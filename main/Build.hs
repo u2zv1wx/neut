@@ -59,37 +59,29 @@ build' (WeakStmtConstDecl _ (_, x, t) cont) = do
   insTypeEnv (Right x) t''
   build' cont
 build' (WeakStmtVisit path ss1 ss2) = do
-  p $ "========VISIT (" <> toFilePath path <> ")============="
   b <- isCacheAvailable path
   if b
     then do
-      acc' <- bypass ss1 -- 引数情報だけ集める (clarify/toLLVM/emitをbypass)
+      acc' <- bypass ss1
       modify (\env -> env {argAcc = acc' ++ (argAcc env)})
       cachePath <- toCacheFilePath path
-      code <- undefined cachePath
+      code <- undefined cachePath -- FIXME: これだとキャッシュを読んだらオブジェクトファイルになってしまう (IRへのパスにするとか？)
       insCachePath cachePath
       cont <- build' ss2
-      -- ここのcodeはfoo.oじゃなくてfoo.llじゃないとダメでは？
       return $ code <> cont
     else do
-      env1 <- get
-      let env1' = env1 {codeEnv = Map.empty, llvmEnv = Map.empty}
-      resultOrErr <- liftIO $ runWithEnv (build' ss1) env1'
-      case resultOrErr of
-        Left err -> throwError err
-        Right (code, env2) -> do
-          compileObject path code
-          updateEnv env1 env2
-          cont <- build' ss2
-          return $ code <> cont
+      snapshot <- get
+      modify (\env -> env {codeEnv = Map.empty, llvmEnv = Map.empty})
+      code <- build' ss1 -- このcodeはLLVM IR
+      compileObject path code -- オブジェクトファイルを構成
+      updateEnv snapshot
+      cont <- build' ss2 -- このcontの結果もあくまでLLVM IR
+      return $ code <> cont -- だからこの結果もちゃんとLLVM IR
 
-updateEnv :: Env -> Env -> WithEnv ()
-updateEnv oldEnv newEnv = do
-  let sc1 = sharedCodeEnv oldEnv
-  let sc2 = sharedCodeEnv newEnv
-  modify (\e -> e {codeEnv = Map.union (codeEnv oldEnv) (codeEnv newEnv)})
-  modify (\e -> e {llvmEnv = Map.union (llvmEnv oldEnv) (llvmEnv newEnv)})
-  modify (\e -> e {sharedCodeEnv = Map.union sc1 sc2})
+updateEnv :: Env -> WithEnv ()
+updateEnv snapshot = do
+  modify (\e -> e {codeEnv = Map.union (codeEnv e) (codeEnv snapshot)})
+  modify (\e -> e {llvmEnv = Map.union (llvmEnv e) (llvmEnv snapshot)})
 
 compileObject :: Path Abs File -> Builder -> WithEnv ()
 compileObject srcPath code = do
