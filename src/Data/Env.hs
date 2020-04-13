@@ -112,6 +112,8 @@ data Env =
     -- external functions that must be declared in LLVM IR
     , declEnv :: Map.HashMap T.Text ([LowType], LowType)
     , nopFreeSet :: S.Set Int
+    , argAcc :: [(Meta, T.Text, TermPlus)]
+    , cachePathList :: [Path Abs File]
     -- , restrictSet :: S.Set T.Text
     -- , finishedSet :: S.Set T.Text
     -- , sharedSet :: S.Set (T.Text, Int)
@@ -163,6 +165,8 @@ initialEnv =
     , zetaEnv = IntMap.empty
     , nameSet = S.empty
     , nopFreeSet = S.empty
+    , argAcc = []
+    , cachePathList = []
     -- , restrictSet = S.empty
     -- , finishedSet = S.empty
     -- , sharedSet =
@@ -187,6 +191,13 @@ evalWithEnv c env = do
   case resultOrErr of
     Left err -> return $ Left err
     Right (result, _) -> return $ Right result
+
+runWithEnv :: WithEnv a -> Env -> IO (Either [Log] (a, Env))
+runWithEnv c env = do
+  resultOrErr <- runExceptT (runStateT c env)
+  case resultOrErr of
+    Left err -> return $ Left err
+    Right (result, e) -> return $ Right (result, e)
 
 newCount :: WithEnv Int
 newCount = do
