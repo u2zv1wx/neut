@@ -14,7 +14,6 @@ import Data.List (nubBy)
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
-import qualified Data.Set as S
 import qualified Data.Text as T
 
 import Clarify.Linearize
@@ -38,10 +37,10 @@ clarify' _ (m, TermPi {}) = returnClosureType m
 clarify' tenv lam@(m, TermPiIntro mxts e) = do
   fvs <- nubFVS <$> chainTermPlus tenv lam
   e' <- clarify' (insTypeEnv1 mxts tenv) e
-  retClosure tenv Nothing fvs m mxts e'
+  retClosure tenv ClsNameAnon fvs m mxts e'
 clarify' tenv (m, TermPiIntroPlus (name, args) mxts e) = do
   e' <- clarify' (insTypeEnv1 mxts tenv) e
-  retClosure tenv (Just $ showInHex name) args m mxts e'
+  retClosure tenv (ClsNameFix $ showInHex name) args m mxts e'
 clarify' tenv (m, TermPiElim e es) = do
   es' <- mapM (clarifyPlus tenv) es
   e' <- clarify' tenv e
@@ -70,7 +69,7 @@ clarify' tenv (m, TermArrayIntro k es) = do
   -- arrayType = Sigma{k} [_ : IMMEDIATE, ..., _ : IMMEDIATE]
   name <- newNameWith' "array"
   let ts = map Left $ replicate (length es) retImmType
-  arrayType <- cartesianSigma name m k ts
+  arrayType <- cartesianSigma (Left name) m k ts
   (zs, es', xs) <- unzip3 <$> mapM (clarifyPlus tenv) es
   return $
     bindLet (zip zs es') $
@@ -122,7 +121,7 @@ constructEnumFVS tenv es = nubFVS <$> concat <$> mapM (chainTermPlus tenv) es
 alignFVS ::
      TypeEnv -> Meta -> [IdentifierPlus] -> [CodePlus] -> WithEnv [CodePlus]
 alignFVS tenv m fvs es = do
-  es' <- mapM (retClosure tenv Nothing fvs m []) es
+  es' <- mapM (retClosure tenv ClsNameAnon fvs m []) es
   mapM (\cls -> callClosure m cls []) es'
 
 clarifyCase ::
@@ -214,11 +213,11 @@ clarifyUnaryOp tenv name op m = do
   case t' of
     (_, TermPi _ [(mx, x, tx)] _) -> do
       let varX = (mx, DataUpsilon x)
-      let name' = showInHex name
-      modify (\env -> env {sharedSet = S.insert (name', 2) (sharedSet env)})
+      -- let name' = showInHex name
+      -- modify (\env -> env {sharedSet = S.insert (name', 2) (sharedSet env)})
       retClosure
         tenv
-        (Just $ showInHex name)
+        (ClsNameShared $ showInHex name)
         []
         m
         [(mx, x, tx)]
@@ -233,11 +232,11 @@ clarifyBinaryOp tenv name op m = do
     (_, TermPi _ [(mx, x, tx), (my, y, ty)] _) -> do
       let varX = (mx, DataUpsilon x)
       let varY = (my, DataUpsilon y)
-      let name' = showInHex name
-      modify (\env -> env {sharedSet = S.insert (name', 3) (sharedSet env)})
+      -- let name' = showInHex name
+      -- modify (\env -> env {sharedSet = S.insert (name', 3) (sharedSet env)})
       retClosure
         tenv
-        (Just $ showInHex name)
+        (ClsNameShared $ showInHex name)
         []
         m
         [(mx, x, tx), (my, y, ty)]
@@ -257,10 +256,10 @@ clarifyArrayAccess tenv m name lowType = do
           [index, arr] -> do
             callThenReturn <- toArrayAccessTail tenv m lowType cod arr index xs
             let body = iterativeApp headerList callThenReturn
-            let name' = showInHex name
-            modify
-              (\env -> env {sharedSet = S.insert (name', 4) (sharedSet env)})
-            retClosure tenv (Just $ showInHex name) [] m xts body
+            -- let name' = showInHex name
+            -- modify
+            --   (\env -> env {sharedSet = S.insert (name', 4) (sharedSet env)})
+            retClosure tenv (ClsNameShared $ showInHex name) [] m xts body
           _ -> raiseCritical m $ "the type of array-access is wrong"
     _ -> raiseCritical m $ "the type of array-access is wrong"
 
@@ -281,11 +280,11 @@ clarifySysCall tenv name syscall args m = do
         let tenv' = insTypeEnv1 xts tenv
         callThenReturn <- toSysCallTail tenv' m cod syscall ds xs
         let body = iterativeApp headerList callThenReturn
-        let name' = showInHex name
-        modify
-          (\env ->
-             env {sharedSet = S.insert (name', length args + 1) (sharedSet env)})
-        retClosure tenv (Just $ showInHex name) [] m xts body
+        -- let name' = showInHex name
+        -- modify
+        --   (\env ->
+        --      env {sharedSet = S.insert (name', length args + 1) (sharedSet env)})
+        retClosure tenv (ClsNameShared $ showInHex name) [] m xts body
     _ -> raiseCritical m $ "the type of " <> name <> " is wrong"
 
 iterativeApp :: [a -> a] -> a -> a
@@ -351,6 +350,12 @@ data Arg
   | ArgArray
   | ArgStruct
   | ArgUnused
+  deriving (Show)
+
+data ClsName
+  = ClsNameAnon
+  | ClsNameFix T.Text
+  | ClsNameShared T.Text
   deriving (Show)
 
 toHeaderInfo ::
@@ -479,7 +484,7 @@ sigToPi m tPi = do
     _ -> raiseCritical m "the type of sigma-intro is wrong"
 
 makeClosure ::
-     Maybe T.Text -- the name of newly created closure
+     ClsName
   -> [(Meta, Identifier, CodePlus)] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
   -> Meta -- meta of lambda
   -> [(Meta, Identifier, CodePlus)] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
@@ -489,32 +494,44 @@ makeClosure mName mxts2 m mxts1 e = do
   let xts1 = dropFst mxts1
   let xts2 = dropFst mxts2
   expName <- newNameWith' "exp"
-  envExp <- cartesianSigma expName m arrVoidPtr $ map Right xts2
-  name <- nameFromMaybe mName
-  registerIfNecessary m name xts1 xts2 e
+  envExp <- cartesianSigma (Left expName) m arrVoidPtr $ map Right xts2
+  -- name <- nameFromMaybe mName
+  name <- registerIfNecessary m mName xts1 xts2 e
   let vs = map (\(mx, x, _) -> (mx, DataUpsilon x)) mxts2
   let fvEnv = (m, sigmaIntro vs)
   return (m, sigmaIntro [envExp, fvEnv, (m, DataConst name)])
 
 registerIfNecessary ::
      Meta
-  -> T.Text
+  -> ClsName
   -> [(Identifier, CodePlus)]
   -> [(Identifier, CodePlus)]
   -> CodePlus
-  -> WithEnv ()
-registerIfNecessary m name xts1 xts2 e = do
-  cenv <- gets codeEnv
-  when (not $ name `Map.member` cenv) $ do
-    e' <- linearize (xts2 ++ xts1) e
-    (envVarName, envVar) <- newDataUpsilonWith m "env"
-    let args = map fst xts1 ++ [envVarName]
-    let body = (m, sigmaElim (map fst xts2) envVar e')
-    insCodeEnv name args body
+  -> WithEnv T.Text
+registerIfNecessary m mName xts1 xts2 e = do
+  (name, inserter, envInfo) <-
+    case mName of
+      ClsNameAnon -> do
+        name <- asText' <$> newNameWith' "thunk"
+        return (name, insCodeEnv, codeEnv)
+      ClsNameFix lamConstName -> return (lamConstName, insCodeEnv, codeEnv)
+      ClsNameShared lamConstName ->
+        return (lamConstName, insSharedCodeEnv, sharedCodeEnv)
+  cenv <- gets envInfo
+  -- when (not $ name `Map.member` cenv) $ do
+  if (name `Map.member` cenv)
+    then return name
+    else do
+      e' <- linearize (xts2 ++ xts1) e
+      (envVarName, envVar) <- newDataUpsilonWith m "env"
+      let args = map fst xts1 ++ [envVarName]
+      let body = (m, sigmaElim (map fst xts2) envVar e')
+      inserter name args body
+      return name
 
 makeClosure' ::
      TypeEnv
-  -> Maybe T.Text -- the name of newly created closure
+  -> ClsName -- the name of newly created closure
   -> [IdentifierPlus] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
   -> Meta -- meta of lambda
   -> [IdentifierPlus] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
@@ -527,7 +544,7 @@ makeClosure' tenv mName fvs m xts e = do
 
 retClosure ::
      TypeEnv
-  -> Maybe T.Text -- the name of newly created closure
+  -> ClsName -- the name of newly created closure
   -> [IdentifierPlus] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
   -> Meta -- meta of lambda
   -> [IdentifierPlus] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
@@ -546,7 +563,7 @@ retClosureFix ::
   -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
   -> WithEnv CodePlus
 retClosureFix tenv x fvs m xts e = do
-  cls <- makeClosure' tenv (Just $ asText'' x) fvs m xts e
+  cls <- makeClosure' tenv (ClsNameFix $ asText'' x) fvs m xts e
   knot m x cls
   return (m, CodeUpIntro cls)
 
@@ -567,12 +584,12 @@ callClosure m e zexes = do
           clsVar
           (m, CodePiElimDownElim lamVar (xs ++ [envVar])))
 
-nameFromMaybe :: Maybe T.Text -> WithEnv T.Text
-nameFromMaybe mName =
-  case mName of
-    Just lamConstName -> return lamConstName
-    Nothing -> asText' <$> newNameWith' "thunk"
-
+-- nameFromMaybe :: ClsName -> WithEnv T.Text
+-- nameFromMaybe mName =
+--   case mName of
+--     ClsNameAnon -> asText' <$> newNameWith' "thunk"
+--     ClsNameFix lamConstName -> return lamConstName
+--     ClsNameShared lamConstName -> return lamConstName
 chainTermPlus :: TypeEnv -> TermPlus -> WithEnv [IdentifierPlus]
 chainTermPlus _ (_, TermTau) = return []
 chainTermPlus tenv (m, TermUpsilon x) = do

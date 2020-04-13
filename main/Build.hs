@@ -99,6 +99,33 @@ build' current acc (WeakStmtBOF path cont) = do
       build' current (acc' ++ acc) cont'
     else do
       build' ("" : current) acc cont
+build' _ acc (WeakStmtEOF path (WeakStmtReturn e)) = do
+  p $ "========LAST-EOF (" <> toFilePath path <> ")============="
+  (e', _) <- infer e
+  analyze >> synthesize >> refine
+  e'' <- elaborate e' >>= bind acc
+  e''' <- clarify e''
+  cenv <- gets codeEnv
+  scenv <- gets sharedCodeEnv
+  modify (\env -> env {codeEnv = Map.union scenv cenv})
+  code <- toLLVM e''' >>= emit
+  header <- emitDeclarations
+  let code' = toLazyByteString $ header <> "\n" <> code
+  -- ここはspawnして最後に待つ感じにしたい
+  cachePath <- toCacheFilePath path
+  tmpOutputPath <- setFileExtension "ll" cachePath
+  liftIO $ L.writeFile (toFilePath tmpOutputPath) code'
+  liftIO $
+    callProcess
+      "clang"
+      [ "-c"
+      , toFilePath tmpOutputPath
+      , "-Wno-override-module"
+      , "-o" ++ toFilePath cachePath
+      ]
+  removeFile tmpOutputPath
+  _ <- error "stop"
+  elaborate e' >>= bind acc >>= clarify >>= toLLVM >>= emit
 build' current acc (WeakStmtEOF path cont) = do
   p $ "========EOF (" <> toFilePath path <> ")============="
   case current of
@@ -106,9 +133,10 @@ build' current acc (WeakStmtEOF path cont) = do
       modify (\env -> env {codeEnv = Map.empty})
       modify (\env -> env {llvmEnv = Map.empty})
       build' [] acc cont
-    (code:codeList) -> do
+    (_:codeList) -> do
       cachePath <- toCacheFilePath path
       tmpOutputPath <- setFileExtension "ll" cachePath
+      code <- toLLVM' >> emit'
       header <- emitDeclarations
       let code' = toLazyByteString $ header <> "\n" <> code
       -- ここはspawnして最後に待つ感じにしたい
@@ -122,9 +150,10 @@ build' current acc (WeakStmtEOF path cont) = do
           , "-o" ++ toFilePath cachePath
           ]
       removeFile tmpOutputPath
+      -- sharedCodeEnvは保持
       modify (\env -> env {codeEnv = Map.empty})
       modify (\env -> env {llvmEnv = Map.empty})
-      build' codeList acc cont -- ここでcodeをco
+      build' codeList acc cont
 
 -- 当該pathから計算されるパスにキャッシュが存在して、かつそのキャッシュのlast modifiedがソースファイルの
 -- last modifiedよりも新しければcache利用可能。（依存関係も計算）
@@ -198,14 +227,15 @@ build'' mx x current acc e t cont = do
   t' <- reduceTermPlus <$> elaborate t
   insTypeEnv (Right x) t'
   modify (\env -> env {cacheEnv = Map.insert x (Left e') (cacheEnv env)})
-  llvm <- clarify e' >>= insCodeEnv (showInHex x) [] >> toLLVM' >> emit'
-  cont' <- build' (concatToHead llvm current) ((mx, x, t') : acc) cont
-  return $ llvm <> "\n" <> cont'
+  -- llvm <- clarify e' >>= insCodeEnv (showInHex x) [] >> toLLVM' >> emit'
+  clarify e' >>= insCodeEnv (showInHex x) []
+  build' current ((mx, x, t') : acc) cont
+  -- cont' <- build' (concatToHead llvm current) ((mx, x, t') : acc) cont
+  -- return $ llvm <> "\n" <> cont'
 
-concatToHead :: Builder -> [Builder] -> [Builder]
-concatToHead x [] = [x]
-concatToHead x (y:ys) = (y <> "\n" <> x : ys)
-
+-- concatToHead :: Builder -> [Builder] -> [Builder]
+-- concatToHead x [] = [x]
+-- concatToHead x (y:ys) = (y <> "\n" <> x : ys)
 bypass' ::
      Path Abs File
   -> Meta

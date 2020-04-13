@@ -51,37 +51,36 @@ emit' = do
   lenv <- gets llvmEnv
   xs <-
     forM (HashMap.toList lenv) $ \(name, (args, body)) -> do
-      whenNotFinished name $ do
-        modify (\env -> env {finishedSet = S.insert name (finishedSet env)})
-        let args' = map (showLLVMData . LLVMDataLocal) args
-        modify (\env -> env {defVarSet = S.fromList $ map asInt args})
-        body' <- reduceLLVM IntMap.empty Map.empty body
-        emitDefinition "i8*" (TE.encodeUtf8Builder name) args' body'
+      let args' = map (showLLVMData . LLVMDataLocal) args
+      modify (\env -> env {defVarSet = S.fromList $ map asInt args})
+      body' <- reduceLLVM IntMap.empty Map.empty body
+      emitDefinition "i8*" (TE.encodeUtf8Builder name) args' body'
   return $ unlinesL $ concat xs
-
-whenNotFinished :: T.Text -> WithEnv [a] -> WithEnv [a]
-whenNotFinished name f = do
-  set1 <- gets finishedSet
-  set2 <- gets sharedSet
-  if S.member name set1 || S.member name (S.map fst set2)
-    then return []
-    else f
+      -- whenNotFinished name $ do
+        -- modify (\env -> env {finishedSet = S.insert name (finishedSet env)})
   -- lenv <- gets llvmEnv
   -- if Map.member name lenv
   --   then return ()
   --   else f
 
+-- whenNotFinished :: T.Text -> WithEnv [a] -> WithEnv [a]
+-- whenNotFinished name f = do
+--   set1 <- gets finishedSet
+--   set2 <- gets sharedSet
+--   if S.member name set1 || S.member name (S.map fst set2)
+--     then return []
+--     else f
 emitDeclarations :: WithEnv Builder
 emitDeclarations = do
   denv <- HashMap.toList <$> gets declEnv
-  sharedDecls <- toResDecl
-  return $ unlinesL $ map declToBuilder $ denv ++ sharedDecls
+  return $ unlinesL $ map declToBuilder denv
+  -- sharedDecls <- toResDecl
+  -- return $ unlinesL $ map declToBuilder $ denv ++ sharedDecls
 
-toResDecl :: WithEnv [(T.Text, ([LowType], LowType))]
-toResDecl = do
-  set <- gets sharedSet
-  return $ map (\(x, i) -> (x, (replicate i voidPtr, voidPtr))) $ S.toList set
-
+-- toResDecl :: WithEnv [(T.Text, ([LowType], LowType))]
+-- toResDecl = do
+--   set <- gets sharedSet
+--   return $ map (\(x, i) -> (x, (replicate i voidPtr, voidPtr))) $ S.toList set
 declToBuilder :: (T.Text, ([LowType], LowType)) -> Builder
 declToBuilder (name, (dom, cod)) = do
   let name' = TE.encodeUtf8Builder name

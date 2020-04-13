@@ -37,19 +37,18 @@ toLLVM' :: WithEnv ()
 toLLVM' = do
   cenv <- Map.toList <$> gets codeEnv
   forM_ cenv $ \(name, Definition _ args e) -> do
-    whenNotFinished name $ do
-      e' <- reduceCodePlus e
-      e'' <- llvmCode e'
-      insLLVMEnv name args e''
+    e' <- reduceCodePlus e
+    e'' <- llvmCode e'
+    insLLVMEnv name args e''
 
-whenNotFinished :: T.Text -> WithEnv () -> WithEnv ()
-whenNotFinished name f = do
-  lenv <- gets llvmEnv
-  set <- gets sharedSet
-  if Map.member name lenv || S.member name (S.map fst set)
-    then return ()
-    else f
-
+-- whenNotFinished name $ do
+-- whenNotFinished :: T.Text -> WithEnv () -> WithEnv ()
+-- whenNotFinished name f = do
+--   lenv <- gets llvmEnv
+--   set <- gets sharedSet
+--   if Map.member name lenv || S.member name (S.map fst set)
+--     then return ()
+--     else f
 llvmCode :: CodePlus -> WithEnv LLVM
 llvmCode (m, CodeConst theta) = llvmCodeConst m theta
 llvmCode (_, CodePiElimDownElim v ds) = do
@@ -290,28 +289,35 @@ llvmUncastLet x@(I (s, _)) d lowType cont = do
 llvmDataLet :: Identifier -> DataPlus -> LLVM -> WithEnv LLVM
 llvmDataLet x (m, DataConst y) cont = do
   cenv <- gets codeEnv
-  case Map.lookup y cenv of
-    Nothing -> do
+  scenv <- gets sharedCodeEnv
+  case (Map.lookup y cenv, Map.lookup y scenv) of
+    (Just (Definition _ args _), _) -> do
+      llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
+    (_, Just (Definition _ args _)) -> do
+      let argType = map (const voidPtr) args
+      denv <- gets declEnv
+      modify (\env -> env {declEnv = Map.insert y (argType, voidPtr) denv})
+      llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
+    (Nothing, Nothing) -> do
       mt <- lookupTypeEnvMaybe (Right y)
       case mt of
-        Nothing
-          -- raiseCritical m $ "no such external constant defined: " <> y
-         -> do
-          denv <- gets declEnv
-          modify (\env -> env {declEnv = Map.insert y ([], voidPtr) denv})
-          llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType []) cont
         Just (_, TermPi _ xts _) -> do
           let y' = "llvm_" <> y -- ここのprefixは設定できるようにしてもよさそう
           denv <- gets declEnv
           let argType = map (const voidPtr) xts
           modify (\env -> env {declEnv = Map.insert y' (argType, voidPtr) denv})
           llvmUncastLet x (LLVMDataGlobal y') (toFunPtrType xts) cont
+        Nothing -> do
+          denv <- gets declEnv
+          modify (\env -> env {declEnv = Map.insert y ([], voidPtr) denv})
+          -- sharedCodeEnvにもcodeEnvにも入っておらず、かつ型情報も見つからないのは、
+          -- すでに定義されているトップレベルの定数。……ここ、あんまり美しく
+          -- ないような気がする。
+          llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType []) cont
         Just t -> do
           raiseError m $
             "external constants must have pi-type, but the type of `" <>
             y <> "` is:\n" <> toText (weaken t)
-    Just (Definition _ args _) -> do
-      llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
 llvmDataLet x (_, DataUpsilon y) cont =
   llvmUncastLet x (LLVMDataLocal y) voidPtr cont
 llvmDataLet x (m, DataSigmaIntro k ds) cont = do

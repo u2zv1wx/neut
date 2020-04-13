@@ -101,6 +101,7 @@ data Env =
     , cacheEnv :: Map.HashMap T.Text (Either TermPlus CodePlus)
     -- f ~> thunk (lam (x1 ... xn) e)
     , codeEnv :: Map.HashMap T.Text Definition
+    , sharedCodeEnv :: Map.HashMap T.Text Definition
     , nameSet :: S.Set T.Text
     , chainEnv :: IntMap.IntMap ([Data.Term.IdentifierPlus], TermPlus)
     --
@@ -111,9 +112,9 @@ data Env =
     -- external functions that must be declared in LLVM IR
     , declEnv :: Map.HashMap T.Text ([LowType], LowType)
     , nopFreeSet :: S.Set Int
-    , restrictSet :: S.Set T.Text
-    , finishedSet :: S.Set T.Text
-    , sharedSet :: S.Set (T.Text, Int)
+    -- , restrictSet :: S.Set T.Text
+    -- , finishedSet :: S.Set T.Text
+    -- , sharedSet :: S.Set (T.Text, Int)
     }
 
 initialEnv :: Env
@@ -147,6 +148,7 @@ initialEnv =
     , typeEnv = Map.empty
     , cacheEnv = Map.empty
     , codeEnv = Map.empty
+    , sharedCodeEnv = Map.empty
     , chainEnv = IntMap.empty
     , llvmEnv = Map.empty
     , defVarSet = S.empty
@@ -161,15 +163,15 @@ initialEnv =
     , zetaEnv = IntMap.empty
     , nameSet = S.empty
     , nopFreeSet = S.empty
-    , restrictSet = S.empty
-    , finishedSet = S.empty
-    , sharedSet =
-        S.fromList
-          [ ("cartesian-immediate", 2)
-          , ("cartesian-struct", 2)
-          , ("cartesian-array-closure-0", 2)
-          , ("cartesian-closure-0", 2)
-          ]
+    -- , restrictSet = S.empty
+    -- , finishedSet = S.empty
+    -- , sharedSet =
+    --     S.fromList
+    --       [ ("cartesian-immediate", 2)
+    --       , ("cartesian-struct", 2)
+    --       , ("cartesian-array-closure-0", 2)
+    --       , ("cartesian-closure-0", 2)
+    --       ]
     }
 
 type WithEnv a = StateT Env (ExceptT [Log] IO) a

@@ -11,6 +11,7 @@ import Control.Monad.State
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
+import qualified Data.Text as T
 
 import Clarify.Linearize
 import Clarify.Utility
@@ -19,12 +20,12 @@ import Data.Code
 import Data.Env
 
 cartesianSigma ::
-     Identifier
+     Either Identifier T.Text
   -> Meta
   -> ArrayKind
   -> [Either CodePlus (Identifier, CodePlus)]
   -> WithEnv DataPlus
-cartesianSigma (I (thetaName, i)) m k mxts = do
+cartesianSigma (Left (I (thetaName, i))) m k mxts = do
   cenv <- gets codeEnv
   let ident = asText' $ I ("cartesian-" <> thetaName, i)
   let theta = (m, DataConst ident)
@@ -37,6 +38,25 @@ cartesianSigma (I (thetaName, i)) m k mxts = do
       rel <- relevantSigma argVar m k mxts
       insCodeEnv
         ident
+        [switchVarName, argVarName]
+        ( m
+        , CodeEnumElim
+            (IntMap.fromList [(asInt argVarName, argVar)])
+            switchVar
+            (switch aff rel))
+      return theta
+cartesianSigma (Right name) m k mxts = do
+  cenv <- gets codeEnv
+  let theta = (m, DataConst name)
+  case Map.lookup name cenv of
+    Just _ -> return theta
+    Nothing -> do
+      (switchVarName, switchVar) <- newDataUpsilonWith m "switch"
+      (argVarName, argVar) <- newDataUpsilonWith m "argsig"
+      aff <- affineSigma argVar m k mxts
+      rel <- relevantSigma argVar m k mxts
+      insSharedCodeEnv
+        name
         [switchVarName, argVarName]
         ( m
         , CodeEnumElim
@@ -151,7 +171,8 @@ returnArrayType m = do
   retImmType <- returnCartesianImmediate m
   t <-
     cartesianSigma
-      (I ("array-closure", 0))
+      -- (I ("array-closure", 0))
+      (Right "cartesian-array")
       m
       arrVoidPtr
       [Right (arr, retImmType), Left (m, CodeUpIntro arrVar)]
@@ -163,7 +184,8 @@ returnClosureType m = do
   retImmType <- returnCartesianImmediate m
   t <-
     cartesianSigma
-      (I ("closure", 0))
+      -- (I ("closure", 0))
+      (Right "cartesian-closure")
       m
       arrVoidPtr
       [Right (env, retImmType), Left (m, CodeUpIntro envVar), Left retImmType]

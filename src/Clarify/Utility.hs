@@ -77,7 +77,7 @@ cartesianImmediate m = do
       (argVarName, argVar) <- newDataUpsilonWith m "argimm"
       aff <- affineImmediate argVar
       rel <- relevantImmediate argVar
-      insCodeEnv
+      insSharedCodeEnv
         ident
         [switchVarName, argVarName]
         ( m
@@ -105,7 +105,7 @@ cartesianStruct m ks = do
       (argVarName, argVar) <- newDataUpsilonWith m "argstruct"
       aff <- affineStruct argVar ks
       rel <- relevantStruct argVar ks
-      insCodeEnv
+      insSharedCodeEnv
         ident
         [switchVarName, argVarName]
         ( m
@@ -138,3 +138,8 @@ insCodeEnv :: T.Text -> [Identifier] -> CodePlus -> WithEnv ()
 insCodeEnv name args e = do
   let def = Definition (IsFixed False) args e
   modify (\env -> env {codeEnv = Map.insert name def (codeEnv env)})
+
+insSharedCodeEnv :: T.Text -> [Identifier] -> CodePlus -> WithEnv ()
+insSharedCodeEnv name args e = do
+  let def = Definition (IsFixed False) args e
+  modify (\env -> env {sharedCodeEnv = Map.insert name def (sharedCodeEnv env)})
