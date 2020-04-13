@@ -31,7 +31,6 @@ import Reduce.WeakTerm
 build :: WeakStmt -> WithEnv L.ByteString
 build stmt = do
   llvm <- build' stmt
-  p "done"
   g <- emitDeclarations
   return $ toLazyByteString $ g <> "\n" <> llvm
 
@@ -73,14 +72,14 @@ build' (WeakStmtVisit path ss1 ss2) = do
       -- ここのcodeはfoo.oじゃなくてfoo.llじゃないとダメでは？
       return $ code <> cont
     else do
-      e1 <- get
-      let e1' = e1 {codeEnv = Map.empty}
-      resultOrErr <- liftIO $ runWithEnv (build' ss1) e1'
+      env1 <- get
+      let env1' = env1 {codeEnv = Map.empty, llvmEnv = Map.empty}
+      resultOrErr <- liftIO $ runWithEnv (build' ss1) env1'
       case resultOrErr of
         Left err -> throwError err
-        Right (code, e2) -> do
+        Right (code, env2) -> do
           compileObject path code
-          updateEnv e1 e2
+          updateEnv env1 env2
           cont <- build' ss2
           return $ code <> cont
 
@@ -89,6 +88,7 @@ updateEnv oldEnv newEnv = do
   let sc1 = sharedCodeEnv oldEnv
   let sc2 = sharedCodeEnv newEnv
   modify (\e -> e {codeEnv = Map.union (codeEnv oldEnv) (codeEnv newEnv)})
+  modify (\e -> e {llvmEnv = Map.union (llvmEnv oldEnv) (llvmEnv newEnv)})
   modify (\e -> e {sharedCodeEnv = Map.union sc1 sc2})
 
 compileObject :: Path Abs File -> Builder -> WithEnv ()
@@ -113,42 +113,6 @@ insCachePath :: Path Abs File -> WithEnv ()
 insCachePath path =
   modify (\env -> env {cachePathList = path : (cachePathList env)})
 
--- build' acc (WeakStmtBOF path cont) = do
---   p $ "========BOF (" <> toFilePath path <> ")============="
---   b <- isCacheAvailable path
---   if b
---     then do
---       (cont', acc') <- bypass path cont
---       modify (\env -> env {codeEnv = Map.empty})
---       modify (\env -> env {llvmEnv = Map.empty})
---       _ <- toCacheFilePath path
---       build' (acc' ++ acc) cont'
---     else do
---       build' acc cont -- ここでevalWithEnvでcodeEnv = emptyでrunするのが正解っぽい？
--- build' _ (WeakStmtEOF path (WeakStmtReturn _)) = do
---   p $ "========LAST-EOF (" <> toFilePath path <> ")============="
---   error "stop"
--- build' acc (WeakStmtEOF path cont) = do
---   p $ "========EOF (" <> toFilePath path <> ")============="
---   cachePath <- toCacheFilePath path
---   tmpOutputPath <- setFileExtension "ll" cachePath
---   code <- toLLVM' >> emit'
---   header <- emitDeclarations
---   let code' = toLazyByteString $ header <> "\n" <> code
---   liftIO $ L.writeFile (toFilePath tmpOutputPath) code'
---   liftIO $
---     callProcess
---       "clang"
---       [ "-c"
---       , toFilePath tmpOutputPath
---       , "-Wno-override-module"
---       , "-o" ++ toFilePath cachePath
---       ]
---   removeFile tmpOutputPath
---   -- sharedCodeEnvは保持
---   modify (\env -> env {codeEnv = Map.empty}) -- ここは修正必要？
---   modify (\env -> env {llvmEnv = Map.empty})
---   build' acc cont
 build'' ::
      Meta
   -> T.Text
@@ -220,7 +184,6 @@ bypass' mx x e t cont = do
   acc <- bypass cont
   return $ (mx, x, t') : acc
 
--- accにはコード末尾で定義されたものほどリストの最初の方に出現するようになっているので修正が必要
 bind :: [(Meta, T.Text, TermPlus)] -> TermPlus -> WithEnv TermPlus
 bind [] e = return e
 bind ((m, c, t):cts) e = do
