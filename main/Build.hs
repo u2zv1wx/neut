@@ -29,10 +29,14 @@ import LLVM
 import Reduce.Term
 import Reduce.WeakTerm
 
-build :: Path Abs File -> WeakStmt -> WithEnv ()
+build :: Path Abs File -> WeakStmt -> WithEnv [Path Abs File]
 build mainFilePath stmt = do
   llvm <- build' stmt
+  -- p "main-compile-object. codeenv:"
+  -- cenv <- gets codeEnv
+  -- p' $ Map.keys cenv
   compileObject mainFilePath llvm
+  gets cachePathList
 
 link :: Path Abs File -> [Path Abs File] -> IO ()
 link outputPath pathList = do
@@ -71,23 +75,24 @@ build' (WeakStmtVisit path ss1 ss2) = do
       acc' <- bypass ss1
       modify (\env -> env {argAcc = acc' ++ (argAcc env)})
       cachePath <- toCacheFilePath path
-      code <- undefined cachePath -- FIXME: これだとキャッシュを読んだらオブジェクトファイルになってしまう (IRへのパスにするとか？)
       insCachePath cachePath
-      cont <- build' ss2
-      return $ code <> cont
+      build' ss2
     else do
       snapshot <- get
       modify (\env -> env {codeEnv = Map.empty, llvmEnv = Map.empty})
-      code <- build' ss1 -- このcodeはLLVM IR
+      code <- build' ss1 -- このcodeはLLVM IR. StmtReturnに由来するやつ。
+      note'' $ "compiling " <> T.pack (toFilePath path) <> " ... "
       compileObject path code -- オブジェクトファイルを構成
-      updateEnv snapshot
-      cont <- build' ss2 -- このcontの結果もあくまでLLVM IR
-      return $ code <> cont -- だからこの結果もちゃんとLLVM IR
+      revertEnv snapshot
+      build' ss2 -- このcontの結果もあくまでLLVM IR
 
-updateEnv :: Env -> WithEnv ()
-updateEnv snapshot = do
-  modify (\e -> e {codeEnv = Map.union (codeEnv e) (codeEnv snapshot)})
-  modify (\e -> e {llvmEnv = Map.union (llvmEnv e) (llvmEnv snapshot)})
+revertEnv :: Env -> WithEnv ()
+revertEnv snapshot = do
+  modify (\e -> e {codeEnv = codeEnv snapshot})
+  modify (\e -> e {llvmEnv = llvmEnv snapshot})
+  modify (\e -> e {declEnv = declEnv snapshot})
+  -- modify (\e -> e {codeEnv = Map.union (codeEnv e) (codeEnv snapshot)})
+  -- modify (\e -> e {llvmEnv = Map.union (llvmEnv e) (llvmEnv snapshot)})
 
 compileObject :: Path Abs File -> Builder -> WithEnv ()
 compileObject srcPath code = do
@@ -104,7 +109,8 @@ compileObject srcPath code = do
       , "-Wno-override-module"
       , "-o" ++ toFilePath cachePath
       ]
-  removeFile tmpOutputPath
+  -- removeFile tmpOutputPath
+  liftIO $ putStrLn "done."
   insCachePath cachePath
 
 insCachePath :: Path Abs File -> WithEnv ()
@@ -119,6 +125,7 @@ build'' ::
   -> WeakStmt
   -> WithEnv Builder
 build'' mx x e t cont = do
+  p' x
   analyze >> synthesize >> refine >> cleanup
   e' <- reduceTermPlus <$> elaborate e
   t' <- reduceTermPlus <$> elaborate t

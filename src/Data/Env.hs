@@ -180,6 +180,13 @@ initialEnv =
 
 type WithEnv a = StateT Env (ExceptT [Log] IO) a
 
+initialDeclEnv :: Map.HashMap T.Text ([LowType], LowType)
+initialDeclEnv =
+  Map.fromList
+    [ ("malloc", ([LowTypeIntS 64], voidPtr))
+    , ("free", ([voidPtr], LowTypeVoid))
+    ]
+
 whenCheck :: WithEnv () -> WithEnv ()
 whenCheck f = do
   b <- gets isCheck
@@ -446,6 +453,12 @@ note' str = do
   b <- gets shouldColorize
   eoe <- gets endOfEntry
   liftIO $ outputLog b eoe $ logInfo' str
+
+note'' :: T.Text -> WithEnv ()
+note'' str = do
+  b <- gets shouldColorize
+  eoe <- gets endOfEntry
+  liftIO $ outputLog b "" $ logInfo' str
 
 warn :: PosInfo -> T.Text -> WithEnv ()
 warn pos str = do

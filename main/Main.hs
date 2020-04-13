@@ -4,13 +4,14 @@ module Main
   ( main
   ) where
 
-import Control.Monad.State
+-- import Control.Monad.State
 import Options.Applicative
 import Path
 import Path.IO
 import System.Directory (listDirectory)
 import System.Exit
-import System.Process
+
+-- import System.Process
 import Text.Read (readMaybe)
 
 import qualified Codec.Archive.Tar as Tar
@@ -165,7 +166,10 @@ run (Build inputPathStr mOutputPathStr outputKind) = do
   outputPath <- constructOutputPath basename mOutputPath outputKind
   case resultOrErr of
     Left err -> seqIO (map (outputLog True "") err) >> exitWith (ExitFailure 1)
-    Right result -> writeResult result outputPath outputKind
+    -- Right result -> do
+    --   writeResult result outputPath outputKind
+    Right pathList -> link outputPath pathList
+      -- writeResult result outputPath outputKind
 run (Check inputPathStr colorizeFlag eoe) = do
   inputPath <- resolveFile' inputPathStr
   resultOrErr <-
@@ -206,20 +210,19 @@ constructOutputArchivePath inputPath Nothing = do
   outputPath <.> "tar.gz"
 constructOutputArchivePath _ (Just path) = return path
 
-writeResult :: L.ByteString -> Path Abs File -> OutputKind -> IO ()
-writeResult result outputPath OutputKindLLVM = do
-  L.writeFile (toFilePath outputPath) result
-writeResult result outputPath OutputKindObject = do
-  tmpOutputPath <- liftIO $ outputPath <.> "ll"
-  let tmpOutputPathStr = toFilePath tmpOutputPath
-  L.writeFile tmpOutputPathStr result
-  callProcess
-    "clang"
-    [tmpOutputPathStr, "-Wno-override-module", "-o" ++ toFilePath outputPath]
-  removeFile tmpOutputPath
-
-runBuild :: Path Abs File -> WithEnv L.ByteString
-runBuild inputPath = parse inputPath >>= build
+-- writeResult :: L.ByteString -> Path Abs File -> OutputKind -> IO ()
+-- writeResult result outputPath OutputKindLLVM = do
+--   L.writeFile (toFilePath outputPath) result
+-- writeResult result outputPath OutputKindObject = do
+--   tmpOutputPath <- liftIO $ outputPath <.> "ll"
+--   let tmpOutputPathStr = toFilePath tmpOutputPath
+--   L.writeFile tmpOutputPathStr result
+--   callProcess
+--     "clang"
+--     [tmpOutputPathStr, "-Wno-override-module", "-o" ++ toFilePath outputPath]
+--   removeFile tmpOutputPath
+runBuild :: Path Abs File -> WithEnv [Path Abs File]
+runBuild inputPath = parse inputPath >>= build inputPath
 
 runCheck :: Path Abs File -> WithEnv ()
 runCheck inputPath = parse inputPath >>= check
