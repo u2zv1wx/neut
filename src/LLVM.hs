@@ -293,7 +293,9 @@ llvmDataLet x (m, DataConst y) cont = do
     Nothing -> do
       mt <- lookupTypeEnvMaybe (Right y)
       case mt of
-        Nothing -> llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType []) cont
+        Nothing -> do
+          raiseCritical m $ "no such external constant defined: " <> y
+          -- llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType []) cont
         Just (_, TermPi _ xts _) -> do
           let y' = "llvm_" <> y -- ここのprefixは設定できるようにしてもよさそう
           denv <- gets declEnv
@@ -304,7 +306,7 @@ llvmDataLet x (m, DataConst y) cont = do
           raiseError m $
             "external constants must have pi-type, but the type of `" <>
             y <> "` is:\n" <> toText (weaken t)
-    Just (Definition _ args _) ->
+    Just (Definition _ args _) -> do
       llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
 llvmDataLet x (_, DataUpsilon y) cont =
   llvmUncastLet x (LLVMDataLocal y) voidPtr cont
