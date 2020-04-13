@@ -31,30 +31,30 @@ import Reduce.WeakTerm
 
 build :: WeakStmt -> WithEnv L.ByteString
 build stmt = do
-  llvm <- build' [] [] stmt
+  llvm <- build' [] stmt
   p "done"
   g <- emitDeclarations
   return $ toLazyByteString $ g <> "\n" <> llvm
 
-build' :: [Builder] -> [(Meta, T.Text, TermPlus)] -> WeakStmt -> WithEnv Builder
-build' _ acc (WeakStmtReturn e) = do
+build' :: [(Meta, T.Text, TermPlus)] -> WeakStmt -> WithEnv Builder
+build' acc (WeakStmtReturn e) = do
   p "compiling last term"
   (e', _) <- infer e
   analyze >> synthesize >> refine
   elaborate e' >>= bind acc >>= clarify >>= toLLVM >>= emit
-build' current acc (WeakStmtLet _ (mx, x, t) e cont) = do
+build' acc (WeakStmtLet _ (mx, x, t) e cont) = do
   p "----------------------"
   p' x
   (e', te) <- infer e
   t' <- inferType t
   insConstraintEnv te t'
-  build'' mx x current acc e' t' cont
-build' current acc (WeakStmtLetWT _ (mx, x, t) e cont) = do
+  build'' mx x acc e' t' cont
+build' acc (WeakStmtLetWT _ (mx, x, t) e cont) = do
   p "----------------------"
   p' x
   t' <- inferType t
-  build'' mx x current acc e t' cont
-build' current acc (WeakStmtVerify m e cont) = do
+  build'' mx x acc e t' cont
+build' acc (WeakStmtVerify m e cont) = do
   whenCheck $ do
     (e', _) <- infer e
     e'' <- elaborate e'
@@ -63,8 +63,8 @@ build' current acc (WeakStmtVerify m e cont) = do
     stop <- liftIO $ getCurrentTime
     let sec = showFloat' (realToFrac $ diffUTCTime stop start :: Float)
     note m $ "verification succeeded (" <> T.pack sec <> " seconds)"
-  build' current acc cont
-build' current acc (WeakStmtImplicit m x idxList cont) = do
+  build' acc cont
+build' acc (WeakStmtImplicit m x idxList cont) = do
   t <- lookupTypeEnv m (Right x) x
   case t of
     (_, TermPi _ xts _) -> do
@@ -72,7 +72,7 @@ build' current acc (WeakStmtImplicit m x idxList cont) = do
         Nothing -> do
           ienv <- gets impEnv
           modify (\env -> env {impEnv = Map.insertWith (++) x idxList ienv})
-          build' current acc cont
+          build' acc cont
         Just idx -> do
           raiseError m $
             "the specified index `" <>
@@ -81,13 +81,13 @@ build' current acc (WeakStmtImplicit m x idxList cont) = do
       raiseError m $
       "the type of " <>
       x <> " must be a Pi-type, but is:\n" <> toText (weaken t)
-build' current acc (WeakStmtConstDecl _ (_, x, t) cont) = do
+build' acc (WeakStmtConstDecl _ (_, x, t) cont) = do
   t' <- inferType t
   analyze >> synthesize >> refine >> cleanup
   t'' <- reduceTermPlus <$> elaborate t'
   insTypeEnv (Right x) t''
-  build' current acc cont
-build' current acc (WeakStmtBOF path cont) = do
+  build' acc cont
+build' acc (WeakStmtBOF path cont) = do
   p $ "========BOF (" <> toFilePath path <> ")============="
   b <- isCacheAvailable path
   if b
@@ -96,24 +96,26 @@ build' current acc (WeakStmtBOF path cont) = do
       modify (\env -> env {codeEnv = Map.empty})
       modify (\env -> env {llvmEnv = Map.empty})
       _ <- toCacheFilePath path
-      build' current (acc' ++ acc) cont'
+      build' (acc' ++ acc) cont'
     else do
-      build' ("" : current) acc cont
-build' _ acc (WeakStmtEOF path (WeakStmtReturn e)) = do
+      build' acc cont -- ここでevalWithEnvでcodeEnv = emptyでrunするのが正解っぽい？
+      -- そうすると全てのファイルがmain fileであるかのように扱われることになる？
+      -- 現在注目中のpathのEOFが出てくるまで続ける、みたいな？
+      -- それ結局Stmtのほうにネスト構造を反映させろって話にならない？
+      -- つまりWeakStmtOtherFile Stmt Stmtみたいな感じで。
+      -- 第1引数のほうもreturnで終了するわけだけど、ここがEOFに対応する、と。
+      -- それ、たとえばcheckのほうはどうなる？前のstmtを全部チェックしてから後ろのStmtをチェックするだけか。
+      -- このときはそれぞれのファイルの末尾にreturn 0が入ってるって理解になるわけですね。
+build' _ (WeakStmtEOF path (WeakStmtReturn _)) = do
   p $ "========LAST-EOF (" <> toFilePath path <> ")============="
-  (e', _) <- infer e
-  analyze >> synthesize >> refine
-  e'' <- elaborate e' >>= bind acc
-  e''' <- clarify e''
-  cenv <- gets codeEnv
-  scenv <- gets sharedCodeEnv
-  modify (\env -> env {codeEnv = Map.union scenv cenv})
-  code <- toLLVM e''' >>= emit
-  header <- emitDeclarations
-  let code' = toLazyByteString $ header <> "\n" <> code
-  -- ここはspawnして最後に待つ感じにしたい
+  error "stop"
+build' acc (WeakStmtEOF path cont) = do
+  p $ "========EOF (" <> toFilePath path <> ")============="
   cachePath <- toCacheFilePath path
   tmpOutputPath <- setFileExtension "ll" cachePath
+  code <- toLLVM' >> emit'
+  header <- emitDeclarations
+  let code' = toLazyByteString $ header <> "\n" <> code
   liftIO $ L.writeFile (toFilePath tmpOutputPath) code'
   liftIO $
     callProcess
@@ -124,36 +126,27 @@ build' _ acc (WeakStmtEOF path (WeakStmtReturn e)) = do
       , "-o" ++ toFilePath cachePath
       ]
   removeFile tmpOutputPath
-  _ <- error "stop"
-  elaborate e' >>= bind acc >>= clarify >>= toLLVM >>= emit
-build' current acc (WeakStmtEOF path cont) = do
-  p $ "========EOF (" <> toFilePath path <> ")============="
-  case current of
-    [] -> do
-      modify (\env -> env {codeEnv = Map.empty})
-      modify (\env -> env {llvmEnv = Map.empty})
-      build' [] acc cont
-    (_:codeList) -> do
-      cachePath <- toCacheFilePath path
-      tmpOutputPath <- setFileExtension "ll" cachePath
-      code <- toLLVM' >> emit'
-      header <- emitDeclarations
-      let code' = toLazyByteString $ header <> "\n" <> code
-      -- ここはspawnして最後に待つ感じにしたい
-      liftIO $ L.writeFile (toFilePath tmpOutputPath) code'
-      liftIO $
-        callProcess
-          "clang"
-          [ "-c"
-          , toFilePath tmpOutputPath
-          , "-Wno-override-module"
-          , "-o" ++ toFilePath cachePath
-          ]
-      removeFile tmpOutputPath
-      -- sharedCodeEnvは保持
-      modify (\env -> env {codeEnv = Map.empty})
-      modify (\env -> env {llvmEnv = Map.empty})
-      build' codeList acc cont
+  -- sharedCodeEnvは保持
+  modify (\env -> env {codeEnv = Map.empty}) -- ここは修正必要？
+  modify (\env -> env {llvmEnv = Map.empty})
+  build' acc cont
+
+build'' ::
+     Meta
+  -> T.Text
+  -> [(Meta, T.Text, TermPlus)]
+  -> WeakTermPlus
+  -> WeakTermPlus
+  -> WeakStmt
+  -> WithEnv Builder
+build'' mx x acc e t cont = do
+  analyze >> synthesize >> refine >> cleanup
+  e' <- reduceTermPlus <$> elaborate e
+  t' <- reduceTermPlus <$> elaborate t
+  insTypeEnv (Right x) t'
+  modify (\env -> env {cacheEnv = Map.insert x (Left e') (cacheEnv env)})
+  clarify e' >>= insCodeEnv (showInHex x) []
+  build' ((mx, x, t') : acc) cont
 
 -- 当該pathから計算されるパスにキャッシュが存在して、かつそのキャッシュのlast modifiedがソースファイルの
 -- last modifiedよりも新しければcache利用可能。（依存関係も計算）
@@ -212,30 +205,6 @@ bypass path (WeakStmtEOF path' cont)
     p $ "========BYPASS-EOF (" <> toFilePath path' <> ")============="
     bypass path cont
 
-build'' ::
-     Meta
-  -> T.Text
-  -> [Builder]
-  -> [(Meta, T.Text, TermPlus)]
-  -> WeakTermPlus
-  -> WeakTermPlus
-  -> WeakStmt
-  -> WithEnv Builder
-build'' mx x current acc e t cont = do
-  analyze >> synthesize >> refine >> cleanup
-  e' <- reduceTermPlus <$> elaborate e
-  t' <- reduceTermPlus <$> elaborate t
-  insTypeEnv (Right x) t'
-  modify (\env -> env {cacheEnv = Map.insert x (Left e') (cacheEnv env)})
-  -- llvm <- clarify e' >>= insCodeEnv (showInHex x) [] >> toLLVM' >> emit'
-  clarify e' >>= insCodeEnv (showInHex x) []
-  build' current ((mx, x, t') : acc) cont
-  -- cont' <- build' (concatToHead llvm current) ((mx, x, t') : acc) cont
-  -- return $ llvm <> "\n" <> cont'
-
--- concatToHead :: Builder -> [Builder] -> [Builder]
--- concatToHead x [] = [x]
--- concatToHead x (y:ys) = (y <> "\n" <> x : ys)
 bypass' ::
      Path Abs File
   -> Meta
