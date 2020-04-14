@@ -30,25 +30,18 @@ import Reduce.Term
 import Reduce.WeakTerm
 
 build :: Path Abs File -> WeakStmt -> WithEnv [Path Abs File]
-build _ (WeakStmtVisit path ss1 retZero)
-  -- note' $ "→ visit: " <> T.pack (toFilePath path)
- = do
+build _ (WeakStmtVisit path ss1 retZero) = do
+  note' $ "→ visit: " <> T.pack (toFilePath path)
   e <- build' ss1
+  modify (\env -> env {argAcc = []})
   retZero' <- build' retZero
   mainTerm <- letBind e retZero'
   llvm <- clarify mainTerm >>= toLLVM >>= emit -- main termのビルドはココで行う。
   sharedCode <- buildShared
-  -- note' $ "← compile: " <> T.pack (toFilePath path)
+  note' $ "← compile: " <> T.pack (toFilePath path)
   compileObject path $ sharedCode <> "\n" <> llvm
   gets cachePathList
 build _ _ = undefined
-  -- note' $ "→ visit: " <> T.pack (toFilePath mainFilePath)
-  -- e <- build' stmt
-  -- llvm <- clarify e >>= toLLVM >>= emit -- main termのビルドはココで行う。
-  -- sharedCode <- buildShared
-  -- note' $ "← compile: " <> T.pack (toFilePath mainFilePath)
-  -- compileObject mainFilePath $ sharedCode <> "\n" <> llvm
-  -- gets cachePathList
 
 link :: Path Abs File -> [Path Abs File] -> IO ()
 link outputPath pathList = do
@@ -94,9 +87,8 @@ build' (WeakStmtVisit path ss1 ss2) = do
     else do
       snapshot <- setupEnv
       e <- build' ss1
-      toLLVM'
-      code <- emit'
-      note' $ "← compile: " <> T.pack (toFilePath path)
+      code <- toLLVM' >> emit'
+      note' $ "← build: " <> T.pack (toFilePath path)
       compileObject path code -- オブジェクトファイルを構成
       revertEnv snapshot
       cont <- build' ss2 -- このcontの結果もあくまでLLVM IR
@@ -121,7 +113,6 @@ revertEnv :: Env -> WithEnv ()
 revertEnv snapshot = do
   modify (\e -> e {codeEnv = codeEnv snapshot})
   modify (\e -> e {llvmEnv = llvmEnv snapshot})
-  -- modify (\e -> e {declEnv = declEnv snapshot})
   modify (\e -> e {argAcc = argAcc snapshot})
 
 buildShared :: WithEnv Builder
