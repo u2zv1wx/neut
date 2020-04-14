@@ -114,6 +114,7 @@ data Env =
     , nopFreeSet :: S.Set Int
     , argAcc :: [(Meta, T.Text, TermPlus)]
     , cachePathList :: [Path Abs File]
+    , nestLevel :: Int
     -- , restrictSet :: S.Set T.Text
     -- , finishedSet :: S.Set T.Text
     -- , sharedSet :: S.Set (T.Text, Int)
@@ -167,6 +168,7 @@ initialEnv =
     , nopFreeSet = S.empty
     , argAcc = []
     , cachePathList = []
+    , nestLevel = 0
     -- , restrictSet = S.empty
     -- , finishedSet = S.empty
     -- , sharedSet =

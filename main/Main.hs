@@ -222,7 +222,7 @@ constructOutputArchivePath _ (Just path) = return path
 --     [tmpOutputPathStr, "-Wno-override-module", "-o" ++ toFilePath outputPath]
 --   removeFile tmpOutputPath
 runBuild :: Path Abs File -> WithEnv [Path Abs File]
-runBuild inputPath = parse inputPath >>= build inputPath
+runBuild inputPath = parse inputPath >>= build
 
 runCheck :: Path Abs File -> WithEnv ()
 runCheck inputPath = parse inputPath >>= check

@@ -29,19 +29,20 @@ import LLVM
 import Reduce.Term
 import Reduce.WeakTerm
 
-build :: Path Abs File -> WeakStmt -> WithEnv [Path Abs File]
-build _ (WeakStmtVisit path ss1 retZero) = do
-  note' $ "→ visit: " <> T.pack (toFilePath path)
+build :: WeakStmt -> WithEnv [Path Abs File]
+build (WeakStmtVisit path ss1 retZero) = do
+  note' $ "→ " <> T.pack (toFilePath path)
+  modify (\env -> env {nestLevel = nestLevel env + 1})
   e <- build' ss1
   modify (\env -> env {argAcc = []})
   retZero' <- build' retZero
   mainTerm <- letBind e retZero'
   llvm <- clarify mainTerm >>= toLLVM >>= emit -- main termのビルドはココで行う。
   sharedCode <- buildShared
-  note' $ "← compile: " <> T.pack (toFilePath path)
+  note' $ "← " <> T.pack (toFilePath path)
   compileObject path $ sharedCode <> "\n" <> llvm
   gets cachePathList
-build _ _ = undefined
+build _ = undefined
 
 link :: Path Abs File -> [Path Abs File] -> IO ()
 link outputPath pathList = do
@@ -74,21 +75,24 @@ build' (WeakStmtConstDecl _ (_, x, t) cont) = do
   insTypeEnv (Right x) t''
   build' cont
 build' (WeakStmtVisit path ss1 ss2) = do
-  note' $ "→ visit: " <> T.pack (toFilePath path)
   b <- isCacheAvailable path
   if b
     then do
-      note' $ "← using cache for " <> T.pack (toFilePath path)
+      note' $ "✓ skip: " <> T.pack (toFilePath path)
       acc' <- bypass ss1
       modify (\env -> env {argAcc = acc' ++ (argAcc env)})
       cachePath <- toCacheFilePath path
       insCachePath cachePath
       build' ss2
     else do
+      i <- gets nestLevel
+      note' $ T.replicate (i * 2) " " <> "→ " <> T.pack (toFilePath path)
+      modify (\env -> env {nestLevel = i + 1})
       snapshot <- setupEnv
       e <- build' ss1
       code <- toLLVM' >> emit'
-      note' $ "← build: " <> T.pack (toFilePath path)
+      note' $ T.replicate (i * 2) " " <> "← " <> T.pack (toFilePath path)
+      modify (\env -> env {nestLevel = i})
       compileObject path code -- オブジェクトファイルを構成
       revertEnv snapshot
       cont <- build' ss2 -- このcontの結果もあくまでLLVM IR
@@ -140,7 +144,7 @@ compileObject srcPath code = do
       , "-Wno-override-module"
       , "-o" ++ toFilePath cachePath
       ]
-  removeFile tmpOutputPath
+  -- removeFile tmpOutputPath
   insCachePath cachePath
 
 insCachePath :: Path Abs File -> WithEnv ()
@@ -154,9 +158,7 @@ build'' ::
   -> WeakTermPlus
   -> WeakStmt
   -> WithEnv TermPlus
-build'' mx x e t cont
-  -- p' x
- = do
+build'' mx x e t cont = do
   analyze >> synthesize >> refine >> cleanup
   e' <- reduceTermPlus <$> elaborate e
   t' <- reduceTermPlus <$> elaborate t
