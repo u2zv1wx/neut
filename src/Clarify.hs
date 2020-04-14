@@ -140,8 +140,8 @@ clarifyCase tenv m cxtes typeVarName envVarName lamVarName = do
         IntMap.fromList $
         map (\(mx, x, _) -> (asInt x, (mx, DataUpsilon x))) fvs
   let cs = map (\cxte -> fst $ fst cxte) cxtes
-  let cs' = map (\(mc, c) -> (mc, showInHex c)) cs
-  return $ bindLet [(y, e')] (m, CodeCase sub yVar (zip cs' es))
+  -- let cs' = map (\(mc, c) -> (mc, showInHex c)) cs
+  return $ bindLet [(y, e')] (m, CodeCase sub yVar (zip cs es))
 
 constructCaseFVS ::
      TypeEnv

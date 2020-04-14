@@ -401,22 +401,30 @@ llvmCodeCase m v (((_, c), code):branchList) = do
   (base, baseVar) <- newDataLocal $ takeBaseName v
   (isEq, isEqVar) <- newDataLocal "cmp"
   uncastThenCmpThenBranch <-
-    llvmUncastLet tmp (LLVMDataGlobal c) funPtrType $
+    llvmUncastLet tmp (LLVMDataGlobal $ showInHex c) funPtrType $
     LLVMLet isEq (LLVMOpBinaryOp (BinaryOpEQ voidPtr) tmpVar baseVar) $
     LLVMBranch isEqVar code' cont
   llvmDataLet base v uncastThenCmpThenBranch
 
+-- 定数の型は() -> i8*で確定
 getLabelType :: Meta -> T.Text -> WithEnv LowType
-getLabelType m c = do
-  cenv <- gets codeEnv
-  case Map.lookup c cenv of
-    Just (Definition _ args _) -> return $ toFunPtrType args
-    Nothing -> do
-      let body = (m, CodeUpIntro (m, DataEnumIntro (EnumValueIntS 64 0)))
-      insCodeEnv c [] body
-      llvm <- llvmCode body
-      insLLVMEnv c [] llvm
-      return $ toFunPtrType []
+getLabelType m c = return $ toFunPtrType []
+  -- t <- lookupTypeEnv m (Right c) c
+  -- case t of
+  --   (_, TermPi _ xts _) -> return $ toFunPtrType xts
+  --   _ -> raiseCritical m "getLabelType"
+  -- cenv <- gets codeEnv
+  -- -- hexにされてしまってるからlookupができない、って話。
+  -- case Map.lookup c cenv of
+  --   Just (Definition _ args _) -> return $ toFunPtrType args
+  --   Nothing -> do
+  --     p "label-type-nothing:"
+  --     p' c
+  --     let body = (m, CodeUpIntro (m, DataEnumIntro (EnumValueIntS 64 0)))
+  --     insCodeEnv c [] body
+  --     llvm <- llvmCode body
+  --     insLLVMEnv c [] llvm
+  --     return $ toFunPtrType []
 
 data AggPtrType
   = AggPtrTypeArray Int LowType

@@ -144,7 +144,7 @@ compileObject srcPath code = do
       , "-Wno-override-module"
       , "-o" ++ toFilePath cachePath
       ]
-  -- removeFile tmpOutputPath
+  removeFile tmpOutputPath
   insCachePath cachePath
 
 insCachePath :: Path Abs File -> WithEnv ()
