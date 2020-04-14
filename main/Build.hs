@@ -76,16 +76,15 @@ build' (WeakStmtConstDecl _ (_, x, t) cont) = do
   build' cont
 build' (WeakStmtVisit path ss1 ss2) = do
   b <- isCacheAvailable path
+  i <- gets nestLevel
   if b
     then do
-      note' $ "✓ skip: " <> T.pack (toFilePath path)
-      acc' <- bypass ss1
-      modify (\env -> env {argAcc = acc' ++ (argAcc env)})
+      note' $ T.replicate (i * 2) " " <> "✓ " <> T.pack (toFilePath path)
+      bypass ss1
       cachePath <- toCacheFilePath path
       insCachePath cachePath
       build' ss2
     else do
-      i <- gets nestLevel
       note' $ T.replicate (i * 2) " " <> "→ " <> T.pack (toFilePath path)
       modify (\env -> env {nestLevel = i + 1})
       snapshot <- setupEnv
@@ -168,8 +167,6 @@ build'' mx x e t cont = do
   modify (\env -> env {argAcc = (mx, x, t') : (argAcc env)})
   build' cont
 
--- 当該pathから計算されるパスにキャッシュが存在して、かつそのキャッシュのlast modifiedがソースファイルの
--- last modifiedよりも新しければcache利用可能。（依存関係も計算）
 isCacheAvailable :: Path Abs File -> WithEnv Bool
 isCacheAvailable path = do
   g <- gets depGraph
@@ -190,13 +187,6 @@ isCacheAvailable' srcPath = do
       srcModTime <- getModificationTime srcPath
       cacheModTime <- getModificationTime cachePath
       return $ srcModTime < cacheModTime
-      -- if srcModTime >= cacheModTime
-      --   then do
-      --     p "src is newer"
-      --     return False
-      --   else do
-      --     p "cache is newer"
-      --     return False
 
 toCacheFilePath :: Path Abs File -> WithEnv (Path Abs File)
 toCacheFilePath srcPath = do
@@ -206,16 +196,16 @@ toCacheFilePath srcPath = do
   ensureDir $ parent item
   setFileExtension "o" $ cacheDirPath </> srcPath'
 
-bypass :: WeakStmt -> WithEnv [(Meta, T.Text, TermPlus)]
-bypass (WeakStmtReturn _) = return []
-bypass (WeakStmtLet _ (mx, x, t) e cont) = do
+bypass :: WeakStmt -> WithEnv ()
+bypass (WeakStmtReturn _) = return ()
+bypass (WeakStmtLet _ (_, x, t) e cont) = do
   (e', te) <- infer e
   t' <- inferType t
   insConstraintEnv te t'
-  bypass' mx x e' t' cont
-bypass (WeakStmtLetWT _ (mx, x, t) e cont) = do
+  bypass' x e' t' cont
+bypass (WeakStmtLetWT _ (_, x, t) e cont) = do
   t' <- inferType t
-  bypass' mx x e t' cont
+  bypass' x e t' cont
 bypass (WeakStmtVerify _ _ cont) = bypass cont
 bypass (WeakStmtImplicit m x idxList cont) = do
   resolveImplicit m x idxList
@@ -226,26 +216,20 @@ bypass (WeakStmtConstDecl _ (_, x, t) cont) = do
   t'' <- reduceTermPlus <$> elaborate t'
   insTypeEnv (Right x) t''
   bypass cont
-bypass (WeakStmtVisit _ ss1 ss2) = do
-  acc1 <- bypass ss1
-  acc2 <- bypass ss2
-  return $ acc1 ++ acc2
+bypass (WeakStmtVisit path ss1 ss2) = do
+  cachePath <- toCacheFilePath path
+  insCachePath cachePath
+  bypass ss1
+  bypass ss2
 
-bypass' ::
-     Meta
-  -> T.Text
-  -> WeakTermPlus
-  -> WeakTermPlus
-  -> WeakStmt
-  -> WithEnv [(Meta, T.Text, TermPlus)]
-bypass' mx x e t cont = do
+bypass' :: T.Text -> WeakTermPlus -> WeakTermPlus -> WeakStmt -> WithEnv ()
+bypass' x e t cont = do
   analyze >> synthesize >> refine >> cleanup
   e' <- reduceTermPlus <$> elaborate e
   t' <- reduceTermPlus <$> elaborate t
   insTypeEnv (Right x) t'
   modify (\env -> env {cacheEnv = Map.insert x (Left e') (cacheEnv env)})
-  acc <- bypass cont
-  return $ (mx, x, t') : acc
+  bypass cont
 
 bind :: [(Meta, T.Text, TermPlus)] -> TermPlus -> WithEnv TermPlus
 bind [] e = return e
