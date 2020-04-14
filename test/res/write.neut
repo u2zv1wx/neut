@@ -256,6 +256,8 @@
 ;; (provide unused-function)
 (?string:print "\n")
 
+(string:print "hello, world!\n")
+
 ;; (let a1 (os:write os:stdout test 3))
 ;; (let a2 (os:write os:stdout test 3))
 ;; (let a3 (os:write os:stdout test 3))

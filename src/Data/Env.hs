@@ -115,6 +115,7 @@ data Env =
     , argAcc :: [(Meta, T.Text, TermPlus)]
     , cachePathList :: [Path Abs File]
     , nestLevel :: Int
+    , depGraph :: Map.HashMap (Path Abs File) [Path Abs File]
     -- , restrictSet :: S.Set T.Text
     -- , finishedSet :: S.Set T.Text
     -- , sharedSet :: S.Set (T.Text, Int)
@@ -169,15 +170,7 @@ initialEnv =
     , argAcc = []
     , cachePathList = []
     , nestLevel = 0
-    -- , restrictSet = S.empty
-    -- , finishedSet = S.empty
-    -- , sharedSet =
-    --     S.fromList
-    --       [ ("cartesian-immediate", 2)
-    --       , ("cartesian-struct", 2)
-    --       , ("cartesian-array-closure-0", 2)
-    --       , ("cartesian-closure-0", 2)
-    --       ]
+    , depGraph = Map.empty
     }
 
 type WithEnv a = StateT Env (ExceptT [Log] IO) a

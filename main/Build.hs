@@ -39,7 +39,7 @@ build (WeakStmtVisit path ss1 retZero) = do
   mainTerm <- letBind e retZero'
   llvm <- clarify mainTerm >>= toLLVM >>= emit -- main termのビルドはココで行う。
   sharedCode <- buildShared
-  note' $ "← " <> T.pack (toFilePath path)
+  -- note' $ "← " <> T.pack (toFilePath path)
   compileObject path $ sharedCode <> "\n" <> llvm
   gets cachePathList
 build _ = undefined
@@ -91,7 +91,7 @@ build' (WeakStmtVisit path ss1 ss2) = do
       snapshot <- setupEnv
       e <- build' ss1
       code <- toLLVM' >> emit'
-      note' $ T.replicate (i * 2) " " <> "← " <> T.pack (toFilePath path)
+      -- note' $ T.replicate (i * 2) " " <> "← " <> T.pack (toFilePath path)
       modify (\env -> env {nestLevel = i})
       compileObject path code -- オブジェクトファイルを構成
       revertEnv snapshot
@@ -171,7 +171,32 @@ build'' mx x e t cont = do
 -- 当該pathから計算されるパスにキャッシュが存在して、かつそのキャッシュのlast modifiedがソースファイルの
 -- last modifiedよりも新しければcache利用可能。（依存関係も計算）
 isCacheAvailable :: Path Abs File -> WithEnv Bool
-isCacheAvailable _ = return False
+isCacheAvailable path = do
+  g <- gets depGraph
+  case Map.lookup path g of
+    Nothing -> isCacheAvailable' path
+    Just xs -> do
+      b <- isCacheAvailable' path
+      bs <- mapM isCacheAvailable xs
+      return $ and $ b : bs
+
+isCacheAvailable' :: Path Abs File -> WithEnv Bool
+isCacheAvailable' srcPath = do
+  cachePath <- toCacheFilePath srcPath
+  b <- doesFileExist cachePath
+  if not b
+    then return False
+    else do
+      srcModTime <- getModificationTime srcPath
+      cacheModTime <- getModificationTime cachePath
+      return $ srcModTime < cacheModTime
+      -- if srcModTime >= cacheModTime
+      --   then do
+      --     p "src is newer"
+      --     return False
+      --   else do
+      --     p "cache is newer"
+      --     return False
 
 toCacheFilePath :: Path Abs File -> WithEnv (Path Abs File)
 toCacheFilePath srcPath = do

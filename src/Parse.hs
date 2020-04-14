@@ -51,6 +51,7 @@ parse inputPath = do
 
 visit :: Path Abs File -> WithEnv [QuasiStmt]
 visit path = do
+  insDepGraph path
   pushTrace path
   modify (\env -> env {fileEnv = Map.insert path VisitInfoActive (fileEnv env)})
   modify (\env -> env {phase = 1 + phase env})
@@ -69,6 +70,15 @@ leave = do
   modify (\env -> env {sectionEnv = []})
   return []
   -- return [QuasiStmtEOF path]
+
+insDepGraph :: Path Abs File -> WithEnv ()
+insDepGraph path = do
+  tenv <- gets traceEnv
+  case tenv of
+    [] -> return ()
+    (foo:_) -> do
+      modify
+        (\env -> env {depGraph = Map.insertWith (++) foo [path] (depGraph env)})
 
 pushTrace :: Path Abs File -> WithEnv ()
 pushTrace path = modify (\env -> env {traceEnv = path : traceEnv env})
