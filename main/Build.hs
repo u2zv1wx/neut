@@ -30,11 +30,25 @@ import Reduce.Term
 import Reduce.WeakTerm
 
 build :: Path Abs File -> WeakStmt -> WithEnv [Path Abs File]
-build mainFilePath stmt = do
-  llvm <- build' stmt
+build _ (WeakStmtVisit path ss1 retZero)
+  -- note' $ "→ visit: " <> T.pack (toFilePath path)
+ = do
+  e <- build' ss1
+  retZero' <- build' retZero
+  mainTerm <- letBind e retZero'
+  llvm <- clarify mainTerm >>= toLLVM >>= emit -- main termのビルドはココで行う。
   sharedCode <- buildShared
-  compileObject mainFilePath $ sharedCode <> "\n" <> llvm
+  -- note' $ "← compile: " <> T.pack (toFilePath path)
+  compileObject path $ sharedCode <> "\n" <> llvm
   gets cachePathList
+build _ _ = undefined
+  -- note' $ "→ visit: " <> T.pack (toFilePath mainFilePath)
+  -- e <- build' stmt
+  -- llvm <- clarify e >>= toLLVM >>= emit -- main termのビルドはココで行う。
+  -- sharedCode <- buildShared
+  -- note' $ "← compile: " <> T.pack (toFilePath mainFilePath)
+  -- compileObject mainFilePath $ sharedCode <> "\n" <> llvm
+  -- gets cachePathList
 
 link :: Path Abs File -> [Path Abs File] -> IO ()
 link outputPath pathList = do
@@ -42,12 +56,12 @@ link outputPath pathList = do
     map toFilePath pathList ++
     ["-Wno-override-module", "-o" ++ toFilePath outputPath]
 
-build' :: WeakStmt -> WithEnv Builder
+build' :: WeakStmt -> WithEnv TermPlus
 build' (WeakStmtReturn e) = do
   (e', _) <- infer e
   analyze >> synthesize >> refine
   acc <- gets argAcc
-  elaborate e' >>= bind acc >>= clarify >>= toLLVM >>= emit
+  elaborate e' >>= bind acc
 build' (WeakStmtLet _ (mx, x, t) e cont) = do
   (e', te) <- infer e
   t' <- inferType t
@@ -67,28 +81,48 @@ build' (WeakStmtConstDecl _ (_, x, t) cont) = do
   insTypeEnv (Right x) t''
   build' cont
 build' (WeakStmtVisit path ss1 ss2) = do
+  note' $ "→ visit: " <> T.pack (toFilePath path)
   b <- isCacheAvailable path
   if b
     then do
+      note' $ "← using cache for " <> T.pack (toFilePath path)
       acc' <- bypass ss1
       modify (\env -> env {argAcc = acc' ++ (argAcc env)})
       cachePath <- toCacheFilePath path
       insCachePath cachePath
       build' ss2
     else do
-      snapshot <- get
-      modify (\env -> env {codeEnv = Map.empty, llvmEnv = Map.empty})
-      code <- build' ss1 -- このcodeはLLVM IR. StmtReturnに由来するやつ。
-      note'' $ "compiling " <> T.pack (toFilePath path) <> " ... "
+      snapshot <- setupEnv
+      e <- build' ss1
+      toLLVM'
+      code <- emit'
+      note' $ "← compile: " <> T.pack (toFilePath path)
       compileObject path code -- オブジェクトファイルを構成
       revertEnv snapshot
-      build' ss2 -- このcontの結果もあくまでLLVM IR
+      cont <- build' ss2 -- このcontの結果もあくまでLLVM IR
+      letBind e cont
+
+letBind :: TermPlus -> TermPlus -> WithEnv TermPlus
+letBind e cont = do
+  h <- newNameWith'' "_"
+  let m = fst e
+  let intType = (m, TermEnum (EnumTypeIntS 64))
+  return (m, TermPiElim (m, TermPiIntro [(m, h, intType)] cont) [e])
+
+setupEnv :: WithEnv Env
+setupEnv = do
+  snapshot <- get
+  modify (\env -> env {codeEnv = Map.empty})
+  modify (\env -> env {llvmEnv = Map.empty})
+  modify (\env -> env {argAcc = []})
+  return snapshot
 
 revertEnv :: Env -> WithEnv ()
 revertEnv snapshot = do
   modify (\e -> e {codeEnv = codeEnv snapshot})
   modify (\e -> e {llvmEnv = llvmEnv snapshot})
-  modify (\e -> e {declEnv = declEnv snapshot})
+  -- modify (\e -> e {declEnv = declEnv snapshot})
+  modify (\e -> e {argAcc = argAcc snapshot})
 
 buildShared :: WithEnv Builder
 buildShared = do
@@ -115,8 +149,7 @@ compileObject srcPath code = do
       , "-Wno-override-module"
       , "-o" ++ toFilePath cachePath
       ]
-  -- removeFile tmpOutputPath
-  liftIO $ putStrLn "done."
+  removeFile tmpOutputPath
   insCachePath cachePath
 
 insCachePath :: Path Abs File -> WithEnv ()
@@ -129,8 +162,10 @@ build'' ::
   -> WeakTermPlus
   -> WeakTermPlus
   -> WeakStmt
-  -> WithEnv Builder
-build'' mx x e t cont = do
+  -> WithEnv TermPlus
+build'' mx x e t cont
+  -- p' x
+ = do
   analyze >> synthesize >> refine >> cleanup
   e' <- reduceTermPlus <$> elaborate e
   t' <- reduceTermPlus <$> elaborate t
