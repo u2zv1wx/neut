@@ -40,8 +40,6 @@ clarify' tenv lam@(m, TermPiIntro mxts e) = do
   retClosure tenv Nothing fvs m mxts e'
 clarify' tenv (m, TermPiIntroPlus (name, args) mxts e) = do
   e' <- clarify' (insTypeEnv1 mxts tenv) e
-  -- fixではなくね？
-  -- piIntroPlusがreduceの結果としてコピーされると定義の重複が起こりうる？
   retClosure tenv (Just $ showInHex name) args m mxts e'
 clarify' tenv (m, TermPiElim e es) = do
   es' <- mapM (clarifyPlus tenv) es
@@ -489,14 +487,6 @@ makeClosure mName mxts2 m mxts1 e = do
   let fvEnv = (m, sigmaIntro vs)
   return (m, sigmaIntro [envExp, fvEnv, (m, DataConst name)])
 
--- nothingだったらcodeEnvに新しい名前で入れて、Fixだったら名前固定で入れて、sharedだったら
--- tryCache的に新しい名前で入れる、とかでいいのか？いや、sharedのほかにinductiveもある。
--- inductiveだったら、tryCache的に名前固定で入れる……？
--- 名前を固定するかしないかの2択と、キャッシュを利用するかしないかの2択がある？
--- 名前を固定して、キャッシュを利用するのは、inductiveのとき？いや、これは起こってはいけないはず。
--- 名前を固定せずにキャッシュを利用するのはinductiveのときで、このときは生成した名前がinductiveなものであるっていう情報をどこかに保持。
--- 名前を固定して、かつキャッシュを利用しないのは、fixのとき。fixはどうせ1回しか作られないのでキャッシュを探す意味がない。
--- いや、let f := (iter) in (...)みたいなやつがあれば、複数回作られるか。
 registerIfNecessary ::
      Meta
   -> T.Text
