@@ -70,7 +70,6 @@ clarify' _ (m, TermArray {}) = returnArrayType m
 clarify' tenv (m, TermArrayIntro k es) = do
   retImmType <- returnCartesianImmediate m
   -- arrayType = Sigma{k} [_ : IMMEDIATE, ..., _ : IMMEDIATE]
-  -- name <- newNameWith' "array"
   let ts = map Left $ replicate (length es) retImmType
   arrayType <- cartesianSigma Nothing m k ts
   (zs, es', xs) <- unzip3 <$> mapM (clarifyPlus tenv) es
@@ -254,10 +253,6 @@ clarifyArrayAccess tenv m name lowType = do
           [index, arr] -> do
             callThenReturn <- toArrayAccessTail tenv m lowType cod arr index xs
             let body = iterativeApp headerList callThenReturn
-            -- let name' = showInHex name
-            -- modify
-            --   (\env -> env {sharedSet = S.insert (name', 4) (sharedSet env)})
-            -- retClosure tenv (ClsNameShared $ showInHex name) [] m xts body
             retClosure tenv Nothing [] m xts body
           _ -> raiseCritical m $ "the type of array-access is wrong"
     _ -> raiseCritical m $ "the type of array-access is wrong"

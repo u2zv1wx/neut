@@ -24,20 +24,6 @@ import Data.Env
 import Data.LLVM
 import Reduce.LLVM
 
--- emit :: LLVM -> WithEnv L.ByteString
--- emit mainTerm = do
---   lenv <- gets llvmEnv
---   g <- emitDeclarations
---   modify (\env -> env {defVarSet = S.empty})
---   mainTerm' <- reduceLLVM IntMap.empty Map.empty mainTerm
---   zs <- emitDefinition "i64" "main" [] mainTerm'
---   xs <-
---     forM (HashMap.toList lenv) $ \(name, (args, body)) -> do
---       let args' = map (showLLVMData . LLVMDataLocal) args
---       modify (\env -> env {defVarSet = S.fromList $ map asInt args})
---       body' <- reduceLLVM IntMap.empty Map.empty body
---       emitDefinition "i8*" (TE.encodeUtf8Builder name) args' body'
---   return $ toLazyByteString $ unlinesL $ g <> zs <> concat xs
 emit :: LLVM -> WithEnv Builder
 emit mainTerm = do
   modify (\env -> env {defVarSet = S.empty})
@@ -56,31 +42,12 @@ emit' = do
       body' <- reduceLLVM IntMap.empty Map.empty body
       emitDefinition "i8*" (TE.encodeUtf8Builder name) args' body'
   return $ unlinesL $ concat xs
-      -- whenNotFinished name $ do
-        -- modify (\env -> env {finishedSet = S.insert name (finishedSet env)})
-  -- lenv <- gets llvmEnv
-  -- if Map.member name lenv
-  --   then return ()
-  --   else f
 
--- whenNotFinished :: T.Text -> WithEnv [a] -> WithEnv [a]
--- whenNotFinished name f = do
---   set1 <- gets finishedSet
---   set2 <- gets sharedSet
---   if S.member name set1 || S.member name (S.map fst set2)
---     then return []
---     else f
 emitDeclarations :: WithEnv Builder
 emitDeclarations = do
   denv <- HashMap.toList <$> gets declEnv
   return $ unlinesL $ map declToBuilder denv
-  -- sharedDecls <- toResDecl
-  -- return $ unlinesL $ map declToBuilder $ denv ++ sharedDecls
 
--- toResDecl :: WithEnv [(T.Text, ([LowType], LowType))]
--- toResDecl = do
---   set <- gets sharedSet
---   return $ map (\(x, i) -> (x, (replicate i voidPtr, voidPtr))) $ S.toList set
 declToBuilder :: (T.Text, ([LowType], LowType)) -> Builder
 declToBuilder (name, (dom, cod)) = do
   let name' = TE.encodeUtf8Builder name

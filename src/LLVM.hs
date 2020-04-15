@@ -36,21 +36,15 @@ toLLVM' :: WithEnv ()
 toLLVM' = do
   cenv <- gets codeEnv
   cenv' <- mapM reduceDefinition cenv
-  -- dset <- gets deleteSet
-  forM_ (Map.toList cenv') $ \(name, Definition _ args e)
-    -- when (name `S.notMember` dset) $ do
-   -> do
-    e' <- llvmCode e
-    insLLVMEnv name args e'
-  -- let cenv'' = Map.filterWithKey (\k _ -> k `S.notMember` dset) cenv'
-  -- cenv <- Map.toList <$> gets codeEnv
-  -- forM_ cenv $ \(name, Definition k args e) -> do
-  --   e' <- reduceCodePlus e
-  --   return (name, Definition k args e)
-  -- forM_ cenv $ \(name, Definition _ args e) -> do
-  --   e' <- reduceCodePlus e
-  --   e'' <- llvmCode e'
-  --   insLLVMEnv name args e''
+  dset <- gets deleteSet
+  forM_ (Map.toList cenv') $ \(name, Definition _ args e) -> do
+    if S.member name dset
+      then do
+        p "found:"
+        p' name
+      else do
+        e' <- llvmCode e
+        insLLVMEnv name args e'
 
 reduceDefinition :: Definition -> WithEnv Definition
 reduceDefinition (Definition k args e) = do

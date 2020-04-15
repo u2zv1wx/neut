@@ -20,12 +20,13 @@ reduceCodePlus (m, CodePiElimDownElim v ds) = do
   case v of
     (_, DataConst x)
       | Just (Definition (IsFixed False) xs body) <- Map.lookup x cenv
-      , length xs == length ds -> do
-        pset <- gets permanentSet
-        when (S.notMember x pset) $
-          -- p $ "delete: " <> T.unpack x
-         do modify (\env -> env {deleteSet = S.insert x (deleteSet env)})
-          -- modify (\env -> env {codeEnv = Map.delete x cenv})
+      , length xs == length ds
+        -- pset <- gets permanentSet
+        -- when (S.notMember x pset) $ do
+        --   p $ "delete: " <> T.unpack x
+        --   modify (\env -> env {deleteSet = S.insert x (deleteSet env)})
+       -> do
+        modify (\env -> env {codeEnv = Map.delete x cenv})
         let sub = IntMap.fromList (zip (map asInt xs) ds)
         reduceCodePlus $ substCodePlus sub body
     -- (_, DataConst x)
