@@ -40,6 +40,7 @@ clarify' tenv lam@(m, TermPiIntro mxts e) = do
   retClosure tenv ClsNameAnon fvs m mxts e'
 clarify' tenv (m, TermPiIntroPlus (name, args) mxts e) = do
   e' <- clarify' (insTypeEnv1 mxts tenv) e
+  -- fixではなくね？
   retClosure tenv (ClsNameFix $ showInHex name) args m mxts e'
 clarify' tenv (m, TermPiElim e es) = do
   es' <- mapM (clarifyPlus tenv) es
@@ -67,9 +68,9 @@ clarify' _ (m, TermArray {}) = returnArrayType m
 clarify' tenv (m, TermArrayIntro k es) = do
   retImmType <- returnCartesianImmediate m
   -- arrayType = Sigma{k} [_ : IMMEDIATE, ..., _ : IMMEDIATE]
-  name <- newNameWith' "array"
+  -- name <- newNameWith' "array"
   let ts = map Left $ replicate (length es) retImmType
-  arrayType <- cartesianSigma (Left name) m k ts
+  arrayType <- cartesianSigma Nothing m k ts
   (zs, es', xs) <- unzip3 <$> mapM (clarifyPlus tenv) es
   return $
     bindLet (zip zs es') $
@@ -217,7 +218,8 @@ clarifyUnaryOp tenv name op m = do
       -- modify (\env -> env {sharedSet = S.insert (name', 2) (sharedSet env)})
       retClosure
         tenv
-        (ClsNameShared $ showInHex name)
+        ClsNameAnon
+        -- (ClsNameShared $ showInHex name)
         []
         m
         [(mx, x, tx)]
@@ -236,7 +238,8 @@ clarifyBinaryOp tenv name op m = do
       -- modify (\env -> env {sharedSet = S.insert (name', 3) (sharedSet env)})
       retClosure
         tenv
-        (ClsNameShared $ showInHex name)
+        ClsNameAnon
+        -- (ClsNameShared $ showInHex name)
         []
         m
         [(mx, x, tx), (my, y, ty)]
@@ -259,10 +262,12 @@ clarifyArrayAccess tenv m name lowType = do
             -- let name' = showInHex name
             -- modify
             --   (\env -> env {sharedSet = S.insert (name', 4) (sharedSet env)})
-            retClosure tenv (ClsNameShared $ showInHex name) [] m xts body
+            -- retClosure tenv (ClsNameShared $ showInHex name) [] m xts body
+            retClosure tenv ClsNameAnon [] m xts body
           _ -> raiseCritical m $ "the type of array-access is wrong"
     _ -> raiseCritical m $ "the type of array-access is wrong"
 
+-- ここでclsをつくる計算は省略できる
 clarifySysCall ::
      TypeEnv
   -> T.Text -- the name of theta
@@ -284,7 +289,8 @@ clarifySysCall tenv name syscall args m = do
         -- modify
         --   (\env ->
         --      env {sharedSet = S.insert (name', length args + 1) (sharedSet env)})
-        retClosure tenv (ClsNameShared $ showInHex name) [] m xts body
+        -- retClosure tenv (ClsNameShared $ showInHex name) [] m xts body
+        retClosure tenv ClsNameAnon [] m xts body
     _ -> raiseCritical m $ "the type of " <> name <> " is wrong"
 
 iterativeApp :: [a -> a] -> a -> a
@@ -493,8 +499,8 @@ makeClosure ::
 makeClosure mName mxts2 m mxts1 e = do
   let xts1 = dropFst mxts1
   let xts2 = dropFst mxts2
-  expName <- newNameWith' "exp"
-  envExp <- cartesianSigma (Left expName) m arrVoidPtr $ map Right xts2
+  -- expName <- newNameWith' "exp"
+  envExp <- cartesianSigma Nothing m arrVoidPtr $ map Right xts2
   -- name <- nameFromMaybe mName
   name <- registerIfNecessary m mName xts1 xts2 e
   let vs = map (\(mx, x, _) -> (mx, DataUpsilon x)) mxts2

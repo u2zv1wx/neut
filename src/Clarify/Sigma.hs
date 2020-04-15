@@ -7,10 +7,10 @@ module Clarify.Sigma
   ) where
 
 import Control.Monad.Except
-import Control.Monad.State
 
-import qualified Data.HashMap.Strict as Map
-import qualified Data.IntMap.Strict as IntMap
+-- import Control.Monad.State
+-- import qualified Data.HashMap.Strict as Map
+-- import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Text as T
 
 import Clarify.Linearize
@@ -19,51 +19,65 @@ import Data.Basic
 import Data.Code
 import Data.Env
 
-cartesianSigma ::
-     Either Identifier T.Text
+cartesianSigma
+     -- Either Identifier T.Text
+ ::
+     Maybe T.Text
   -> Meta
   -> ArrayKind
   -> [Either CodePlus (Identifier, CodePlus)]
   -> WithEnv DataPlus
-cartesianSigma (Left (I (thetaName, i))) m k mxts = do
-  cenv <- gets codeEnv
-  let ident = asText' $ I ("cartesian-" <> thetaName, i)
-  let theta = (m, DataConst ident)
-  case Map.lookup ident cenv of
-    Just _ -> return theta
-    Nothing -> do
-      (switchVarName, switchVar) <- newDataUpsilonWith m "switch"
-      (argVarName, argVar) <- newDataUpsilonWith m "argsig"
-      aff <- affineSigma argVar m k mxts
-      rel <- relevantSigma argVar m k mxts
-      insCodeEnv
-        ident
-        [switchVarName, argVarName]
-        ( m
-        , CodeEnumElim
-            (IntMap.fromList [(asInt argVarName, argVar)])
-            switchVar
-            (switch aff rel))
-      return theta
-cartesianSigma (Right name) m k mxts = do
-  cenv <- gets codeEnv
-  let theta = (m, DataConst name)
-  case Map.lookup name cenv of
-    Just _ -> return theta
-    Nothing -> do
-      (switchVarName, switchVar) <- newDataUpsilonWith m "switch"
-      (argVarName, argVar) <- newDataUpsilonWith m "argsig"
-      aff <- affineSigma argVar m k mxts
-      rel <- relevantSigma argVar m k mxts
-      insSharedCodeEnv
-        name
-        [switchVarName, argVarName]
-        ( m
-        , CodeEnumElim
-            (IntMap.fromList [(asInt argVarName, argVar)])
-            switchVar
-            (switch aff rel))
-      return theta
+cartesianSigma Nothing m k mxts = do
+  let aff = affineSigma m k mxts
+  let rel = relevantSigma m k mxts
+  def <- makeSwitcher m aff rel
+  nameDefinition m "cartesian-sigma" def
+  -- insSharedCodeEnv' name def
+  -- cartesianSigma (Right name) m k mxts
+  -- cenv <- gets codeEnv
+  -- let ident = asText' $ I ("cartesian-" <> thetaName, i)
+  -- let theta = (m, DataConst ident)
+  -- case Map.lookup ident cenv of
+  --   Just _ -> return theta
+  --   Nothing -> do
+  --     (switchVarName, switchVar) <- newDataUpsilonWith m "switch"
+  --     (argVarName, argVar) <- newDataUpsilonWith m "argsig"
+  --     aff <- affineSigma argVar m k mxts
+  --     rel <- relevantSigma argVar m k mxts
+  --     insCodeEnv
+  --       ident
+  --       [switchVarName, argVarName]
+  --       ( m
+  --       , CodeEnumElim
+  --           (IntMap.fromList [(asInt argVarName, argVar)])
+  --           switchVar
+  --           (switch aff rel))
+  --     return theta
+cartesianSigma (Just name) m k mxts = do
+  tryCache m name $ do
+    let aff = affineSigma m k mxts
+    let rel = relevantSigma m k mxts
+    def <- makeSwitcher m aff rel
+    insSharedCodeEnv' name def
+    cartesianSigma (Just name) m k mxts
+  -- cenv <- gets codeEnv
+  -- let theta = (m, DataConst name)
+  -- case Map.lookup name cenv of
+  --   Just _ -> return theta
+  --   Nothing -> do
+  --     (switchVarName, switchVar) <- newDataUpsilonWith m "switch"
+  --     (argVarName, argVar) <- newDataUpsilonWith m "argsig"
+  --     aff <- affineSigma argVar m k mxts
+  --     rel <- relevantSigma argVar m k mxts
+  --     insSharedCodeEnv
+  --       name
+  --       [switchVarName, argVarName]
+  --       ( m
+  --       , CodeEnumElim
+  --           (IntMap.fromList [(asInt argVarName, argVar)])
+  --           switchVar
+  --           (switch aff rel))
+  --     return theta
 
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
 -- affineSigma NAME LOC [(x1, t1), ..., (xn, tn)]   ~>
@@ -81,12 +95,12 @@ cartesianSigma (Right name) m k mxts = do
 --     return ()                                     ---        ---
 --
 affineSigma ::
-     DataPlus
-  -> Meta
+     Meta
   -> ArrayKind
   -> [Either CodePlus (Identifier, CodePlus)]
+  -> DataPlus
   -> WithEnv CodePlus
-affineSigma argVar m k mxts = do
+affineSigma m k mxts argVar = do
   xts <- mapM supplyName mxts
   -- as == [APP-1, ..., APP-n]   (`a` here stands for `app`)
   as <- forM xts $ \(x, t) -> toAffineApp m x t
@@ -113,12 +127,12 @@ affineSigma argVar m k mxts = do
 --     let (pn1, pn2) := pair-n in               ---                   ---       ---
 --     return ((p11, ..., pn1), (p12, ..., pn2)) ---                   ---       ---
 relevantSigma ::
-     DataPlus
-  -> Meta
+     Meta
   -> ArrayKind
   -> [Either CodePlus (Identifier, CodePlus)]
+  -> DataPlus
   -> WithEnv CodePlus
-relevantSigma argVar m k mxts = do
+relevantSigma m k mxts argVar = do
   xts <- mapM supplyName mxts
   -- as == [APP-1, ..., APP-n]
   as <- forM xts $ \(x, t) -> toRelevantApp m x t
@@ -165,6 +179,9 @@ supplyName (Left t) = do
   x <- newNameWith' "unused-sigarg"
   return (x, t)
 
+cartArrayName :: T.Text
+cartArrayName = "cartesian-array"
+
 returnArrayType :: Meta -> WithEnv CodePlus
 returnArrayType m = do
   (arr, arrVar) <- newDataUpsilonWith m "arr"
@@ -172,11 +189,14 @@ returnArrayType m = do
   t <-
     cartesianSigma
       -- (I ("array-closure", 0))
-      (Right "cartesian-array")
+      (Just cartArrayName)
       m
       arrVoidPtr
       [Right (arr, retImmType), Left (m, CodeUpIntro arrVar)]
   return (m, CodeUpIntro t)
+
+cartClsName :: T.Text
+cartClsName = "cartesian-closure"
 
 returnClosureType :: Meta -> WithEnv CodePlus
 returnClosureType m = do
@@ -185,7 +205,7 @@ returnClosureType m = do
   t <-
     cartesianSigma
       -- (I ("closure", 0))
-      (Right "cartesian-closure")
+      (Just cartClsName)
       m
       arrVoidPtr
       [Right (env, retImmType), Left (m, CodeUpIntro envVar), Left retImmType]
