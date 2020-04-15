@@ -14,7 +14,6 @@ import Data.List (nubBy)
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
-import qualified Data.Set as S
 import qualified Data.Text as T
 
 import Clarify.Linearize
@@ -42,7 +41,6 @@ clarify' tenv lam@(m, TermPiIntro mxts e) = do
 clarify' tenv (m, TermPiIntroPlus (name, args) mxts e) = do
   e' <- clarify' (insTypeEnv1 mxts tenv) e
   let name' = showInHex name
-  modify (\env -> env {permanentSet = S.insert name' (permanentSet env)})
   retClosure tenv (Just name') args m mxts e'
 clarify' tenv (m, TermPiElim e es) = do
   es' <- mapM (clarifyPlus tenv) es

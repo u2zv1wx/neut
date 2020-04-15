@@ -104,9 +104,6 @@ data Env =
     , codeEnv :: Map.HashMap T.Text Definition
     , sharedCodeEnv :: Map.HashMap T.Text DataPlus
     , nameSet :: S.Set T.Text
-    , permanentSet :: S.Set T.Text
-    , deleteSet :: S.Set T.Text
-    , inlineSet :: S.Set T.Text
     , chainEnv :: IntMap.IntMap ([Data.Term.IdentifierPlus], TermPlus)
     --
     -- LLVM
@@ -171,9 +168,6 @@ initialEnv =
     , substEnv = IntMap.empty
     , zetaEnv = IntMap.empty
     , nameSet = S.empty
-    , permanentSet = S.empty
-    , deleteSet = S.empty
-    , inlineSet = S.empty
     , nopFreeSet = S.empty
     , argAcc = []
     , cachePathList = []

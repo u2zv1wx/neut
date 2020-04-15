@@ -36,10 +36,7 @@ toLLVM' :: WithEnv ()
 toLLVM' = do
   cenv <- gets codeEnv
   cenv' <- mapM reduceDefinition cenv
-  -- iset <- gets inlineSet
-  forM_ (Map.toList cenv') $ \(name, Definition _ args e)
-    -- when (S.notMember name iset) $ do
-   -> do
+  forM_ (Map.toList cenv') $ \(name, Definition _ args e) -> do
     e' <- llvmCode e
     insLLVMEnv name args e'
 
