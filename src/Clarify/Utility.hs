@@ -59,9 +59,6 @@ returnCartesianImmediate m = do
   v <- cartesianImmediate m
   return (m, CodeUpIntro v)
 
--- toConstInfo :: T.Text -> Meta -> WithEnv (T.Text, DataPlus)
--- toConstInfo thetaName m = do
---   return (thetaName, (m, DataConst thetaName))
 newConstInfo :: T.Text -> Meta -> WithEnv (T.Text, DataPlus)
 newConstInfo name m = do
   name' <- newTextWith name
@@ -85,9 +82,6 @@ tryCache m key f = do
   case Map.lookup key scenv of
     Nothing -> f
     Just def -> nameDefinition m key def
-      -- (name, theta) <- newConstInfo key m
-      -- insCodeEnv' name def
-      -- return theta
 
 makeSwitcher ::
      Meta
