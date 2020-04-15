@@ -102,7 +102,7 @@ data Env =
     , cacheEnv :: Map.HashMap T.Text (Either TermPlus CodePlus)
     -- f ~> thunk (lam (x1 ... xn) e)
     , codeEnv :: Map.HashMap T.Text Definition
-    , sharedCodeEnv :: Map.HashMap T.Text Definition
+    , sharedCodeEnv :: Map.HashMap T.Text DataPlus
     , nameSet :: S.Set T.Text
     , permanentSet :: S.Set T.Text
     , deleteSet :: S.Set T.Text

@@ -80,40 +80,40 @@ nameDefinition m key def = do
   modify (\env -> env {inlineSet = S.insert name (inlineSet env)})
   return theta
 
-tryCache :: Meta -> T.Text -> WithEnv DataPlus -> WithEnv DataPlus
-tryCache m key f = do
+tryCache :: T.Text -> WithEnv DataPlus -> WithEnv DataPlus
+tryCache key f = do
   scenv <- gets sharedCodeEnv
   case Map.lookup key scenv of
     Nothing -> f
-    Just def -> do
-      nameDefinition m key def
+    Just def -> return def
+      -- nameDefinition m key def
 
 makeSwitcher ::
      Meta
   -> (DataPlus -> WithEnv CodePlus)
   -> (DataPlus -> WithEnv CodePlus)
-  -> WithEnv Definition
+  -> WithEnv DataPlus
 makeSwitcher m compAff compRel = do
   (switchVarName, switchVar) <- newDataUpsilonWith m "switch"
   (argVarName, argVar) <- newDataUpsilonWith m "argimm"
   aff <- compAff argVar
   rel <- compRel argVar
   return $
-    Definition
-      (IsFixed False)
-      [switchVarName, argVarName]
-      ( m
-      , CodeEnumElim
-          (IntMap.fromList [(asInt argVarName, argVar)])
-          switchVar
-          (switch aff rel))
+    ( m
+    , DataDownIntroPiIntro
+        [switchVarName, argVarName]
+        ( m
+        , CodeEnumElim
+            (IntMap.fromList [(asInt argVarName, argVar)])
+            switchVar
+            (switch aff rel)))
 
 cartesianImmediate :: Meta -> WithEnv DataPlus
 cartesianImmediate m = do
-  tryCache m cartImmName $ do
+  tryCache cartImmName $ do
     def <- makeSwitcher m affineImmediate relevantImmediate
     insSharedCodeEnv' cartImmName def
-    cartesianImmediate m
+    return def
 
 affineImmediate :: DataPlus -> WithEnv CodePlus
 affineImmediate (m, _) = return (m, CodeUpIntro (m, sigmaIntro []))
@@ -127,7 +127,7 @@ cartStructName = "cartesian-struct"
 
 cartesianStruct :: Meta -> [ArrayKind] -> WithEnv DataPlus
 cartesianStruct m ks = do
-  tryCache m cartStructName $ do
+  tryCache cartStructName $ do
     def <- makeSwitcher m (affineStruct ks) (relevantStruct ks)
     insSharedCodeEnv' cartStructName def
     cartesianStruct m ks
@@ -160,11 +160,10 @@ insCodeEnv' :: T.Text -> Definition -> WithEnv ()
 insCodeEnv' name def = do
   modify (\env -> env {codeEnv = Map.insert name def (codeEnv env)})
 
-insSharedCodeEnv :: T.Text -> [Identifier] -> CodePlus -> WithEnv ()
-insSharedCodeEnv name args e = do
-  let def = Definition (IsFixed False) args e
-  modify (\env -> env {sharedCodeEnv = Map.insert name def (sharedCodeEnv env)})
-
-insSharedCodeEnv' :: T.Text -> Definition -> WithEnv ()
+-- insSharedCodeEnv :: T.Text -> [Identifier] -> CodePlus -> WithEnv ()
+-- insSharedCodeEnv name args e = do
+--   let def = Definition (IsFixed False) args e
+--   modify (\env -> env {sharedCodeEnv = Map.insert name def (sharedCodeEnv env)})
+insSharedCodeEnv' :: T.Text -> DataPlus -> WithEnv ()
 insSharedCodeEnv' name def = do
   modify (\env -> env {sharedCodeEnv = Map.insert name def (sharedCodeEnv env)})

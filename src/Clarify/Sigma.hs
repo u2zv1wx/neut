@@ -23,13 +23,15 @@ cartesianSigma ::
   -> [Either CodePlus (Identifier, CodePlus)]
   -> WithEnv DataPlus
 cartesianSigma Nothing m k mxts = do
-  def <- makeSwitcher m (affineSigma m k mxts) (relevantSigma m k mxts)
-  nameDefinition m "cartesian-sigma" def
+  makeSwitcher m (affineSigma m k mxts) (relevantSigma m k mxts)
+  -- def <- makeSwitcher m (affineSigma m k mxts) (relevantSigma m k mxts)
+  -- nameDefinition m "cartesian-sigma" def
 cartesianSigma (Just name) m k mxts = do
-  tryCache m name $ do
+  tryCache name $ do
     def <- makeSwitcher m (affineSigma m k mxts) (relevantSigma m k mxts)
     insSharedCodeEnv' name def
-    cartesianSigma (Just name) m k mxts
+    return def
+    -- cartesianSigma (Just name) m k mxts
 
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
 -- affineSigma NAME LOC [(x1, t1), ..., (xn, tn)]   ~>
