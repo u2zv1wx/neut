@@ -68,8 +68,6 @@ check (WeakStmtVisit _ ss1 ss2) = do
   check ss1
   check ss2
 
--- check (WeakStmtBOF _ cont) = check cont
--- check (WeakStmtEOF _ cont) = check cont
 check' :: T.Text -> WeakTermPlus -> WeakTermPlus -> WeakStmt -> WithEnv ()
 check' x e t cont = do
   analyze >> synthesize >> cleanup
