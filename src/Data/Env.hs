@@ -53,6 +53,7 @@ data Env =
     , shouldColorize :: Bool
     , endOfEntry :: String
     , isCheck :: Bool
+    , timestamp :: Integer
     --
     -- parse
     --
@@ -103,6 +104,8 @@ data Env =
     , codeEnv :: Map.HashMap T.Text Definition
     , sharedCodeEnv :: Map.HashMap T.Text Definition
     , nameSet :: S.Set T.Text
+    , permanentSet :: S.Set T.Text
+    , deleteSet :: S.Set T.Text
     , chainEnv :: IntMap.IntMap ([Data.Term.IdentifierPlus], TermPlus)
     --
     -- LLVM
@@ -127,6 +130,7 @@ initialEnv =
     { count = 0
     , ppCount = 0
     , shouldColorize = False
+    , timestamp = 0
     , isCheck = False
     , endOfEntry = ""
     , phase = 0
@@ -166,6 +170,8 @@ initialEnv =
     , substEnv = IntMap.empty
     , zetaEnv = IntMap.empty
     , nameSet = S.empty
+    , permanentSet = S.empty
+    , deleteSet = S.empty
     , nopFreeSet = S.empty
     , argAcc = []
     , cachePathList = []

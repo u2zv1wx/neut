@@ -61,7 +61,10 @@ returnCartesianImmediate m = do
 
 newConstInfo :: T.Text -> Meta -> WithEnv (T.Text, DataPlus)
 newConstInfo name m = do
-  name' <- newTextWith name
+  t <- gets timestamp
+  -- unixtime <- liftIO $ round <$> getPOSIXTime :: WithEnv Integer
+  i <- newCount
+  let name' = "_" <> T.pack (show t) <> "-" <> name <> "-" <> T.pack (show i)
   return (name', (m, DataConst name'))
 
 switch :: CodePlus -> CodePlus -> [(Case, CodePlus)]
@@ -77,11 +80,17 @@ nameDefinition m key def = do
   return theta
 
 tryCache :: Meta -> T.Text -> WithEnv DataPlus -> WithEnv DataPlus
-tryCache m key f = do
+tryCache m key f
+  -- p "tryCache"
+ = do
   scenv <- gets sharedCodeEnv
   case Map.lookup key scenv of
     Nothing -> f
-    Just def -> nameDefinition m key def
+    Just def
+      -- p "ins-with-new-name-for: "
+      -- p' key
+     -> do
+      nameDefinition m key def
 
 makeSwitcher ::
      Meta

@@ -32,15 +32,17 @@ import Reduce.WeakTerm
 build :: WeakStmt -> WithEnv [Path Abs File]
 build (WeakStmtVisit path ss1 retZero) = do
   note' $ "→ " <> T.pack (toFilePath path)
+  -- ホントはここでもキャッシュを調べにいっていい
   modify (\env -> env {nestLevel = nestLevel env + 1})
   e <- build' ss1
   modify (\env -> env {argAcc = []})
   retZero' <- build' retZero
   mainTerm <- letBind e retZero'
   llvm <- clarify mainTerm >>= toLLVM >>= emit -- main termのビルドはココで行う。
-  sharedCode <- buildShared
+  -- sharedCode <- buildShared
   -- note' $ "← " <> T.pack (toFilePath path)
-  compileObject path $ sharedCode <> "\n" <> llvm
+  compileObject path llvm
+  -- compileObject path $ sharedCode <> "\n" <> llvm
   gets cachePathList
 build _ = undefined
 
@@ -118,16 +120,15 @@ revertEnv snapshot = do
   modify (\e -> e {llvmEnv = llvmEnv snapshot})
   modify (\e -> e {argAcc = argAcc snapshot})
 
-buildShared :: WithEnv Builder
-buildShared = do
-  scenv <- gets sharedCodeEnv
-  modify (\env -> env {codeEnv = scenv, llvmEnv = Map.empty})
-  denv <- gets declEnv
-  let denv' = Map.filterWithKey (\k _ -> not $ Map.member k scenv) denv
-  modify (\env -> env {declEnv = denv'})
-  toLLVM'
-  emit'
-
+-- buildShared :: WithEnv Builder
+-- buildShared = do
+--   scenv <- gets sharedCodeEnv
+--   modify (\env -> env {codeEnv = scenv, llvmEnv = Map.empty})
+--   denv <- gets declEnv
+--   let denv' = Map.filterWithKey (\k _ -> not $ Map.member k scenv) denv
+--   modify (\env -> env {declEnv = denv'})
+--   toLLVM'
+--   emit'
 compileObject :: Path Abs File -> Builder -> WithEnv ()
 compileObject srcPath code = do
   cachePath <- toCacheFilePath srcPath
@@ -143,7 +144,7 @@ compileObject srcPath code = do
       , "-Wno-override-module"
       , "-o" ++ toFilePath cachePath
       ]
-  removeFile tmpOutputPath
+  -- removeFile tmpOutputPath
   insCachePath cachePath
 
 insCachePath :: Path Abs File -> WithEnv ()

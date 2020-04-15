@@ -6,32 +6,38 @@ import Control.Monad.State
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
-import qualified Data.Set as S
 
 import Data.Basic
 import Data.Code
 import Data.Env
+import qualified Data.Set as S
+import qualified Data.Text as T
 
 reduceCodePlus :: CodePlus -> WithEnv CodePlus
--- reduceCodePlus (m, CodePiElimDownElim v ds) = do
---   cenv <- gets codeEnv
---   -- ns <- gets nameSet
---   case v of
---     (_, DataConst x)
---       | Just (Definition (IsFixed False) xs body) <- Map.lookup x cenv
---       , length xs == length ds -> do
---         let sub = IntMap.fromList (zip (map asInt xs) ds)
---         reduceCodePlus $ substCodePlus sub body
---     -- (_, DataConst x)
---     --   | Just (Definition (IsFixed True) xs body) <- Map.lookup x cenv
---     --   , length xs == length ds
---     --   , not (x `S.member` ns) -> do
---     --     modify (\env -> env {nameSet = S.insert x ns})
---     --     body' <- reduceCodePlus body
---     --     let def = Definition (IsFixed True) xs body'
---     --     modify (\env -> env {codeEnv = Map.insert x def cenv})
---     --     return (m, CodePiElimDownElim v ds)
---     _ -> return (m, CodePiElimDownElim v ds)
+reduceCodePlus (m, CodePiElimDownElim v ds) = do
+  cenv <- gets codeEnv
+  -- ns <- gets nameSet
+  case v of
+    (_, DataConst x)
+      | Just (Definition (IsFixed False) xs body) <- Map.lookup x cenv
+      , length xs == length ds -> do
+        pset <- gets permanentSet
+        when (S.notMember x pset) $
+          -- p $ "delete: " <> T.unpack x
+         do modify (\env -> env {deleteSet = S.insert x (deleteSet env)})
+          -- modify (\env -> env {codeEnv = Map.delete x cenv})
+        let sub = IntMap.fromList (zip (map asInt xs) ds)
+        reduceCodePlus $ substCodePlus sub body
+    -- (_, DataConst x)
+    --   | Just (Definition (IsFixed True) xs body) <- Map.lookup x cenv
+    --   , length xs == length ds
+    --   , not (x `S.member` ns) -> do
+    --     modify (\env -> env {nameSet = S.insert x ns})
+    --     body' <- reduceCodePlus body
+    --     let def = Definition (IsFixed True) xs body'
+    --     modify (\env -> env {codeEnv = Map.insert x def cenv})
+    --     return (m, CodePiElimDownElim v ds)
+    _ -> return (m, CodePiElimDownElim v ds)
 reduceCodePlus (m, CodeSigmaElim mk xs v e) = do
   case v of
     (_, DataSigmaIntro mk' ds)

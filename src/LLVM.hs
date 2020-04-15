@@ -12,7 +12,6 @@ import qualified Data.HashMap.Strict as Map
 import qualified Data.Set as S
 import qualified Data.Text as T
 
-import Clarify.Utility
 import Data.Basic
 import Data.Code
 import Data.Env hiding (newNameWith'')
@@ -35,20 +34,29 @@ toLLVM mainTerm@(m, _) = do
 
 toLLVM' :: WithEnv ()
 toLLVM' = do
-  cenv <- Map.toList <$> gets codeEnv
-  forM_ cenv $ \(name, Definition _ args e) -> do
-    e' <- reduceCodePlus e
-    e'' <- llvmCode e'
-    insLLVMEnv name args e''
+  cenv <- gets codeEnv
+  cenv' <- mapM reduceDefinition cenv
+  -- dset <- gets deleteSet
+  forM_ (Map.toList cenv') $ \(name, Definition _ args e)
+    -- when (name `S.notMember` dset) $ do
+   -> do
+    e' <- llvmCode e
+    insLLVMEnv name args e'
+  -- let cenv'' = Map.filterWithKey (\k _ -> k `S.notMember` dset) cenv'
+  -- cenv <- Map.toList <$> gets codeEnv
+  -- forM_ cenv $ \(name, Definition k args e) -> do
+  --   e' <- reduceCodePlus e
+  --   return (name, Definition k args e)
+  -- forM_ cenv $ \(name, Definition _ args e) -> do
+  --   e' <- reduceCodePlus e
+  --   e'' <- llvmCode e'
+  --   insLLVMEnv name args e''
 
--- whenNotFinished name $ do
--- whenNotFinished :: T.Text -> WithEnv () -> WithEnv ()
--- whenNotFinished name f = do
---   lenv <- gets llvmEnv
---   set <- gets sharedSet
---   if Map.member name lenv || S.member name (S.map fst set)
---     then return ()
---     else f
+reduceDefinition :: Definition -> WithEnv Definition
+reduceDefinition (Definition k args e) = do
+  e' <- reduceCodePlus e
+  return (Definition k args e')
+
 llvmCode :: CodePlus -> WithEnv LLVM
 llvmCode (m, CodeConst theta) = llvmCodeConst m theta
 llvmCode (_, CodePiElimDownElim v ds) = do
@@ -289,24 +297,12 @@ llvmUncastLet x@(I (s, _)) d lowType cont = do
 llvmDataLet :: Identifier -> DataPlus -> LLVM -> WithEnv LLVM
 llvmDataLet x (m, DataConst y) cont = do
   cenv <- gets codeEnv
-  scenv <- gets sharedCodeEnv
-  case (Map.lookup y cenv, Map.lookup y scenv) of
-    (Just (Definition _ args _), _) -> do
+  case Map.lookup y cenv of
+    Just (Definition _ args _) -> do
       llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
-    (_, Just (Definition _ args _)) -> do
-      let argType = map (const voidPtr) args
-      denv <- gets declEnv
-      modify (\env -> env {declEnv = Map.insert y (argType, voidPtr) denv})
-      llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
-    (Nothing, Nothing) -> do
+    Nothing -> do
       mt <- lookupTypeEnvMaybe (Right y)
       case mt of
-        Just (_, TermPi _ xts _) -> do
-          let y' = "llvm_" <> y -- ここのprefixは設定できるようにしてもよさそう
-          denv <- gets declEnv
-          let argType = map (const voidPtr) xts
-          modify (\env -> env {declEnv = Map.insert y' (argType, voidPtr) denv})
-          llvmUncastLet x (LLVMDataGlobal y') (toFunPtrType xts) cont
         Nothing -> do
           denv <- gets declEnv
           modify (\env -> env {declEnv = Map.insert y ([], voidPtr) denv})
@@ -314,6 +310,12 @@ llvmDataLet x (m, DataConst y) cont = do
           -- すでに定義されているトップレベルの定数。……ここ、あんまり美しく
           -- ないような気がする。
           llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType []) cont
+        Just (_, TermPi _ xts _) -> do
+          let y' = "llvm_" <> y -- ここのprefixは設定できるようにしてもよさそう
+          denv <- gets declEnv
+          let argType = map (const voidPtr) xts
+          modify (\env -> env {declEnv = Map.insert y' (argType, voidPtr) denv})
+          llvmUncastLet x (LLVMDataGlobal y') (toFunPtrType xts) cont
         Just t -> do
           raiseError m $
             "external constants must have pi-type, but the type of `" <>
@@ -394,21 +396,17 @@ llvmCodeCase :: Meta -> DataPlus -> [((Meta, T.Text), CodePlus)] -> WithEnv LLVM
 llvmCodeCase _ _ [] = return LLVMUnreachable
 llvmCodeCase _ _ [(_, code)] = llvmCode code
 llvmCodeCase m v (((_, c), code):branchList) = do
-  funPtrType <- getLabelType m c
   code' <- llvmCode code
   cont <- llvmCodeCase m v branchList
   (tmp, tmpVar) <- newDataLocal c
   (base, baseVar) <- newDataLocal $ takeBaseName v
   (isEq, isEqVar) <- newDataLocal "cmp"
   uncastThenCmpThenBranch <-
-    llvmUncastLet tmp (LLVMDataGlobal $ showInHex c) funPtrType $
+    llvmUncastLet tmp (LLVMDataGlobal $ showInHex c) (toFunPtrType []) $
     LLVMLet isEq (LLVMOpBinaryOp (BinaryOpEQ voidPtr) tmpVar baseVar) $
     LLVMBranch isEqVar code' cont
   llvmDataLet base v uncastThenCmpThenBranch
-
--- 定数の型は() -> i8*で確定
-getLabelType :: Meta -> T.Text -> WithEnv LowType
-getLabelType m c = return $ toFunPtrType []
+  -- funPtrType <- getLabelType m c
   -- t <- lookupTypeEnv m (Right c) c
   -- case t of
   --   (_, TermPi _ xts _) -> return $ toFunPtrType xts
@@ -426,6 +424,9 @@ getLabelType m c = return $ toFunPtrType []
   --     insLLVMEnv c [] llvm
   --     return $ toFunPtrType []
 
+-- 定数の型は() -> i8*で確定
+-- getLabelType :: Meta -> T.Text -> WithEnv LowType
+-- getLabelType _ _ = return $ toFunPtrType []
 data AggPtrType
   = AggPtrTypeArray Int LowType
   | AggPtrTypeStruct [LowType]

@@ -4,6 +4,8 @@ module Main
   ( main
   ) where
 
+import Data.Time.Clock.POSIX
+
 -- import Control.Monad.State
 import Options.Applicative
 import Path
@@ -158,9 +160,10 @@ parseCompleteOpt = do
 run :: Command -> IO ()
 run (Build inputPathStr mOutputPathStr outputKind) = do
   inputPath <- resolveFile' inputPathStr
+  time <- round <$> getPOSIXTime
   resultOrErr <-
     evalWithEnv (runBuild inputPath) $
-    initialEnv {shouldColorize = True, endOfEntry = ""}
+    initialEnv {shouldColorize = True, endOfEntry = "", timestamp = time}
   basename <- setFileExtension "" $ filename inputPath
   mOutputPath <- mapM resolveFile' mOutputPathStr
   outputPath <- constructOutputPath basename mOutputPath outputKind
@@ -172,9 +175,15 @@ run (Build inputPathStr mOutputPathStr outputKind) = do
       -- writeResult result outputPath outputKind
 run (Check inputPathStr colorizeFlag eoe) = do
   inputPath <- resolveFile' inputPathStr
+  time <- round <$> getPOSIXTime
   resultOrErr <-
     evalWithEnv (runCheck inputPath) $
-    initialEnv {shouldColorize = colorizeFlag, endOfEntry = eoe, isCheck = True}
+    initialEnv
+      { shouldColorize = colorizeFlag
+      , endOfEntry = eoe
+      , isCheck = True
+      , timestamp = time
+      }
   case resultOrErr of
     Right _ -> return ()
     Left err ->
@@ -187,7 +196,9 @@ run (Archive inputPathStr mOutputPathStr) = do
   archive outputPath (toFilePath inputPath) contents
 run (Complete inputPathStr l c) = do
   inputPath <- resolveFile' inputPathStr
-  resultOrErr <- evalWithEnv (complete inputPath l c) initialEnv
+  time <- round <$> getPOSIXTime
+  resultOrErr <-
+    evalWithEnv (complete inputPath l c) $ initialEnv {timestamp = time}
   case resultOrErr of
     Left _ -> return ()
     Right result -> mapM_ putStrLn result
