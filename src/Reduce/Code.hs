@@ -25,8 +25,8 @@ reduceCodePlus (m, CodePiElimDownElim v ds) = do
         -- when (S.notMember x pset) $ do
         --   p $ "delete: " <> T.unpack x
         --   modify (\env -> env {deleteSet = S.insert x (deleteSet env)})
+        -- modify (\env -> env {codeEnv = Map.delete x cenv})
        -> do
-        modify (\env -> env {codeEnv = Map.delete x cenv})
         let sub = IntMap.fromList (zip (map asInt xs) ds)
         reduceCodePlus $ substCodePlus sub body
     -- (_, DataConst x)

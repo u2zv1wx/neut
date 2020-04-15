@@ -31,15 +31,24 @@ import Reduce.WeakTerm
 
 build :: WeakStmt -> WithEnv [Path Abs File]
 build (WeakStmtVisit path ss1 retZero) = do
-  note' $ "→ " <> T.pack (toFilePath path)
-  modify (\env -> env {nestLevel = nestLevel env + 1})
-  e <- build' ss1
-  modify (\env -> env {argAcc = []})
-  retZero' <- build' retZero
-  mainTerm <- letBind e retZero'
-  llvm <- clarify mainTerm >>= toLLVM >>= emit
-  compileObject path llvm
-  gets cachePathList
+  b <- isCacheAvailable path
+  if b
+    then do
+      note' $ "✓ " <> T.pack (toFilePath path)
+      bypass ss1
+      cachePath <- toCacheFilePath path
+      insCachePath cachePath
+      gets cachePathList
+    else do
+      note' $ "→ " <> T.pack (toFilePath path)
+      modify (\env -> env {nestLevel = nestLevel env + 1})
+      e <- build' ss1
+      modify (\env -> env {argAcc = []})
+      retZero' <- build' retZero
+      mainTerm <- letBind e retZero'
+      llvm <- clarify mainTerm >>= toLLVM >>= emit
+      compileObject path llvm
+      gets cachePathList
 build _ = raiseCritical' "build"
 
 link :: Path Abs File -> [Path Abs File] -> IO ()
