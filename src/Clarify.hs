@@ -41,6 +41,7 @@ clarify' tenv lam@(m, TermPiIntro mxts e) = do
 clarify' tenv (m, TermPiIntroPlus (name, args) mxts e) = do
   e' <- clarify' (insTypeEnv1 mxts tenv) e
   -- fixではなくね？
+  -- piIntroPlusがreduceの結果としてコピーされると定義の重複が起こりうる？
   retClosure tenv (ClsNameFix $ showInHex name) args m mxts e'
 clarify' tenv (m, TermPiElim e es) = do
   es' <- mapM (clarifyPlus tenv) es
@@ -361,7 +362,7 @@ data Arg
 data ClsName
   = ClsNameAnon
   | ClsNameFix T.Text
-  | ClsNameShared T.Text
+  -- | ClsNameShared T.Text
   deriving (Show)
 
 toHeaderInfo ::
@@ -499,41 +500,28 @@ makeClosure ::
 makeClosure mName mxts2 m mxts1 e = do
   let xts1 = dropFst mxts1
   let xts2 = dropFst mxts2
-  -- expName <- newNameWith' "exp"
   envExp <- cartesianSigma Nothing m arrVoidPtr $ map Right xts2
-  -- name <- nameFromMaybe mName
-  name <- registerIfNecessary m mName xts1 xts2 e
+  name <- nameFromMaybe mName
+  registerIfNecessary m name xts1 xts2 e
   let vs = map (\(mx, x, _) -> (mx, DataUpsilon x)) mxts2
   let fvEnv = (m, sigmaIntro vs)
   return (m, sigmaIntro [envExp, fvEnv, (m, DataConst name)])
 
 registerIfNecessary ::
      Meta
-  -> ClsName
+  -> T.Text
   -> [(Identifier, CodePlus)]
   -> [(Identifier, CodePlus)]
   -> CodePlus
-  -> WithEnv T.Text
-registerIfNecessary m mName xts1 xts2 e = do
-  (name, inserter, envInfo) <-
-    case mName of
-      ClsNameAnon -> do
-        name <- asText' <$> newNameWith' "thunk"
-        return (name, insCodeEnv, codeEnv)
-      ClsNameFix lamConstName -> return (lamConstName, insCodeEnv, codeEnv)
-      ClsNameShared lamConstName ->
-        return (lamConstName, insSharedCodeEnv, sharedCodeEnv)
-  cenv <- gets envInfo
-  -- when (not $ name `Map.member` cenv) $ do
-  if (name `Map.member` cenv)
-    then return name
-    else do
-      e' <- linearize (xts2 ++ xts1) e
-      (envVarName, envVar) <- newDataUpsilonWith m "env"
-      let args = map fst xts1 ++ [envVarName]
-      let body = (m, sigmaElim (map fst xts2) envVar e')
-      inserter name args body
-      return name
+  -> WithEnv ()
+registerIfNecessary m name xts1 xts2 e = do
+  cenv <- gets codeEnv
+  when (not $ name `Map.member` cenv) $ do
+    e' <- linearize (xts2 ++ xts1) e
+    (envVarName, envVar) <- newDataUpsilonWith m "env"
+    let args = map fst xts1 ++ [envVarName]
+    let body = (m, sigmaElim (map fst xts2) envVar e')
+    insCodeEnv name args body
 
 makeClosure' ::
      TypeEnv
@@ -590,11 +578,12 @@ callClosure m e zexes = do
           clsVar
           (m, CodePiElimDownElim lamVar (xs ++ [envVar])))
 
--- nameFromMaybe :: ClsName -> WithEnv T.Text
--- nameFromMaybe mName =
---   case mName of
---     ClsNameAnon -> asText' <$> newNameWith' "thunk"
---     ClsNameFix lamConstName -> return lamConstName
+nameFromMaybe :: ClsName -> WithEnv T.Text
+nameFromMaybe mName =
+  case mName of
+    ClsNameAnon -> asText' <$> newNameWith' "thunk"
+    ClsNameFix lamConstName -> return lamConstName
+
 --     ClsNameShared lamConstName -> return lamConstName
 chainTermPlus :: TypeEnv -> TermPlus -> WithEnv [IdentifierPlus]
 chainTermPlus _ (_, TermTau) = return []
