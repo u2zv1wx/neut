@@ -103,6 +103,7 @@ uncastList ((y, (x, et)):yxs) e = do
 takeBaseName :: DataPlus -> T.Text
 takeBaseName (_, DataConst s) = s
 takeBaseName (_, DataUpsilon (I (s, _))) = s
+takeBaseName (_, DataDownIntroPiIntro {}) = "thunk"
 takeBaseName (_, DataSigmaIntro _ ds) = "array" <> T.pack (show (length ds))
 takeBaseName (_, DataFloat FloatSize16 _) = "half"
 takeBaseName (_, DataFloat FloatSize32 _) = "float"
@@ -313,6 +314,13 @@ llvmDataLet x (m, DataConst y) cont = do
             y <> "` is:\n" <> toText (weaken t)
 llvmDataLet x (_, DataUpsilon y) cont =
   llvmUncastLet x (LLVMDataLocal y) voidPtr cont
+llvmDataLet x (_, DataDownIntroPiIntro xs e) cont = do
+  time <- gets timestamp
+  i <- newCount
+  let g = "_" <> T.pack (show time) <> "-" <> T.pack (show i)
+  e' <- llvmCode e
+  insLLVMEnv g xs e'
+  llvmUncastLet x (LLVMDataGlobal g) (toFunPtrType xs) cont
 llvmDataLet x (m, DataSigmaIntro k ds) cont = do
   let elemType = arrayKindToLowType k
   let arrayType = AggPtrTypeArray (length ds) elemType
