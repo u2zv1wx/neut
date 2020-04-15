@@ -166,7 +166,7 @@ run (Build inputPathStr mOutputPathStr outputKind) = do
   resultOrErr <-
     evalWithEnv (runBuild inputPath) $
     initialEnv {shouldColorize = True, endOfEntry = "", timestamp = time}
-  basename <- setFileExtension "" $ filename inputPath
+  basename <- replaceExtension "" $ filename inputPath
   mOutputPath <- mapM resolveFile' mOutputPathStr
   outputPath <- constructOutputPath basename mOutputPath outputKind
   case resultOrErr of
@@ -210,10 +210,10 @@ constructOutputPath ::
      Path Rel File -> Maybe (Path Abs File) -> OutputKind -> IO (Path Abs File)
 constructOutputPath basename Nothing OutputKindLLVM = do
   dir <- getCurrentDir
-  (dir </> basename) <.> "ll"
+  addExtension "ll" (dir </> basename)
 constructOutputPath basename Nothing OutputKindAsm = do
   dir <- getCurrentDir
-  (dir </> basename) <.> "s"
+  addExtension "s" (dir </> basename)
 constructOutputPath basename Nothing OutputKindObject = do
   dir <- getCurrentDir
   return $ dir </> basename
@@ -224,7 +224,7 @@ constructOutputArchivePath ::
 constructOutputArchivePath inputPath Nothing = do
   let baseName = fromRelDir $ dirname inputPath
   outputPath <- resolveFile' baseName
-  outputPath <.> "tar.gz"
+  addExtension "tar.gz" outputPath
 constructOutputArchivePath _ (Just path) = return path
 
 runBuild :: Path Abs File -> WithEnv [Path Abs File]

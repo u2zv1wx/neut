@@ -5,6 +5,7 @@ module Check
   ) where
 
 import Control.Monad.State
+import Data.Binary
 import Data.List (find)
 import Data.Time
 import Numeric
@@ -64,12 +65,17 @@ check (WeakStmtConstDecl _ (_, x, t) cont) = do
   t'' <- reduceTermPlus <$> elaborate t'
   insTypeEnv (Right x) t''
   check cont
-check (WeakStmtVisit _ ss1 ss2) = do
+check (WeakStmtVisit path ss1 ss2) = do
+  p "start:"
+  p' path
   check ss1
+  p "done:"
+  p' path
   check ss2
 
 check' :: T.Text -> WeakTermPlus -> WeakTermPlus -> WeakStmt -> WithEnv ()
 check' x e t cont = do
+  p' x
   analyze >> synthesize >> cleanup
   e' <- elaborate e
   t' <- elaborate t

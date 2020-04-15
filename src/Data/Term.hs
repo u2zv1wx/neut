@@ -1,8 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module Data.Term where
 
+import Data.Binary
 import Data.Maybe (fromMaybe)
+import GHC.Generics (Generic)
 
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Text as T
@@ -37,7 +40,9 @@ data Term
       T.Text
       TermPlus -- (the `e` in `case e of (...)`, the type of `e`)
       [Clause] -- ((cons x xs) e), ((nil) e), ((succ n) e).  (not ((cons A x xs) e).)
-  deriving (Show)
+  deriving (Show, Generic)
+
+instance Binary Term
 
 type TermPlus = (Meta, Term)
 

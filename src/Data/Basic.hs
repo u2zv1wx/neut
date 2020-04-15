@@ -4,18 +4,22 @@
 module Data.Basic where
 
 import Codec.Binary.UTF8.String
-import Data.Word
+import Data.Binary hiding (encode)
+import GHC.Generics hiding (Meta)
 import Path
+import Path.Internal
 
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Set as S
 import qualified Data.Text as T
 
-import Text.Read
+import Text.Read hiding (get)
 
 newtype Identifier =
   I (T.Text, Int)
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Generic)
+
+instance Binary Identifier
 
 asText :: Identifier -> T.Text
 asText (I (s, _)) = s
@@ -43,6 +47,9 @@ type Column = Int
 
 type Loc = (Phase, Line, Column)
 
+unwrapPath :: Path a b -> FilePath
+unwrapPath (Path path) = path
+
 data Meta =
   Meta
     { metaFileName :: Path Abs File
@@ -50,6 +57,26 @@ data Meta =
     , metaIsExplicit :: Bool
     , metaIsReducible :: Bool
     }
+  deriving (Generic)
+
+instance Binary Meta where
+  put m = do
+    put $ unwrapPath $ metaFileName m
+    put $ metaLocation m
+    put $ metaIsExplicit m
+    put $ metaIsReducible m
+  get = do
+    path <- get
+    loc <- get
+    isExplicit <- get
+    isReducible <- get
+    return $
+      Meta
+        { metaFileName = Path path
+        , metaLocation = loc
+        , metaIsExplicit = isExplicit
+        , metaIsReducible = isReducible
+        }
 
 -- required to derive the eqality on WeakTerm
 instance Eq Meta where
@@ -117,7 +144,9 @@ data FloatSize
   = FloatSize16
   | FloatSize32
   | FloatSize64
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic)
+
+instance Binary FloatSize
 
 asFloatSize :: Int -> Maybe FloatSize
 asFloatSize 16 = Just FloatSize16
@@ -134,18 +163,24 @@ data EnumType
   = EnumTypeLabel T.Text
   | EnumTypeIntS Int -- i{k}
   | EnumTypeIntU Int -- u{k}
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
+
+instance Binary EnumType
 
 data EnumValue
   = EnumValueIntS IntSize Integer
   | EnumValueIntU IntSize Integer
   | EnumValueLabel T.Text
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance Binary EnumValue
 
 data Case
   = CaseValue EnumValue
   | CaseDefault
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance Binary Case
 
 type CasePlus = (Meta, Case)
 
@@ -185,7 +220,9 @@ data ArrayKind
   | ArrayKindIntU Int
   | ArrayKindFloat FloatSize
   | ArrayKindVoidPtr
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
+
+instance Binary ArrayKind
 
 voidPtr :: LowType
 voidPtr = LowTypePtr (LowTypeIntS 8)

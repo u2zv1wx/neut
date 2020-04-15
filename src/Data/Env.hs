@@ -432,6 +432,12 @@ getObjectCacheDirPath = do
   relCachePath <- parseRelDir $ ".cache/neut/" <> ver <> "/object"
   getDirPath relCachePath
 
+getTypeCacheDirPath :: WithEnv (Path Abs Dir)
+getTypeCacheDirPath = do
+  let ver = showVersion version
+  relCachePath <- parseRelDir $ ".cache/neut/" <> ver <> "/type"
+  getDirPath relCachePath
+
 getDirPath :: Path Rel Dir -> WithEnv (Path Abs Dir)
 getDirPath base = do
   homeDirPath <- getHomeDir
