@@ -6,6 +6,7 @@ import Control.Monad.State
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
+import qualified Data.Set as S
 import qualified Data.Text as T
 
 import Data.Basic
@@ -76,6 +77,7 @@ nameDefinition :: Meta -> T.Text -> Definition -> WithEnv DataPlus
 nameDefinition m key def = do
   (name, theta) <- newConstInfo key m
   insCodeEnv' name def
+  modify (\env -> env {inlineSet = S.insert name (inlineSet env)})
   return theta
 
 tryCache :: Meta -> T.Text -> WithEnv DataPlus -> WithEnv DataPlus

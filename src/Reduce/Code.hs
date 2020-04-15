@@ -11,12 +11,11 @@ import Data.Basic
 import Data.Code
 import Data.Env
 import qualified Data.Set as S
-import qualified Data.Text as T
 
 reduceCodePlus :: CodePlus -> WithEnv CodePlus
 reduceCodePlus (m, CodePiElimDownElim v ds) = do
   cenv <- gets codeEnv
-  -- ns <- gets nameSet
+  ns <- gets nameSet
   case v of
     (_, DataConst x)
       | Just (Definition (IsFixed False) xs body) <- Map.lookup x cenv
@@ -29,15 +28,15 @@ reduceCodePlus (m, CodePiElimDownElim v ds) = do
        -> do
         let sub = IntMap.fromList (zip (map asInt xs) ds)
         reduceCodePlus $ substCodePlus sub body
-    -- (_, DataConst x)
-    --   | Just (Definition (IsFixed True) xs body) <- Map.lookup x cenv
-    --   , length xs == length ds
-    --   , not (x `S.member` ns) -> do
-    --     modify (\env -> env {nameSet = S.insert x ns})
-    --     body' <- reduceCodePlus body
-    --     let def = Definition (IsFixed True) xs body'
-    --     modify (\env -> env {codeEnv = Map.insert x def cenv})
-    --     return (m, CodePiElimDownElim v ds)
+    (_, DataConst x)
+      | Just (Definition (IsFixed True) xs body) <- Map.lookup x cenv
+      , length xs == length ds
+      , not (x `S.member` ns) -> do
+        modify (\env -> env {nameSet = S.insert x ns})
+        body' <- reduceCodePlus body
+        let def = Definition (IsFixed True) xs body'
+        modify (\env -> env {codeEnv = Map.insert x def cenv})
+        return (m, CodePiElimDownElim v ds)
     _ -> return (m, CodePiElimDownElim v ds)
 reduceCodePlus (m, CodeSigmaElim mk xs v e) = do
   case v of
@@ -105,4 +104,10 @@ reduceCodePlus (m, CodeStructElim xks d e) = do
           , Just ys <- mapM asUpsilon ds2
           , xs == ys -> return (mUp, CodeUpIntro d) -- eta-reduce
         _ -> return (m, CodeStructElim xks d e)
+reduceCodePlus (m, CodeCase sub d mces) = do
+  let (mcs, es) = unzip mces
+  let es' = map (substCodePlus sub) es
+  es'' <- mapM reduceCodePlus es'
+  return (m, CodeCase IntMap.empty d $ zip mcs es'')
+  -- | CodeCase SubstDataPlus DataPlus [((Meta, T.Text), CodePlus)]
 reduceCodePlus t = return t

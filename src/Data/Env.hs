@@ -106,6 +106,7 @@ data Env =
     , nameSet :: S.Set T.Text
     , permanentSet :: S.Set T.Text
     , deleteSet :: S.Set T.Text
+    , inlineSet :: S.Set T.Text
     , chainEnv :: IntMap.IntMap ([Data.Term.IdentifierPlus], TermPlus)
     --
     -- LLVM
@@ -172,6 +173,7 @@ initialEnv =
     , nameSet = S.empty
     , permanentSet = S.empty
     , deleteSet = S.empty
+    , inlineSet = S.empty
     , nopFreeSet = S.empty
     , argAcc = []
     , cachePathList = []

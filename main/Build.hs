@@ -97,7 +97,6 @@ build' (WeakStmtVisit path ss1 ss2) = do
       snapshot <- setupEnv
       e <- build' ss1
       code <- toLLVM' >> emit'
-      -- note' $ T.replicate (i * 2) " " <> "← " <> T.pack (toFilePath path)
       modify (\env -> env {nestLevel = i})
       compileObject path code
       revertEnv snapshot
