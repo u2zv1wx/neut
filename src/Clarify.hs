@@ -479,11 +479,18 @@ makeClosure mName mxts2 m mxts1 e = do
   let xts1 = dropFst mxts1
   let xts2 = dropFst mxts2
   envExp <- cartesianSigma Nothing m arrVoidPtr $ map Right xts2
-  name <- nameFromMaybe mName
-  registerIfNecessary m name xts1 xts2 e
   let vs = map (\(mx, x, _) -> (mx, DataUpsilon x)) mxts2
   let fvEnv = (m, sigmaIntro vs)
-  return (m, sigmaIntro [envExp, fvEnv, (m, DataConst name)])
+  case mName of
+    Nothing -> do
+      (args, body) <- toLamInfo m xts1 xts2 e
+      return
+        (m, sigmaIntro [envExp, fvEnv, (m, DataDownIntroPiIntro args body)])
+    Just name -> do
+      registerIfNecessary m name xts1 xts2 e
+      -- let vs = map (\(mx, x, _) -> (mx, DataUpsilon x)) mxts2
+      -- let fvEnv = (m, sigmaIntro vs)
+      return (m, sigmaIntro [envExp, fvEnv, (m, DataConst name)])
 
 registerIfNecessary ::
      Meta
@@ -495,11 +502,21 @@ registerIfNecessary ::
 registerIfNecessary m name xts1 xts2 e = do
   cenv <- gets codeEnv
   when (not $ name `Map.member` cenv) $ do
-    e' <- linearize (xts2 ++ xts1) e
-    (envVarName, envVar) <- newDataUpsilonWith m "env"
-    let args = map fst xts1 ++ [envVarName]
-    let body = (m, sigmaElim (map fst xts2) envVar e')
+    (args, body) <- toLamInfo m xts1 xts2 e
     insCodeEnv name args body
+
+toLamInfo ::
+     Meta
+  -> [(Identifier, CodePlus)]
+  -> [(Identifier, CodePlus)]
+  -> CodePlus
+  -> WithEnv ([Identifier], CodePlus)
+toLamInfo m xts1 xts2 e = do
+  e' <- linearize (xts2 ++ xts1) e
+  (envVarName, envVar) <- newDataUpsilonWith m "env"
+  let args = map fst xts1 ++ [envVarName]
+  let body = (m, sigmaElim (map fst xts2) envVar e')
+  return (args, body)
 
 makeClosure' ::
      TypeEnv
@@ -555,12 +572,6 @@ callClosure m e zexes = do
           [typeVarName, envVarName, lamVarName]
           clsVar
           (m, CodePiElimDownElim lamVar (xs ++ [envVar])))
-
-nameFromMaybe :: Maybe T.Text -> WithEnv T.Text
-nameFromMaybe mName =
-  case mName of
-    Nothing -> asText' <$> newNameWith' "thunk"
-    Just lamConstName -> return lamConstName
 
 chainTermPlus :: TypeEnv -> TermPlus -> WithEnv [IdentifierPlus]
 chainTermPlus _ (_, TermTau) = return []
