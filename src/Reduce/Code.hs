@@ -70,6 +70,9 @@ reduceCodePlus (m, CodeUpElim x e1 e2) = do
           | x == y -> return e1' -- eta-reduce
         _ -> return (m, CodeUpElim x e1' e2')
 reduceCodePlus (m, CodeEnumElim varInfo v les) = do
+  let (ls, es) = unzip les
+  let es' = map (substCodePlus varInfo) es
+  es'' <- mapM reduceCodePlus es'
   case v of
     (_, DataEnumIntro l) ->
       case lookup (CaseValue l) les of
@@ -78,13 +81,8 @@ reduceCodePlus (m, CodeEnumElim varInfo v les) = do
           case lookup CaseDefault les of
             Just body -> reduceCodePlus $ substCodePlus varInfo body
             Nothing -> do
-              let (ls, es) = unzip les
-              es' <- mapM reduceCodePlus es
-              return (m, CodeEnumElim varInfo v $ zip ls es')
-    _ -> do
-      let (ls, es) = unzip les
-      es' <- mapM reduceCodePlus es
-      return (m, CodeEnumElim varInfo v $ zip ls es')
+              return (m, CodeEnumElim IntMap.empty v $ zip ls es'')
+    _ -> return (m, CodeEnumElim IntMap.empty v $ zip ls es'')
 reduceCodePlus (m, CodeStructElim xks d e) = do
   let (xs, ks1) = unzip xks
   case d of
