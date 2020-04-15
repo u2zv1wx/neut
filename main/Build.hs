@@ -51,11 +51,11 @@ build (WeakStmtVisit path ss1 retZero) = do
       gets cachePathList
 build _ = raiseCritical' "build"
 
-link :: Path Abs File -> [Path Abs File] -> IO ()
-link outputPath pathList = do
+link :: Path Abs File -> [Path Abs File] -> [String] -> IO ()
+link outputPath pathList opt = do
   callProcess "clang" $
     map toFilePath pathList ++
-    ["-Wno-override-module", "-o" ++ toFilePath outputPath]
+    opt ++ ["-Wno-override-module", "-o" ++ toFilePath outputPath]
 
 build' :: WeakStmt -> WithEnv TermPlus
 build' (WeakStmtReturn e) = do

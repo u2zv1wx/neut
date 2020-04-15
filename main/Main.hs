@@ -48,11 +48,13 @@ type Column = Int
 data OutputKind
   = OutputKindObject
   | OutputKindLLVM
+  | OutputKindAsm
   deriving (Show)
 
 instance Read OutputKind where
   readsPrec _ "object" = [(OutputKindObject, [])]
   readsPrec _ "llvm" = [(OutputKindLLVM, [])]
+  readsPrec _ "asm" = [(OutputKindAsm, [])]
   readsPrec _ _ = []
 
 data Command
@@ -169,10 +171,11 @@ run (Build inputPathStr mOutputPathStr outputKind) = do
   outputPath <- constructOutputPath basename mOutputPath outputKind
   case resultOrErr of
     Left err -> seqIO (map (outputLog True "") err) >> exitWith (ExitFailure 1)
-    -- Right result -> do
-    --   writeResult result outputPath outputKind
-    Right pathList -> link outputPath pathList
-      -- writeResult result outputPath outputKind
+    Right pathList -> link outputPath pathList []
+      -- case outputKind of
+      --   OutputKindObject -> link outputPath pathList []
+      --   OutputKindLLVM -> link outputPath pathList ["-emit-llvm"]
+      --   OutputKindAsm -> link outputPath pathList ["-S"]
 run (Check inputPathStr colorizeFlag eoe) = do
   inputPath <- resolveFile' inputPathStr
   time <- round <$> getPOSIXTime
@@ -208,6 +211,9 @@ constructOutputPath ::
 constructOutputPath basename Nothing OutputKindLLVM = do
   dir <- getCurrentDir
   (dir </> basename) <.> "ll"
+constructOutputPath basename Nothing OutputKindAsm = do
+  dir <- getCurrentDir
+  (dir </> basename) <.> "s"
 constructOutputPath basename Nothing OutputKindObject = do
   dir <- getCurrentDir
   return $ dir </> basename
@@ -221,17 +227,6 @@ constructOutputArchivePath inputPath Nothing = do
   outputPath <.> "tar.gz"
 constructOutputArchivePath _ (Just path) = return path
 
--- writeResult :: L.ByteString -> Path Abs File -> OutputKind -> IO ()
--- writeResult result outputPath OutputKindLLVM = do
---   L.writeFile (toFilePath outputPath) result
--- writeResult result outputPath OutputKindObject = do
---   tmpOutputPath <- liftIO $ outputPath <.> "ll"
---   let tmpOutputPathStr = toFilePath tmpOutputPath
---   L.writeFile tmpOutputPathStr result
---   callProcess
---     "clang"
---     [tmpOutputPathStr, "-Wno-override-module", "-o" ++ toFilePath outputPath]
---   removeFile tmpOutputPath
 runBuild :: Path Abs File -> WithEnv [Path Abs File]
 runBuild inputPath = parse inputPath >>= build
 
