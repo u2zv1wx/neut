@@ -72,19 +72,12 @@ switch e1 e2 = [(CaseValue (EnumValueIntS 64 0), e1), (CaseDefault, e2)]
 cartImmName :: T.Text
 cartImmName = "cartesian-immediate"
 
-nameDefinition :: Meta -> T.Text -> Definition -> WithEnv DataPlus
-nameDefinition m key def = do
-  (name, theta) <- newConstInfo key m
-  insCodeEnv' name def
-  return theta
-
 tryCache :: T.Text -> WithEnv DataPlus -> WithEnv DataPlus
 tryCache key f = do
   scenv <- gets sharedCodeEnv
   case Map.lookup key scenv of
     Nothing -> f
     Just def -> return def
-      -- nameDefinition m key def
 
 makeSwitcher ::
      Meta
@@ -110,7 +103,7 @@ cartesianImmediate :: Meta -> WithEnv DataPlus
 cartesianImmediate m = do
   tryCache cartImmName $ do
     def <- makeSwitcher m affineImmediate relevantImmediate
-    insSharedCodeEnv' cartImmName def
+    insSharedCodeEnv cartImmName def
     return def
 
 affineImmediate :: DataPlus -> WithEnv CodePlus
@@ -127,7 +120,7 @@ cartesianStruct :: Meta -> [ArrayKind] -> WithEnv DataPlus
 cartesianStruct m ks = do
   tryCache cartStructName $ do
     def <- makeSwitcher m (affineStruct ks) (relevantStruct ks)
-    insSharedCodeEnv' cartStructName def
+    insSharedCodeEnv cartStructName def
     cartesianStruct m ks
 
 affineStruct :: [ArrayKind] -> DataPlus -> WithEnv CodePlus
@@ -154,14 +147,6 @@ insCodeEnv name args e = do
   let def = Definition (IsFixed False) args e
   modify (\env -> env {codeEnv = Map.insert name def (codeEnv env)})
 
-insCodeEnv' :: T.Text -> Definition -> WithEnv ()
-insCodeEnv' name def = do
-  modify (\env -> env {codeEnv = Map.insert name def (codeEnv env)})
-
--- insSharedCodeEnv :: T.Text -> [Identifier] -> CodePlus -> WithEnv ()
--- insSharedCodeEnv name args e = do
---   let def = Definition (IsFixed False) args e
---   modify (\env -> env {sharedCodeEnv = Map.insert name def (sharedCodeEnv env)})
-insSharedCodeEnv' :: T.Text -> DataPlus -> WithEnv ()
-insSharedCodeEnv' name def = do
+insSharedCodeEnv :: T.Text -> DataPlus -> WithEnv ()
+insSharedCodeEnv name def = do
   modify (\env -> env {sharedCodeEnv = Map.insert name def (sharedCodeEnv env)})
