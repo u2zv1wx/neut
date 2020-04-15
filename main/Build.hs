@@ -32,19 +32,15 @@ import Reduce.WeakTerm
 build :: WeakStmt -> WithEnv [Path Abs File]
 build (WeakStmtVisit path ss1 retZero) = do
   note' $ "→ " <> T.pack (toFilePath path)
-  -- ホントはここでもキャッシュを調べにいっていい
   modify (\env -> env {nestLevel = nestLevel env + 1})
   e <- build' ss1
   modify (\env -> env {argAcc = []})
   retZero' <- build' retZero
   mainTerm <- letBind e retZero'
-  llvm <- clarify mainTerm >>= toLLVM >>= emit -- main termのビルドはココで行う。
-  -- sharedCode <- buildShared
-  -- note' $ "← " <> T.pack (toFilePath path)
+  llvm <- clarify mainTerm >>= toLLVM >>= emit
   compileObject path llvm
-  -- compileObject path $ sharedCode <> "\n" <> llvm
   gets cachePathList
-build _ = undefined
+build _ = raiseCritical' "build"
 
 link :: Path Abs File -> [Path Abs File] -> IO ()
 link outputPath pathList = do
@@ -94,9 +90,9 @@ build' (WeakStmtVisit path ss1 ss2) = do
       code <- toLLVM' >> emit'
       -- note' $ T.replicate (i * 2) " " <> "← " <> T.pack (toFilePath path)
       modify (\env -> env {nestLevel = i})
-      compileObject path code -- オブジェクトファイルを構成
+      compileObject path code
       revertEnv snapshot
-      cont <- build' ss2 -- このcontの結果もあくまでLLVM IR
+      cont <- build' ss2
       letBind e cont
 
 letBind :: TermPlus -> TermPlus -> WithEnv TermPlus
@@ -120,15 +116,6 @@ revertEnv snapshot = do
   modify (\e -> e {llvmEnv = llvmEnv snapshot})
   modify (\e -> e {argAcc = argAcc snapshot})
 
--- buildShared :: WithEnv Builder
--- buildShared = do
---   scenv <- gets sharedCodeEnv
---   modify (\env -> env {codeEnv = scenv, llvmEnv = Map.empty})
---   denv <- gets declEnv
---   let denv' = Map.filterWithKey (\k _ -> not $ Map.member k scenv) denv
---   modify (\env -> env {declEnv = denv'})
---   toLLVM'
---   emit'
 compileObject :: Path Abs File -> Builder -> WithEnv ()
 compileObject srcPath code = do
   cachePath <- toCacheFilePath srcPath
