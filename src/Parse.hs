@@ -43,7 +43,7 @@ parse :: Path Abs File -> WithEnv WeakStmt
 parse inputPath = do
   stmtList <- visit inputPath
   stmtList' <- discern stmtList
-  -- warnUnusedVar
+  warnUnusedVar
   pushTrace inputPath
   concatQuasiStmtList stmtList'
 
