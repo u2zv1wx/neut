@@ -18,7 +18,6 @@ data Term
   | TermUpsilon Identifier
   | TermPi (Maybe T.Text) [IdentifierPlus] TermPlus
   | TermPiIntro (Maybe (T.Text, [IdentifierPlus])) [IdentifierPlus] TermPlus
-  -- | TermPiIntroPlus (T.Text, [IdentifierPlus]) [IdentifierPlus] TermPlus
   | TermPiElim TermPlus [TermPlus]
   | TermIter IdentifierPlus [IdentifierPlus] TermPlus
   | TermConst T.Text
@@ -67,7 +66,6 @@ varTermPlus (_, TermTau) = []
 varTermPlus (_, TermUpsilon x) = [x]
 varTermPlus (_, TermPi _ xts t) = varTermPlus' xts [t]
 varTermPlus (_, TermPiIntro _ xts e) = varTermPlus' xts [e]
--- varTermPlus (_, TermPiIntroPlus _ xts e) = varTermPlus' xts [e]
 varTermPlus (_, TermPiElim e es) = do
   let xs1 = varTermPlus e
   let xs2 = concatMap varTermPlus es
@@ -112,13 +110,17 @@ substTermPlus sub (m, TermUpsilon x) =
 substTermPlus sub (m, TermPi mName xts t) = do
   let (xts', t') = substTermPlus'' sub xts t
   (m, TermPi mName xts' t')
-substTermPlus sub (m, TermPiIntro Nothing xts body) = do
+substTermPlus sub (m, TermPiIntro info xts body) = do
+  let info' = fmap2 (substTermPlus' sub) info
   let (xts', body') = substTermPlus'' sub xts body
-  (m, TermPiIntro Nothing xts' body')
-substTermPlus sub (m, TermPiIntro (Just (name, args)) xts body) = do
-  let args' = substTermPlus' sub args
-  let (xts', body') = substTermPlus'' sub xts body
-  (m, TermPiIntro (Just (name, args')) xts' body')
+  (m, TermPiIntro info' xts' body')
+-- substTermPlus sub (m, TermPiIntro Nothing xts body) = do
+--   let (xts', body') = substTermPlus'' sub xts body
+--   (m, TermPiIntro Nothing xts' body')
+-- substTermPlus sub (m, TermPiIntro (Just (name, args)) xts body) = do
+--   let args' = substTermPlus' sub args
+--   let (xts', body') = substTermPlus'' sub xts body
+--   (m, TermPiIntro (Just (name, args')) xts' body')
 substTermPlus sub (m, TermPiElim e es) = do
   let e' = substTermPlus sub e
   let es' = map (substTermPlus sub) es
@@ -189,12 +191,16 @@ weaken (m, TermTau) = (m, WeakTermTau)
 weaken (m, TermUpsilon x) = (m, WeakTermUpsilon x)
 weaken (m, TermPi mName xts t) =
   (m, WeakTermPi mName (weakenArgs xts) (weaken t))
-weaken (m, TermPiIntro Nothing xts body) = do
-  (m, WeakTermPiIntro Nothing (weakenArgs xts) (weaken body))
-weaken (m, TermPiIntro (Just (name, args)) xts body) = do
-  let args' = weakenArgs args
+weaken (m, TermPiIntro info xts body) = do
+  let info' = fmap2 weakenArgs info
   let xts' = (weakenArgs xts)
-  (m, WeakTermPiIntro (Just (name, args')) xts' (weaken body))
+  (m, WeakTermPiIntro info' xts' (weaken body))
+-- weaken (m, TermPiIntro Nothing xts body) = do
+--   (m, WeakTermPiIntro Nothing (weakenArgs xts) (weaken body))
+-- weaken (m, TermPiIntro (Just (name, args)) xts body) = do
+--   let args' = weakenArgs args
+--   let xts' = (weakenArgs xts)
+--   (m, WeakTermPiIntro (Just (name, args')) xts' (weaken body))
 weaken (m, TermPiElim e es) = do
   let e' = weaken e
   let es' = map weaken es

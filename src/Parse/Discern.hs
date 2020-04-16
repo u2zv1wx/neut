@@ -123,13 +123,17 @@ discern'' nenv (m, WeakTermUpsilon x@(I (s, _))) = do
 discern'' nenv (m, WeakTermPi mName xts t) = do
   (xts', t') <- discernBinder nenv xts t
   return (m, WeakTermPi mName xts' t')
-discern'' nenv (m, WeakTermPiIntro Nothing xts e) = do
+discern'' nenv (m, WeakTermPiIntro info xts e) = do
+  info' <- fmap2M (mapM (discernIdentPlus nenv)) info
   (xts', e') <- discernBinder nenv xts e
-  return (m, WeakTermPiIntro Nothing xts' e')
-discern'' nenv (m, WeakTermPiIntro (Just (name, args)) xts e) = do
-  args' <- mapM (discernIdentPlus nenv) args
-  (xts', e') <- discernBinder nenv xts e
-  return (m, WeakTermPiIntro (Just (name, args')) xts' e')
+  return (m, WeakTermPiIntro info' xts' e')
+-- discern'' nenv (m, WeakTermPiIntro Nothing xts e) = do
+--   (xts', e') <- discernBinder nenv xts e
+--   return (m, WeakTermPiIntro Nothing xts' e')
+-- discern'' nenv (m, WeakTermPiIntro (Just (name, args)) xts e) = do
+--   args' <- mapM (discernIdentPlus nenv) args
+--   (xts', e') <- discernBinder nenv xts e
+--   return (m, WeakTermPiIntro (Just (name, args')) xts' e')
 discern'' nenv (m, WeakTermPiElim e es) = do
   es' <- mapM (discern'' nenv) es
   e' <- discern'' nenv e

@@ -125,15 +125,20 @@ elaborate (m, WeakTermPi mName xts t) = do
   xts' <- mapM elaboratePlus xts
   t' <- elaborate t
   return (m, TermPi mName xts' t')
-elaborate (m, WeakTermPiIntro Nothing xts e) = do
-  e' <- elaborate e
+elaborate (m, WeakTermPiIntro info xts e) = do
+  info' <- fmap2M (mapM elaboratePlus) info
   xts' <- mapM elaboratePlus xts
-  return (m, TermPiIntro Nothing xts' e')
-elaborate (m, WeakTermPiIntro (Just (name, args)) xts e) = do
-  args' <- mapM elaboratePlus args
   e' <- elaborate e
-  xts' <- mapM elaboratePlus xts
-  return (m, TermPiIntro (Just (name, args')) xts' e')
+  return (m, TermPiIntro info' xts' e')
+-- elaborate (m, WeakTermPiIntro Nothing xts e) = do
+--   e' <- elaborate e
+--   xts' <- mapM elaboratePlus xts
+--   return (m, TermPiIntro Nothing xts' e')
+-- elaborate (m, WeakTermPiIntro (Just (name, args)) xts e) = do
+--   args' <- mapM elaboratePlus args
+--   e' <- elaborate e
+--   xts' <- mapM elaboratePlus xts
+--   return (m, TermPiIntro (Just (name, args')) xts' e')
 elaborate (m, WeakTermPiElim (mh, WeakTermZeta (I (_, x))) es) = do
   sub <- gets substEnv
   case IntMap.lookup x sub of

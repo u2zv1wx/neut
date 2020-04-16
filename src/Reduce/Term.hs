@@ -23,10 +23,11 @@ reduceTermPlus (m, TermPi mName xts cod) = do
   let cod' = reduceTermPlus cod
   (m, TermPi mName (zip3 ms xs ts') cod')
 reduceTermPlus (m, TermPiIntro info xts e) = do
+  let info' = fmap2 (map reduceIdentPlus) info
   let (ms, xs, ts) = unzip3 xts
   let ts' = map reduceTermPlus ts
   let e' = reduceTermPlus e
-  (m, TermPiIntro info (zip3 ms xs ts') e')
+  (m, TermPiIntro info' (zip3 ms xs ts') e')
 -- reduceTermPlus (m, TermPiIntroPlus (name, args) xts e) = do
 --   let args' = map reduceIdentPlus args
 --   let xts' = map reduceIdentPlus xts

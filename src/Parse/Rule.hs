@@ -483,13 +483,17 @@ substRuleType _ (m, WeakTermUpsilon x) = return (m, WeakTermUpsilon x)
 substRuleType sub (m, WeakTermPi mName xts t) = do
   (xts', t') <- substRuleType'' sub xts t
   return (m, WeakTermPi mName xts' t')
-substRuleType sub (m, WeakTermPiIntro Nothing xts body) = do
+substRuleType sub (m, WeakTermPiIntro info xts body) = do
+  info' <- fmap2M (substRuleType' sub) info
   (xts', body') <- substRuleType'' sub xts body
-  return (m, WeakTermPiIntro Nothing xts' body')
-substRuleType sub (m, WeakTermPiIntro (Just (name, args)) xts body) = do
-  args' <- substRuleType' sub args
-  (xts', body') <- substRuleType'' sub xts body
-  return (m, WeakTermPiIntro (Just (name, args')) xts' body')
+  return (m, WeakTermPiIntro info' xts' body')
+-- substRuleType sub (m, WeakTermPiIntro Nothing xts body) = do
+--   (xts', body') <- substRuleType'' sub xts body
+--   return (m, WeakTermPiIntro Nothing xts' body')
+-- substRuleType sub (m, WeakTermPiIntro (Just (name, args)) xts body) = do
+--   args' <- substRuleType' sub args
+--   (xts', body') <- substRuleType'' sub xts body
+--   return (m, WeakTermPiIntro (Just (name, args')) xts' body')
 substRuleType sub@((a1, es1), (a2, es2)) (m, WeakTermPiElim e es)
   | (mx, WeakTermUpsilon x) <- e
   , a1 == x =

@@ -18,7 +18,6 @@ data WeakTerm
       (Maybe ((T.Text, [IdentifierPlus])))
       [IdentifierPlus]
       WeakTermPlus
-  -- | WeakTermPiIntroPlus (T.Text, [IdentifierPlus]) [IdentifierPlus] WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
   | WeakTermIter IdentifierPlus [IdentifierPlus] WeakTermPlus
   | WeakTermZeta Identifier
@@ -125,7 +124,6 @@ varWeakTermPlus (_, WeakTermTau) = S.empty
 varWeakTermPlus (_, WeakTermUpsilon x) = S.singleton x
 varWeakTermPlus (_, WeakTermPi _ xts t) = varWeakTermPlus' xts [t]
 varWeakTermPlus (_, WeakTermPiIntro _ xts e) = varWeakTermPlus' xts [e]
--- varWeakTermPlus (_, WeakTermPiIntroPlus _ xts e) = varWeakTermPlus' xts [e]
 varWeakTermPlus (_, WeakTermPiElim e es) = do
   let xs = varWeakTermPlus e
   let ys = S.unions $ map varWeakTermPlus es
@@ -180,7 +178,6 @@ holeWeakTermPlus (_, WeakTermTau) = S.empty
 holeWeakTermPlus (_, WeakTermUpsilon _) = S.empty
 holeWeakTermPlus (_, WeakTermPi _ xts t) = holeWeakTermPlus' xts [t]
 holeWeakTermPlus (_, WeakTermPiIntro _ xts e) = holeWeakTermPlus' xts [e]
--- holeWeakTermPlus (_, WeakTermPiIntroPlus {}) = S.empty
 holeWeakTermPlus (_, WeakTermPiElim e es) = do
   let set1 = holeWeakTermPlus e
   let set2 = S.unions $ map holeWeakTermPlus es
@@ -237,7 +234,6 @@ constWeakTermPlus (_, WeakTermTau) = S.empty
 constWeakTermPlus (_, WeakTermUpsilon _) = S.empty
 constWeakTermPlus (_, WeakTermPi _ xts t) = constWeakTermPlus' xts [t]
 constWeakTermPlus (_, WeakTermPiIntro _ xts e) = constWeakTermPlus' xts [e]
--- constWeakTermPlus (_, WeakTermPiIntroPlus _ xts e) = constWeakTermPlus' xts [e]
 constWeakTermPlus (_, WeakTermPiElim e es) = do
   let xs = constWeakTermPlus e
   let ys = S.unions $ map constWeakTermPlus es
@@ -296,13 +292,17 @@ substWeakTermPlus sub e1@(_, WeakTermUpsilon x) = do
 substWeakTermPlus sub (m, WeakTermPi mName xts t) = do
   let (xts', t') = substWeakTermPlus'' sub xts t
   (m, WeakTermPi mName xts' t')
-substWeakTermPlus sub (m, WeakTermPiIntro Nothing xts body) = do
+substWeakTermPlus sub (m, WeakTermPiIntro info xts body) = do
+  let info' = fmap2 (substWeakTermPlus' sub) info
   let (xts', body') = substWeakTermPlus'' sub xts body
-  (m, WeakTermPiIntro Nothing xts' body')
-substWeakTermPlus sub (m, WeakTermPiIntro (Just (name, args)) xts body) = do
-  let args' = substWeakTermPlus' sub args
-  let (xts', body') = substWeakTermPlus'' sub xts body
-  (m, WeakTermPiIntro (Just (name, args')) xts' body')
+  (m, WeakTermPiIntro info' xts' body')
+-- substWeakTermPlus sub (m, WeakTermPiIntro Nothing xts body) = do
+--   let (xts', body') = substWeakTermPlus'' sub xts body
+--   (m, WeakTermPiIntro Nothing xts' body')
+-- substWeakTermPlus sub (m, WeakTermPiIntro (Just (name, args)) xts body) = do
+--   let args' = substWeakTermPlus' sub args
+--   let (xts', body') = substWeakTermPlus'' sub xts body
+--   (m, WeakTermPiIntro (Just (name, args')) xts' body')
 substWeakTermPlus sub (m, WeakTermPiElim e es) = do
   let e' = substWeakTermPlus sub e
   let es' = map (substWeakTermPlus sub) es

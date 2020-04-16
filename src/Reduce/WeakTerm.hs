@@ -22,10 +22,11 @@ reduceWeakTermPlus (_, WeakTermPiIntro Nothing xts (_, WeakTermPiElim e args))
   | Just ys <- mapM asUpsilon args
   , ys == map (\(_, x, _) -> x) xts = e
 reduceWeakTermPlus (m, WeakTermPiIntro info xts e) = do
+  let info' = fmap2 (map reduceWeakTermIdentPlus) info
   let (ms, xs, ts) = unzip3 xts
   let ts' = map reduceWeakTermPlus ts
   let e' = reduceWeakTermPlus e
-  (m, WeakTermPiIntro info (zip3 ms xs ts') e')
+  (m, WeakTermPiIntro info' (zip3 ms xs ts') e')
 -- reduceWeakTermPlus (m, WeakTermPiIntroPlus (name, args) xts e) = do
 --   let args' = map reduceWeakTermIdentPlus args
 --   let xts' = map reduceWeakTermIdentPlus xts
