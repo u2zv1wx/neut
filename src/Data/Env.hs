@@ -26,7 +26,6 @@ import qualified Data.IntMap.Strict as IntMap
 import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
 import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
 
 import qualified Text.Show.Pretty as Pr
 
@@ -176,13 +175,6 @@ initialEnv =
 
 type WithEnv a = StateT Env (ExceptT [Log] IO) a
 
-initialDeclEnv :: Map.HashMap T.Text ([LowType], LowType)
-initialDeclEnv =
-  Map.fromList
-    [ ("malloc", ([LowTypeIntS 64], voidPtr))
-    , ("free", ([voidPtr], LowTypeVoid))
-    ]
-
 whenCheck :: WithEnv () -> WithEnv ()
 whenCheck f = do
   b <- gets isCheck
@@ -194,13 +186,6 @@ evalWithEnv c env = do
   case resultOrErr of
     Left err -> return $ Left err
     Right (result, _) -> return $ Right result
-
-runWithEnv :: WithEnv a -> Env -> IO (Either [Log] (a, Env))
-runWithEnv c env = do
-  resultOrErr <- runExceptT (runStateT c env)
-  case resultOrErr of
-    Left err -> return $ Left err
-    Right (result, e) -> return $ Right (result, e)
 
 newCount :: WithEnv Int
 newCount = do
@@ -393,9 +378,6 @@ p s = liftIO $ putStrLn s
 p' :: (Show a) => a -> WithEnv ()
 p' s = liftIO $ putStrLn $ Pr.ppShow s
 
-pp :: WeakTermPlus -> WithEnv ()
-pp e = liftIO $ TIO.putStrLn $ toText e
-
 lowTypeToArrayKind :: Meta -> LowType -> WithEnv ArrayKind
 lowTypeToArrayKind m lowType =
   case lowTypeToArrayKindMaybe lowType of
@@ -429,12 +411,6 @@ getObjectCacheDirPath :: WithEnv (Path Abs Dir)
 getObjectCacheDirPath = do
   let ver = showVersion version
   relCachePath <- parseRelDir $ ".cache/neut/" <> ver <> "/object"
-  getDirPath relCachePath
-
-getTypeCacheDirPath :: WithEnv (Path Abs Dir)
-getTypeCacheDirPath = do
-  let ver = showVersion version
-  relCachePath <- parseRelDir $ ".cache/neut/" <> ver <> "/type"
   getDirPath relCachePath
 
 getDirPath :: Path Rel Dir -> WithEnv (Path Abs Dir)
