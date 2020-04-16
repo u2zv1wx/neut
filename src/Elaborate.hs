@@ -48,7 +48,7 @@ elaborateStmt (WeakStmtLet m (mx, x, t) e cont) = do
   x' <- newNameWith'' x
   let c = (m, TermConst x)
   -- このxをトップレベルに登録したいんですが。codeEnvに入るのはすべて関数だけなのでむずい。
-  return (m, TermPiElim (m, TermPiIntro [(mx, x', t'')] cont') [c])
+  return (m, TermPiElim (m, termPiIntro [(mx, x', t'')] cont') [c])
 elaborateStmt (WeakStmtLetWT m (mx, x, t) e cont) = do
   t' <- inferType t
   analyze >> synthesize >> refine >> cleanup
@@ -59,7 +59,7 @@ elaborateStmt (WeakStmtLetWT m (mx, x, t) e cont) = do
   cont' <- elaborateStmt cont
   x' <- newNameWith'' x
   let c = (m, TermConst x)
-  return (m, TermPiElim (m, TermPiIntro [(mx, x', t'')] cont') [c])
+  return (m, TermPiElim (m, termPiIntro [(mx, x', t'')] cont') [c])
 elaborateStmt (WeakStmtVerify m e cont) = do
   whenCheck $ do
     (e', _) <- infer e
@@ -102,7 +102,7 @@ elaborateStmt (WeakStmtVisit _ ss1 ss2) = do
   return
     ( m
     , TermPiElim
-        (m, TermPiIntro [(m, h, (m, TermEnum (EnumTypeIntS 64)))] e2)
+        (m, termPiIntro [(m, h, (m, TermEnum (EnumTypeIntS 64)))] e2)
         [e1])
 
 cleanup :: WithEnv ()
@@ -125,20 +125,20 @@ elaborate (m, WeakTermPi mName xts t) = do
   xts' <- mapM elaboratePlus xts
   t' <- elaborate t
   return (m, TermPi mName xts' t')
-elaborate (m, WeakTermPiIntro xts e) = do
+elaborate (m, WeakTermPiIntro Nothing xts e) = do
   e' <- elaborate e
   xts' <- mapM elaboratePlus xts
-  return (m, TermPiIntro xts' e')
-elaborate (m, WeakTermPiIntroPlus (name, args) xts e) = do
+  return (m, TermPiIntro Nothing xts' e')
+elaborate (m, WeakTermPiIntro (Just (name, args)) xts e) = do
   args' <- mapM elaboratePlus args
   e' <- elaborate e
   xts' <- mapM elaboratePlus xts
-  return (m, TermPiIntroPlus (name, args') xts' e')
+  return (m, TermPiIntro (Just (name, args')) xts' e')
 elaborate (m, WeakTermPiElim (mh, WeakTermZeta (I (_, x))) es) = do
   sub <- gets substEnv
   case IntMap.lookup x sub of
     Nothing -> raiseError mh $ "couldn't instantiate the hole here"
-    Just (_, WeakTermPiIntro xts e)
+    Just (_, WeakTermPiIntro _ xts e)
       | length xts == length es -> do
         let xs = map (\(_, y, _) -> Left $ asInt y) xts
         let s = Map.fromList $ zip xs es

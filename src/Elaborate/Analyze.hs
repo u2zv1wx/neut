@@ -49,17 +49,17 @@ simp' (((m1, WeakTermPi name1 xts1 cod1), (m2, WeakTermPi name2 xts2 cod2)):cs)
         xt2 <- asIdentPlus m2 cod2
         simpBinder (xts1 ++ [xt1]) (xts2 ++ [xt2])
         simp cs
-simp' (((m1, WeakTermPiIntro xts1 e1), (m2, WeakTermPiIntro xts2 e2)):cs)
+simp' (((m1, WeakTermPiIntro Nothing xts1 e1), (m2, WeakTermPiIntro Nothing xts2 e2)):cs)
   | length xts1 == length xts2 = do
     xt1 <- asIdentPlus m1 e1
     xt2 <- asIdentPlus m2 e2
     simpBinder (xts1 ++ [xt1]) (xts2 ++ [xt2])
     simp cs
-simp' (((m1, WeakTermPiIntroPlus (name1, args1) xts1 e1), (m2, WeakTermPiIntroPlus (name2, args2) xts2 e2)):cs)
+simp' (((m1, WeakTermPiIntro (Just (name1, args1)) xts1 e1), (m2, WeakTermPiIntro (Just (name2, args2)) xts2 e2)):cs)
   | name1 == name2
   , length args1 == length args2 = do
     simpBinder args1 args2
-    simp $ ((m1, WeakTermPiIntro xts1 e1), (m2, WeakTermPiIntro xts2 e2)) : cs
+    simp $ ((m1, weakTermPiIntro xts1 e1), (m2, weakTermPiIntro xts2 e2)) : cs
 simp' (((m1, WeakTermIter xt1@(_, x1, _) xts1 e1), (m2, WeakTermIter xt2@(_, x2, _) xts2 e2)):cs)
   | x1 == x2
   , length xts1 == length xts2 = do
@@ -342,7 +342,7 @@ bindFormalArgs :: WeakTermPlus -> [[IdentifierPlus]] -> WeakTermPlus
 bindFormalArgs e [] = e
 bindFormalArgs e (xts:xtss) = do
   let e' = bindFormalArgs e xtss
-  (metaOf e', WeakTermPiIntro xts e')
+  (metaOf e', weakTermPiIntro xts e')
 
 lookupAny :: [Identifier] -> IntMap.IntMap a -> Maybe (Identifier, a)
 lookupAny [] _ = Nothing

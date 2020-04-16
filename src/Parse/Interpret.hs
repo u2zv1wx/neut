@@ -41,7 +41,7 @@ interpret (m, TreeNode ((_, TreeLeaf "pi"):rest))
 interpret (m, TreeNode ((_, TreeLeaf "pi-introduction"):rest))
   | [(_, TreeNode xts), e] <- rest = do
     (xts', e') <- interpretBinder xts e
-    return (m, WeakTermPiIntro xts' e')
+    return (m, weakTermPiIntro xts' e')
   | otherwise = raiseSyntaxError m "(pi-introduction (TREE*) TREE)"
 interpret (m, TreeNode ((_, TreeLeaf "pi-elimination"):rest))
   | e:es <- rest = do interpretPiElim m e es
@@ -254,7 +254,7 @@ sigmaIntro m es = do
   let piType = (m, weakTermPi xts zv)
   return
     ( m
-    , WeakTermPiIntro
+    , weakTermPiIntro
         [(m, z, (m, WeakTermTau)), (m, k, piType)]
         (m, WeakTermPiElim (m, WeakTermUpsilon k) es))
 
@@ -271,7 +271,7 @@ sigmaIntroString m u8s = do
   arrVar <- newNameWith'' "array"
   return
     ( m
-    , WeakTermPiIntro
+    , weakTermPiIntro
         [ (m, z, (m, WeakTermTau))
         , ( m
           , k
@@ -302,7 +302,7 @@ sigmaElim ::
   -> WeakTermPlus
   -> WeakTermPlus
 sigmaElim m t xts e1 e2 =
-  (m, WeakTermPiElim e1 [t, (m, WeakTermPiIntro xts e2)])
+  (m, WeakTermPiElim e1 [t, (m, weakTermPiIntro xts e2)])
 
 toIdentPlus :: (Meta, Identifier) -> WithEnv IdentifierPlus
 toIdentPlus (m, x) = do
@@ -514,7 +514,7 @@ asLamClause ::
   -> WithEnv (Identifier, WeakTermPlus)
 asLamClause b m t body = do
   h <- newNameWith'' "hole"
-  return (b, (m, WeakTermPiIntro [(m, h, t)] body))
+  return (b, (m, weakTermPiIntro [(m, h, t)] body))
 
 headNameOf :: Meta -> CocaseClause -> (Identifier, WeakTermPlus)
 headNameOf m ((a, _), _) = (a, (m, WeakTermUpsilon a))
@@ -526,7 +526,7 @@ cocaseBaseValue m codType =
       (m, WeakTermUpsilon $ asIdent "unsafe:cast")
       [ (m, weakTermPi [] (m, WeakTermEnum (EnumTypeIntS 64)))
       , codType
-      , (m, (WeakTermPiIntro [] (m, WeakTermEnumIntro (EnumValueIntS 64 0))))
+      , (m, (weakTermPiIntro [] (m, WeakTermEnumIntro (EnumValueIntS 64 0))))
       ])
 
 interpretEnumItem :: Meta -> T.Text -> [TreePlus] -> WithEnv [(T.Text, Int)]
@@ -623,7 +623,7 @@ interpretWith (m, TreeNode (with@(_, TreeLeaf "with"):bind:(_, TreeNode ((_, Tre
       e' <- interpretWith (m, TreeNode (with : bind : es'))
       xt' <- interpretIdentifierPlus xt
       rest' <- interpretWith (m, TreeNode (with : bind : rest))
-      let lam = (m, WeakTermPiIntro [xt'] rest')
+      let lam = (m, weakTermPiIntro [xt'] rest')
       return (m, WeakTermPiElim bind' [h1, h2, e', lam])
 interpretWith (m, TreeNode (with@(_, TreeLeaf "with"):bind:(_, TreeNode ((_, TreeLeaf "erase"):xs)):rest)) = do
   case mapM asLeaf xs of

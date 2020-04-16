@@ -38,15 +38,15 @@ infer' _ (m, WeakTermUpsilon x) = do
 infer' ctx (m, WeakTermPi mName xts t) = do
   (xts', t') <- inferPi ctx xts t
   return ((m, WeakTermPi mName xts' t'), (m, WeakTermTau))
-infer' ctx (m, WeakTermPiIntro xts e) = do
+infer' ctx (m, WeakTermPiIntro Nothing xts e) = do
   (xts', (e', t')) <- inferBinder ctx xts e
-  return ((m, WeakTermPiIntro xts' e'), (m, weakTermPi xts' t'))
-infer' ctx (m, WeakTermPiIntroPlus (name, args) xts e) = do
+  return ((m, WeakTermPiIntro Nothing xts' e'), (m, weakTermPi xts' t'))
+infer' ctx (m, WeakTermPiIntro (Just (name, args)) xts e) = do
+  (ai, _) <- lookupRevIndEnv m name
   args' <- inferSigma ctx args
   (xts', (e', t')) <- inferBinder ctx xts e
-  (ai, _) <- lookupRevIndEnv m name
   return
-    ( (m, WeakTermPiIntroPlus (name, args') xts' e')
+    ( (m, WeakTermPiIntro (Just (name, args')) xts' e')
     , (m, WeakTermPi (Just ai) xts' t'))
 infer' ctx (m, WeakTermPiElim e es) = do
   es' <- insertHoleIfNecessary e es
@@ -213,7 +213,7 @@ constructIndType m ctx x = do
   case Map.lookup x cenv of
     Just (Left e) -> do
       case weaken e of
-        e'@(me, WeakTermPiIntro xts cod) -> do
+        e'@(me, WeakTermPiIntro Nothing xts cod) -> do
           holeList <- mapM (const $ newHoleInCtx ctx me) xts
           _ <- inferArgs m holeList xts cod
           let es = map (\(h, _) -> h) holeList

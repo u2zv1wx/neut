@@ -14,8 +14,11 @@ data WeakTerm
   = WeakTermTau
   | WeakTermUpsilon Identifier
   | WeakTermPi (Maybe T.Text) [IdentifierPlus] WeakTermPlus
-  | WeakTermPiIntro [IdentifierPlus] WeakTermPlus
-  | WeakTermPiIntroPlus (T.Text, [IdentifierPlus]) [IdentifierPlus] WeakTermPlus
+  | WeakTermPiIntro
+      (Maybe ((T.Text, [IdentifierPlus])))
+      [IdentifierPlus]
+      WeakTermPlus
+  -- | WeakTermPiIntroPlus (T.Text, [IdentifierPlus]) [IdentifierPlus] WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
   | WeakTermIter IdentifierPlus [IdentifierPlus] WeakTermPlus
   | WeakTermZeta Identifier
@@ -64,6 +67,9 @@ type TextPlus = (Meta, T.Text, WeakTermPlus)
 type Def = (Meta, IdentifierPlus, [IdentifierPlus], WeakTermPlus)
 
 type IdentDef = (T.Text, Def)
+
+weakTermPiIntro :: [IdentifierPlus] -> WeakTermPlus -> WeakTerm
+weakTermPiIntro = WeakTermPiIntro Nothing
 
 type Rule -- inference rule
    = ( Meta -- location of the name
@@ -118,8 +124,8 @@ varWeakTermPlus :: WeakTermPlus -> S.Set Identifier
 varWeakTermPlus (_, WeakTermTau) = S.empty
 varWeakTermPlus (_, WeakTermUpsilon x) = S.singleton x
 varWeakTermPlus (_, WeakTermPi _ xts t) = varWeakTermPlus' xts [t]
-varWeakTermPlus (_, WeakTermPiIntro xts e) = varWeakTermPlus' xts [e]
-varWeakTermPlus (_, WeakTermPiIntroPlus _ xts e) = varWeakTermPlus' xts [e]
+varWeakTermPlus (_, WeakTermPiIntro _ xts e) = varWeakTermPlus' xts [e]
+-- varWeakTermPlus (_, WeakTermPiIntroPlus _ xts e) = varWeakTermPlus' xts [e]
 varWeakTermPlus (_, WeakTermPiElim e es) = do
   let xs = varWeakTermPlus e
   let ys = S.unions $ map varWeakTermPlus es
@@ -173,8 +179,8 @@ holeWeakTermPlus :: WeakTermPlus -> S.Set Identifier
 holeWeakTermPlus (_, WeakTermTau) = S.empty
 holeWeakTermPlus (_, WeakTermUpsilon _) = S.empty
 holeWeakTermPlus (_, WeakTermPi _ xts t) = holeWeakTermPlus' xts [t]
-holeWeakTermPlus (_, WeakTermPiIntro xts e) = holeWeakTermPlus' xts [e]
-holeWeakTermPlus (_, WeakTermPiIntroPlus {}) = S.empty
+holeWeakTermPlus (_, WeakTermPiIntro _ xts e) = holeWeakTermPlus' xts [e]
+-- holeWeakTermPlus (_, WeakTermPiIntroPlus {}) = S.empty
 holeWeakTermPlus (_, WeakTermPiElim e es) = do
   let set1 = holeWeakTermPlus e
   let set2 = S.unions $ map holeWeakTermPlus es
@@ -230,8 +236,8 @@ constWeakTermPlus :: WeakTermPlus -> S.Set T.Text
 constWeakTermPlus (_, WeakTermTau) = S.empty
 constWeakTermPlus (_, WeakTermUpsilon _) = S.empty
 constWeakTermPlus (_, WeakTermPi _ xts t) = constWeakTermPlus' xts [t]
-constWeakTermPlus (_, WeakTermPiIntro xts e) = constWeakTermPlus' xts [e]
-constWeakTermPlus (_, WeakTermPiIntroPlus _ xts e) = constWeakTermPlus' xts [e]
+constWeakTermPlus (_, WeakTermPiIntro _ xts e) = constWeakTermPlus' xts [e]
+-- constWeakTermPlus (_, WeakTermPiIntroPlus _ xts e) = constWeakTermPlus' xts [e]
 constWeakTermPlus (_, WeakTermPiElim e es) = do
   let xs = constWeakTermPlus e
   let ys = S.unions $ map constWeakTermPlus es
@@ -290,13 +296,13 @@ substWeakTermPlus sub e1@(_, WeakTermUpsilon x) = do
 substWeakTermPlus sub (m, WeakTermPi mName xts t) = do
   let (xts', t') = substWeakTermPlus'' sub xts t
   (m, WeakTermPi mName xts' t')
-substWeakTermPlus sub (m, WeakTermPiIntro xts body) = do
+substWeakTermPlus sub (m, WeakTermPiIntro Nothing xts body) = do
   let (xts', body') = substWeakTermPlus'' sub xts body
-  (m, WeakTermPiIntro xts' body')
-substWeakTermPlus sub (m, WeakTermPiIntroPlus (name, args) xts body) = do
+  (m, WeakTermPiIntro Nothing xts' body')
+substWeakTermPlus sub (m, WeakTermPiIntro (Just (name, args)) xts body) = do
   let args' = substWeakTermPlus' sub args
   let (xts', body') = substWeakTermPlus'' sub xts body
-  (m, WeakTermPiIntroPlus (name, args') xts' body')
+  (m, WeakTermPiIntro (Just (name, args')) xts' body')
 substWeakTermPlus sub (m, WeakTermPiElim e es) = do
   let e' = substWeakTermPlus sub e
   let es' = map (substWeakTermPlus sub) es
@@ -416,10 +422,10 @@ toText piType@(_, WeakTermPi Nothing xts cod) = do
         showCons ["arrow", showCons $ map toText ts, toText cod]
 toText (_, WeakTermPi (Just _) _ cod) = toText cod
 -- toText (m, WeakTermPi _ xts cod) = "+" <> toText (m, WeakTermPi Nothing xts cod)
-toText (_, WeakTermPiIntro xts e) = do
+toText (_, WeakTermPiIntro Nothing xts e) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["λ", argStr, toText e]
-toText (_, WeakTermPiIntroPlus (name, _) _ _) = do
+toText (_, WeakTermPiIntro (Just (name, _)) _ _) = do
   "<#" <> name <> "-" <> "internal" <> "#>"
 toText (_, WeakTermPiElim e es) = do
   showCons $ map toText $ e : es

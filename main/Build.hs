@@ -108,7 +108,7 @@ letBind e cont = do
   h <- newNameWith'' "_"
   let m = fst e
   let intType = (m, TermEnum (EnumTypeIntS 64))
-  return (m, TermPiElim (m, TermPiIntro [(m, h, intType)] cont) [e])
+  return (m, TermPiElim (m, termPiIntro [(m, h, intType)] cont) [e])
 
 setupEnv :: WithEnv Env
 setupEnv = do
@@ -231,7 +231,7 @@ bind :: [(Meta, T.Text, TermPlus)] -> TermPlus -> WithEnv TermPlus
 bind [] e = return e
 bind ((m, c, t):cts) e = do
   h <- newNameWith'' "_"
-  bind cts (m, TermPiElim (m, TermPiIntro [(m, h, t)] e) [(m, TermConst c)])
+  bind cts (m, TermPiElim (m, termPiIntro [(m, h, t)] e) [(m, TermConst c)])
 
 cleanup :: WithEnv ()
 cleanup = do

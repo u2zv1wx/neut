@@ -22,38 +22,38 @@ reduceTermPlus (m, TermPi mName xts cod) = do
   let ts' = map reduceTermPlus ts
   let cod' = reduceTermPlus cod
   (m, TermPi mName (zip3 ms xs ts') cod')
-reduceTermPlus (m, TermPiIntro xts e) = do
+reduceTermPlus (m, TermPiIntro info xts e) = do
   let (ms, xs, ts) = unzip3 xts
   let ts' = map reduceTermPlus ts
   let e' = reduceTermPlus e
-  (m, TermPiIntro (zip3 ms xs ts') e')
-reduceTermPlus (m, TermPiIntroPlus (name, args) xts e) = do
-  let args' = map reduceIdentPlus args
-  let xts' = map reduceIdentPlus xts
-  let e' = reduceTermPlus e
-  (m, TermPiIntroPlus (name, args') xts' e')
+  (m, TermPiIntro info (zip3 ms xs ts') e')
+-- reduceTermPlus (m, TermPiIntroPlus (name, args) xts e) = do
+--   let args' = map reduceIdentPlus args
+--   let xts' = map reduceIdentPlus xts
+--   let e' = reduceTermPlus e
+--   (m, TermPiIntroPlus (name, args') xts' e')
 reduceTermPlus (m, TermPiElim e es) = do
   let e' = reduceTermPlus e
   let es' = map reduceTermPlus es
   let app = TermPiElim e' es'
   let valueCond = and $ map isValue es
   case e' of
-    (mLam, TermPiIntro xts body) -- fixme: reduceできるだけreduceするようにする (partial evaluation)
+    (mLam, TermPiIntro _ xts body) -- fixme: reduceできるだけreduceするようにする (partial evaluation)
       | length xts == length es'
       , metaIsReducible mLam
       , valueCond -> do
         let xs = map (\(_, x, _) -> asInt x) xts
         let sub = IntMap.fromList $ zip xs es'
         reduceTermPlus $ substTermPlus sub body
-    (_, TermPiIntroPlus _ xts body)
-      | length xts == length es'
-      , valueCond -> do
-        let xs = map (\(_, x, _) -> asInt x) xts
-        let sub = IntMap.fromList $ zip xs es'
-        reduceTermPlus $ substTermPlus sub body
+    -- (_, TermPiIntroPlus _ xts body)
+    --   | length xts == length es'
+    --   , valueCond -> do
+    --     let xs = map (\(_, x, _) -> asInt x) xts
+    --     let sub = IntMap.fromList $ zip xs es'
+    --     reduceTermPlus $ substTermPlus sub body
     _ -> (m, app)
 reduceTermPlus (m, TermIter (mx, x, t) xts e)
-  | x `notElem` varTermPlus e = reduceTermPlus (m, TermPiIntro xts e)
+  | x `notElem` varTermPlus e = reduceTermPlus (m, termPiIntro xts e)
   | otherwise = do
     let t' = reduceTermPlus t
     let (ms, xs, ts) = unzip3 xts
@@ -129,7 +129,7 @@ isValue (_, TermTau) = True
 isValue (_, TermUpsilon _) = True
 isValue (_, TermPi {}) = True
 isValue (_, TermPiIntro {}) = True
-isValue (_, TermPiIntroPlus {}) = True
+-- isValue (_, TermPiIntroPlus {}) = True
 isValue (_, TermIter {}) = True
 isValue (_, TermConst x) = isValueConst x
 isValue (_, TermFloat _ _) = True
@@ -159,28 +159,28 @@ normalize (m, TermPi mName xts cod) = do
   ts' <- mapM normalize ts
   cod' <- normalize cod
   return (m, TermPi mName (zip3 ms xs ts') cod')
-normalize (m, TermPiIntro xts e) = do
+normalize (m, TermPiIntro Nothing xts e) = do
   let (ms, xs, ts) = unzip3 xts
   ts' <- mapM normalize ts
   e' <- normalize e
-  return (m, TermPiIntro (zip3 ms xs ts') e')
-normalize (m, TermPiIntroPlus (name, args) xts e) = do
+  return (m, TermPiIntro Nothing (zip3 ms xs ts') e')
+normalize (m, TermPiIntro (Just (name, args)) xts e) = do
   args' <- mapM normalizeIdentPlus args
   xts' <- mapM normalizeIdentPlus xts
   e' <- normalize e
-  return (m, TermPiIntroPlus (name, args') xts' e')
+  return (m, TermPiIntro (Just (name, args')) xts' e')
 normalize (m, TermPiElim e es) = do
   e' <- normalize e
   es' <- mapM normalize es
   case e' of
-    (_, TermPiIntro xts body) -> do
+    (_, TermPiIntro _ xts body) -> do
       let xs = map (\(_, x, _) -> asInt x) xts
       let sub = IntMap.fromList $ zip xs es'
       normalize $ substTermPlus sub body
-    (_, TermPiIntroPlus _ xts body) -> do
-      let xs = map (\(_, x, _) -> asInt x) xts
-      let sub = IntMap.fromList $ zip xs es'
-      normalize $ substTermPlus sub body
+    -- (_, TermPiIntroPlus _ xts body) -> do
+    --   let xs = map (\(_, x, _) -> asInt x) xts
+    --   let sub = IntMap.fromList $ zip xs es'
+    --   normalize $ substTermPlus sub body
     iter@(_, TermIter (_, self, _) xts body) -> do
       let xs = map (\(_, x, _) -> asInt x) xts
       let sub = IntMap.fromList $ (asInt self, iter) : zip xs es'

@@ -12,7 +12,6 @@ module Parse.Rule
 import Control.Monad.Except
 import Control.Monad.State
 import Data.Either (rights)
-import Data.Monoid ((<>))
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Set as S
@@ -99,7 +98,7 @@ generateProjections ts = do
               mb
               (mb, b', (mb, WeakTermPi Nothing (xts ++ [dom]) cod))
               ( mb
-              , WeakTermPiIntro
+              , weakTermPiIntro
                   (xts ++ [dom])
                   ( mb
                   , WeakTermCase
@@ -155,7 +154,7 @@ toInductive ats bts connective@(m, ai, xts, _) = do
         m
         formationRule
         -- nat := lam (...). Pi{nat} (...)
-        (m, WeakTermPiIntro xts (m, WeakTermPi (Just ai) atsbts cod))
+        (m, weakTermPiIntro xts (m, WeakTermPi (Just ai) atsbts cod))
     -- induction principle
     , QuasiStmtLetWT
         m
@@ -163,7 +162,7 @@ toInductive ats bts connective@(m, ai, xts, _) = do
         , (ai <> ":" <> "induction")
         , (m, WeakTermPi Nothing (xts ++ [zt] ++ atsbts) cod))
         ( m
-        , WeakTermPiIntro
+        , weakTermPiIntro
             (xts ++ [zt] ++ atsbts)
             (m, WeakTermPiElim (toVar' zt) (map toVar' atsbts)))
     ]
@@ -195,11 +194,11 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
           m
           (mb, bi, (m, weakTermPi (xts' ++ yts) cod))
           ( m {metaIsReducible = False}
-          , WeakTermPiIntro
+          , weakTermPiIntro
               (xts' ++ yts)
               ( m
-              , WeakTermPiIntroPlus
-                  (bi, xts' ++ yts)
+              , WeakTermPiIntro
+                  (Just (bi, xts' ++ yts))
                   (ats ++ bts)
                   ( m
                   , WeakTermPiElim
@@ -338,7 +337,7 @@ thetaPi mode isub atsbts xts cod e = do
   appForward <- theta mode isub atsbts cod' (fst e, WeakTermPiElim e xsBackward)
   -- 結果をまとめる
   let ts'' = map (substWeakTermPlus isub) ts' -- 引数をinternalizeされたバージョンの型にする
-  return (fst e, WeakTermPiIntro (zip3 ms' xs' ts'') appForward)
+  return (fst e, weakTermPiIntro (zip3 ms' xs' ts'') appForward)
 
 thetaInductive ::
      Mode
@@ -381,7 +380,7 @@ thetaInductiveNested mode isub atsbts e va aOuter es bts = do
     ( m
     , WeakTermPiElim
         e
-        ((m, WeakTermPiIntro xts (m, WeakTermPiElim va es')) : args))
+        ((m, weakTermPiIntro xts (m, WeakTermPiElim va es')) : args))
 
 thetaInductiveNestedMutual :: Meta -> T.Text -> WithEnv WeakTermPlus
 thetaInductiveNestedMutual m ai =
@@ -396,7 +395,7 @@ lookupInductive ::
 lookupInductive m ai = do
   fenv <- gets formationEnv
   case Map.lookup ai fenv of
-    Just (Just (_, WeakTermPiIntro xts (_, WeakTermPi (Just _) atsbts (_, WeakTermPiElim (_, WeakTermUpsilon _) _)))) -> do
+    Just (Just (_, WeakTermPiIntro Nothing xts (_, WeakTermPi (Just _) atsbts (_, WeakTermPiElim (_, WeakTermUpsilon _) _)))) -> do
       let at = head atsbts
       let bts = tail atsbts -- valid since a is not mutual
       return (xts, at, bts)
@@ -450,7 +449,7 @@ toInternalizedArg mode isub aInner aOuter xts atsbts es es' b (mbInner, _, (_, W
   -- あとは結果を返すだけ
   return
     ( mbInner
-    , WeakTermPiIntro
+    , weakTermPiIntro
         ytsInner'
         (mbInner, WeakTermPiElim (toConst b) (es' ++ args)))
         -- (mbInner, WeakTermPiElim (toVar' b) (es' ++ args)))
@@ -484,13 +483,13 @@ substRuleType _ (m, WeakTermUpsilon x) = return (m, WeakTermUpsilon x)
 substRuleType sub (m, WeakTermPi mName xts t) = do
   (xts', t') <- substRuleType'' sub xts t
   return (m, WeakTermPi mName xts' t')
-substRuleType sub (m, WeakTermPiIntro xts body) = do
+substRuleType sub (m, WeakTermPiIntro Nothing xts body) = do
   (xts', body') <- substRuleType'' sub xts body
-  return (m, WeakTermPiIntro xts' body')
-substRuleType sub (m, WeakTermPiIntroPlus (name, args) xts body) = do
+  return (m, WeakTermPiIntro Nothing xts' body')
+substRuleType sub (m, WeakTermPiIntro (Just (name, args)) xts body) = do
   args' <- substRuleType' sub args
   (xts', body') <- substRuleType'' sub xts body
-  return (m, WeakTermPiIntroPlus (name, args') xts' body')
+  return (m, WeakTermPiIntro (Just (name, args')) xts' body')
 substRuleType sub@((a1, es1), (a2, es2)) (m, WeakTermPiElim e es)
   | (mx, WeakTermUpsilon x) <- e
   , a1 == x =

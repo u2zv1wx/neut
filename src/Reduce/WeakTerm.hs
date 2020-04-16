@@ -18,39 +18,39 @@ reduceWeakTermPlus (m, WeakTermPi mName xts cod) = do
   (m, WeakTermPi mName (zip3 ms xs ts') cod')
 -- eta-reduce (note that reduceWeakTermPlus expects the argument to be pure; this reduction is
 -- unsound if `e` has certain sort of side-effect, like print)
-reduceWeakTermPlus (_, WeakTermPiIntro xts (_, WeakTermPiElim e args))
+reduceWeakTermPlus (_, WeakTermPiIntro Nothing xts (_, WeakTermPiElim e args))
   | Just ys <- mapM asUpsilon args
   , ys == map (\(_, x, _) -> x) xts = e
-reduceWeakTermPlus (m, WeakTermPiIntro xts e) = do
+reduceWeakTermPlus (m, WeakTermPiIntro info xts e) = do
   let (ms, xs, ts) = unzip3 xts
   let ts' = map reduceWeakTermPlus ts
   let e' = reduceWeakTermPlus e
-  (m, WeakTermPiIntro (zip3 ms xs ts') e')
-reduceWeakTermPlus (m, WeakTermPiIntroPlus (name, args) xts e) = do
-  let args' = map reduceWeakTermIdentPlus args
-  let xts' = map reduceWeakTermIdentPlus xts
-  let e' = reduceWeakTermPlus e
-  (m, WeakTermPiIntroPlus (name, args') xts' e')
+  (m, WeakTermPiIntro info (zip3 ms xs ts') e')
+-- reduceWeakTermPlus (m, WeakTermPiIntroPlus (name, args) xts e) = do
+--   let args' = map reduceWeakTermIdentPlus args
+--   let xts' = map reduceWeakTermIdentPlus xts
+--   let e' = reduceWeakTermPlus e
+--   (m, WeakTermPiIntroPlus (name, args') xts' e')
 reduceWeakTermPlus (m, WeakTermPiElim e es) = do
   let e' = reduceWeakTermPlus e
   let es' = map reduceWeakTermPlus es
   let app = WeakTermPiElim e' es'
   case e' of
-    (mLam, WeakTermPiIntro xts body)
+    (mLam, WeakTermPiIntro _ xts body)
       | length xts == length es'
       , metaIsReducible mLam -> do
         let xs = map (\(_, x, _) -> Left $ asInt x) xts
         let sub = Map.fromList $ zip xs es'
         reduceWeakTermPlus $ substWeakTermPlus sub body
-    (_, WeakTermPiIntroPlus _ xts body)
-      | length xts == length es' -> do
-        let xs = map (\(_, x, _) -> Left $ asInt x) xts
-        let sub = Map.fromList $ zip xs es'
-        reduceWeakTermPlus $ substWeakTermPlus sub body
+    -- (_, WeakTermPiIntroPlus _ xts body)
+    --   | length xts == length es' -> do
+    --     let xs = map (\(_, x, _) -> Left $ asInt x) xts
+    --     let sub = Map.fromList $ zip xs es'
+    --     reduceWeakTermPlus $ substWeakTermPlus sub body
     _ -> (m, app)
 reduceWeakTermPlus (m, WeakTermIter (mx, x, t) xts e)
   | x `notElem` varWeakTermPlus e = do
-    reduceWeakTermPlus (m, WeakTermPiIntro xts e)
+    reduceWeakTermPlus (m, weakTermPiIntro xts e)
   | otherwise = do
     let t' = reduceWeakTermPlus t
     let e' = reduceWeakTermPlus e
