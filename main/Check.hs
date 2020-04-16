@@ -9,6 +9,8 @@ import Data.Binary
 import Data.List (find)
 import Data.Time
 import Numeric
+import Path
+import Path.IO
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
@@ -66,22 +68,60 @@ check (WeakStmtConstDecl _ (_, x, t) cont) = do
   insTypeEnv (Right x) t''
   check cont
 check (WeakStmtVisit path ss1 ss2) = do
-  p "start:"
-  p' path
   check ss1
-  p "done:"
-  p' path
   check ss2
+  -- b <- isTypeCacheAvailable path
+  -- cachePath <- toTypeCacheFilePath path
+  -- if b
+  --   then do
+  --     cacheInfo <- liftIO $ decodeFile $ toFilePath cachePath
+  --     withCacheInfo cacheInfo $ check ss1
+  --     check ss2
+  --   else do
+  --     withTypeCacheAcc [] $ do
+  --       check ss1
+  --       acc <- gets typeCacheAcc
+  --       liftIO $ encodeFile (toFilePath cachePath) acc
+  --     check ss2
 
 check' :: T.Text -> WeakTermPlus -> WeakTermPlus -> WeakStmt -> WithEnv ()
-check' x e t cont = do
-  p' x
+check' x e t cont
+  -- met <- lookupCache x
+  -- case met of
+  --   Just (e', t') -> do
+  --     insTypeEnv (Right x) t'
+  --     modify (\env -> env {cacheEnv = Map.insert x (Left e') (cacheEnv env)})
+  --     check cont
+  --   Nothing -> do
+ = do
   analyze >> synthesize >> cleanup
   e' <- elaborate e
   t' <- elaborate t
   insTypeEnv (Right x) t'
   modify (\env -> env {cacheEnv = Map.insert x (Left e') (cacheEnv env)})
+      -- modify (\env -> env {typeCacheAcc = (x, (e', t')) : typeCacheAcc env})
   check cont
+
+lookupCache :: T.Text -> WithEnv (Maybe (TermPlus, TermPlus))
+lookupCache x = do
+  cache <- gets typeCacheEnv
+  return $ Map.lookup x cache
+
+withTypeCacheAcc :: [(T.Text, (TermPlus, TermPlus))] -> WithEnv a -> WithEnv a
+withTypeCacheAcc info f = do
+  snapshot <- gets typeCacheAcc
+  modify (\env -> env {typeCacheAcc = info})
+  result <- f
+  modify (\env -> env {typeCacheAcc = snapshot})
+  return result
+
+withCacheInfo :: [(T.Text, (TermPlus, TermPlus))] -> WithEnv a -> WithEnv a
+withCacheInfo info f = do
+  snapshot <- gets typeCacheEnv
+  modify (\env -> env {typeCacheEnv = Map.fromList info})
+  result <- f
+  modify (\env -> env {typeCacheEnv = snapshot})
+  return result
 
 cleanup :: WithEnv ()
 cleanup = do
@@ -91,3 +131,32 @@ cleanup = do
 
 showFloat' :: Float -> String
 showFloat' x = showFFloat Nothing x ""
+
+toTypeCacheFilePath :: Path Abs File -> WithEnv (Path Abs File)
+toTypeCacheFilePath srcPath = do
+  cacheDirPath <- getTypeCacheDirPath
+  srcPath' <- parseRelFile $ "." <> toFilePath srcPath
+  item <- replaceExtension ".type" $ cacheDirPath </> srcPath'
+  ensureDir $ parent item
+  replaceExtension ".type" $ cacheDirPath </> srcPath'
+
+isTypeCacheAvailable :: Path Abs File -> WithEnv Bool
+isTypeCacheAvailable path = do
+  g <- gets depGraph
+  case Map.lookup path g of
+    Nothing -> isTypeCacheAvailable' path
+    Just xs -> do
+      b <- isTypeCacheAvailable' path
+      bs <- mapM isTypeCacheAvailable xs
+      return $ and $ b : bs
+
+isTypeCacheAvailable' :: Path Abs File -> WithEnv Bool
+isTypeCacheAvailable' srcPath = do
+  cachePath <- toTypeCacheFilePath srcPath
+  b <- doesFileExist cachePath
+  if not b
+    then return False
+    else do
+      srcModTime <- getModificationTime srcPath
+      cacheModTime <- getModificationTime cachePath
+      return $ srcModTime < cacheModTime

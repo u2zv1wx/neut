@@ -10,8 +10,6 @@ module Parse
 import Control.Monad.Except
 import Control.Monad.State hiding (get)
 import Data.ByteString.Builder
-
-import Data.Monoid ((<>))
 import Network.Http.Client
 import Path
 import Path.IO
@@ -45,7 +43,7 @@ parse :: Path Abs File -> WithEnv WeakStmt
 parse inputPath = do
   stmtList <- visit inputPath
   stmtList' <- discern stmtList
-  warnUnusedVar
+  -- warnUnusedVar
   pushTrace inputPath
   concatQuasiStmtList stmtList'
 

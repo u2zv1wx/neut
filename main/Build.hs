@@ -127,7 +127,7 @@ revertEnv snapshot = do
 compileObject :: Path Abs File -> Builder -> WithEnv ()
 compileObject srcPath code = do
   cachePath <- toCacheFilePath srcPath
-  tmpOutputPath <- replaceExtension "ll" cachePath
+  tmpOutputPath <- replaceExtension ".ll" cachePath
   header <- emitDeclarations
   let code' = toLazyByteString $ header <> "\n" <> code
   liftIO $ L.writeFile (toFilePath tmpOutputPath) code'
@@ -188,9 +188,9 @@ toCacheFilePath :: Path Abs File -> WithEnv (Path Abs File)
 toCacheFilePath srcPath = do
   cacheDirPath <- getObjectCacheDirPath
   srcPath' <- parseRelFile $ "." <> toFilePath srcPath
-  item <- replaceExtension "o" $ cacheDirPath </> srcPath'
+  item <- replaceExtension ".o" $ cacheDirPath </> srcPath'
   ensureDir $ parent item
-  replaceExtension "o" $ cacheDirPath </> srcPath'
+  replaceExtension ".o" $ cacheDirPath </> srcPath'
 
 bypass :: WeakStmt -> WithEnv ()
 bypass (WeakStmtReturn _) = return ()

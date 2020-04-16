@@ -210,10 +210,10 @@ constructOutputPath ::
      Path Rel File -> Maybe (Path Abs File) -> OutputKind -> IO (Path Abs File)
 constructOutputPath basename Nothing OutputKindLLVM = do
   dir <- getCurrentDir
-  addExtension "ll" (dir </> basename)
+  addExtension ".ll" (dir </> basename)
 constructOutputPath basename Nothing OutputKindAsm = do
   dir <- getCurrentDir
-  addExtension "s" (dir </> basename)
+  addExtension ".s" (dir </> basename)
 constructOutputPath basename Nothing OutputKindObject = do
   dir <- getCurrentDir
   return $ dir </> basename
@@ -224,7 +224,7 @@ constructOutputArchivePath ::
 constructOutputArchivePath inputPath Nothing = do
   let baseName = fromRelDir $ dirname inputPath
   outputPath <- resolveFile' baseName
-  addExtension "tar.gz" outputPath
+  addExtension ".tar.gz" outputPath
 constructOutputArchivePath _ (Just path) = return path
 
 runBuild :: Path Abs File -> WithEnv [Path Abs File]

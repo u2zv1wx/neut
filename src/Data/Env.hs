@@ -96,6 +96,8 @@ data Env =
     -- metavar ~> beta-equivalent weakterm
     , substEnv :: IntMap.IntMap WeakTermPlus
     , zetaEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus)
+    , typeCacheEnv :: Map.HashMap T.Text (TermPlus, TermPlus)
+    , typeCacheAcc :: [(T.Text, (TermPlus, TermPlus))]
     --
     -- clarify
     --
@@ -146,6 +148,8 @@ initialEnv =
     , intactSet = S.empty
     , prefixEnv = []
     , sectionEnv = []
+    , typeCacheEnv = Map.empty
+    , typeCacheAcc = []
     , formationEnv = Map.empty
     , indEnv = Map.empty
     , labelEnv = Map.empty
