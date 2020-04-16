@@ -4,8 +4,8 @@ module Data.Log
   ( Log
   , outputLog
   , outputLog'
-  , logInfo
-  , logInfo'
+  , logNote
+  , logNote'
   , logWarning
   , logError
   , logCritical
@@ -89,11 +89,11 @@ withSGR :: Bool -> [SGR] -> IO () -> IO ()
 withSGR False _ f = f
 withSGR True arg f = setSGR arg >> f >> setSGR [Reset]
 
-logInfo :: PosInfo -> T.Text -> Log
-logInfo pos text = (Just pos, LogLevelNote, text)
+logNote :: PosInfo -> T.Text -> Log
+logNote pos text = (Just pos, LogLevelNote, text)
 
-logInfo' :: T.Text -> Log
-logInfo' text = (Nothing, LogLevelNote, text)
+logNote' :: T.Text -> Log
+logNote' text = (Nothing, LogLevelNote, text)
 
 logWarning :: PosInfo -> T.Text -> Log
 logWarning pos text = (Just pos, LogLevelWarning, text)

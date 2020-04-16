@@ -57,7 +57,6 @@ visit path = do
   treeList <- tokenize content
   ss <- parse' $ includeCore (newMeta 1 1 path) treeList
   return [QuasiStmtVisit path ss]
-  -- return $ QuasiStmtBOF path : ss
 
 leave :: WithEnv [QuasiStmt]
 leave = do
@@ -67,7 +66,6 @@ leave = do
   modify (\env -> env {prefixEnv = []})
   modify (\env -> env {sectionEnv = []})
   return []
-  -- return [QuasiStmtEOF path]
 
 insDepGraph :: Path Abs File -> WithEnv ()
 insDepGraph path = do
@@ -523,12 +521,6 @@ concatQuasiStmtList (QuasiStmtVisit path ss1:ss2) = do
   ss2' <- concatQuasiStmtList ss2
   return $ WeakStmtVisit path ss1' ss2'
 
--- concatQuasiStmtList (QuasiStmtBOF path:ss) = do
---   ss' <- concatQuasiStmtList ss
---   return $ WeakStmtBOF path ss'
--- concatQuasiStmtList (QuasiStmtEOF path:ss) = do
---   ss' <- concatQuasiStmtList ss
---   return $ WeakStmtEOF path ss'
 toLetList :: [(IdentDef, WeakTermPlus)] -> [QuasiStmt]
 toLetList [] = []
 toLetList (((x, (m, (mx, _, t), _, _)), iter):rest) =
@@ -545,12 +537,6 @@ selfCompose n sub = compose sub $ selfCompose (n - 1) sub
 compose :: SubstWeakTerm -> SubstWeakTerm -> SubstWeakTerm
 compose s1 s2 = do
   Map.union (Map.map (substWeakTermPlus s1) s2) s1
-  -- IntMap.union s1 $ IntMap.map (substWeakTermPlus s1) s2
-  -- let domS2 = map fst s2
-  -- let codS2 = map snd s2
-  -- let codS2' = map (substWeakTermPlus s1) codS2
-  -- let s1' = filter (\(ident, _) -> ident `notElem` domS2) s1
-  -- s1' ++ zip domS2 codS2'
 
 checkKeywordSanity :: Meta -> T.Text -> WithEnv ()
 checkKeywordSanity m "" = raiseError m "empty string for a keyword"

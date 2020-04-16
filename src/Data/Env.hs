@@ -448,18 +448,18 @@ note :: Meta -> T.Text -> WithEnv ()
 note m str = do
   b <- gets shouldColorize
   eoe <- gets endOfEntry
-  liftIO $ outputLog b eoe $ logInfo (getPosInfo m) str
+  liftIO $ outputLog b eoe $ logNote (getPosInfo m) str
 
 note' :: T.Text -> WithEnv ()
 note' str = do
   b <- gets shouldColorize
   eoe <- gets endOfEntry
-  liftIO $ outputLog b eoe $ logInfo' str
+  liftIO $ outputLog b eoe $ logNote' str
 
 note'' :: T.Text -> WithEnv ()
 note'' str = do
   b <- gets shouldColorize
-  liftIO $ outputLog' b $ logInfo' str
+  liftIO $ outputLog' b $ logNote' str
 
 warn :: PosInfo -> T.Text -> WithEnv ()
 warn pos str = do
