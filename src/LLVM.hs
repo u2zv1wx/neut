@@ -22,15 +22,29 @@ import Reduce.Code
 
 toLLVM :: CodePlus -> WithEnv LLVM
 toLLVM mainTerm@(m, _) = do
-  toLLVM'
-  mainTerm' <- reduceCodePlus mainTerm
-  mainTerm'' <- llvmCode mainTerm'
-  -- the result of "main" must be i64, not i8*
-  (result, resultVar) <- newDataUpsilonWith m "result"
-  (cast, castThen) <- llvmCast (Just "cast") resultVar (LowTypeIntS 64)
-  castResult <- castThen (LLVMReturn cast)
-  -- let result: i8* := (main-term) in {cast result to i64}
-  commConv result mainTerm'' $ castResult
+  b <- gets isIncremental
+  modify (\env -> env {nameSet = S.empty})
+  if b
+    then do
+      toLLVM'
+      mainTerm' <- reduceCodePlus mainTerm
+      mainTerm'' <- llvmCode mainTerm'
+      -- the result of "main" must be i64, not i8*
+      (result, resultVar) <- newDataUpsilonWith m "result"
+      (cast, castThen) <- llvmCast (Just "cast") resultVar (LowTypeIntS 64)
+      castResult <- castThen (LLVMReturn cast)
+      -- let result: i8* := (main-term) in {cast result to i64}
+      commConv result mainTerm'' $ castResult
+    else do
+      mainTerm' <- reduceCodePlus mainTerm
+      modify (\env -> env {nameSet = S.empty})
+      mainTerm'' <- llvmCode mainTerm'
+      -- the result of "main" must be i64, not i8*
+      (result, resultVar) <- newDataUpsilonWith m "result"
+      (cast, castThen) <- llvmCast (Just "cast") resultVar (LowTypeIntS 64)
+      castResult <- castThen (LLVMReturn cast)
+      -- let result: i8* := (main-term) in {cast result to i64}
+      commConv result mainTerm'' $ castResult
 
 toLLVM' :: WithEnv ()
 toLLVM' = do
@@ -285,30 +299,62 @@ llvmUncastLet x@(I (s, _)) d lowType cont = do
 -- continuation `cont`.
 llvmDataLet :: Identifier -> DataPlus -> LLVM -> WithEnv LLVM
 llvmDataLet x (m, DataConst y) cont = do
-  cenv <- gets codeEnv
-  case Map.lookup y cenv of
-    Just (Definition _ args _) -> do
-      llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
-    Nothing -> do
-      mt <- lookupTypeEnvMaybe (Right y)
-      case mt of
+  b <- gets isIncremental
+  if b
+    then do
+      cenv <- gets codeEnv
+      case Map.lookup y cenv of
+        Just (Definition _ args _) -> do
+          llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
         Nothing -> do
-          denv <- gets declEnv
-          modify (\env -> env {declEnv = Map.insert y ([], voidPtr) denv})
-          -- sharedCodeEnvにもcodeEnvにも入っておらず、かつ型情報も見つからないのは、
-          -- すでに定義されているトップレベルの定数。……ここ、あんまり美しく
-          -- ないような気がする。
-          llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType []) cont
-        Just (_, TermPi _ xts _) -> do
-          let y' = "llvm_" <> y -- ここのprefixは設定できるようにしてもよさそう
-          denv <- gets declEnv
-          let argType = map (const voidPtr) xts
-          modify (\env -> env {declEnv = Map.insert y' (argType, voidPtr) denv})
-          llvmUncastLet x (LLVMDataGlobal y') (toFunPtrType xts) cont
-        Just t -> do
-          raiseError m $
-            "external constants must have pi-type, but the type of `" <>
-            y <> "` is:\n" <> toText (weaken t)
+          mt <- lookupTypeEnvMaybe (Right y)
+          case mt of
+            Nothing -> do
+              denv <- gets declEnv
+              modify (\env -> env {declEnv = Map.insert y ([], voidPtr) denv})
+              llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType []) cont
+            Just (_, TermPi _ xts _) -> do
+              let y' = "llvm_" <> y -- ここのprefixは設定できるようにしてもよさそう
+              denv <- gets declEnv
+              let argType = map (const voidPtr) xts
+              modify
+                (\env -> env {declEnv = Map.insert y' (argType, voidPtr) denv})
+              llvmUncastLet x (LLVMDataGlobal y') (toFunPtrType xts) cont
+            Just t -> do
+              raiseError m $
+                "external constants must have pi-type, but the type of `" <>
+                y <> "` is:\n" <> toText (weaken t)
+    else do
+      cenv <- gets codeEnv
+      ns <- gets nameSet
+      case Map.lookup y cenv of
+        Nothing -> do
+          mt <- lookupTypeEnvMaybe (Right y)
+          case mt of
+            Just (_, TermPi _ xts _) -> do
+              let y' = "llvm_" <> y
+              denv <- gets declEnv
+              let argType = map (const voidPtr) xts
+              modify
+                (\env -> env {declEnv = Map.insert y' (argType, voidPtr) denv})
+              llvmUncastLet x (LLVMDataGlobal y') (toFunPtrType xts) cont
+            Just t -> do
+              raiseError m $
+                "external constants must have pi-type, but the type of `" <>
+                y <> "` is:\n" <> toText (weaken t)
+            Nothing -> raiseCritical m $ "no such global label defined: " <> y
+        Just (Definition _ args e)
+          | not (y `S.member` ns) -> do
+            modify (\env -> env {nameSet = S.insert y ns})
+            ns' <- gets nameSet
+            modify (\env -> env {nameSet = S.empty})
+            e' <- reduceCodePlus e
+            modify (\env -> env {nameSet = ns'})
+            llvm <- llvmCode e'
+            insLLVMEnv y args llvm
+            llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
+          | otherwise -> do
+            llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
 llvmDataLet x (_, DataUpsilon y) cont =
   llvmUncastLet x (LLVMDataLocal y) voidPtr cont
 llvmDataLet x (_, DataDownIntroPiIntro xs e) cont = do
@@ -402,27 +448,7 @@ llvmCodeCase m v (((_, c), code):branchList) = do
     LLVMLet isEq (LLVMOpBinaryOp (BinaryOpEQ voidPtr) tmpVar baseVar) $
     LLVMBranch isEqVar code' cont
   llvmDataLet base v uncastThenCmpThenBranch
-  -- funPtrType <- getLabelType m c
-  -- t <- lookupTypeEnv m (Right c) c
-  -- case t of
-  --   (_, TermPi _ xts _) -> return $ toFunPtrType xts
-  --   _ -> raiseCritical m "getLabelType"
-  -- cenv <- gets codeEnv
-  -- -- hexにされてしまってるからlookupができない、って話。
-  -- case Map.lookup c cenv of
-  --   Just (Definition _ args _) -> return $ toFunPtrType args
-  --   Nothing -> do
-  --     p "label-type-nothing:"
-  --     p' c
-  --     let body = (m, CodeUpIntro (m, DataEnumIntro (EnumValueIntS 64 0)))
-  --     insCodeEnv c [] body
-  --     llvm <- llvmCode body
-  --     insLLVMEnv c [] llvm
-  --     return $ toFunPtrType []
 
--- 定数の型は() -> i8*で確定
--- getLabelType :: Meta -> T.Text -> WithEnv LowType
--- getLabelType _ _ = return $ toFunPtrType []
 data AggPtrType
   = AggPtrTypeArray Int LowType
   | AggPtrTypeStruct [LowType]

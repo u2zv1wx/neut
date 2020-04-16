@@ -13,6 +13,7 @@ import Data.Env
 import qualified Data.Set as S
 
 reduceCodePlus :: CodePlus -> WithEnv CodePlus
+reduceCodePlus (m, CodeConst c) = return (m, CodeConst c)
 reduceCodePlus (m, CodePiElimDownElim v ds) = do
   cenv <- gets codeEnv
   ns <- gets nameSet
@@ -50,6 +51,7 @@ reduceCodePlus (m, CodeSigmaElim mk xs v e) = do
           | Just ys <- mapM asUpsilon ds
           , xs == ys -> return (mUp, CodeUpIntro v) -- eta-reduce
         _ -> return (m, CodeSigmaElim mk xs v e')
+reduceCodePlus (m, CodeUpIntro v) = return (m, CodeUpIntro v)
 reduceCodePlus (m, CodeUpElim x e1 e2) = do
   e1' <- reduceCodePlus e1
   case e1' of
@@ -105,4 +107,3 @@ reduceCodePlus (m, CodeCase sub d mces) = do
   let es' = map (substCodePlus sub) es
   es'' <- mapM reduceCodePlus es'
   return (m, CodeCase IntMap.empty d $ zip mcs es'')
-reduceCodePlus t = return t

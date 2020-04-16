@@ -2,6 +2,7 @@
 
 module Elaborate
   ( elaborate
+  , elaborateStmt
   , analyze
   , synthesize
   , infer
@@ -10,7 +11,9 @@ module Elaborate
   ) where
 
 import Control.Monad.State
-import Data.List (nub)
+import Data.List (find, nub)
+import Data.Time
+import Numeric
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
@@ -25,6 +28,95 @@ import Elaborate.Infer
 import Elaborate.Synthesize
 import Reduce.Term
 import Reduce.WeakTerm
+
+elaborateStmt :: WeakStmt -> WithEnv TermPlus
+elaborateStmt (WeakStmtReturn e) = do
+  (e', _) <- infer e
+  analyze >> synthesize >> refine
+  elaborate e'
+elaborateStmt (WeakStmtLet m (mx, x, t) e cont) = do
+  (e', te) <- infer e
+  t' <- inferType t
+  insConstraintEnv te t'
+  analyze >> synthesize >> refine >> cleanup
+  e'' <- elaborate e'
+  t'' <- reduceTermPlus <$> elaborate t'
+  insTypeEnv (Right x) t''
+  modify (\env -> env {cacheEnv = Map.insert x (Left e'') (cacheEnv env)})
+  -- cはエフェクトをもちうるのでこう変換する必要あり
+  cont' <- elaborateStmt cont
+  x' <- newNameWith'' x
+  let c = (m, TermConst x)
+  -- このxをトップレベルに登録したいんですが。codeEnvに入るのはすべて関数だけなのでむずい。
+  return (m, TermPiElim (m, TermPiIntro [(mx, x', t'')] cont') [c])
+elaborateStmt (WeakStmtLetWT m (mx, x, t) e cont) = do
+  t' <- inferType t
+  analyze >> synthesize >> refine >> cleanup
+  e' <- elaborate e -- `e` is supposed to be well-typed
+  t'' <- reduceTermPlus <$> elaborate t'
+  insTypeEnv (Right x) t''
+  modify (\env -> env {cacheEnv = Map.insert x (Left e') (cacheEnv env)})
+  cont' <- elaborateStmt cont
+  x' <- newNameWith'' x
+  let c = (m, TermConst x)
+  return (m, TermPiElim (m, TermPiIntro [(mx, x', t'')] cont') [c])
+elaborateStmt (WeakStmtVerify m e cont) = do
+  whenCheck $ do
+    (e', _) <- infer e
+    e'' <- elaborate e'
+    start <- liftIO $ getCurrentTime
+    _ <- normalize e''
+    stop <- liftIO $ getCurrentTime
+    let sec = realToFrac $ diffUTCTime stop start :: Float
+    note m $
+      "verification succeeded (" <> T.pack (showFloat' sec) <> " seconds)"
+  elaborateStmt cont
+elaborateStmt (WeakStmtImplicit m x idxList cont) = do
+  t <- lookupTypeEnv m (Right x) x
+  case t of
+    (_, TermPi _ xts _) -> do
+      case find (\idx -> idx < 0 || length xts <= idx) idxList of
+        Nothing -> do
+          ienv <- gets impEnv
+          modify (\env -> env {impEnv = Map.insertWith (++) x idxList ienv})
+          elaborateStmt cont
+        Just idx -> do
+          raiseError m $
+            "the specified index `" <>
+            T.pack (show idx) <> "` is out of range of the domain of " <> x
+    _ ->
+      raiseError m $
+      "the type of " <>
+      x <> " is supposed to be a Pi-type, but is:\n" <> toText (weaken t)
+elaborateStmt (WeakStmtConstDecl _ (_, x, t) cont) = do
+  t' <- inferType t
+  analyze >> synthesize >> refine >> cleanup
+  t'' <- reduceTermPlus <$> elaborate t'
+  insTypeEnv (Right x) t''
+  elaborateStmt cont
+elaborateStmt (WeakStmtVisit _ ss1 ss2) = do
+  e1 <- elaborateStmt ss1
+  e2 <- elaborateStmt ss2
+  let m = fst e1
+  h <- newNameWith'' "visit"
+  return
+    ( m
+    , TermPiElim
+        (m, TermPiIntro [(m, h, (m, TermEnum (EnumTypeIntS 64)))] e2)
+        [e1])
+
+cleanup :: WithEnv ()
+cleanup = do
+  modify (\env -> env {constraintEnv = []})
+  modify (\env -> env {weakTypeEnv = IntMap.empty})
+  modify (\env -> env {zetaEnv = IntMap.empty})
+
+refine :: WithEnv ()
+refine =
+  modify (\env -> env {substEnv = IntMap.map reduceWeakTermPlus (substEnv env)})
+
+showFloat' :: Float -> String
+showFloat' x = showFFloat Nothing x ""
 
 elaborate :: WeakTermPlus -> WithEnv TermPlus
 elaborate (m, WeakTermTau) = return (m, TermTau)

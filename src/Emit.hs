@@ -9,7 +9,6 @@ module Emit
 import Control.Monad.Except
 import Control.Monad.State
 import Data.ByteString.Builder
-import Data.Monoid ((<>))
 import Numeric.Half
 
 import qualified Data.HashMap.Strict as HashMap
@@ -26,11 +25,25 @@ import Reduce.LLVM
 
 emit :: LLVM -> WithEnv Builder
 emit mainTerm = do
-  modify (\env -> env {defVarSet = S.empty})
-  mainTerm' <- reduceLLVM IntMap.empty Map.empty mainTerm
-  zs <- emitDefinition "i64" "main" [] mainTerm'
-  code <- emit'
-  return $ unlinesL $ zs <> [code]
+  b <- gets isIncremental
+  if b
+    then do
+      modify (\env -> env {defVarSet = S.empty})
+      mainTerm' <- reduceLLVM IntMap.empty Map.empty mainTerm
+      zs <- emitDefinition "i64" "main" [] mainTerm'
+      code <- emit'
+      return $ unlinesL $ zs <> [code]
+    else do
+      lenv <- gets llvmEnv
+      g <- emitDeclarations
+      mainTerm' <- reduceLLVM IntMap.empty Map.empty mainTerm
+      zs <- emitDefinition "i64" "main" [] mainTerm'
+      xs <-
+        forM (HashMap.toList lenv) $ \(name, (args, body)) -> do
+          let args' = map (showLLVMData . LLVMDataLocal) args
+          body' <- reduceLLVM IntMap.empty Map.empty body
+          emitDefinition "i8*" (TE.encodeUtf8Builder name) args' body'
+      return $ unlinesL $ g : zs <> concat xs
 
 emit' :: WithEnv Builder
 emit' = do

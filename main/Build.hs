@@ -260,3 +260,66 @@ resolveImplicit m x idxList = do
       raiseError m $
       "the type of " <>
       x <> " must be a Pi-type, but is:\n" <> toText (weaken t)
+-- buildOneshot s = do
+--   e <- elaborateStmt
+-- buildOneshot :: WeakStmt -> WithEnv TermPlus
+-- buildOneshot (WeakStmtReturn e) = do
+--   (e', _) <- infer e
+--   analyze >> synthesize >> refine
+--   acc <- gets argAcc
+--   elaborate e' >>= bind acc
+-- buildOneshot (WeakStmtLet _ (mx, x, t) e cont) = do
+--   (e', te) <- infer e
+--   t' <- inferType t
+--   insConstraintEnv te t'
+--   buildOneshot' mx x e' t' cont
+-- buildOneshot (WeakStmtLetWT _ (mx, x, t) e cont) = do
+--   t' <- inferType t
+--   buildOneshot' mx x e t' cont
+-- buildOneshot (WeakStmtVerify _ _ cont) = buildOneshot cont
+-- buildOneshot (WeakStmtImplicit m x idxList cont) = do
+--   resolveImplicit m x idxList
+--   buildOneshot cont
+-- buildOneshot (WeakStmtConstDecl _ (_, x, t) cont) = do
+--   t' <- inferType t
+--   analyze >> synthesize >> refine >> cleanup
+--   t'' <- reduceTermPlus <$> elaborate t'
+--   insTypeEnv (Right x) t''
+--   buildOneshot cont
+-- buildOneshot (WeakStmtVisit path ss1 ss2) = do
+--   b <- isCacheAvailable path
+--   i <- gets nestLevel
+--   if b
+--     then do
+--       note' $ T.replicate (i * 2) " " <> "✓ " <> T.pack (toFilePath path)
+--       bypass ss1
+--       cachePath <- toCacheFilePath path
+--       insCachePath cachePath
+--       buildOneshot ss2
+--     else do
+--       note' $ T.replicate (i * 2) " " <> "→ " <> T.pack (toFilePath path)
+--       modify (\env -> env {nestLevel = i + 1})
+--       snapshot <- setupEnv
+--       e <- buildOneshot ss1
+--       code <- toLLVM' >> emit'
+--       modify (\env -> env {nestLevel = i})
+--       compileObject path code
+--       revertEnv snapshot
+--       cont <- buildOneshot ss2
+--       letBind e cont
+-- buildOneshot' ::
+--      Meta
+--   -> T.Text
+--   -> WeakTermPlus
+--   -> WeakTermPlus
+--   -> WeakStmt
+--   -> WithEnv TermPlus
+-- buildOneshot' mx x e t cont = do
+--   analyze >> synthesize >> refine >> cleanup
+--   e' <- reduceTermPlus <$> elaborate e
+--   t' <- reduceTermPlus <$> elaborate t
+--   insTypeEnv (Right x) t'
+--   modify (\env -> env {cacheEnv = Map.insert x (Left e') (cacheEnv env)})
+--   clarify e' >>= insCodeEnv (showInHex x) []
+--   modify (\env -> env {argAcc = (mx, x, t') : (argAcc env)})
+--   buildOneshot cont

@@ -6,14 +6,15 @@ module Main
 
 import Data.Time.Clock.POSIX
 
--- import Control.Monad.State
+import Control.Monad.State
+import Data.ByteString.Builder
 import Options.Applicative
 import Path
 import Path.IO
 import System.Directory (listDirectory)
 import System.Exit
 
--- import System.Process
+import System.Process
 import Text.Read (readMaybe)
 
 import qualified Codec.Archive.Tar as Tar
@@ -22,24 +23,25 @@ import qualified Data.ByteString.Lazy as L
 
 import Build
 import Check
+import Clarify
 import Complete
 import Data.Env
 import Data.Log
+import Elaborate
+import Emit
+import LLVM
 import Parse
+import Reduce.Term
 
-type BuildOptInputPath = String
+type InputPath = String
 
-type BuildOptOutputPath = String
+type OutputPath = String
 
-type CheckOptInputPath = String
+type IsIncremental = Bool
 
 type CheckOptEndOfEntry = String
 
-type CheckOptColorize = Bool
-
-type ArchiveOptInputPath = String
-
-type ArchiveOptOutputPath = String
+type ShouldColorize = Bool
 
 type Line = Int
 
@@ -58,10 +60,10 @@ instance Read OutputKind where
   readsPrec _ _ = []
 
 data Command
-  = Build BuildOptInputPath (Maybe BuildOptOutputPath) OutputKind
-  | Check CheckOptInputPath CheckOptColorize CheckOptEndOfEntry
-  | Archive ArchiveOptInputPath (Maybe ArchiveOptOutputPath)
-  | Complete FilePath Line Column
+  = Build InputPath (Maybe OutputPath) OutputKind IsIncremental
+  | Check InputPath ShouldColorize CheckOptEndOfEntry
+  | Archive InputPath (Maybe OutputPath)
+  | Complete InputPath Line Column
 
 main :: IO ()
 main = execParser (info (helper <*> parseOpt) fullDesc) >>= run
@@ -105,7 +107,13 @@ parseBuildOpt = do
           , value OutputKindObject
           , help "The type of output file"
           ]
-  Build <$> inputPathOpt <*> outputPathOpt <*> outputKindOpt
+  let incrementalOpt =
+        flag False True $
+        mconcat
+          [ long "incremental"
+          , help "Set this to enable incremental compilation"
+          ]
+  Build <$> inputPathOpt <*> outputPathOpt <*> outputKindOpt <*> incrementalOpt
 
 kindReader :: ReadM OutputKind
 kindReader = do
@@ -160,22 +168,57 @@ parseCompleteOpt = do
   Complete <$> inputPathOpt <*> lineOpt <*> columnOpt
 
 run :: Command -> IO ()
-run (Build inputPathStr mOutputPathStr outputKind) = do
+run (Build inputPathStr mOutputPathStr outputKind isIncFlag) = do
   inputPath <- resolveFile' inputPathStr
   time <- round <$> getPOSIXTime
-  resultOrErr <-
-    evalWithEnv (runBuild inputPath) $
-    initialEnv {shouldColorize = True, endOfEntry = "", timestamp = time}
-  basename <- replaceExtension "" $ filename inputPath
-  mOutputPath <- mapM resolveFile' mOutputPathStr
-  outputPath <- constructOutputPath basename mOutputPath outputKind
-  case resultOrErr of
-    Left err -> seqIO (map (outputLog True "") err) >> exitWith (ExitFailure 1)
-    Right pathList -> link outputPath pathList []
-      -- case outputKind of
-      --   OutputKindObject -> link outputPath pathList []
-      --   OutputKindLLVM -> link outputPath pathList ["-emit-llvm"]
-      --   OutputKindAsm -> link outputPath pathList ["-S"]
+  if isIncFlag
+    then do
+      resultOrErr <-
+        evalWithEnv (runBuild inputPath) $
+        initialEnv
+          { shouldColorize = True
+          , endOfEntry = ""
+          , timestamp = time
+          , isIncremental = isIncFlag
+          }
+      (basename, _) <- splitExtension $ filename inputPath
+      mOutputPath <- mapM resolveFile' mOutputPathStr
+      outputPath <- constructOutputPath basename mOutputPath outputKind
+      case resultOrErr of
+        Left err ->
+          seqIO (map (outputLog True "") err) >> exitWith (ExitFailure 1)
+        Right pathList -> link outputPath pathList []
+    else do
+      resultOrErr <-
+        evalWithEnv (runBuildOneshot inputPath) $
+        initialEnv
+          { shouldColorize = True
+          , endOfEntry = ""
+          , timestamp = time
+          , isIncremental = isIncFlag
+          }
+      (basename, _) <- splitExtension $ filename inputPath
+      mOutputPath <- mapM resolveFile' mOutputPathStr
+      outputPath <- constructOutputPath basename mOutputPath outputKind
+      case resultOrErr of
+        Left err ->
+          seqIO (map (outputLog True "") err) >> exitWith (ExitFailure 1)
+        Right result -> do
+          let result' = toLazyByteString result
+          case outputKind of
+            OutputKindLLVM -> L.writeFile (toFilePath outputPath) result'
+            OutputKindObject -> do
+              tmpOutputPath <- liftIO $ addExtension ".ll" outputPath
+              let tmpOutputPathStr = toFilePath tmpOutputPath
+              L.writeFile tmpOutputPathStr result'
+              callProcess
+                "clang"
+                [ tmpOutputPathStr
+                , "-Wno-override-module"
+                , "-o" ++ toFilePath outputPath
+                ]
+              removeFile tmpOutputPath
+            OutputKindAsm -> undefined
 run (Check inputPathStr colorizeFlag eoe) = do
   inputPath <- resolveFile' inputPathStr
   time <- round <$> getPOSIXTime
@@ -229,6 +272,11 @@ constructOutputArchivePath _ (Just path) = return path
 
 runBuild :: Path Abs File -> WithEnv [Path Abs File]
 runBuild inputPath = parse inputPath >>= build
+
+runBuildOneshot :: Path Abs File -> WithEnv Builder
+runBuildOneshot inputPath = do
+  mainTerm <- parse inputPath >>= elaborateStmt
+  clarify (reduceTermPlus mainTerm) >>= toLLVM >>= emit
 
 runCheck :: Path Abs File -> WithEnv ()
 runCheck inputPath = parse inputPath >>= check

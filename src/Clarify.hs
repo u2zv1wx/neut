@@ -14,6 +14,7 @@ import Data.List (nubBy)
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
+import qualified Data.Set as S
 import qualified Data.Text as T
 
 import Clarify.Linearize
@@ -23,6 +24,7 @@ import Data.Basic
 import Data.Code
 import Data.Env
 import Data.Term
+import Reduce.Code
 import Reduce.Term
 
 clarify :: TermPlus -> WithEnv CodePlus
@@ -186,10 +188,22 @@ clarifyConst tenv m x
     cenv <- gets cacheEnv
     -- showInHexはLLVMのときまで遅延させたほうがいいかも（型情報の取得が絡むので）
     let x' = showInHex x
-    case (asSysCallMaybe os x, Map.lookup x cenv) of
-      (Just (syscall, argInfo), _) -> clarifySysCall tenv x syscall argInfo m
-      (_, Nothing) -> return (m, CodeUpIntro (m, DataConst x)) -- external
-      (_, Just _) -> return (m, CodePiElimDownElim (m, DataConst x') [])
+    b <- gets isIncremental
+    case (asSysCallMaybe os x, b, Map.lookup x cenv) of
+      (Just (syscall, argInfo), _, _) -> clarifySysCall tenv x syscall argInfo m
+      (_, _, Nothing) -> return (m, CodeUpIntro (m, DataConst x)) -- external
+      (_, True, Just _) -> return (m, CodePiElimDownElim (m, DataConst x') [])
+      (_, False, Just (Right _)) ->
+        return (m, CodePiElimDownElim (m, DataConst x') [])
+      (_, False, Just (Left e))
+        | T.any (`S.member` S.fromList "()") x -> clarify' tenv e
+        | otherwise -> do
+          e' <- clarify' tenv e
+          modify (\env -> env {nameSet = S.empty})
+          e'' <- reduceCodePlus e'
+          modify (\env -> env {cacheEnv = Map.insert x (Right e'') cenv})
+          insCodeEnv x' [] e''
+          return (m, CodePiElimDownElim (m, DataConst x') [])
 
 immType :: Meta -> TermPlus
 immType m = (m, TermEnum (EnumTypeIntS 64))
