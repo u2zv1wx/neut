@@ -96,8 +96,6 @@ data Env =
     -- metavar ~> beta-equivalent weakterm
     , substEnv :: IntMap.IntMap WeakTermPlus
     , zetaEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus)
-    , typeCacheEnv :: Map.HashMap T.Text (TermPlus, TermPlus)
-    , typeCacheAcc :: [(T.Text, (TermPlus, TermPlus))]
     --
     -- clarify
     --
@@ -119,9 +117,6 @@ data Env =
     , cachePathList :: [Path Abs File]
     , nestLevel :: Int
     , depGraph :: Map.HashMap (Path Abs File) [Path Abs File]
-    -- , restrictSet :: S.Set T.Text
-    -- , finishedSet :: S.Set T.Text
-    -- , sharedSet :: S.Set (T.Text, Int)
     }
 
 initialEnv :: Env
@@ -148,8 +143,6 @@ initialEnv =
     , intactSet = S.empty
     , prefixEnv = []
     , sectionEnv = []
-    , typeCacheEnv = Map.empty
-    , typeCacheAcc = []
     , formationEnv = Map.empty
     , indEnv = Map.empty
     , labelEnv = Map.empty
