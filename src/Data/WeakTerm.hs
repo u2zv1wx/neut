@@ -296,13 +296,6 @@ substWeakTermPlus sub (m, WeakTermPiIntro info xts body) = do
   let info' = fmap2 (substWeakTermPlus' sub) info
   let (xts', body') = substWeakTermPlus'' sub xts body
   (m, WeakTermPiIntro info' xts' body')
--- substWeakTermPlus sub (m, WeakTermPiIntro Nothing xts body) = do
---   let (xts', body') = substWeakTermPlus'' sub xts body
---   (m, WeakTermPiIntro Nothing xts' body')
--- substWeakTermPlus sub (m, WeakTermPiIntro (Just (name, args)) xts body) = do
---   let args' = substWeakTermPlus' sub args
---   let (xts', body') = substWeakTermPlus'' sub xts body
---   (m, WeakTermPiIntro (Just (name, args')) xts' body')
 substWeakTermPlus sub (m, WeakTermPiElim e es) = do
   let e' = substWeakTermPlus sub e
   let es' = map (substWeakTermPlus sub) es

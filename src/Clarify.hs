@@ -592,7 +592,6 @@ chainTermPlus tenv (m, TermUpsilon x) = do
   return $ xts ++ [(m, x, t)]
 chainTermPlus tenv (_, TermPi _ xts t) = chainTermPlus' tenv xts [t]
 chainTermPlus tenv (_, TermPiIntro _ xts e) = chainTermPlus' tenv xts [e]
--- chainTermPlus tenv (_, TermPiIntroPlus _ xts e) = chainTermPlus' tenv xts [e]
 chainTermPlus tenv (_, TermPiElim e es) = do
   xs1 <- chainTermPlus tenv e
   xs2 <- concat <$> mapM (chainTermPlus tenv) es

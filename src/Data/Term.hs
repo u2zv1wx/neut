@@ -114,13 +114,6 @@ substTermPlus sub (m, TermPiIntro info xts body) = do
   let info' = fmap2 (substTermPlus' sub) info
   let (xts', body') = substTermPlus'' sub xts body
   (m, TermPiIntro info' xts' body')
--- substTermPlus sub (m, TermPiIntro Nothing xts body) = do
---   let (xts', body') = substTermPlus'' sub xts body
---   (m, TermPiIntro Nothing xts' body')
--- substTermPlus sub (m, TermPiIntro (Just (name, args)) xts body) = do
---   let args' = substTermPlus' sub args
---   let (xts', body') = substTermPlus'' sub xts body
---   (m, TermPiIntro (Just (name, args')) xts' body')
 substTermPlus sub (m, TermPiElim e es) = do
   let e' = substTermPlus sub e
   let es' = map (substTermPlus sub) es
@@ -195,12 +188,6 @@ weaken (m, TermPiIntro info xts body) = do
   let info' = fmap2 weakenArgs info
   let xts' = (weakenArgs xts)
   (m, WeakTermPiIntro info' xts' (weaken body))
--- weaken (m, TermPiIntro Nothing xts body) = do
---   (m, WeakTermPiIntro Nothing (weakenArgs xts) (weaken body))
--- weaken (m, TermPiIntro (Just (name, args)) xts body) = do
---   let args' = weakenArgs args
---   let xts' = (weakenArgs xts)
---   (m, WeakTermPiIntro (Just (name, args')) xts' (weaken body))
 weaken (m, TermPiElim e es) = do
   let e' = weaken e
   let es' = map weaken es

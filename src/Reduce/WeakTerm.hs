@@ -27,11 +27,6 @@ reduceWeakTermPlus (m, WeakTermPiIntro info xts e) = do
   let ts' = map reduceWeakTermPlus ts
   let e' = reduceWeakTermPlus e
   (m, WeakTermPiIntro info' (zip3 ms xs ts') e')
--- reduceWeakTermPlus (m, WeakTermPiIntroPlus (name, args) xts e) = do
---   let args' = map reduceWeakTermIdentPlus args
---   let xts' = map reduceWeakTermIdentPlus xts
---   let e' = reduceWeakTermPlus e
---   (m, WeakTermPiIntroPlus (name, args') xts' e')
 reduceWeakTermPlus (m, WeakTermPiElim e es) = do
   let e' = reduceWeakTermPlus e
   let es' = map reduceWeakTermPlus es
@@ -43,11 +38,6 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
         let xs = map (\(_, x, _) -> Left $ asInt x) xts
         let sub = Map.fromList $ zip xs es'
         reduceWeakTermPlus $ substWeakTermPlus sub body
-    -- (_, WeakTermPiIntroPlus _ xts body)
-    --   | length xts == length es' -> do
-    --     let xs = map (\(_, x, _) -> Left $ asInt x) xts
-    --     let sub = Map.fromList $ zip xs es'
-    --     reduceWeakTermPlus $ substWeakTermPlus sub body
     _ -> (m, app)
 reduceWeakTermPlus (m, WeakTermIter (mx, x, t) xts e)
   | x `notElem` varWeakTermPlus e = do

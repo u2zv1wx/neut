@@ -28,11 +28,6 @@ reduceTermPlus (m, TermPiIntro info xts e) = do
   let ts' = map reduceTermPlus ts
   let e' = reduceTermPlus e
   (m, TermPiIntro info' (zip3 ms xs ts') e')
--- reduceTermPlus (m, TermPiIntroPlus (name, args) xts e) = do
---   let args' = map reduceIdentPlus args
---   let xts' = map reduceIdentPlus xts
---   let e' = reduceTermPlus e
---   (m, TermPiIntroPlus (name, args') xts' e')
 reduceTermPlus (m, TermPiElim e es) = do
   let e' = reduceTermPlus e
   let es' = map reduceTermPlus es
@@ -46,12 +41,6 @@ reduceTermPlus (m, TermPiElim e es) = do
         let xs = map (\(_, x, _) -> asInt x) xts
         let sub = IntMap.fromList $ zip xs es'
         reduceTermPlus $ substTermPlus sub body
-    -- (_, TermPiIntroPlus _ xts body)
-    --   | length xts == length es'
-    --   , valueCond -> do
-    --     let xs = map (\(_, x, _) -> asInt x) xts
-    --     let sub = IntMap.fromList $ zip xs es'
-    --     reduceTermPlus $ substTermPlus sub body
     _ -> (m, app)
 reduceTermPlus (m, TermIter (mx, x, t) xts e)
   | x `notElem` varTermPlus e = reduceTermPlus (m, termPiIntro xts e)
@@ -130,7 +119,6 @@ isValue (_, TermTau) = True
 isValue (_, TermUpsilon _) = True
 isValue (_, TermPi {}) = True
 isValue (_, TermPiIntro {}) = True
--- isValue (_, TermPiIntroPlus {}) = True
 isValue (_, TermIter {}) = True
 isValue (_, TermConst x) = isValueConst x
 isValue (_, TermFloat _ _) = True
@@ -160,16 +148,12 @@ normalize (m, TermPi mName xts cod) = do
   ts' <- mapM normalize ts
   cod' <- normalize cod
   return (m, TermPi mName (zip3 ms xs ts') cod')
-normalize (m, TermPiIntro Nothing xts e) = do
+normalize (m, TermPiIntro info xts e) = do
+  info' <- fmap2M (mapM normalizeIdentPlus) info
   let (ms, xs, ts) = unzip3 xts
   ts' <- mapM normalize ts
   e' <- normalize e
-  return (m, TermPiIntro Nothing (zip3 ms xs ts') e')
-normalize (m, TermPiIntro (Just (name, args)) xts e) = do
-  args' <- mapM normalizeIdentPlus args
-  xts' <- mapM normalizeIdentPlus xts
-  e' <- normalize e
-  return (m, TermPiIntro (Just (name, args')) xts' e')
+  return (m, TermPiIntro info' (zip3 ms xs ts') e')
 normalize (m, TermPiElim e es) = do
   e' <- normalize e
   es' <- mapM normalize es
@@ -178,10 +162,6 @@ normalize (m, TermPiElim e es) = do
       let xs = map (\(_, x, _) -> asInt x) xts
       let sub = IntMap.fromList $ zip xs es'
       normalize $ substTermPlus sub body
-    -- (_, TermPiIntroPlus _ xts body) -> do
-    --   let xs = map (\(_, x, _) -> asInt x) xts
-    --   let sub = IntMap.fromList $ zip xs es'
-    --   normalize $ substTermPlus sub body
     iter@(_, TermIter (_, self, _) xts body) -> do
       let xs = map (\(_, x, _) -> asInt x) xts
       let sub = IntMap.fromList $ (asInt self, iter) : zip xs es'

@@ -38,7 +38,6 @@ infer' _ (m, WeakTermUpsilon x) = do
 infer' ctx (m, WeakTermPi mName xts t) = do
   (xts', t') <- inferPi ctx xts t
   return ((m, WeakTermPi mName xts' t'), (m, WeakTermTau))
--- infer' ctx (m, WeakTermPiIntro info xts e) = do;
 infer' ctx (m, WeakTermPiIntro info xts e) = do
   (xts', (e', t')) <- inferBinder ctx xts e
   case info of
@@ -49,13 +48,6 @@ infer' ctx (m, WeakTermPiIntro info xts e) = do
       return
         ( (m, WeakTermPiIntro (Just (name, args')) xts' e')
         , (m, WeakTermPi (Just ai) xts' t'))
--- infer' ctx (m, WeakTermPiIntro (Just (name, args)) xts e) = do
---   (ai, _) <- lookupRevIndEnv m name
---   args' <- inferSigma ctx args
---   (xts', (e', t')) <- inferBinder ctx xts e
---   return
---     ( (m, WeakTermPiIntro (Just (name, args')) xts' e')
---     , (m, WeakTermPi (Just ai) xts' t'))
 infer' ctx (m, WeakTermPiElim e es) = do
   es' <- insertHoleIfNecessary e es
   etls <- mapM (infer' ctx) es'

@@ -195,8 +195,6 @@ unravel (m, WeakTermPi mName xts t) = do
 unravel (m, WeakTermPiIntro info xts e) = do
   (xts', e') <- unravelBinder xts e
   return (m, WeakTermPiIntro info xts' e')
--- unravel (m, WeakTermPiIntroPlus (name, args) xts e) =
---   return (m, WeakTermPiIntroPlus (name, args) xts e)
 unravel (m, WeakTermPiElim e es) = do
   e' <- unravel e
   es' <- mapM unravel es

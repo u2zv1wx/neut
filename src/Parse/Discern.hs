@@ -92,12 +92,6 @@ discern' nenv (QuasiStmtVisit path ss1:ss2) = do
   let ss2' = drop (length ss1) ssss
   return $ QuasiStmtVisit path ss1' : ss2'
 
--- discern' nenv (QuasiStmtBOF path:ss) = do
---   ss' <- discern' nenv ss
---   return $ QuasiStmtBOF path : ss'
--- discern' nenv (QuasiStmtEOF path:ss) = do
---   ss' <- discern' nenv ss
---   return $ QuasiStmtEOF path : ss'
 discernDef :: NameEnv -> Def -> WithEnv Def
 discernDef nenv (m, (mx, x, t), xts, e) = do
   t' <- discern'' nenv t
@@ -127,13 +121,6 @@ discern'' nenv (m, WeakTermPiIntro info xts e) = do
   info' <- fmap2M (mapM (discernIdentPlus nenv)) info
   (xts', e') <- discernBinder nenv xts e
   return (m, WeakTermPiIntro info' xts' e')
--- discern'' nenv (m, WeakTermPiIntro Nothing xts e) = do
---   (xts', e') <- discernBinder nenv xts e
---   return (m, WeakTermPiIntro Nothing xts' e')
--- discern'' nenv (m, WeakTermPiIntro (Just (name, args)) xts e) = do
---   args' <- mapM (discernIdentPlus nenv) args
---   (xts', e') <- discernBinder nenv xts e
---   return (m, WeakTermPiIntro (Just (name, args')) xts' e')
 discern'' nenv (m, WeakTermPiElim e es) = do
   es' <- mapM (discern'' nenv) es
   e' <- discern'' nenv e

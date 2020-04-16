@@ -436,15 +436,9 @@ hex 14 = "e"
 hex 15 = "f"
 hex _ = " "
 
--- maybe-lift
--- mLift :: (b -> c) -> Maybe (a, b) -> Maybe (a, c)
--- mLift _ Nothing = Nothing
--- mLift f (Just (x, y)) = Just (x, f y)
 fmap2 :: (Functor f, Functor g) => (a -> b) -> f (g a) -> f (g b)
 fmap2 f m = fmap (fmap f) m
 
--- これってS (T (U A)) ~> S (U (T A)) ~> U (S (T A))の変換？それは厳しいんでは？
--- というかmLiftでいいか。
 fmap2M :: (Monad m) => (b -> m c) -> Maybe (a, b) -> m (Maybe (a, c))
 fmap2M _ Nothing = return Nothing
 fmap2M f (Just (x, y)) = do
