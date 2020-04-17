@@ -17,11 +17,12 @@ reduceCodePlus (m, CodeConst c) = return (m, CodeConst c)
 reduceCodePlus (m, CodePiElimDownElim v ds) = do
   cenv <- gets codeEnv
   ns <- gets nameSet
-  case v of
-    (_, DataDownIntroPiIntro xs body)
-      | length xs == length ds -> do
-        let sub = IntMap.fromList (zip (map asInt xs) ds)
-        reduceCodePlus $ substCodePlus sub body
+  case v
+    -- (_, DataDownIntroPiIntro xs body)
+    --   | length xs == length ds -> do
+    --     let sub = IntMap.fromList (zip (map asInt xs) ds)
+    --     reduceCodePlus $ substCodePlus sub body
+        of
     (_, DataConst x)
       | Just (Definition (IsFixed False) xs body) <- Map.lookup x cenv
       , length xs == length ds -> do

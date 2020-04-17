@@ -10,7 +10,7 @@ import Data.Basic
 data Data
   = DataConst T.Text
   | DataUpsilon Identifier
-  | DataDownIntroPiIntro [Identifier] CodePlus
+  -- | DataDownIntroPiIntro [Identifier] CodePlus
   | DataSigmaIntro ArrayKind [DataPlus]
   | DataEnumIntro EnumValue
   | DataFloat FloatSize Double
@@ -63,7 +63,7 @@ substDataPlus :: SubstDataPlus -> DataPlus -> DataPlus
 substDataPlus _ (m, DataConst x) = (m, DataConst x)
 substDataPlus sub (m, DataUpsilon s) =
   fromMaybe (m, DataUpsilon s) (IntMap.lookup (asInt s) sub) -- ここではsの整数部分を比較したほうがよさそう？
-substDataPlus _ f@(_, DataDownIntroPiIntro {}) = f -- pi-introには自由変数がないので
+-- substDataPlus _ f@(_, DataDownIntroPiIntro {}) = f -- pi-introには自由変数がないので
 substDataPlus sub (m, DataSigmaIntro mk vs) = do
   let vs' = map (substDataPlus sub) vs
   (m, DataSigmaIntro mk vs')

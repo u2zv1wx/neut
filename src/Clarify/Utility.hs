@@ -72,39 +72,35 @@ switch e1 e2 = [(CaseValue (EnumValueIntS 64 0), e1), (CaseDefault, e2)]
 cartImmName :: T.Text
 cartImmName = "cartesian-immediate"
 
-tryCache :: T.Text -> WithEnv DataPlus -> WithEnv DataPlus
-tryCache key f = do
-  scenv <- gets sharedCodeEnv
-  case Map.lookup key scenv of
-    Nothing -> f
-    Just def -> return def
+tryCache :: Meta -> T.Text -> WithEnv () -> WithEnv DataPlus
+tryCache m key f = do
+  cenv <- gets codeEnv
+  when (not $ Map.member key cenv) $ f
+  return (m, DataConst key)
 
 makeSwitcher ::
      Meta
   -> (DataPlus -> WithEnv CodePlus)
   -> (DataPlus -> WithEnv CodePlus)
-  -> WithEnv DataPlus
+  -> WithEnv ([Identifier], CodePlus)
 makeSwitcher m compAff compRel = do
   (switchVarName, switchVar) <- newDataUpsilonWith m "switch"
   (argVarName, argVar) <- newDataUpsilonWith m "argimm"
   aff <- compAff argVar
   rel <- compRel argVar
-  return $
-    ( m
-    , DataDownIntroPiIntro
-        [switchVarName, argVarName]
-        ( m
-        , CodeEnumElim
-            (IntMap.fromList [(asInt argVarName, argVar)])
-            switchVar
-            (switch aff rel)))
+  return
+    ( [switchVarName, argVarName]
+    , ( m
+      , CodeEnumElim
+          (IntMap.fromList [(asInt argVarName, argVar)])
+          switchVar
+          (switch aff rel)))
 
 cartesianImmediate :: Meta -> WithEnv DataPlus
 cartesianImmediate m = do
-  tryCache cartImmName $ do
-    def <- makeSwitcher m affineImmediate relevantImmediate
-    insSharedCodeEnv cartImmName def
-    return def
+  tryCache m cartImmName $ do
+    (args, e) <- makeSwitcher m affineImmediate relevantImmediate
+    insCodeEnv cartImmName args e
 
 affineImmediate :: DataPlus -> WithEnv CodePlus
 affineImmediate (m, _) = return (m, CodeUpIntro (m, sigmaIntro []))
@@ -118,10 +114,9 @@ cartStructName = "cartesian-struct"
 
 cartesianStruct :: Meta -> [ArrayKind] -> WithEnv DataPlus
 cartesianStruct m ks = do
-  tryCache cartStructName $ do
-    def <- makeSwitcher m (affineStruct ks) (relevantStruct ks)
-    insSharedCodeEnv cartStructName def
-    cartesianStruct m ks
+  tryCache m cartStructName $ do
+    (args, e) <- makeSwitcher m (affineStruct ks) (relevantStruct ks)
+    insCodeEnv cartStructName args e
 
 affineStruct :: [ArrayKind] -> DataPlus -> WithEnv CodePlus
 affineStruct ks argVar@(m, _) = do
@@ -146,7 +141,3 @@ insCodeEnv :: T.Text -> [Identifier] -> CodePlus -> WithEnv ()
 insCodeEnv name args e = do
   let def = Definition (IsFixed False) args e
   modify (\env -> env {codeEnv = Map.insert name def (codeEnv env)})
-
-insSharedCodeEnv :: T.Text -> DataPlus -> WithEnv ()
-insSharedCodeEnv name def = do
-  modify (\env -> env {sharedCodeEnv = Map.insert name def (sharedCodeEnv env)})

@@ -22,13 +22,18 @@ cartesianSigma ::
   -> ArrayKind
   -> [Either CodePlus (Identifier, CodePlus)]
   -> WithEnv DataPlus
-cartesianSigma Nothing m k mxts =
-  makeSwitcher m (affineSigma m k mxts) (relevantSigma m k mxts)
+cartesianSigma Nothing m k mxts = do
+  (args, e) <- makeSwitcher m (affineSigma m k mxts) (relevantSigma m k mxts)
+  i <- newCount
+  let h = "sigma-" <> T.pack (show i)
+  insCodeEnv h args e
+  return (m, DataConst h)
+  -- return (m, DataDownIntroPiIntro args e)
 cartesianSigma (Just name) m k mxts = do
-  tryCache name $ do
-    def <- makeSwitcher m (affineSigma m k mxts) (relevantSigma m k mxts)
-    insSharedCodeEnv name def
-    return def
+  tryCache m name $ do
+    (args, e) <- makeSwitcher m (affineSigma m k mxts) (relevantSigma m k mxts)
+    insCodeEnv name args e
+    -- return def
 
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
 -- affineSigma NAME LOC [(x1, t1), ..., (xn, tn)]   ~>

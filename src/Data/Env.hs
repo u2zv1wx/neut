@@ -101,7 +101,6 @@ data Env =
     , cacheEnv :: Map.HashMap T.Text (Either TermPlus CodePlus)
     -- f ~> thunk (lam (x1 ... xn) e)
     , codeEnv :: Map.HashMap T.Text Definition
-    , sharedCodeEnv :: Map.HashMap T.Text DataPlus
     , nameSet :: S.Set T.Text
     , chainEnv :: IntMap.IntMap ([Data.Term.IdentifierPlus], TermPlus)
     --
@@ -150,7 +149,6 @@ initialEnv =
     , typeEnv = Map.empty
     , cacheEnv = Map.empty
     , codeEnv = Map.empty
-    , sharedCodeEnv = Map.empty
     , chainEnv = IntMap.empty
     , llvmEnv = Map.empty
     , defVarSet = S.empty

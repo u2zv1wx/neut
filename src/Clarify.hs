@@ -13,6 +13,7 @@ import Data.List (nubBy)
 
 import qualified Data.HashMap.Lazy as Map
 import qualified Data.IntMap as IntMap
+import qualified Data.Set as S
 import qualified Data.Text as T
 
 import Clarify.Linearize
@@ -22,12 +23,14 @@ import Data.Basic
 import Data.Code
 import Data.Env
 import Data.Term
-
--- import Reduce.Code
+import Reduce.Code
 import Reduce.Term
 
 clarify :: Stmt -> WithEnv CodePlus
-clarify = clarifyStmt
+clarify stmt = do
+  e <- clarifyStmt stmt
+  modify (\env -> env {nameSet = S.empty})
+  reduceCodePlus e
 
 clarifyStmt :: Stmt -> WithEnv CodePlus
 clarifyStmt (StmtReturn e) = do
@@ -35,8 +38,9 @@ clarifyStmt (StmtReturn e) = do
   clarify' tenv e
 clarifyStmt (StmtLet _ (_, x, _) e cont) = do
   tenv <- gets typeEnv
-  e' <- clarify' tenv e
   let x' = showInHex x
+  modify (\env -> env {nameSet = S.empty})
+  e' <- clarify' tenv e >>= reduceCodePlus
   insCodeEnv x' [] e'
   cont' <- clarifyStmt cont
   h <- newNameWith'' "comp"
@@ -510,14 +514,15 @@ makeClosure mName mxts2 m mxts1 e = do
   envExp <- cartesianSigma Nothing m arrVoidPtr $ map Right xts2
   let vs = map (\(mx, x, _) -> (mx, DataUpsilon x)) mxts2
   let fvEnv = (m, sigmaIntro vs)
-  case mName of
-    Nothing -> do
-      (args, body) <- toLamInfo m xts1 xts2 e
-      return
-        (m, sigmaIntro [envExp, fvEnv, (m, DataDownIntroPiIntro args body)])
-    Just name -> do
-      registerIfNecessary m name xts1 xts2 e
-      return (m, sigmaIntro [envExp, fvEnv, (m, DataConst name)])
+  name <- toName mName
+  registerIfNecessary m name xts1 xts2 e
+  return (m, sigmaIntro [envExp, fvEnv, (m, DataConst name)])
+
+toName :: Maybe T.Text -> WithEnv T.Text
+toName (Just name) = return name
+toName Nothing = do
+  i <- newCount
+  return $ "thunk-" <> T.pack (show i)
 
 registerIfNecessary ::
      Meta
