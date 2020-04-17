@@ -19,7 +19,7 @@ import Data.List (elemIndex, sortOn)
 import Data.Maybe (catMaybes, fromMaybe)
 import Text.Read (readMaybe)
 
-import qualified Data.HashMap.Strict as Map
+import qualified Data.HashMap.Lazy as Map
 import qualified Data.Text.Lazy as T
 
 import Data.Basic

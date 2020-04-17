@@ -4,8 +4,8 @@ module Reduce.Code
 
 import Control.Monad.State.Lazy
 
-import qualified Data.HashMap.Strict as Map
-import qualified Data.IntMap.Strict as IntMap
+import qualified Data.HashMap.Lazy as Map
+import qualified Data.IntMap as IntMap
 
 import Data.Basic
 import Data.Code

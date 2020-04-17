@@ -4,7 +4,7 @@ module Clarify.Linearize
   ( linearize
   ) where
 
-import qualified Data.IntMap.Strict as IntMap
+import qualified Data.IntMap as IntMap
 
 import Clarify.Utility
 import Data.Basic

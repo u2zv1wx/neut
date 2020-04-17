@@ -5,7 +5,7 @@ module Reduce.WeakTerm
   , reduceWeakTermIdentPlus
   ) where
 
-import qualified Data.HashMap.Strict as Map
+import qualified Data.HashMap.Lazy as Map
 
 import Data.Basic
 import Data.WeakTerm

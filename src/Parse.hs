@@ -19,7 +19,7 @@ import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
-import qualified Data.HashMap.Strict as Map
+import qualified Data.HashMap.Lazy as Map
 
 import qualified Data.Set as S
 import qualified Data.Text.Lazy as T

@@ -7,7 +7,7 @@ import Data.Binary
 import Data.Maybe (fromMaybe)
 import GHC.Generics (Generic)
 
-import qualified Data.IntMap.Strict as IntMap
+import qualified Data.IntMap as IntMap
 import qualified Data.Text.Lazy as T
 
 import Data.Basic

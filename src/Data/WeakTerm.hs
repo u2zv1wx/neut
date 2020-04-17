@@ -4,7 +4,7 @@ module Data.WeakTerm where
 
 import Path
 
-import qualified Data.HashMap.Strict as Map
+import qualified Data.HashMap.Lazy as Map
 import qualified Data.Set as S
 import qualified Data.Text.Lazy as T
 

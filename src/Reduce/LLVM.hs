@@ -4,7 +4,7 @@ module Reduce.LLVM
 
 import Control.Monad.State.Lazy
 
-import qualified Data.IntMap.Strict as IntMap
+import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
 import qualified Data.Set as S
 

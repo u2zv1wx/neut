@@ -6,7 +6,7 @@ module Parse.Discern
 
 import Control.Monad.State.Lazy
 
-import qualified Data.HashMap.Strict as Map
+import qualified Data.HashMap.Lazy as Map
 import qualified Data.Set as S
 import qualified Data.Text.Lazy as T
 

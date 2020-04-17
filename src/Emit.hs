@@ -10,8 +10,8 @@ import Control.Monad.State.Lazy
 import Data.ByteString.Builder
 import Numeric.Half
 
-import qualified Data.HashMap.Strict as HashMap
-import qualified Data.IntMap.Strict as IntMap
+import qualified Data.HashMap.Lazy as HashMap
+import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
 import qualified Data.Set as S
 import qualified Data.Text.Lazy as T

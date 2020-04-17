@@ -21,8 +21,8 @@ import Data.Version (showVersion)
 import Data.WeakTerm
 import Paths_neut (version)
 
-import qualified Data.HashMap.Strict as Map
-import qualified Data.IntMap.Strict as IntMap
+import qualified Data.HashMap.Lazy as Map
+import qualified Data.IntMap as IntMap
 import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
 import qualified Data.Text.Lazy as T

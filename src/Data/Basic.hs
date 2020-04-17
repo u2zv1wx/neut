@@ -9,7 +9,7 @@ import GHC.Generics hiding (Meta)
 import Path
 import Path.Internal
 
-import qualified Data.IntMap.Strict as IntMap
+import qualified Data.IntMap as IntMap
 import qualified Data.Set as S
 import qualified Data.Text.Lazy as T
 

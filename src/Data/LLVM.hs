@@ -1,6 +1,6 @@
 module Data.LLVM where
 
-import qualified Data.IntMap.Strict as IntMap
+import qualified Data.IntMap as IntMap
 import qualified Data.Text.Lazy as T
 
 import Data.Basic

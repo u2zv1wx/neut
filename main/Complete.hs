@@ -8,7 +8,7 @@ import Control.Monad.State.Lazy
 import Data.List hiding (findIndex)
 import Path
 
-import qualified Data.HashMap.Strict as Map
+import qualified Data.HashMap.Lazy as Map
 import qualified Data.Set as S
 
 import qualified Data.Text.Lazy as T
