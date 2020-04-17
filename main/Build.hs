@@ -32,20 +32,13 @@ build :: WeakStmt -> WithEnv [Path Abs File]
 build (WeakStmtVisit path ss1 ss2) = do
   b <- isCacheAvailable path
   if b
-    then do
-      outputSkipHeader path
-      bypass ss1
-      toCacheFilePath path >>= insCachePath
-      gets cachePathList
+    then skip path ss1 >> gets cachePathList
     else do
       outputVisitHeader path
-      modify (\env -> env {nestLevel = nestLevel env + 1})
       e <- build' ss1
       modify (\env -> env {argAcc = []})
-      ss2' <- build' ss2
-      mainTerm <- letBind e ss2'
-      llvm <- clarify mainTerm >>= toLLVM >>= emit
-      compileObject path llvm
+      mainTerm <- build' ss2 >>= letBind e
+      clarify mainTerm >>= toLLVM >>= emit >>= compileObject path
       gets cachePathList
 build _ = raiseCritical' "build"
 
@@ -82,21 +75,21 @@ build' (WeakStmtConstDecl _ (_, x, t) cont) = do
 build' (WeakStmtVisit path ss1 ss2) = do
   b <- isCacheAvailable path
   if b
-    then do
-      outputSkipHeader path
-      bypass ss1
-      toCacheFilePath path >>= insCachePath
-      build' ss2
+    then skip path ss1 >> build' ss2
     else do
       outputVisitHeader path
       e <-
         withStack $ do
           e <- build' ss1
-          code <- toLLVM' >> emit'
-          compileObject path code
+          toLLVM' >> emit' >>= compileObject path
           return e
-      cont <- build' ss2
-      letBind e cont
+      build' ss2 >>= letBind e
+
+skip :: Path Abs File -> WeakStmt -> WithEnv ()
+skip path ss = do
+  outputSkipHeader path
+  bypass ss
+  toCacheFilePath path >>= insCachePath
 
 letBind :: TermPlus -> TermPlus -> WithEnv TermPlus
 letBind e cont = do
