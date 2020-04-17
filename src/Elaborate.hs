@@ -2,13 +2,6 @@
 
 module Elaborate
   ( elaborate
-  -- , elaborateStmt
-  -- , resolveImplicit
-  -- , analyze
-  -- , synthesize
-  -- , infer
-  -- , inferType
-  -- , insConstraintEnv
   ) where
 
 import Control.Monad.State.Lazy

@@ -53,7 +53,6 @@ data Env =
     , endOfEntry :: String
     , isCheck :: Bool
     , timestamp :: Integer
-    -- , isIncremental :: Bool
     --
     -- parse
     --
@@ -127,7 +126,6 @@ initialEnv =
     , shouldColorize = False
     , timestamp = 0
     , isCheck = False
-    -- , isIncremental = False
     , endOfEntry = ""
     , phase = 0
     , target = Nothing

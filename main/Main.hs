@@ -167,24 +167,6 @@ run :: Command -> IO ()
 run (Build inputPathStr mOutputPathStr outputKind _) = do
   inputPath <- resolveFile' inputPathStr
   time <- round <$> getPOSIXTime
-  -- if isIncFlag
-  --   then do
-      -- resultOrErr <-
-      --   evalWithEnv (runBuild inputPath) $
-      --   initialEnv
-      --     { shouldColorize = True
-      --     , endOfEntry = ""
-      --     , timestamp = time
-      --     , isIncremental = isIncFlag
-      --     }
-      -- (basename, _) <- splitExtension $ filename inputPath
-      -- mOutputPath <- mapM resolveFile' mOutputPathStr
-      -- outputPath <- constructOutputPath basename mOutputPath outputKind
-      -- case resultOrErr of
-      --   Left (Error err) ->
-      --     seqIO (map (outputLog True "") err) >> exitWith (ExitFailure 1)
-      --   Right pathList -> link outputPath pathList []
-    -- else do
   resultOrErr <-
     evalWithEnv (runBuild inputPath) $
     initialEnv {shouldColorize = True, endOfEntry = "", timestamp = time}
@@ -263,20 +245,10 @@ constructOutputArchivePath _ (Just path) = return path
 
 runBuild :: Path Abs File -> WithEnv Builder
 runBuild = parse >=> elaborate >=> clarify >=> toLLVM >=> emit
-  -- parse inputPath >>= elaborate >>= clarify >>= toLLVM >>= emit
 
--- runBuild :: Path Abs File -> WithEnv [Path Abs File]
--- runBuild inputPath = parse inputPath >>= build
--- runBuildOneshot :: Path Abs File -> WithEnv Builder
--- runBuildOneshot inputPath = do
---   mainTerm <- parse inputPath >>= elaborateStmt
---   clarify (reduceTermPlus mainTerm) >>= toLLVM >>= emit
 runCheck :: Path Abs File -> WithEnv ()
 runCheck = parse >=> elaborate >=> \_ -> return ()
 
--- runCheck inputPath = parse inputPath >>= elaborate >>= \_ -> return ()
--- runCheck :: Path Abs File -> WithEnv ()
--- runCheck inputPath = parse inputPath >>= check
 seqIO :: [IO ()] -> IO ()
 seqIO [] = return ()
 seqIO (a:as) = a >> seqIO as
