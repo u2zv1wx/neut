@@ -51,6 +51,7 @@
 ;; (write hole stdout &test 3)
 
 
+
 ;; こっちだと最初と最後の1回だけ。
 ;; ここの最初の「&test」も「test」に解決されるわけだけど、するとbeginのあとでも「test」が
 ;; 使用されていることから、ここでtestのコピーが走ることになる。
@@ -190,6 +191,8 @@
 
 
 (let p (equal:refl (i64 3)))
+
+;; (i64:add top tau)
 
 ?p
 

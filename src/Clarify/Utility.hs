@@ -6,7 +6,7 @@ import Control.Monad.State.Lazy
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
-import qualified Data.Text as T
+import qualified Data.Text.Lazy as T
 
 import Data.Basic
 import Data.Code

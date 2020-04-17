@@ -14,7 +14,7 @@ import Data.Either (rights)
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Set as S
-import qualified Data.Text as T
+import qualified Data.Text.Lazy as T
 
 import Data.Basic
 import Data.Env

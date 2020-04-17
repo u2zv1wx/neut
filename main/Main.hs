@@ -205,7 +205,11 @@ run (Build inputPathStr mOutputPathStr outputKind isIncFlag) = do
         Right result -> do
           let result' = toLazyByteString result
           case outputKind of
-            OutputKindLLVM -> L.writeFile (toFilePath outputPath) result'
+            OutputKindLLVM
+              -- L.writeFile (toFilePath outputPath) result'
+             -> do
+              putStrLn "done"
+              -- L.putStr result'
             OutputKindObject -> do
               tmpOutputPath <- liftIO $ addExtension ".ll" outputPath
               let tmpOutputPathStr = toFilePath tmpOutputPath

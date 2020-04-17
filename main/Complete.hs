@@ -5,13 +5,14 @@ module Complete
   ) where
 
 import Control.Monad.State.Lazy
-import Data.List
+import Data.List hiding (findIndex)
 import Path
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Set as S
-import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
+
+import qualified Data.Text.Lazy as T
+import qualified Data.Text.Lazy.IO as TIO
 
 import Data.Basic
 import Data.Env
@@ -205,10 +206,10 @@ toSuffixList :: Identifier -> [Identifier]
 toSuffixList (I (s, i)) = map (\x -> I (x, i)) $ toSuffixList' s
 
 toSuffixList' :: T.Text -> [T.Text]
-toSuffixList' s =
-  case T.findIndex (== ':') s of
-    Nothing -> [s]
-    Just i -> s : toSuffixList' (T.drop (i + 1) s)
+toSuffixList' s = [s]
+  -- case findIndex (== ':') s of
+  --   Nothing -> [s]
+  --   Just i -> s : toSuffixList' (T.drop (toEnum i + 1) s)
 
 headTailMaybe :: [a] -> Maybe (a, [a])
 headTailMaybe [] = Nothing
@@ -221,6 +222,8 @@ headTailMaybeText s
 
 splitAtMaybe :: Int -> T.Text -> Maybe (T.Text, T.Text)
 splitAtMaybe i xs = do
-  if 0 <= i && i < T.length xs
-    then return $ T.splitAt i xs
+  if 0 <= i && toEnum i < T.length xs
+    then return $ T.splitAt (toEnum i) xs
     else Nothing
+-- findIndex :: (Char -> Bool) -> T.Text -> Maybe Int
+-- findIndex p t = TS.findIndex p (TS.stream t)

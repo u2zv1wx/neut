@@ -3,7 +3,7 @@ module Data.Code where
 import Data.Maybe (fromMaybe)
 
 import qualified Data.IntMap.Strict as IntMap
-import qualified Data.Text as T
+import qualified Data.Text.Lazy as T
 
 import Data.Basic
 

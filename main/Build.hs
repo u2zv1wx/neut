@@ -14,7 +14,7 @@ import System.Process (callProcess)
 import qualified Data.ByteString.Lazy as L
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
-import qualified Data.Text as T
+import qualified Data.Text.Lazy as T
 
 import Clarify
 import Data.Basic
@@ -108,12 +108,12 @@ concatMain e cont = do
 outputVisitHeader :: Path Abs File -> WithEnv ()
 outputVisitHeader path = do
   i <- gets nestLevel
-  note' $ T.replicate (i * 2) " " <> "→ " <> T.pack (toFilePath path)
+  note' $ T.replicate (toEnum i * 2) " " <> "→ " <> T.pack (toFilePath path)
 
 outputSkipHeader :: Path Abs File -> WithEnv ()
 outputSkipHeader path = do
   i <- gets nestLevel
-  note' $ T.replicate (i * 2) " " <> "✓ " <> T.pack (toFilePath path)
+  note' $ T.replicate (toEnum i * 2) " " <> "✓ " <> T.pack (toFilePath path)
 
 setupEnv :: WithEnv Env
 setupEnv = do

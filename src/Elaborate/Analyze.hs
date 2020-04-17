@@ -15,7 +15,7 @@ import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
-import qualified Data.Text as T
+import qualified Data.Text.Lazy as T
 
 import Data.Basic
 import Data.Constraint

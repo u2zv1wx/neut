@@ -7,10 +7,11 @@ module Parse.Tokenize
 
 import Control.Exception.Safe
 import Control.Monad.State.Lazy
+import Data.Int
 import Path
 
 import qualified Data.Set as S
-import qualified Data.Text as T
+import qualified Data.Text.Lazy as T
 
 import Data.Basic
 import Data.Env
@@ -20,8 +21,8 @@ import Data.Tree
 data TEnv =
   TEnv
     { text :: T.Text
-    , line :: Int
-    , column :: Int
+    , line :: Int64
+    , column :: Int64
     , filePath :: Path Abs File
     }
   deriving (Show)
@@ -161,7 +162,7 @@ string = do
 
 type EscapeFlag = Bool
 
-headStringLengthOf :: EscapeFlag -> T.Text -> Int -> Tokenizer Int
+headStringLengthOf :: EscapeFlag -> T.Text -> Int64 -> Tokenizer Int64
 headStringLengthOf flag s i = do
   case T.uncons s of
     Nothing -> raiseTokenizeError "unexpected end of input while lexing string"
@@ -186,7 +187,7 @@ currentMeta = do
   l <- gets line
   c <- gets column
   path <- gets filePath
-  return $ newMeta l c path
+  return $ newMeta (fromEnum l) (fromEnum c) path
 
 {-# INLINE isSymbolChar #-}
 isSymbolChar :: Char -> Bool
@@ -210,7 +211,7 @@ updateStreamL s =
   modify (\env -> env {text = s, line = 1 + line env, column = 1})
 
 {-# INLINE updateStreamC #-}
-updateStreamC :: Int -> T.Text -> Tokenizer ()
+updateStreamC :: Int64 -> T.Text -> Tokenizer ()
 updateStreamC c s = modify (\env -> env {text = s, column = c + column env})
 
 incrementLine :: Tokenizer ()
