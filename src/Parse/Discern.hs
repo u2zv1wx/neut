@@ -174,12 +174,6 @@ discern'' nenv (m, WeakTermCase indName e cxtes) = do
   cxtes' <-
     flip mapM cxtes $ \(((mc, c), xts), body) -> do
       c' <- lookupConstant mc penv c
-      -- c' <- lookupConsName mc penv nenv c
-      -- label <- lookupLLVMEnumEnv mc c'
-      -- renv <- gets revCaseEnv
-      -- p "revcaseenv-insert:"
-      -- p' (c', label)
-      -- modify (\env -> env {revCaseEnv = Map.insert c' label renv})
       (xts', body') <- discernBinder nenv xts body
       return (((mc, c'), xts'), body')
   return (m, WeakTermCase indName e' cxtes')
