@@ -5,7 +5,7 @@ module Parse.MacroExpand
   , checkNotationSanity
   ) where
 
-import Control.Monad.Except
+-- import Control.Monad.Except
 import Control.Monad.State.Lazy
 
 import qualified Data.Set as S

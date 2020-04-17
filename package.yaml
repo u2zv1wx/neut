@@ -25,6 +25,7 @@ dependencies:
 - pqueue
 - pretty-show
 - process
+- safe-exceptions
 - tar
 - text
 - time

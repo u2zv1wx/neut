@@ -4,10 +4,9 @@ module Main
   ( main
   ) where
 
-import Data.Time.Clock.POSIX
-
 import Control.Monad.State.Lazy
 import Data.ByteString.Builder
+import Data.Time.Clock.POSIX
 import Options.Applicative
 import Path
 import Path.IO
@@ -185,7 +184,7 @@ run (Build inputPathStr mOutputPathStr outputKind isIncFlag) = do
       mOutputPath <- mapM resolveFile' mOutputPathStr
       outputPath <- constructOutputPath basename mOutputPath outputKind
       case resultOrErr of
-        Left err ->
+        Left (Error err) ->
           seqIO (map (outputLog True "") err) >> exitWith (ExitFailure 1)
         Right pathList -> link outputPath pathList []
     else do
@@ -201,7 +200,7 @@ run (Build inputPathStr mOutputPathStr outputKind isIncFlag) = do
       mOutputPath <- mapM resolveFile' mOutputPathStr
       outputPath <- constructOutputPath basename mOutputPath outputKind
       case resultOrErr of
-        Left err ->
+        Left (Error err) ->
           seqIO (map (outputLog True "") err) >> exitWith (ExitFailure 1)
         Right result -> do
           let result' = toLazyByteString result
@@ -232,7 +231,7 @@ run (Check inputPathStr colorizeFlag eoe) = do
       }
   case resultOrErr of
     Right _ -> return ()
-    Left err ->
+    Left (Error err) ->
       seqIO (map (outputLog colorizeFlag eoe) err) >> exitWith (ExitFailure 1)
 run (Archive inputPathStr mOutputPathStr) = do
   inputPath <- resolveDir' inputPathStr

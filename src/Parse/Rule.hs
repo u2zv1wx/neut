@@ -9,7 +9,7 @@ module Parse.Rule
   , generateProjections
   ) where
 
-import Control.Monad.Except
+-- import Control.Monad.Except
 import Control.Monad.State.Lazy
 import Data.Either (rights)
 

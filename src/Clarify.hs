@@ -8,7 +8,7 @@ module Clarify
   , insCodeEnv
   ) where
 
-import Control.Monad.Except
+-- import Control.Monad.Except
 import Control.Monad.State.Lazy
 import Data.List (nubBy)
 

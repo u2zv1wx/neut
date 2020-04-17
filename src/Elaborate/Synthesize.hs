@@ -1,10 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Elaborate.Synthesize
   ( synthesize
   ) where
 
-import Control.Monad.Except
+import Control.Exception.Safe
+
+-- import Control.Monad.Except
 import Control.Monad.State.Lazy
 import Data.List (nub, sortOn)
 
@@ -84,7 +87,8 @@ asAnalyzable (Enriched cs hs _) = Enriched cs hs ConstraintAnalyzable
 tryPlanList :: Meta -> [WithEnv a] -> WithEnv a
 tryPlanList m [] = raiseError m $ "cannot synthesize(tryPlanList)."
 tryPlanList _ [plan] = plan
-tryPlanList m (plan:planList) = catchError plan (const $ tryPlanList m planList)
+tryPlanList m (plan:planList) =
+  catch plan (\(_ :: Error) -> tryPlanList m planList)
 
 deleteMin :: WithEnv ()
 deleteMin = do
@@ -159,7 +163,8 @@ throwTypeErrors = do
   q <- gets constraintQueue
   let pcs = sortOn fst $ nub $ setupPosInfo $ Q.toList q
   errorList <- constructErrors [] pcs
-  throwError errorList
+  throw $ Error errorList
+  -- throwError errorList
 
 setupPosInfo :: [EnrichedConstraint] -> [(PosInfo, PreConstraint)]
 setupPosInfo [] = []

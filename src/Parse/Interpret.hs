@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Parse.Interpret
   ( interpret
@@ -11,7 +12,9 @@ module Parse.Interpret
   ) where
 
 import Codec.Binary.UTF8.String
-import Control.Monad.Except
+
+-- import Control.Monad.Except
+import Control.Exception.Safe
 import Control.Monad.State.Lazy
 import Data.List (elemIndex, sortOn)
 import Data.Maybe (catMaybes, fromMaybe)
@@ -355,8 +358,11 @@ interpretLeafText (m, TreeLeaf x) = do
 interpretLeafText t = raiseSyntaxError (fst t) "LEAF"
 
 interpretEnumValueMaybe :: TreePlus -> WithEnv (Maybe EnumValue)
-interpretEnumValueMaybe t =
-  (Just <$> interpretEnumValue t) `catchError` (const $ return Nothing)
+interpretEnumValueMaybe t = do
+  catch
+    (interpretEnumValue t >>= \x -> return (Just x))
+    (\(_ :: Error) -> return Nothing)
+  -- (Just <$> interpretEnumValue t) `catch` (const $ return Nothing)
 
 interpretEnumValue :: TreePlus -> WithEnv EnumValue
 interpretEnumValue (_, TreeLeaf x) = return $ EnumValueLabel x

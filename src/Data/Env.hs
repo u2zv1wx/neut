@@ -2,6 +2,7 @@
 
 module Data.Env where
 
+import Control.Exception.Safe
 import Control.Monad.Except
 import Control.Monad.State.Lazy
 import Data.List (find)
@@ -173,20 +174,34 @@ initialEnv =
     , depGraph = Map.empty
     }
 
-type WithEnv a = StateT Env (ExceptT [Log] IO) a
+-- type WithEnv a = StateT Env (ExceptT [Log] IO) a
+newtype Error =
+  Error [Log]
+  deriving (Show)
+
+instance Exception Error
+
+type WithEnv a = StateT Env IO a
 
 whenCheck :: WithEnv () -> WithEnv ()
 whenCheck f = do
   b <- gets isCheck
   when b f
 
-evalWithEnv :: WithEnv a -> Env -> IO (Either [Log] a)
+evalWithEnv :: WithEnv a -> Env -> IO (Either Error a)
 evalWithEnv c env = do
-  resultOrErr <- runExceptT (runStateT c env)
+  resultOrErr <- try $ runStateT c env
+  -- return resultOrErr
   case resultOrErr of
     Left err -> return $ Left err
     Right (result, _) -> return $ Right result
 
+-- evalWithEnv :: WithEnv a -> Env -> IO (Either [Log] a)
+-- evalWithEnv c env = do
+--   resultOrErr <- runExceptT (runStateT c env)
+--   case resultOrErr of
+--     Left err -> return $ Left err
+--     Right (result, _) -> return $ Right result
 newCount :: WithEnv Int
 newCount = do
   i <- gets count
@@ -385,14 +400,18 @@ lowTypeToArrayKind m lowType =
     Nothing -> raiseCritical m "Infer.lowTypeToArrayKind"
 
 raiseError :: Meta -> T.Text -> WithEnv a
-raiseError m text = throwError [logError (getPosInfo m) text]
+raiseError m text = throw $ Error [logError (getPosInfo m) text]
 
+-- raiseError :: Meta -> T.Text -> WithEnv a
+-- raiseError m text = throwError [logError (getPosInfo m) text]
 raiseCritical :: Meta -> T.Text -> WithEnv a
-raiseCritical m text = throwError [logCritical (getPosInfo m) text]
+raiseCritical m text = throw $ Error [logCritical (getPosInfo m) text]
 
+-- raiseCritical m text = throwError [logCritical (getPosInfo m) text]
 raiseCritical' :: T.Text -> WithEnv a
-raiseCritical' text = throwError [logCritical' text]
+raiseCritical' text = throw $ Error [logCritical' text]
 
+-- raiseCritical' text = throwError [logCritical' text]
 getCurrentFilePath :: WithEnv (Path Abs File)
 getCurrentFilePath = do
   tenv <- gets traceEnv
