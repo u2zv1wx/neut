@@ -2,7 +2,7 @@
 
 module LLVM
   ( toLLVM
-  , toLLVM'
+  -- , toLLVM'
   ) where
 
 import Control.Monad.State.Lazy
@@ -20,44 +20,43 @@ import Data.WeakTerm
 import Reduce.Code
 
 toLLVM :: CodePlus -> WithEnv LLVM
-toLLVM mainTerm@(m, _) = do
-  b <- gets isIncremental
+toLLVM mainTerm@(m, _)
+  -- b <- gets isIncremental
+ = do
   modify (\env -> env {nameSet = S.empty})
-  if b
-    then do
-      toLLVM'
-      mainTerm' <- reduceCodePlus mainTerm
-      mainTerm'' <- llvmCode mainTerm'
-      -- the result of "main" must be i64, not i8*
-      (result, resultVar) <- newDataUpsilonWith m "result"
-      (cast, castThen) <- llvmCast (Just "cast") resultVar (LowTypeIntS 64)
-      castResult <- castThen (LLVMReturn cast)
-      -- let result: i8* := (main-term) in {cast result to i64}
-      commConv result mainTerm'' $ castResult
-    else do
-      mainTerm' <- reduceCodePlus mainTerm
-      modify (\env -> env {nameSet = S.empty})
-      mainTerm'' <- llvmCode mainTerm'
-      -- the result of "main" must be i64, not i8*
-      (result, resultVar) <- newDataUpsilonWith m "result"
-      (cast, castThen) <- llvmCast (Just "cast") resultVar (LowTypeIntS 64)
-      castResult <- castThen (LLVMReturn cast)
-      -- let result: i8* := (main-term) in {cast result to i64}
-      commConv result mainTerm'' $ castResult
+  -- if b
+  --   then do
+  --     toLLVM'
+  --     mainTerm' <- reduceCodePlus mainTerm
+  --     mainTerm'' <- llvmCode mainTerm'
+  --     -- the result of "main" must be i64, not i8*
+  --     (result, resultVar) <- newDataUpsilonWith m "result"
+  --     (cast, castThen) <- llvmCast (Just "cast") resultVar (LowTypeIntS 64)
+  --     castResult <- castThen (LLVMReturn cast)
+  --     -- let result: i8* := (main-term) in {cast result to i64}
+  --     commConv result mainTerm'' $ castResult
+  --   else do
+  mainTerm' <- reduceCodePlus mainTerm
+  modify (\env -> env {nameSet = S.empty})
+  mainTerm'' <- llvmCode mainTerm'
+  -- the result of "main" must be i64, not i8*
+  (result, resultVar) <- newDataUpsilonWith m "result"
+  (cast, castThen) <- llvmCast (Just "cast") resultVar (LowTypeIntS 64)
+  castResult <- castThen (LLVMReturn cast)
+  -- let result: i8* := (main-term) in {cast result to i64}
+  commConv result mainTerm'' $ castResult
 
-toLLVM' :: WithEnv ()
-toLLVM' = do
-  cenv <- gets codeEnv
-  cenv' <- mapM reduceDefinition cenv
-  forM_ (Map.toList cenv') $ \(name, Definition _ args e) -> do
-    e' <- llvmCode e
-    insLLVMEnv name args e'
-
-reduceDefinition :: Definition -> WithEnv Definition
-reduceDefinition (Definition k args e) = do
-  e' <- reduceCodePlus e
-  return (Definition k args e')
-
+-- toLLVM' :: WithEnv ()
+-- toLLVM' = do
+--   cenv <- gets codeEnv
+--   cenv' <- mapM reduceDefinition cenv
+--   forM_ (Map.toList cenv') $ \(name, Definition _ args e) -> do
+--     e' <- llvmCode e
+--     insLLVMEnv name args e'
+-- reduceDefinition :: Definition -> WithEnv Definition
+-- reduceDefinition (Definition k args e) = do
+--   e' <- reduceCodePlus e
+--   return (Definition k args e')
 llvmCode :: CodePlus -> WithEnv LLVM
 llvmCode (m, CodeConst theta) = llvmCodeConst m theta
 llvmCode (_, CodePiElimDownElim v ds) = do
@@ -297,63 +296,63 @@ llvmUncastLet x@(I (s, _)) d lowType cont = do
 -- `llvmDataLet x d cont` binds the data `d` to the variable `x`, and computes the
 -- continuation `cont`.
 llvmDataLet :: Identifier -> DataPlus -> LLVM -> WithEnv LLVM
-llvmDataLet x (m, DataConst y) cont = do
-  b <- gets isIncremental
-  if b
-    then do
-      cenv <- gets codeEnv
-      case Map.lookup y cenv of
-        Just (Definition _ args _) -> do
-          llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
-        Nothing -> do
-          mt <- lookupTypeEnvMaybe (Right y)
-          case mt of
-            Nothing -> do
-              denv <- gets declEnv
-              modify (\env -> env {declEnv = Map.insert y ([], voidPtr) denv})
-              llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType []) cont
-            Just (_, TermPi _ xts _) -> do
-              let y' = "llvm_" <> y -- ここのprefixは設定できるようにしてもよさそう
-              denv <- gets declEnv
-              let argType = map (const voidPtr) xts
-              modify
-                (\env -> env {declEnv = Map.insert y' (argType, voidPtr) denv})
-              llvmUncastLet x (LLVMDataGlobal y') (toFunPtrType xts) cont
-            Just t -> do
-              raiseError m $
-                "external constants must have pi-type, but the type of `" <>
-                y <> "` is:\n" <> toText (weaken t)
-    else do
-      cenv <- gets codeEnv
-      ns <- gets nameSet
-      case Map.lookup y cenv of
-        Nothing -> do
-          mt <- lookupTypeEnvMaybe (Right y)
-          case mt of
-            Just (_, TermPi _ xts _) -> do
-              let y' = "llvm_" <> y
-              denv <- gets declEnv
-              let argType = map (const voidPtr) xts
-              modify
-                (\env -> env {declEnv = Map.insert y' (argType, voidPtr) denv})
-              llvmUncastLet x (LLVMDataGlobal y') (toFunPtrType xts) cont
-            Just t -> do
-              raiseError m $
-                "external constants must have pi-type, but the type of `" <>
-                y <> "` is:\n" <> toText (weaken t)
-            Nothing -> raiseCritical m $ "no such global label defined: " <> y
-        Just (Definition _ args e)
-          | not (y `S.member` ns) -> do
-            modify (\env -> env {nameSet = S.insert y ns})
-            ns' <- gets nameSet
-            modify (\env -> env {nameSet = S.empty})
-            e' <- reduceCodePlus e
-            modify (\env -> env {nameSet = ns'})
-            llvm <- llvmCode e'
-            insLLVMEnv y args llvm
-            llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
-          | otherwise -> do
-            llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
+llvmDataLet x (m, DataConst y) cont
+  -- b <- gets isIncremental
+  -- if b
+  --   then do
+  --     cenv <- gets codeEnv
+  --     case Map.lookup y cenv of
+  --       Just (Definition _ args _) -> do
+  --         llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
+  --       Nothing -> do
+  --         mt <- lookupTypeEnvMaybe (Right y)
+  --         case mt of
+  --           Nothing -> do
+  --             denv <- gets declEnv
+  --             modify (\env -> env {declEnv = Map.insert y ([], voidPtr) denv})
+  --             llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType []) cont
+  --           Just (_, TermPi _ xts _) -> do
+  --             let y' = "llvm_" <> y -- ここのprefixは設定できるようにしてもよさそう
+  --             denv <- gets declEnv
+  --             let argType = map (const voidPtr) xts
+  --             modify
+  --               (\env -> env {declEnv = Map.insert y' (argType, voidPtr) denv})
+  --             llvmUncastLet x (LLVMDataGlobal y') (toFunPtrType xts) cont
+  --           Just t -> do
+  --             raiseError m $
+  --               "external constants must have pi-type, but the type of `" <>
+  --               y <> "` is:\n" <> toText (weaken t)
+  --   else do
+ = do
+  cenv <- gets codeEnv
+  ns <- gets nameSet
+  case Map.lookup y cenv of
+    Nothing -> do
+      mt <- lookupTypeEnvMaybe (Right y)
+      case mt of
+        Just (_, TermPi _ xts _) -> do
+          let y' = "llvm_" <> y
+          denv <- gets declEnv
+          let argType = map (const voidPtr) xts
+          modify (\env -> env {declEnv = Map.insert y' (argType, voidPtr) denv})
+          llvmUncastLet x (LLVMDataGlobal y') (toFunPtrType xts) cont
+        Just t -> do
+          raiseError m $
+            "external constants must have pi-type, but the type of `" <>
+            y <> "` is:\n" <> toText (weaken t)
+        Nothing -> raiseCritical m $ "no such global label defined: " <> y
+    Just (Definition _ args e)
+      | not (y `S.member` ns) -> do
+        modify (\env -> env {nameSet = S.insert y ns})
+        ns' <- gets nameSet
+        modify (\env -> env {nameSet = S.empty})
+        e' <- reduceCodePlus e
+        modify (\env -> env {nameSet = ns'})
+        llvm <- llvmCode e'
+        insLLVMEnv y args llvm
+        llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
+      | otherwise -> do
+        llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
 llvmDataLet x (_, DataUpsilon y) cont =
   llvmUncastLet x (LLVMDataLocal y) voidPtr cont
 llvmDataLet x (_, DataDownIntroPiIntro xs e) cont = do

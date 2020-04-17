@@ -187,14 +187,13 @@ clarifyConst tenv m x
     cenv <- gets cacheEnv
     -- showInHexはLLVMのときまで遅延させたほうがいいかも（型情報の取得が絡むので）
     let x' = showInHex x
-    b <- gets isIncremental
-    case (asSysCallMaybe os x, b, Map.lookup x cenv) of
-      (Just (syscall, argInfo), _, _) -> clarifySysCall tenv x syscall argInfo m
-      (_, _, Nothing) -> return (m, CodeUpIntro (m, DataConst x)) -- external
-      (_, True, Just _) -> return (m, CodePiElimDownElim (m, DataConst x') [])
-      (_, False, Just (Right _)) ->
-        return (m, CodePiElimDownElim (m, DataConst x') [])
-      (_, False, Just (Left e))
+    -- b <- gets isIncremental
+    case (asSysCallMaybe os x, Map.lookup x cenv) of
+      (Just (syscall, argInfo), _) -> clarifySysCall tenv x syscall argInfo m
+      (_, Nothing) -> return (m, CodeUpIntro (m, DataConst x)) -- external
+      -- (_, True, Just _) -> return (m, CodePiElimDownElim (m, DataConst x') [])
+      (_, Just (Right _)) -> return (m, CodePiElimDownElim (m, DataConst x') [])
+      (_, Just (Left e))
         | T.any (`S.member` S.fromList "()") x -> clarify' tenv e
         | otherwise -> do
           e' <- clarify' tenv e

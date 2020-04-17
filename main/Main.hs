@@ -20,8 +20,6 @@ import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
 import qualified Data.ByteString.Lazy as L
 
-import Build
-import Check
 import Clarify
 import Complete
 import Data.Env
@@ -30,7 +28,6 @@ import Elaborate
 import Emit
 import LLVM
 import Parse
-import Reduce.Term
 
 type InputPath = String
 
@@ -167,61 +164,52 @@ parseCompleteOpt = do
   Complete <$> inputPathOpt <*> lineOpt <*> columnOpt
 
 run :: Command -> IO ()
-run (Build inputPathStr mOutputPathStr outputKind isIncFlag) = do
+run (Build inputPathStr mOutputPathStr outputKind _) = do
   inputPath <- resolveFile' inputPathStr
   time <- round <$> getPOSIXTime
-  if isIncFlag
-    then do
-      resultOrErr <-
-        evalWithEnv (runBuild inputPath) $
-        initialEnv
-          { shouldColorize = True
-          , endOfEntry = ""
-          , timestamp = time
-          , isIncremental = isIncFlag
-          }
-      (basename, _) <- splitExtension $ filename inputPath
-      mOutputPath <- mapM resolveFile' mOutputPathStr
-      outputPath <- constructOutputPath basename mOutputPath outputKind
-      case resultOrErr of
-        Left (Error err) ->
-          seqIO (map (outputLog True "") err) >> exitWith (ExitFailure 1)
-        Right pathList -> link outputPath pathList []
-    else do
-      resultOrErr <-
-        evalWithEnv (runBuildOneshot inputPath) $
-        initialEnv
-          { shouldColorize = True
-          , endOfEntry = ""
-          , timestamp = time
-          , isIncremental = isIncFlag
-          }
-      (basename, _) <- splitExtension $ filename inputPath
-      mOutputPath <- mapM resolveFile' mOutputPathStr
-      outputPath <- constructOutputPath basename mOutputPath outputKind
-      case resultOrErr of
-        Left (Error err) ->
-          seqIO (map (outputLog True "") err) >> exitWith (ExitFailure 1)
-        Right result -> do
-          let result' = toLazyByteString result
-          case outputKind of
-            OutputKindLLVM
-              -- L.writeFile (toFilePath outputPath) result'
-             -> do
-              putStrLn "done"
-              -- L.putStr result'
-            OutputKindObject -> do
-              tmpOutputPath <- liftIO $ addExtension ".ll" outputPath
-              let tmpOutputPathStr = toFilePath tmpOutputPath
-              L.writeFile tmpOutputPathStr result'
-              callProcess
-                "clang"
-                [ tmpOutputPathStr
-                , "-Wno-override-module"
-                , "-o" ++ toFilePath outputPath
-                ]
-              removeFile tmpOutputPath
-            OutputKindAsm -> undefined
+  -- if isIncFlag
+  --   then do
+      -- resultOrErr <-
+      --   evalWithEnv (runBuild inputPath) $
+      --   initialEnv
+      --     { shouldColorize = True
+      --     , endOfEntry = ""
+      --     , timestamp = time
+      --     , isIncremental = isIncFlag
+      --     }
+      -- (basename, _) <- splitExtension $ filename inputPath
+      -- mOutputPath <- mapM resolveFile' mOutputPathStr
+      -- outputPath <- constructOutputPath basename mOutputPath outputKind
+      -- case resultOrErr of
+      --   Left (Error err) ->
+      --     seqIO (map (outputLog True "") err) >> exitWith (ExitFailure 1)
+      --   Right pathList -> link outputPath pathList []
+    -- else do
+  resultOrErr <-
+    evalWithEnv (runBuild inputPath) $
+    initialEnv {shouldColorize = True, endOfEntry = "", timestamp = time}
+  (basename, _) <- splitExtension $ filename inputPath
+  mOutputPath <- mapM resolveFile' mOutputPathStr
+  outputPath <- constructOutputPath basename mOutputPath outputKind
+  case resultOrErr of
+    Left (Error err) ->
+      seqIO (map (outputLog True "") err) >> exitWith (ExitFailure 1)
+    Right result -> do
+      let result' = toLazyByteString result
+      case outputKind of
+        OutputKindLLVM -> L.writeFile (toFilePath outputPath) result'
+        OutputKindObject -> do
+          tmpOutputPath <- liftIO $ addExtension ".ll" outputPath
+          let tmpOutputPathStr = toFilePath tmpOutputPath
+          L.writeFile tmpOutputPathStr result'
+          callProcess
+            "clang"
+            [ tmpOutputPathStr
+            , "-Wno-override-module"
+            , "-o" ++ toFilePath outputPath
+            ]
+          removeFile tmpOutputPath
+        OutputKindAsm -> undefined
 run (Check inputPathStr colorizeFlag eoe) = do
   inputPath <- resolveFile' inputPathStr
   time <- round <$> getPOSIXTime
@@ -273,17 +261,22 @@ constructOutputArchivePath inputPath Nothing = do
   addExtension ".tar.gz" outputPath
 constructOutputArchivePath _ (Just path) = return path
 
-runBuild :: Path Abs File -> WithEnv [Path Abs File]
-runBuild inputPath = parse inputPath >>= build
+runBuild :: Path Abs File -> WithEnv Builder
+runBuild = parse >=> elaborate >=> clarify >=> toLLVM >=> emit
+  -- parse inputPath >>= elaborate >>= clarify >>= toLLVM >>= emit
 
-runBuildOneshot :: Path Abs File -> WithEnv Builder
-runBuildOneshot inputPath = do
-  mainTerm <- parse inputPath >>= elaborateStmt
-  clarify (reduceTermPlus mainTerm) >>= toLLVM >>= emit
-
+-- runBuild :: Path Abs File -> WithEnv [Path Abs File]
+-- runBuild inputPath = parse inputPath >>= build
+-- runBuildOneshot :: Path Abs File -> WithEnv Builder
+-- runBuildOneshot inputPath = do
+--   mainTerm <- parse inputPath >>= elaborateStmt
+--   clarify (reduceTermPlus mainTerm) >>= toLLVM >>= emit
 runCheck :: Path Abs File -> WithEnv ()
-runCheck inputPath = parse inputPath >>= check
+runCheck = parse >=> elaborate >=> \_ -> return ()
 
+-- runCheck inputPath = parse inputPath >>= elaborate >>= \_ -> return ()
+-- runCheck :: Path Abs File -> WithEnv ()
+-- runCheck inputPath = parse inputPath >>= check
 seqIO :: [IO ()] -> IO ()
 seqIO [] = return ()
 seqIO (a:as) = a >> seqIO as

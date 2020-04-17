@@ -2,8 +2,8 @@
 
 module Emit
   ( emit
-  , emit'
-  , emitDeclarations
+  -- , emit'
+  -- , emitDeclarations
   ) where
 
 import Control.Monad.State.Lazy
@@ -23,38 +23,38 @@ import Data.LLVM
 import Reduce.LLVM
 
 emit :: LLVM -> WithEnv Builder
-emit mainTerm = do
-  b <- gets isIncremental
-  if b
-    then do
-      modify (\env -> env {defVarSet = S.empty})
-      mainTerm' <- reduceLLVM IntMap.empty Map.empty mainTerm
-      zs <- emitDefinition "i64" "main" [] mainTerm'
-      code <- emit'
-      return $ unlinesL $ zs <> [code]
-    else do
-      lenv <- gets llvmEnv
-      g <- emitDeclarations
-      mainTerm' <- reduceLLVM IntMap.empty Map.empty mainTerm
-      zs <- emitDefinition "i64" "main" [] mainTerm'
-      xs <-
-        forM (HashMap.toList lenv) $ \(name, (args, body)) -> do
-          let args' = map (showLLVMData . LLVMDataLocal) args
-          body' <- reduceLLVM IntMap.empty Map.empty body
-          emitDefinition "i8*" (TE.encodeUtf8Builder name) args' body'
-      return $ unlinesL $ g : zs <> concat xs
-
-emit' :: WithEnv Builder
-emit' = do
+emit mainTerm
+  -- b <- gets isIncremental
+  -- if b
+  --   then do
+  --     modify (\env -> env {defVarSet = S.empty})
+  --     mainTerm' <- reduceLLVM IntMap.empty Map.empty mainTerm
+  --     zs <- emitDefinition "i64" "main" [] mainTerm'
+  --     code <- emit'
+  --     return $ unlinesL $ zs <> [code]
+  --   else do
+ = do
   lenv <- gets llvmEnv
+  g <- emitDeclarations
+  mainTerm' <- reduceLLVM IntMap.empty Map.empty mainTerm
+  zs <- emitDefinition "i64" "main" [] mainTerm'
   xs <-
     forM (HashMap.toList lenv) $ \(name, (args, body)) -> do
       let args' = map (showLLVMData . LLVMDataLocal) args
-      modify (\env -> env {defVarSet = S.fromList $ map asInt args})
       body' <- reduceLLVM IntMap.empty Map.empty body
       emitDefinition "i8*" (TE.encodeUtf8Builder name) args' body'
-  return $ unlinesL $ concat xs
+  return $ unlinesL $ g : zs <> concat xs
 
+-- emit' :: WithEnv Builder
+-- emit' = do
+--   lenv <- gets llvmEnv
+--   xs <-
+--     forM (HashMap.toList lenv) $ \(name, (args, body)) -> do
+--       let args' = map (showLLVMData . LLVMDataLocal) args
+--       modify (\env -> env {defVarSet = S.fromList $ map asInt args})
+--       body' <- reduceLLVM IntMap.empty Map.empty body
+--       emitDefinition "i8*" (TE.encodeUtf8Builder name) args' body'
+--   return $ unlinesL $ concat xs
 emitDeclarations :: WithEnv Builder
 emitDeclarations = do
   denv <- HashMap.toList <$> gets declEnv
