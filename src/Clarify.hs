@@ -23,6 +23,8 @@ import Data.Basic
 import Data.Code
 import Data.Env
 import Data.Term
+
+-- import Data.WeakTerm (toText)
 import Reduce.Code
 import Reduce.Term
 
@@ -36,17 +38,19 @@ clarifyStmt :: Stmt -> WithEnv CodePlus
 clarifyStmt (StmtReturn e) = do
   tenv <- gets typeEnv
   clarify' tenv e
-clarifyStmt (StmtLet _ (_, x, _) e cont) = do
+clarifyStmt (StmtLet _ (_, x, _) e cont)
+  -- p "-------------"
+  -- p' x
+  -- p $ T.unpack $ toText $ weaken e
+ = do
   tenv <- gets typeEnv
   let x' = showInHex x
   modify (\env -> env {nameSet = S.empty})
   e' <- clarify' tenv e >>= reduceCodePlus
-  insCodeEnv x' [] e'
+  insCodeEnv x' [] e' -- 実質的にはbox-introへの変換
   cont' <- clarifyStmt cont
   h <- newNameWith'' "comp"
-  return
-    ( fst e'
-    , CodeUpElim h (fst e', CodePiElimDownElim (fst e', DataConst x') []) cont')
+  return (fst e', CodeUpElim h e' cont')
 clarifyStmt (StmtVisit _ ss1 ss2) = do
   e1' <- clarifyStmt ss1 -- ここでss1のキャッシュを利用できそう？
   e2' <- clarifyStmt ss2
@@ -212,19 +216,7 @@ clarifyConst tenv m x
     case (asSysCallMaybe os x, Map.lookup x cenv) of
       (Just (syscall, argInfo), _) -> clarifySysCall tenv x syscall argInfo m
       (_, Nothing) -> return (m, CodeUpIntro (m, DataConst x)) -- external
-      (_, Just _) -> return (m, CodePiElimDownElim (m, DataConst x') [])
-      -- (_, Just (Right e)) -> return e
-      --   -- return (m, CodePiElimDownElim (m, DataConst x') [])
-      -- (_, Just (Left e))
-      --   | T.any (`S.member` S.fromList "()") x -> clarify' tenv e
-      --   | otherwise -> do
-      --     e' <- clarify' tenv e
-      --     modify (\env -> env {nameSet = S.empty})
-      --     e'' <- reduceCodePlus e'
-      --     modify (\env -> env {cacheEnv = Map.insert x (Right e'') cenv})
-      --     return e''
-      --     -- insCodeEnv x' [] e''
-      --     -- return (m, CodePiElimDownElim (m, DataConst x') [])
+      (_, Just _) -> return (m, CodePiElimDownElim (m, DataConst x') []) -- box-elim
 
 immType :: Meta -> TermPlus
 immType m = (m, TermEnum (EnumTypeIntS 64))

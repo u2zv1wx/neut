@@ -111,9 +111,7 @@ data Env =
     -- external functions that must be declared in LLVM IR
     , declEnv :: Map.HashMap T.Text ([LowType], LowType)
     , nopFreeSet :: S.Set Int
-    , argAcc :: [(Meta, T.Text, TermPlus)]
     , cachePathList :: [Path Abs File]
-    , nestLevel :: Int
     , depGraph :: Map.HashMap (Path Abs File) [Path Abs File]
     }
 
@@ -163,9 +161,7 @@ initialEnv =
     , zetaEnv = IntMap.empty
     , nameSet = S.empty
     , nopFreeSet = S.empty
-    , argAcc = []
     , cachePathList = []
-    , nestLevel = 0
     , depGraph = Map.empty
     }
 

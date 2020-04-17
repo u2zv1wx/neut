@@ -295,24 +295,20 @@ emitLLVMOp foo = do
   p' foo
   raiseCritical' "ill-typed LLVMOp"
 
-{-# INLINE emitUnaryOp #-}
 emitUnaryOp :: LowType -> Builder -> LLVMData -> WithEnv Builder
 emitUnaryOp t inst d = do
   return $ unwordsL [inst, showLowType t, showLLVMData d]
 
-{-# INLINE emitBinaryOp #-}
 emitBinaryOp :: LowType -> Builder -> LLVMData -> LLVMData -> WithEnv Builder
 emitBinaryOp t inst d1 d2 = do
   return $
     unwordsL [inst, showLowType t, showLLVMData d1 <> ",", showLLVMData d2]
 
-{-# INLINE emitLLVMConvOp #-}
 emitLLVMConvOp :: Builder -> LLVMData -> LowType -> LowType -> WithEnv Builder
 emitLLVMConvOp cast d dom cod = do
   return $
     unwordsL [cast, showLowType dom, showLLVMData d, "to", showLowType cod]
 
-{-# INLINE emitSysCallOp #-}
 emitSysCallOp :: Integer -> [LLVMData] -> WithEnv Builder
 emitSysCallOp num ds = do
   regList <- getRegList
@@ -325,15 +321,12 @@ emitSysCallOp num ds = do
       return $
         unwordsL ["call fastcc i8* asm sideeffect \"syscall\",", regStr, argStr]
 
-{-# INLINE emitOp #-}
 emitOp :: Builder -> WithEnv [Builder]
 emitOp s = return ["  " <> s]
 
-{-# INLINE emitRet #-}
 emitRet :: Builder -> LLVMData -> WithEnv [Builder]
 emitRet retType d = emitOp $ unwordsL ["ret", retType, showLLVMData d]
 
-{-# INLINE emitLabel #-}
 emitLabel :: Builder -> Builder
 emitLabel s = s <> ":"
 
@@ -400,7 +393,6 @@ getRegList = do
     OSLinux -> return ["rax", "rdi", "rsi", "rdx", "rcx", "r8", "r9"]
     OSDarwin -> return ["rax", "rdi", "rsi", "rdx", "r10", "r8", "r9"]
 
-{-# INLINE showLowType #-}
 showLowType :: LowType -> Builder
 showLowType (LowTypeIntS i) = "i" <> intDec i
 -- LLVM doesn't distinguish unsigned integers from signed ones

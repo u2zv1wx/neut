@@ -17,12 +17,7 @@ reduceCodePlus (m, CodeConst c) = return (m, CodeConst c)
 reduceCodePlus (m, CodePiElimDownElim v ds) = do
   cenv <- gets codeEnv
   ns <- gets nameSet
-  case v
-    -- (_, DataDownIntroPiIntro xs body)
-    --   | length xs == length ds -> do
-    --     let sub = IntMap.fromList (zip (map asInt xs) ds)
-    --     reduceCodePlus $ substCodePlus sub body
-        of
+  case v of
     (_, DataConst x)
       | Just (Definition (IsFixed False) xs body) <- Map.lookup x cenv
       , length xs == length ds -> do
@@ -37,7 +32,8 @@ reduceCodePlus (m, CodePiElimDownElim v ds) = do
         let def = Definition (IsFixed True) xs body'
         modify (\env -> env {codeEnv = Map.insert x def cenv})
         return (m, CodePiElimDownElim v ds)
-    _ -> return (m, CodePiElimDownElim v ds)
+    _ -> do
+      return (m, CodePiElimDownElim v ds)
 reduceCodePlus (m, CodeSigmaElim mk xs v e) = do
   case v of
     (_, DataSigmaIntro mk' ds)
@@ -51,7 +47,8 @@ reduceCodePlus (m, CodeSigmaElim mk xs v e) = do
         (mUp, CodeUpIntro (_, DataSigmaIntro _ ds))
           | Just ys <- mapM asUpsilon ds
           , xs == ys -> return (mUp, CodeUpIntro v) -- eta-reduce
-        _ -> return (m, CodeSigmaElim mk xs v e')
+        _ -> do
+          return (m, CodeSigmaElim mk xs v e')
 reduceCodePlus (m, CodeUpIntro v) = return (m, CodeUpIntro v)
 reduceCodePlus (m, CodeUpElim x e1 e2) = do
   e1' <- reduceCodePlus e1
@@ -73,9 +70,6 @@ reduceCodePlus (m, CodeUpElim x e1 e2) = do
           | x == y -> return e1' -- eta-reduce
         _ -> return (m, CodeUpElim x e1' e2')
 reduceCodePlus (m, CodeEnumElim varInfo v les) = do
-  let (ls, es) = unzip les
-  let es' = map (substCodePlus varInfo) es
-  es'' <- mapM reduceCodePlus es'
   case v of
     (_, DataEnumIntro l) ->
       case lookup (CaseValue l) les of
@@ -83,9 +77,10 @@ reduceCodePlus (m, CodeEnumElim varInfo v les) = do
         Nothing ->
           case lookup CaseDefault les of
             Just body -> reduceCodePlus $ substCodePlus varInfo body
-            Nothing -> do
-              return (m, CodeEnumElim IntMap.empty v $ zip ls es'')
-    _ -> return (m, CodeEnumElim IntMap.empty v $ zip ls es'')
+            Nothing -> return (m, CodeEnumElim varInfo v les)
+              -- return (m, CodeEnumElim IntMap.empty v $ zip ls es'')
+    _ -> return (m, CodeEnumElim varInfo v les)
+      -- return (m, CodeEnumElim IntMap.empty v $ zip ls es'')
 reduceCodePlus (m, CodeStructElim xks d e) = do
   let (xs, ks1) = unzip xks
   case d of
@@ -102,9 +97,10 @@ reduceCodePlus (m, CodeStructElim xks d e) = do
           , ks1 == ks2
           , Just ys <- mapM asUpsilon ds2
           , xs == ys -> return (mUp, CodeUpIntro d) -- eta-reduce
-        _ -> return (m, CodeStructElim xks d e)
-reduceCodePlus (m, CodeCase sub d mces) = do
-  let (mcs, es) = unzip mces
-  let es' = map (substCodePlus sub) es
-  es'' <- mapM reduceCodePlus es'
-  return (m, CodeCase IntMap.empty d $ zip mcs es'')
+        _ -> return (m, CodeStructElim xks d e')
+reduceCodePlus e = return e
+-- reduceCodePlus (m, CodeCase sub d mces) = do
+--   let (mcs, es) = unzip mces
+--   let es' = map (substCodePlus sub) es
+--   es'' <- mapM reduceCodePlus es'
+--   return (m, CodeCase IntMap.empty d $ zip mcs es'')

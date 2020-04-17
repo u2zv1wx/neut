@@ -32,9 +32,8 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
   let es' = map reduceWeakTermPlus es
   let app = WeakTermPiElim e' es'
   case e' of
-    (mLam, WeakTermPiIntro _ xts body)
-      | length xts == length es'
-      , metaIsReducible mLam -> do
+    (_, WeakTermPiIntro Nothing xts body) -- justのときはreduceしない
+      | length xts == length es' -> do
         let xs = map (\(_, x, _) -> Left $ asInt x) xts
         let sub = Map.fromList $ zip xs es'
         reduceWeakTermPlus $ substWeakTermPlus sub body

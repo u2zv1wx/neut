@@ -39,14 +39,15 @@ infer' ctx (m, WeakTermPi mName xts t) = do
   return ((m, WeakTermPi mName xts' t'), (m, WeakTermTau))
 infer' ctx (m, WeakTermPiIntro info xts e) = do
   (xts', (e', t')) <- inferBinder ctx xts e
+  let m' = m {metaIsReducible = True}
   case info of
-    Nothing -> return ((m, weakTermPiIntro xts' e'), (m, weakTermPi xts' t'))
+    Nothing -> return ((m, weakTermPiIntro xts' e'), (m', weakTermPi xts' t'))
     Just (name, args) -> do
-      (ai, _) <- lookupRevIndEnv m name
+      (ai, _) <- lookupRevIndEnv m' name
       args' <- inferSigma ctx args
       return
         ( (m, WeakTermPiIntro (Just (name, args')) xts' e')
-        , (m, WeakTermPi (Just ai) xts' t'))
+        , (m', WeakTermPi (Just ai) xts' t'))
 infer' ctx (m, WeakTermPiElim e es) = do
   es' <- insertHoleIfNecessary e es
   etls <- mapM (infer' ctx) es'

@@ -73,9 +73,9 @@ cartImmName :: T.Text
 cartImmName = "cartesian-immediate"
 
 tryCache :: Meta -> T.Text -> WithEnv () -> WithEnv DataPlus
-tryCache m key f = do
+tryCache m key doInsertion = do
   cenv <- gets codeEnv
-  when (not $ Map.member key cenv) $ f
+  when (not $ Map.member key cenv) $ doInsertion
   return (m, DataConst key)
 
 makeSwitcher ::

@@ -191,7 +191,18 @@ run (Build inputPathStr mOutputPathStr outputKind _) = do
             , "-o" ++ toFilePath outputPath
             ]
           removeFile tmpOutputPath
-        OutputKindAsm -> undefined
+        OutputKindAsm -> do
+          tmpOutputPath <- liftIO $ addExtension ".ll" outputPath
+          let tmpOutputPathStr = toFilePath tmpOutputPath
+          L.writeFile tmpOutputPathStr result'
+          callProcess
+            "clang"
+            [ "-S"
+            , tmpOutputPathStr
+            , "-Wno-override-module"
+            , "-o" ++ toFilePath outputPath
+            ]
+          removeFile tmpOutputPath
 run (Check inputPathStr colorizeFlag eoe) = do
   inputPath <- resolveFile' inputPathStr
   time <- round <$> getPOSIXTime

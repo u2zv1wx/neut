@@ -16,36 +16,36 @@ type SizeMap = Map.Map SizeInfo [(Int, LLVMData)]
 
 reduceLLVM :: SubstLLVM -> SizeMap -> LLVM -> WithEnv LLVM
 reduceLLVM sub _ (LLVMReturn d) = return $ LLVMReturn $ substLLVMData sub d
-reduceLLVM sub sm (LLVMLet x (LLVMOpBitcast d from to) cont)
-  | from == to = do
-    let sub' = IntMap.insert (asInt x) (substLLVMData sub d) sub
-    reduceLLVM sub' sm cont
-reduceLLVM sub sm (LLVMLet x (LLVMOpAlloc _ (LowTypePtr (LowTypeArray 0 _))) cont) = do
-  let sub' = IntMap.insert (asInt x) LLVMDataNull sub
-  reduceLLVM sub' sm cont
-reduceLLVM sub sm (LLVMLet x (LLVMOpAlloc _ (LowTypePtr (LowTypeStruct []))) cont) = do
-  let sub' = IntMap.insert (asInt x) LLVMDataNull sub
-  reduceLLVM sub' sm cont
-reduceLLVM sub sm (LLVMLet x op@(LLVMOpAlloc _ size) cont) = do
-  case Map.lookup size sm of
-    Just ((j, d):rest) -> do
-      modify (\env -> env {nopFreeSet = S.insert j (nopFreeSet env)})
-      let sm' = Map.insert size rest sm
-      let sub' = IntMap.insert (asInt x) (substLLVMData sub d) sub
-      reduceLLVM sub' sm' cont
-    _ -> do
-      b <- isAlreadyDefined x
-      if b
-        then do
-          x' <- newNameWith x
-          let sub' = IntMap.insert (asInt x) (LLVMDataLocal x') sub
-          insVar x'
-          cont' <- reduceLLVM sub' sm cont
-          return $ LLVMLet x' op cont'
-        else do
-          insVar x
-          cont' <- reduceLLVM sub sm cont
-          return $ LLVMLet x op cont'
+-- reduceLLVM sub sm (LLVMLet x (LLVMOpBitcast d from to) cont)
+--   | from == to = do
+--     let sub' = IntMap.insert (asInt x) (substLLVMData sub d) sub
+--     reduceLLVM sub' sm cont
+-- reduceLLVM sub sm (LLVMLet x (LLVMOpAlloc _ (LowTypePtr (LowTypeArray 0 _))) cont) = do
+--   let sub' = IntMap.insert (asInt x) LLVMDataNull sub
+--   reduceLLVM sub' sm cont
+-- reduceLLVM sub sm (LLVMLet x (LLVMOpAlloc _ (LowTypePtr (LowTypeStruct []))) cont) = do
+--   let sub' = IntMap.insert (asInt x) LLVMDataNull sub
+--   reduceLLVM sub' sm cont
+-- reduceLLVM sub sm (LLVMLet x op@(LLVMOpAlloc _ size) cont) = do
+--   case Map.lookup size sm of
+--     Just ((j, d):rest) -> do
+--       modify (\env -> env {nopFreeSet = S.insert j (nopFreeSet env)})
+--       let sm' = Map.insert size rest sm
+--       let sub' = IntMap.insert (asInt x) (substLLVMData sub d) sub
+--       reduceLLVM sub' sm' cont
+--     _ -> do
+--       b <- isAlreadyDefined x
+--       if b
+--         then do
+--           x' <- newNameWith x
+--           let sub' = IntMap.insert (asInt x) (LLVMDataLocal x') sub
+--           insVar x'
+--           cont' <- reduceLLVM sub' sm cont
+--           return $ LLVMLet x' op cont'
+--         else do
+--           insVar x
+--           cont' <- reduceLLVM sub sm cont
+--           return $ LLVMLet x op cont'
 reduceLLVM sub sm (LLVMLet x op cont) = do
   let op' = substLLVMOp sub op
   b <- isAlreadyDefined x

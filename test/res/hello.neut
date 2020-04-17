@@ -6,4 +6,52 @@
 
 ;; (use string)
 
-(string:print "hello, world!\n")
+(string:print "hello!\n")
+
+;; (string:print "a\n")
+
+;; (let test "aaaa")
+
+;; (definition foo ()
+;;   (string:print test))
+
+;; (foo)
+
+;; (constant os:file-descriptor tau)
+
+;; (include library "core/notation.neut")
+
+;; ;; (include library "core/base.neut")
+
+;; ;; (constant stdin file-descriptor)
+
+;; (constant os:stdout os:file-descriptor)
+
+;; (use os)
+
+;; (constant os:write
+;;   (pi
+;;     ((A u64)
+;;      (out file-descriptor)
+;;      (str (array A u8))
+;;      (len u64))
+;;     (product (array A u8) u64)))
+
+;; (definition let-bind ((a tau) (b tau) (x a) (k (hom a b)))
+;;   (witness b
+;;     (k x)))
+
+;; (definition string
+;;   (sigma
+;;     ((len u64))
+;;     (array len u8)))
+
+;; (definition my-string:print ((str string))
+;;   (witness (product string u64)
+;;     ;; (let (tuple n content) str) ← こんなふうに書けると嬉しい？
+;;     ;; (...)
+;;     (destruct str (n content)
+;;       (let len (write hole stdout &content n))
+;;       (tuple (tuple n content) len))))
+
+;; (my-string:print "hello, world!\n")
