@@ -193,6 +193,7 @@ evalWithEnv c env = do
     Left err -> return $ Left err
     Right (result, _) -> return $ Right result
 
+{-# INLINE newCount #-}
 newCount :: WithEnv Int
 newCount = do
   i <- gets count
@@ -209,26 +210,31 @@ newCountPP = do
     then raiseCritical' "counter exhausted"
     else return i
 
+{-# INLINE newNameWith #-}
 newNameWith :: Identifier -> WithEnv Identifier
 newNameWith (I (s, _)) = do
   j <- newCount
   return $ I (s, j)
 
+{-# INLINE newNameWith' #-}
 newNameWith' :: T.Text -> WithEnv Identifier
 newNameWith' s = do
   i <- newCount
   return $ I (s, i)
 
+{-# INLINE newNameWith'' #-}
 newNameWith'' :: T.Text -> WithEnv Identifier
 newNameWith'' s = do
   i <- newCount
   return $ I ("(" <> s <> "-" <> T.pack (show i) <> ")", i)
 
+{-# INLINE newTextWith #-}
 newTextWith :: T.Text -> WithEnv T.Text
 newTextWith s = do
   i <- newCount
   return $ "(" <> s <> "-" <> T.pack (show i) <> ")"
 
+{-# INLINE newHole #-}
 newHole :: Meta -> WithEnv WeakTermPlus
 newHole m = do
   h <- newNameWith'' "hole"
@@ -257,6 +263,7 @@ getArch = do
     "x86_64" -> return Arch64
     s -> raiseCritical' $ "unsupported target arch: " <> T.pack (show s)
 
+{-# INLINE newDataUpsilonWith #-}
 newDataUpsilonWith :: Meta -> T.Text -> WithEnv (Identifier, DataPlus)
 newDataUpsilonWith m name = do
   x <- newNameWith' name
