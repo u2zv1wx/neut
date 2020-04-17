@@ -2,7 +2,7 @@ module Reduce.LLVM
   ( reduceLLVM
   ) where
 
-import Control.Monad.State
+import Control.Monad.State.Lazy
 
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Map as Map

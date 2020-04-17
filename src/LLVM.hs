@@ -6,7 +6,7 @@ module LLVM
   ) where
 
 import Control.Monad.Except
-import Control.Monad.State
+import Control.Monad.State.Lazy
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Set as S

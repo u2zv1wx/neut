@@ -10,7 +10,7 @@ module Parse.Rule
   ) where
 
 import Control.Monad.Except
-import Control.Monad.State
+import Control.Monad.State.Lazy
 import Data.Either (rights)
 
 import qualified Data.HashMap.Strict as Map

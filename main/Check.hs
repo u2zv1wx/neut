@@ -4,7 +4,7 @@ module Check
   ( check
   ) where
 
-import Control.Monad.State
+import Control.Monad.State.Lazy
 import Data.List (find)
 import Data.Time
 import Numeric

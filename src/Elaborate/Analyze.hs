@@ -8,7 +8,7 @@ module Elaborate.Analyze
   , lookupAny
   ) where
 
-import Control.Monad.State
+import Control.Monad.State.Lazy
 import Data.Maybe
 
 import qualified Data.HashMap.Strict as Map

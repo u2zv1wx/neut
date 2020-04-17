@@ -5,7 +5,7 @@ module Parse.Tokenize
   ) where
 
 import Control.Monad.Except
-import Control.Monad.State
+import Control.Monad.State.Lazy
 import Path
 
 import qualified Data.Set as S

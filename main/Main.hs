@@ -6,7 +6,7 @@ module Main
 
 import Data.Time.Clock.POSIX
 
-import Control.Monad.State
+import Control.Monad.State.Lazy
 import Data.ByteString.Builder
 import Options.Applicative
 import Path

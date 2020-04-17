@@ -8,7 +8,7 @@ module Parse
   ) where
 
 import Control.Monad.Except
-import Control.Monad.State hiding (get)
+import Control.Monad.State.Lazy hiding (get)
 import Data.ByteString.Builder
 import Network.Http.Client
 import Path

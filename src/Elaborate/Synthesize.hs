@@ -5,7 +5,7 @@ module Elaborate.Synthesize
   ) where
 
 import Control.Monad.Except
-import Control.Monad.State
+import Control.Monad.State.Lazy
 import Data.List (nub, sortOn)
 
 import qualified Data.HashMap.Strict as Map

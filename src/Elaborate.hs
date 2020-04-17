@@ -11,7 +11,7 @@ module Elaborate
   , insConstraintEnv
   ) where
 
-import Control.Monad.State
+import Control.Monad.State.Lazy
 import Data.List (find, nub)
 import Data.Time
 import Numeric

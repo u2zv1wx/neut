@@ -2,7 +2,7 @@
 
 module Clarify.Utility where
 
-import Control.Monad.State
+import Control.Monad.State.Lazy
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap

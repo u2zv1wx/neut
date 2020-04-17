@@ -12,7 +12,7 @@ module Parse.Interpret
 
 import Codec.Binary.UTF8.String
 import Control.Monad.Except
-import Control.Monad.State
+import Control.Monad.State.Lazy
 import Data.List (elemIndex, sortOn)
 import Data.Maybe (catMaybes, fromMaybe)
 import Text.Read (readMaybe)

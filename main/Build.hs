@@ -6,7 +6,7 @@ module Build
   ) where
 
 import Control.Monad.Except
-import Control.Monad.State
+import Control.Monad.State.Lazy
 import Data.ByteString.Builder
 import Path
 import Path.IO

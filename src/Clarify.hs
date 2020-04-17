@@ -9,7 +9,7 @@ module Clarify
   ) where
 
 import Control.Monad.Except
-import Control.Monad.State
+import Control.Monad.State.Lazy
 import Data.List (nubBy)
 
 import qualified Data.HashMap.Strict as Map
@@ -500,8 +500,6 @@ makeClosure mName mxts2 m mxts1 e = do
         (m, sigmaIntro [envExp, fvEnv, (m, DataDownIntroPiIntro args body)])
     Just name -> do
       registerIfNecessary m name xts1 xts2 e
-      -- let vs = map (\(mx, x, _) -> (mx, DataUpsilon x)) mxts2
-      -- let fvEnv = (m, sigmaIntro vs)
       return (m, sigmaIntro [envExp, fvEnv, (m, DataConst name)])
 
 registerIfNecessary ::

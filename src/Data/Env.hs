@@ -3,7 +3,7 @@
 module Data.Env where
 
 import Control.Monad.Except
-import Control.Monad.State
+import Control.Monad.State.Lazy
 import Data.List (find)
 import Path
 import Path.IO

@@ -4,7 +4,7 @@ module Complete
   ( complete
   ) where
 
-import Control.Monad.State
+import Control.Monad.State.Lazy
 import Data.List
 import Path
 
