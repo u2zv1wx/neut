@@ -11,7 +11,7 @@ import Path.Internal
 
 import qualified Data.IntMap as IntMap
 import qualified Data.Set as S
-import qualified Data.Text.Lazy as T
+import qualified Data.Text as T
 
 import Text.Read hiding (get)
 

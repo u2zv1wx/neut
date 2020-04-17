@@ -11,8 +11,8 @@ import Path
 import qualified Data.HashMap.Lazy as Map
 import qualified Data.Set as S
 
-import qualified Data.Text.Lazy as T
-import qualified Data.Text.Lazy.IO as TIO
+import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 
 import Data.Basic
 import Data.Env
@@ -206,10 +206,10 @@ toSuffixList :: Identifier -> [Identifier]
 toSuffixList (I (s, i)) = map (\x -> I (x, i)) $ toSuffixList' s
 
 toSuffixList' :: T.Text -> [T.Text]
-toSuffixList' s = [s]
-  -- case findIndex (== ':') s of
-  --   Nothing -> [s]
-  --   Just i -> s : toSuffixList' (T.drop (toEnum i + 1) s)
+toSuffixList' s =
+  case T.findIndex (== ':') s of
+    Nothing -> [s]
+    Just i -> s : toSuffixList' (T.drop (toEnum i + 1) s)
 
 headTailMaybe :: [a] -> Maybe (a, [a])
 headTailMaybe [] = Nothing

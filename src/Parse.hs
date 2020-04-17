@@ -22,9 +22,9 @@ import qualified Data.ByteString.Lazy as L
 import qualified Data.HashMap.Lazy as Map
 
 import qualified Data.Set as S
-import qualified Data.Text.Lazy as T
-import qualified Data.Text.Lazy.Encoding as TE
-import qualified Data.Text.Lazy.IO as TIO
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
+import qualified Data.Text.IO as TIO
 
 import qualified System.IO.Streams as Streams
 
@@ -153,7 +153,7 @@ parse' ((m, TreeNode ((_, TreeLeaf "ensure"):rest)):as)
     when (not isAlreadyInstalled) $ do
       urlStr' <- parseByteString mUrl urlStr
       note' $ "downloading " <> pkg <> " from " <> TE.decodeUtf8 urlStr'
-      item <- liftIO $ get (L.toStrict urlStr') lazyConcatHandler
+      item <- liftIO $ get urlStr' lazyConcatHandler
       note' $ "installing " <> pkg <> " into " <> T.pack (toFilePath path)
       install item path
     parse' as
@@ -337,7 +337,7 @@ styleRule (m, TreeNode [(mName, TreeLeaf name), (_, TreeNode xts), t]) = do
         ])
 styleRule t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) TREE)"
 
-parseByteString :: Meta -> T.Text -> WithEnv L.ByteString
+parseByteString :: Meta -> T.Text -> WithEnv B.ByteString
 parseByteString m quotedStr =
   case readMaybe (T.unpack quotedStr) of
     Nothing -> raiseError m "the argument of `include` must be a string"

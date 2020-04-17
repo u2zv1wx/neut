@@ -14,8 +14,8 @@ import qualified Data.HashMap.Lazy as HashMap
 import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
 import qualified Data.Set as S
-import qualified Data.Text.Lazy as T
-import qualified Data.Text.Lazy.Encoding as TE
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
 
 import Data.Basic
 import Data.Env

@@ -14,8 +14,8 @@ module Data.Log
 
 import System.Console.ANSI
 
-import qualified Data.Text.Lazy as T
-import qualified Data.Text.Lazy.IO as TIO
+import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 
 import Data.Basic
 

@@ -14,7 +14,7 @@ import Data.List (nubBy)
 import qualified Data.HashMap.Lazy as Map
 import qualified Data.IntMap as IntMap
 import qualified Data.Set as S
-import qualified Data.Text.Lazy as T
+import qualified Data.Text as T
 
 import Clarify.Linearize
 import Clarify.Sigma

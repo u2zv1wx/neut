@@ -8,7 +8,7 @@ module Clarify.Sigma
 
 import Control.Monad.State.Lazy
 
-import qualified Data.Text.Lazy as T
+import qualified Data.Text as T
 
 import Clarify.Linearize
 import Clarify.Utility

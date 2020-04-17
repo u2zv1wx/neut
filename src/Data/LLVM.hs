@@ -1,7 +1,7 @@
 module Data.LLVM where
 
 import qualified Data.IntMap as IntMap
-import qualified Data.Text.Lazy as T
+import qualified Data.Text as T
 
 import Data.Basic
 
