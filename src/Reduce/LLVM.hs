@@ -7,7 +7,6 @@ import Control.Monad.State.Lazy
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Map as Map
 import qualified Data.Set as S
-import qualified Data.Text as T
 
 import Data.Basic
 import Data.Env
