@@ -3,6 +3,7 @@
 module Elaborate
   ( elaborate
   , elaborateStmt
+  , resolveImplicit
   , analyze
   , synthesize
   , infer
@@ -72,22 +73,8 @@ elaborateStmt (WeakStmtVerify m e cont) = do
       "verification succeeded (" <> T.pack (showFloat' sec) <> " seconds)"
   elaborateStmt cont
 elaborateStmt (WeakStmtImplicit m x idxList cont) = do
-  t <- lookupTypeEnv m (Right x) x
-  case t of
-    (_, TermPi _ xts _) -> do
-      case find (\idx -> idx < 0 || length xts <= idx) idxList of
-        Nothing -> do
-          ienv <- gets impEnv
-          modify (\env -> env {impEnv = Map.insertWith (++) x idxList ienv})
-          elaborateStmt cont
-        Just idx -> do
-          raiseError m $
-            "the specified index `" <>
-            T.pack (show idx) <> "` is out of range of the domain of " <> x
-    _ ->
-      raiseError m $
-      "the type of " <>
-      x <> " is supposed to be a Pi-type, but is:\n" <> toText (weaken t)
+  resolveImplicit m x idxList
+  elaborateStmt cont
 elaborateStmt (WeakStmtConstDecl _ (_, x, t) cont) = do
   t' <- inferType t
   analyze >> synthesize >> refine >> cleanup
@@ -117,6 +104,24 @@ refine =
 
 showFloat' :: Float -> String
 showFloat' x = showFFloat Nothing x ""
+
+resolveImplicit :: Meta -> T.Text -> [Int] -> WithEnv ()
+resolveImplicit m x idxList = do
+  t <- lookupTypeEnv m (Right x) x
+  case t of
+    (_, TermPi _ xts _) -> do
+      case find (\idx -> idx < 0 || length xts <= idx) idxList of
+        Nothing -> do
+          ienv <- gets impEnv
+          modify (\env -> env {impEnv = Map.insertWith (++) x idxList ienv})
+        Just idx -> do
+          raiseError m $
+            "the specified index `" <>
+            T.pack (show idx) <> "` is out of range of the domain of " <> x
+    _ ->
+      raiseError m $
+      "the type of " <>
+      x <> " must be a Pi-type, but is:\n" <> toText (weaken t)
 
 elaborate :: WeakTermPlus -> WithEnv TermPlus
 elaborate (m, WeakTermTau) = return (m, TermTau)

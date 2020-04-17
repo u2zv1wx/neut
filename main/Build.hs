@@ -8,7 +8,6 @@ module Build
 import Control.Monad.Except
 import Control.Monad.State
 import Data.ByteString.Builder
-import Data.List (find)
 import Path
 import Path.IO
 import System.Process (callProcess)
@@ -30,22 +29,21 @@ import Reduce.Term
 import Reduce.WeakTerm
 
 build :: WeakStmt -> WithEnv [Path Abs File]
-build (WeakStmtVisit path ss1 retZero) = do
+build (WeakStmtVisit path ss1 ss2) = do
   b <- isCacheAvailable path
   if b
     then do
-      note' $ "✓ " <> T.pack (toFilePath path)
+      outputSkipHeader path
       bypass ss1
-      cachePath <- toCacheFilePath path
-      insCachePath cachePath
+      toCacheFilePath path >>= insCachePath
       gets cachePathList
     else do
-      note' $ "→ " <> T.pack (toFilePath path)
+      outputVisitHeader path
       modify (\env -> env {nestLevel = nestLevel env + 1})
       e <- build' ss1
       modify (\env -> env {argAcc = []})
-      retZero' <- build' retZero
-      mainTerm <- letBind e retZero'
+      ss2' <- build' ss2
+      mainTerm <- letBind e ss2'
       llvm <- clarify mainTerm >>= toLLVM >>= emit
       compileObject path llvm
       gets cachePathList
@@ -83,23 +81,20 @@ build' (WeakStmtConstDecl _ (_, x, t) cont) = do
   build' cont
 build' (WeakStmtVisit path ss1 ss2) = do
   b <- isCacheAvailable path
-  i <- gets nestLevel
   if b
     then do
-      note' $ T.replicate (i * 2) " " <> "✓ " <> T.pack (toFilePath path)
+      outputSkipHeader path
       bypass ss1
-      cachePath <- toCacheFilePath path
-      insCachePath cachePath
+      toCacheFilePath path >>= insCachePath
       build' ss2
     else do
-      note' $ T.replicate (i * 2) " " <> "→ " <> T.pack (toFilePath path)
-      modify (\env -> env {nestLevel = i + 1})
-      snapshot <- setupEnv
-      e <- build' ss1
-      code <- toLLVM' >> emit'
-      modify (\env -> env {nestLevel = i})
-      compileObject path code
-      revertEnv snapshot
+      outputVisitHeader path
+      e <-
+        withStack $ do
+          e <- build' ss1
+          code <- toLLVM' >> emit'
+          compileObject path code
+          return e
       cont <- build' ss2
       letBind e cont
 
@@ -110,9 +105,27 @@ letBind e cont = do
   let intType = (m, TermEnum (EnumTypeIntS 64))
   return (m, TermPiElim (m, termPiIntro [(m, h, intType)] cont) [e])
 
+outputVisitHeader :: Path Abs File -> WithEnv ()
+outputVisitHeader path = do
+  i <- gets nestLevel
+  note' $ T.replicate (i * 2) " " <> "→ " <> T.pack (toFilePath path)
+
+outputSkipHeader :: Path Abs File -> WithEnv ()
+outputSkipHeader path = do
+  i <- gets nestLevel
+  note' $ T.replicate (i * 2) " " <> "✓ " <> T.pack (toFilePath path)
+
+withStack :: WithEnv a -> WithEnv a
+withStack f = do
+  snapshot <- setupEnv
+  result <- f
+  revertEnv snapshot
+  return result
+
 setupEnv :: WithEnv Env
 setupEnv = do
   snapshot <- get
+  modify (\env -> env {nestLevel = (nestLevel env) + 1})
   modify (\env -> env {codeEnv = Map.empty})
   modify (\env -> env {llvmEnv = Map.empty})
   modify (\env -> env {argAcc = []})
@@ -120,6 +133,7 @@ setupEnv = do
 
 revertEnv :: Env -> WithEnv ()
 revertEnv snapshot = do
+  modify (\env -> env {nestLevel = (nestLevel env) - 1})
   modify (\e -> e {codeEnv = codeEnv snapshot})
   modify (\e -> e {llvmEnv = llvmEnv snapshot})
   modify (\e -> e {argAcc = argAcc snapshot})
@@ -162,35 +176,6 @@ build'' mx x e t cont = do
   clarify e' >>= insCodeEnv (showInHex x) []
   modify (\env -> env {argAcc = (mx, x, t') : (argAcc env)})
   build' cont
-
-isCacheAvailable :: Path Abs File -> WithEnv Bool
-isCacheAvailable path = do
-  g <- gets depGraph
-  case Map.lookup path g of
-    Nothing -> isCacheAvailable' path
-    Just xs -> do
-      b <- isCacheAvailable' path
-      bs <- mapM isCacheAvailable xs
-      return $ and $ b : bs
-
-isCacheAvailable' :: Path Abs File -> WithEnv Bool
-isCacheAvailable' srcPath = do
-  cachePath <- toCacheFilePath srcPath
-  b <- doesFileExist cachePath
-  if not b
-    then return False
-    else do
-      srcModTime <- getModificationTime srcPath
-      cacheModTime <- getModificationTime cachePath
-      return $ srcModTime < cacheModTime
-
-toCacheFilePath :: Path Abs File -> WithEnv (Path Abs File)
-toCacheFilePath srcPath = do
-  cacheDirPath <- getObjectCacheDirPath
-  srcPath' <- parseRelFile $ "." <> toFilePath srcPath
-  item <- replaceExtension ".o" $ cacheDirPath </> srcPath'
-  ensureDir $ parent item
-  replaceExtension ".o" $ cacheDirPath </> srcPath'
 
 bypass :: WeakStmt -> WithEnv ()
 bypass (WeakStmtReturn _) = return ()
@@ -242,21 +227,3 @@ cleanup = do
 refine :: WithEnv ()
 refine =
   modify (\env -> env {substEnv = IntMap.map reduceWeakTermPlus (substEnv env)})
-
-resolveImplicit :: Meta -> T.Text -> [Int] -> WithEnv ()
-resolveImplicit m x idxList = do
-  t <- lookupTypeEnv m (Right x) x
-  case t of
-    (_, TermPi _ xts _) -> do
-      case find (\idx -> idx < 0 || length xts <= idx) idxList of
-        Nothing -> do
-          ienv <- gets impEnv
-          modify (\env -> env {impEnv = Map.insertWith (++) x idxList ienv})
-        Just idx -> do
-          raiseError m $
-            "the specified index `" <>
-            T.pack (show idx) <> "` is out of range of the domain of " <> x
-    _ ->
-      raiseError m $
-      "the type of " <>
-      x <> " must be a Pi-type, but is:\n" <> toText (weaken t)
