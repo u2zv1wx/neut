@@ -35,11 +35,11 @@ build (WeakStmtVisit path ss1 ss2) = do
     then skip path ss1 >> gets cachePathList
     else do
       outputVisitHeader path
-      e <- build' ss1
-      modify (\env -> env {argAcc = []})
-      mainTerm <- build' ss2 >>= letBind e
-      clarify mainTerm >>= toLLVM >>= emit >>= compileObject path
-      gets cachePathList
+      withStack $ do
+        e1 <- build' ss1
+        e2 <- build' ss2
+        letBind e1 e2 >>= clarify >>= toLLVM >>= emit >>= compileObject path
+        gets cachePathList
 build _ = raiseCritical' "build"
 
 link :: Path Abs File -> [Path Abs File] -> [String] -> IO ()
@@ -53,6 +53,7 @@ build' (WeakStmtReturn e) = do
   (e', _) <- infer e
   analyze >> synthesize >> refine
   acc <- gets argAcc
+  modify (\env -> env {argAcc = []})
   elaborate e' >>= bind acc
 build' (WeakStmtLet _ (mx, x, t) e cont) = do
   (e', te) <- infer e
@@ -81,9 +82,12 @@ build' (WeakStmtVisit path ss1 ss2) = do
       e <-
         withStack $ do
           e <- build' ss1
-          toLLVM' >> emit' >>= compileObject path
+          compileWithCurrentEnv path
           return e
       build' ss2 >>= letBind e
+
+compileWithCurrentEnv :: Path Abs File -> WithEnv ()
+compileWithCurrentEnv path = toLLVM' >> emit' >>= compileObject path
 
 skip :: Path Abs File -> WeakStmt -> WithEnv ()
 skip path ss = do
@@ -121,15 +125,14 @@ setupEnv = do
   modify (\env -> env {nestLevel = (nestLevel env) + 1})
   modify (\env -> env {codeEnv = Map.empty})
   modify (\env -> env {llvmEnv = Map.empty})
-  modify (\env -> env {argAcc = []})
   return snapshot
 
 revertEnv :: Env -> WithEnv ()
 revertEnv snapshot = do
+  modify (\env -> env {argAcc = []})
   modify (\env -> env {nestLevel = (nestLevel env) - 1})
   modify (\e -> e {codeEnv = codeEnv snapshot})
   modify (\e -> e {llvmEnv = llvmEnv snapshot})
-  modify (\e -> e {argAcc = argAcc snapshot})
 
 compileObject :: Path Abs File -> Builder -> WithEnv ()
 compileObject srcPath code = do
