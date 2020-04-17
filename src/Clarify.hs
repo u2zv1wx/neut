@@ -13,7 +13,6 @@ import Data.List (nubBy)
 
 import qualified Data.HashMap.Lazy as Map
 import qualified Data.IntMap as IntMap
-import qualified Data.Set as S
 import qualified Data.Text as T
 
 import Clarify.Linearize
@@ -23,13 +22,32 @@ import Data.Basic
 import Data.Code
 import Data.Env
 import Data.Term
-import Reduce.Code
+
+-- import Reduce.Code
 import Reduce.Term
 
-clarify :: TermPlus -> WithEnv CodePlus
-clarify e = do
+clarify :: Stmt -> WithEnv CodePlus
+clarify = clarifyStmt
+
+clarifyStmt :: Stmt -> WithEnv CodePlus
+clarifyStmt (StmtReturn e) = do
   tenv <- gets typeEnv
   clarify' tenv e
+clarifyStmt (StmtLet _ (_, x, _) e cont) = do
+  tenv <- gets typeEnv
+  e' <- clarify' tenv e
+  let x' = showInHex x
+  insCodeEnv x' [] e'
+  cont' <- clarifyStmt cont
+  h <- newNameWith'' "comp"
+  return
+    ( fst e'
+    , CodeUpElim h (fst e', CodePiElimDownElim (fst e', DataConst x') []) cont')
+clarifyStmt (StmtVisit _ ss1 ss2) = do
+  e1' <- clarifyStmt ss1 -- ここでss1のキャッシュを利用できそう？
+  e2' <- clarifyStmt ss2
+  h <- newNameWith'' "visit"
+  return (fst e1', CodeUpElim h e1' e2')
 
 clarify' :: TypeEnv -> TermPlus -> WithEnv CodePlus
 clarify' _ (m, TermTau) = returnCartesianImmediate m
@@ -187,21 +205,22 @@ clarifyConst tenv m x
     cenv <- gets cacheEnv
     -- showInHexはLLVMのときまで遅延させたほうがいいかも（型情報の取得が絡むので）
     let x' = showInHex x
-    -- b <- gets isIncremental
     case (asSysCallMaybe os x, Map.lookup x cenv) of
       (Just (syscall, argInfo), _) -> clarifySysCall tenv x syscall argInfo m
       (_, Nothing) -> return (m, CodeUpIntro (m, DataConst x)) -- external
-      -- (_, True, Just _) -> return (m, CodePiElimDownElim (m, DataConst x') [])
-      (_, Just (Right _)) -> return (m, CodePiElimDownElim (m, DataConst x') [])
-      (_, Just (Left e))
-        | T.any (`S.member` S.fromList "()") x -> clarify' tenv e
-        | otherwise -> do
-          e' <- clarify' tenv e
-          modify (\env -> env {nameSet = S.empty})
-          e'' <- reduceCodePlus e'
-          modify (\env -> env {cacheEnv = Map.insert x (Right e'') cenv})
-          insCodeEnv x' [] e''
-          return (m, CodePiElimDownElim (m, DataConst x') [])
+      (_, Just _) -> return (m, CodePiElimDownElim (m, DataConst x') [])
+      -- (_, Just (Right e)) -> return e
+      --   -- return (m, CodePiElimDownElim (m, DataConst x') [])
+      -- (_, Just (Left e))
+      --   | T.any (`S.member` S.fromList "()") x -> clarify' tenv e
+      --   | otherwise -> do
+      --     e' <- clarify' tenv e
+      --     modify (\env -> env {nameSet = S.empty})
+      --     e'' <- reduceCodePlus e'
+      --     modify (\env -> env {cacheEnv = Map.insert x (Right e'') cenv})
+      --     return e''
+      --     -- insCodeEnv x' [] e''
+      --     -- return (m, CodePiElimDownElim (m, DataConst x') [])
 
 immType :: Meta -> TermPlus
 immType m = (m, TermEnum (EnumTypeIntS 64))

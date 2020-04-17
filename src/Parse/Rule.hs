@@ -46,14 +46,14 @@ setupIndPrefix' _ t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) TREE)"
 parseConnective ::
      Meta
   -> [TreePlus]
-  -> ([TextPlus] -> [TextPlus] -> Connective -> WithEnv [QuasiStmt])
-  -> ([TextPlus] -> Connective -> WithEnv [QuasiStmt])
+  -> ([WeakTextPlus] -> [WeakTextPlus] -> Connective -> WithEnv [QuasiStmt])
+  -> ([WeakTextPlus] -> Connective -> WithEnv [QuasiStmt])
   -> WithEnv [QuasiStmt]
 parseConnective m ts f g = do
   connectiveList <- mapM parseConnective' ts
   fs <- mapM formationRuleOf' connectiveList
   -- fs <- mapM formationRuleOf connectiveList
-  ats <- mapM ruleAsTextPlus fs
+  ats <- mapM ruleAsWeakTextPlus fs
   bts <- concat <$> mapM toInternalRuleList connectiveList
   checkNameSanity m $ ats ++ bts
   connectiveList' <- concat <$> mapM (f ats bts) connectiveList
@@ -71,7 +71,7 @@ registerLabelInfo :: [TreePlus] -> WithEnv ()
 registerLabelInfo ts = do
   connectiveList <- mapM parseConnective' ts
   fs <- mapM formationRuleOf connectiveList
-  ats <- mapM ruleAsTextPlus fs
+  ats <- mapM ruleAsWeakTextPlus fs
   bts <- concat <$> mapM toInternalRuleList connectiveList
   forM_ ats $ \(_, a, _) -> do
     let asbs = map (\(_, x, _) -> x) $ ats ++ bts
@@ -81,7 +81,7 @@ generateProjections :: [TreePlus] -> WithEnv [QuasiStmt]
 generateProjections ts = do
   connectiveList <- mapM parseConnective' ts
   fs <- mapM formationRuleOf connectiveList
-  ats <- mapM ruleAsTextPlus fs
+  ats <- mapM ruleAsWeakTextPlus fs
   bts <- concat <$> mapM toInternalRuleList connectiveList
   let bts' = map textPlusToIdentPlus bts
   stmtListList <-
@@ -131,7 +131,7 @@ parseRule (m, TreeNode [(mName, TreeLeaf name), (_, TreeNode xts), t]) = do
   return (m, name, mName, xts', t')
 parseRule t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) TREE)"
 
-checkNameSanity :: Meta -> [TextPlus] -> WithEnv ()
+checkNameSanity :: Meta -> [WeakTextPlus] -> WithEnv ()
 checkNameSanity m atsbts = do
   let asbs = map (\(_, x, _) -> x) atsbts
   when (not $ linearCheck asbs) $
@@ -139,10 +139,11 @@ checkNameSanity m atsbts = do
       m
       "the names of the rules of inductive/coinductive type must be distinct"
 
-toInductive :: [TextPlus] -> [TextPlus] -> Connective -> WithEnv [QuasiStmt]
+toInductive ::
+     [WeakTextPlus] -> [WeakTextPlus] -> Connective -> WithEnv [QuasiStmt]
 toInductive ats bts connective@(m, ai, xts, _) = do
   let a = asIdent ai
-  formationRule <- formationRuleOf connective >>= ruleAsTextPlus
+  formationRule <- formationRuleOf connective >>= ruleAsWeakTextPlus
   let cod = (m, WeakTermPiElim (m, WeakTermUpsilon a) (map toVar' xts))
   z <- newNameWith'' "_"
   let zt = (m, z, cod)
@@ -166,7 +167,7 @@ toInductive ats bts connective@(m, ai, xts, _) = do
             (m, WeakTermPiElim (toVar' zt) (map toVar' atsbts)))
     ]
 
-toInductiveIntroList :: [TextPlus] -> Connective -> WithEnv [QuasiStmt]
+toInductiveIntroList :: [WeakTextPlus] -> Connective -> WithEnv [QuasiStmt]
 toInductiveIntroList ats (_, a, xts, rules) = do
   let ats' = map textPlusToIdentPlus ats
   bts <- mapM ruleAsIdentPlus rules -- fixme: このbtsはmutualな別の部分からもとってくる必要があるはず
@@ -216,11 +217,11 @@ ruleAsIdentPlus :: Rule -> WithEnv IdentifierPlus
 ruleAsIdentPlus (mb, b, m, xts, t) = do
   return (mb, asIdent b, (m, weakTermPi xts t))
 
-ruleAsTextPlus :: Rule -> WithEnv TextPlus
-ruleAsTextPlus (mb, b, m, xts, t) = do
+ruleAsWeakTextPlus :: Rule -> WithEnv WeakTextPlus
+ruleAsWeakTextPlus (mb, b, m, xts, t) = do
   return (mb, b, (m, weakTermPi xts t))
 
-textPlusToIdentPlus :: TextPlus -> IdentifierPlus
+textPlusToIdentPlus :: WeakTextPlus -> IdentifierPlus
 textPlusToIdentPlus (mx, x, t) = (mx, asIdent x, t)
 
 formationRuleOf :: Connective -> WithEnv Rule
@@ -234,22 +235,22 @@ formationRuleOf' (m, x, xts, rules) = do
   insEnumEnv m x bis
   return (m, x, m, xts, (m, WeakTermTau))
 
-toInternalRuleList :: Connective -> WithEnv [TextPlus]
-toInternalRuleList (_, _, _, rules) = mapM ruleAsTextPlus rules
+toInternalRuleList :: Connective -> WithEnv [WeakTextPlus]
+toInternalRuleList (_, _, _, rules) = mapM ruleAsWeakTextPlus rules
 
 toVar' :: IdentifierPlus -> WeakTermPlus
 toVar' (m, x, _) = (m, WeakTermUpsilon x)
 
-toConst :: TextPlus -> WeakTermPlus
+toConst :: WeakTextPlus -> WeakTermPlus
 toConst (m, x, _) = (m, WeakTermConst x)
 
-insForm :: Int -> TextPlus -> WeakTermPlus -> WithEnv ()
+insForm :: Int -> WeakTextPlus -> WeakTermPlus -> WithEnv ()
 insForm 1 (_, x, _) e =
   modify (\env -> env {formationEnv = Map.insert x (Just e) (formationEnv env)})
 insForm _ (_, x, _) _ =
   modify (\env -> env {formationEnv = Map.insert x Nothing (formationEnv env)})
 
-insInductive :: [T.Text] -> TextPlus -> WithEnv ()
+insInductive :: [T.Text] -> WeakTextPlus -> WithEnv ()
 insInductive [ai] bt = do
   ienv <- gets indEnv
   modify (\env -> env {indEnv = Map.insertWith optConcat ai (Just [bt]) ienv})
@@ -364,7 +365,7 @@ thetaInductiveNested ::
   -> WeakTermPlus -- list Aにおけるlist
   -> T.Text -- list (トップレベルで定義されている名前、つまりouterの名前)
   -> [WeakTermPlus] -- list AにおけるA
-  -> [TextPlus] -- トップレベルで定義されているコンストラクタたち
+  -> [WeakTextPlus] -- トップレベルで定義されているコンストラクタたち
   -> WithEnv WeakTermPlus
 thetaInductiveNested mode isub atsbts e va aOuter es bts = do
   (xts, (_, aInner, _), btsInner) <- lookupInductive (metaOf va) aOuter
@@ -417,7 +418,7 @@ toInternalizedArg ::
   -> [IdentifierPlus] -- base caseでのinternalizeのための情報。
   -> [WeakTermPlus] -- list @ (e1, ..., en)の引数部分。
   -> [WeakTermPlus] -- eiをisubでsubstしたもの。
-  -> TextPlus -- outerでのコンストラクタ。
+  -> WeakTextPlus -- outerでのコンストラクタ。
   -> IdentifierPlus -- innerでのコンストラクタ。xts部分の引数だけouterのコンストラクタと型がずれていることに注意。
   -> WithEnv WeakTermPlus
 toInternalizedArg mode isub aInner aOuter xts atsbts es es' b (mbInner, _, (_, WeakTermPi _ ytsInner _)) = do

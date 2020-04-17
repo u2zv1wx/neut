@@ -61,7 +61,7 @@ type SubstWeakTerm = Map.HashMap (Either Int T.Text) WeakTermPlus
 
 type IdentifierPlus = (Meta, Identifier, WeakTermPlus)
 
-type TextPlus = (Meta, T.Text, WeakTermPlus)
+type WeakTextPlus = (Meta, T.Text, WeakTermPlus)
 
 type Def = (Meta, IdentifierPlus, [IdentifierPlus], WeakTermPlus)
 
@@ -86,9 +86,9 @@ type Connective
       )
 
 data QuasiStmt
-  = QuasiStmtLet Meta TextPlus WeakTermPlus
+  = QuasiStmtLet Meta WeakTextPlus WeakTermPlus
   -- special case of `let` in which the `e` in `let x := e` is known to be well-typed
-  | QuasiStmtLetWT Meta TextPlus WeakTermPlus
+  | QuasiStmtLetWT Meta WeakTextPlus WeakTermPlus
   -- mutually recursive definition (n >= 0)
   --   (definition
   --     ((f1 A1) (ARGS-1) e1)
@@ -98,9 +98,9 @@ data QuasiStmt
   | QuasiStmtVerify Meta WeakTermPlus
   | QuasiStmtImplicit Meta T.Text [Int]
   | QuasiStmtEnum Meta T.Text [(T.Text, Int)]
-  | QuasiStmtConstDecl Meta TextPlus
-  | QuasiStmtLetInductive Int Meta TextPlus WeakTermPlus
-  | QuasiStmtLetInductiveIntro Meta TextPlus WeakTermPlus [T.Text]
+  | QuasiStmtConstDecl Meta WeakTextPlus
+  | QuasiStmtLetInductive Int Meta WeakTextPlus WeakTermPlus
+  | QuasiStmtLetInductiveIntro Meta WeakTextPlus WeakTermPlus [T.Text]
   | QuasiStmtUse T.Text
   | QuasiStmtUnuse T.Text
   | QuasiStmtVisit (Path Abs File) [QuasiStmt]
@@ -108,11 +108,11 @@ data QuasiStmt
 
 data WeakStmt
   = WeakStmtReturn WeakTermPlus
-  | WeakStmtLet Meta TextPlus WeakTermPlus WeakStmt
-  | WeakStmtLetWT Meta TextPlus WeakTermPlus WeakStmt
+  | WeakStmtLet Meta WeakTextPlus WeakTermPlus WeakStmt
+  | WeakStmtLetWT Meta WeakTextPlus WeakTermPlus WeakStmt
   | WeakStmtVerify Meta WeakTermPlus WeakStmt
   | WeakStmtImplicit Meta T.Text [Int] WeakStmt
-  | WeakStmtConstDecl Meta TextPlus WeakStmt
+  | WeakStmtConstDecl Meta WeakTextPlus WeakStmt
   | WeakStmtVisit (Path Abs File) WeakStmt WeakStmt
   deriving (Show)
 

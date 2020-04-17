@@ -23,14 +23,16 @@ import Elaborate.Synthesize
 import Reduce.Term
 import Reduce.WeakTerm
 
-elaborate :: WeakStmt -> WithEnv TermPlus
-elaborate e = reduceTermPlus <$> elaborateStmt e
+elaborate :: WeakStmt -> WithEnv Stmt
+elaborate = elaborateStmt
 
-elaborateStmt :: WeakStmt -> WithEnv TermPlus
+-- elaborate e = reduceTermPlus <$> elaborateStmt e
+elaborateStmt :: WeakStmt -> WithEnv Stmt
 elaborateStmt (WeakStmtReturn e) = do
   (e', _) <- infer e
   analyze >> synthesize >> refine
-  elaborate' e'
+  e'' <- elaborate' e'
+  return $ StmtReturn e''
 elaborateStmt (WeakStmtLet m (mx, x, t) e cont) = do
   (e', te) <- infer e
   t' <- inferType t
@@ -41,9 +43,10 @@ elaborateStmt (WeakStmtLet m (mx, x, t) e cont) = do
   insTypeEnv (Right x) t''
   modify (\env -> env {cacheEnv = Map.insert x (Left e'') (cacheEnv env)})
   cont' <- elaborateStmt cont
-  x' <- newNameWith'' x
-  let c = (m, TermConst x)
-  return (m, TermPiElim (m, termPiIntro [(mx, x', t'')] cont') [c])
+  return $ StmtLet m (mx, x, t'') e'' cont'
+  -- x' <- newNameWith'' x
+  -- let c = (m, TermConst x)
+  -- return (m, TermPiElim (m, termPiIntro [(mx, x', t'')] cont') [c])
 elaborateStmt (WeakStmtLetWT m (mx, x, t) e cont) = do
   t' <- inferType t
   analyze >> synthesize >> refine >> cleanup
@@ -52,9 +55,10 @@ elaborateStmt (WeakStmtLetWT m (mx, x, t) e cont) = do
   insTypeEnv (Right x) t''
   modify (\env -> env {cacheEnv = Map.insert x (Left e') (cacheEnv env)})
   cont' <- elaborateStmt cont
-  x' <- newNameWith'' x
-  let c = (m, TermConst x)
-  return (m, TermPiElim (m, termPiIntro [(mx, x', t'')] cont') [c])
+  return $ StmtLet m (mx, x, t'') e' cont'
+  -- x' <- newNameWith'' x
+  -- let c = (m, TermConst x)
+  -- return (m, TermPiElim (m, termPiIntro [(mx, x', t'')] cont') [c])
 elaborateStmt (WeakStmtVerify m e cont) = do
   whenCheck $ do
     (e', _) <- infer e
@@ -75,17 +79,77 @@ elaborateStmt (WeakStmtConstDecl _ (_, x, t) cont) = do
   t'' <- reduceTermPlus <$> elaborate' t'
   insTypeEnv (Right x) t''
   elaborateStmt cont
-elaborateStmt (WeakStmtVisit _ ss1 ss2) = do
-  e1 <- elaborateStmt ss1
-  e2 <- elaborateStmt ss2
-  let m = fst e1
-  h <- newNameWith'' "visit"
-  return
-    ( m
-    , TermPiElim
-        (m, termPiIntro [(m, h, (m, TermEnum (EnumTypeIntS 64)))] e2)
-        [e1])
+elaborateStmt (WeakStmtVisit path ss1 ss2) = do
+  ss1' <- elaborateStmt ss1
+  ss2' <- elaborateStmt ss2
+  -- let m = fst e1
+  return $ StmtVisit path ss1' ss2'
+  -- h <- newNameWith'' "visit"
+  -- return
+  --   ( m
+  --   , TermPiElim
+  --       (m, termPiIntro [(m, h, (m, TermEnum (EnumTypeIntS 64)))] e2)
+  --       [e1])
 
+-- elaborateStmt :: WeakStmt -> WithEnv TermPlus
+-- elaborateStmt (WeakStmtReturn e) = do
+--   (e', _) <- infer e
+--   analyze >> synthesize >> refine
+--   elaborate' e'
+-- elaborateStmt (WeakStmtLet m (mx, x, t) e cont) = do
+--   (e', te) <- infer e
+--   t' <- inferType t
+--   insConstraintEnv te t'
+--   analyze >> synthesize >> refine >> cleanup
+--   e'' <- elaborate' e'
+--   t'' <- reduceTermPlus <$> elaborate' t'
+--   insTypeEnv (Right x) t''
+--   modify (\env -> env {cacheEnv = Map.insert x (Left e'') (cacheEnv env)})
+--   cont' <- elaborateStmt cont
+--   x' <- newNameWith'' x
+--   let c = (m, TermConst x)
+--   return (m, TermPiElim (m, termPiIntro [(mx, x', t'')] cont') [c])
+-- elaborateStmt (WeakStmtLetWT m (mx, x, t) e cont) = do
+--   t' <- inferType t
+--   analyze >> synthesize >> refine >> cleanup
+--   e' <- elaborate' e -- `e` is supposed to be well-typed
+--   t'' <- reduceTermPlus <$> elaborate' t'
+--   insTypeEnv (Right x) t''
+--   modify (\env -> env {cacheEnv = Map.insert x (Left e') (cacheEnv env)})
+--   cont' <- elaborateStmt cont
+--   x' <- newNameWith'' x
+--   let c = (m, TermConst x)
+--   return (m, TermPiElim (m, termPiIntro [(mx, x', t'')] cont') [c])
+-- elaborateStmt (WeakStmtVerify m e cont) = do
+--   whenCheck $ do
+--     (e', _) <- infer e
+--     e'' <- elaborate' e'
+--     start <- liftIO $ getCurrentTime
+--     _ <- normalize e''
+--     stop <- liftIO $ getCurrentTime
+--     let sec = realToFrac $ diffUTCTime stop start :: Float
+--     note m $
+--       "verification succeeded (" <> T.pack (showFloat' sec) <> " seconds)"
+--   elaborateStmt cont
+-- elaborateStmt (WeakStmtImplicit m x idxList cont) = do
+--   resolveImplicit m x idxList
+--   elaborateStmt cont
+-- elaborateStmt (WeakStmtConstDecl _ (_, x, t) cont) = do
+--   t' <- inferType t
+--   analyze >> synthesize >> refine >> cleanup
+--   t'' <- reduceTermPlus <$> elaborate' t'
+--   insTypeEnv (Right x) t''
+--   elaborateStmt cont
+-- elaborateStmt (WeakStmtVisit _ ss1 ss2) = do
+--   e1 <- elaborateStmt ss1
+--   e2 <- elaborateStmt ss2
+--   let m = fst e1
+--   h <- newNameWith'' "visit"
+--   return
+--     ( m
+--     , TermPiElim
+--         (m, termPiIntro [(m, h, (m, TermEnum (EnumTypeIntS 64)))] e2)
+--         [e1])
 cleanup :: WithEnv ()
 cleanup = do
   modify (\env -> env {constraintEnv = []})

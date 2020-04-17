@@ -6,6 +6,7 @@ module Data.Term where
 import Data.Binary
 import Data.Maybe (fromMaybe)
 import GHC.Generics (Generic)
+import Path
 
 import qualified Data.IntMap as IntMap
 import qualified Data.Text as T
@@ -42,6 +43,14 @@ data Term
   deriving (Show, Generic)
 
 instance Binary Term
+
+type TextPlus = (Meta, T.Text, TermPlus)
+
+data Stmt
+  = StmtReturn TermPlus
+  | StmtLet Meta TextPlus TermPlus Stmt
+  | StmtVisit (Path Abs File) Stmt Stmt
+  deriving (Show)
 
 type TermPlus = (Meta, Term)
 

@@ -337,7 +337,7 @@ interpretLeaf (m, TreeLeaf x) = do
   return (m, asIdent x)
 interpretLeaf t = raiseSyntaxError (fst t) "LEAF"
 
-interpretTextPlus :: TreePlus -> WithEnv TextPlus
+interpretTextPlus :: TreePlus -> WithEnv WeakTextPlus
 interpretTextPlus leaf@(_, TreeLeaf _) = do
   (m, x') <- interpretLeafText leaf
   h <- newHole m
