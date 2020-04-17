@@ -41,7 +41,7 @@ build (WeakStmtVisit path ss1 ss2) = do
       main <- concatMain main1 main2
       compileMain main path
       gets cachePathList
-build _ = raiseCritical' "build"
+build _ = raiseCritical' "an invalid argument passed to Build.build"
 
 link :: Path Abs File -> [Path Abs File] -> [String] -> IO ()
 link outputPath pathList opt = do
