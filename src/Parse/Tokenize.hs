@@ -6,8 +6,6 @@ module Parse.Tokenize
   ) where
 
 import Control.Exception.Safe
-
--- import Control.Monad.Except
 import Control.Monad.State.Lazy
 import Path
 
@@ -30,17 +28,13 @@ data TEnv =
 
 type Tokenizer a = StateT TEnv IO a
 
--- type Tokenizer a = StateT TEnv (ExceptT Log IO) a
 tokenize :: T.Text -> WithEnv [TreePlus]
 tokenize input = do
   modify (\env -> env {count = 1 + count env})
   path <- getCurrentFilePath
   let env = TEnv {text = input, line = 1, column = 1, filePath = path}
   resultOrError <- liftIO $ try $ runStateT program env
-  -- resultOrError <- liftIO $ runExceptT (runStateT program env)
-  case resultOrError
-    -- Left err -> throwError [err]
-        of
+  case resultOrError of
     Left (Error err) -> throw $ Error err
     Right (result, _) -> do
       return result
@@ -141,21 +135,12 @@ sepEndBy :: Tokenizer a -> Tokenizer () -> Tokenizer [a]
 sepEndBy f g = sepEndBy' (f >>= return . Right) g []
 
 sepEndBy' :: Tokenizer (Either [a] a) -> Tokenizer () -> [a] -> Tokenizer [a]
-sepEndBy' f g acc
-  -- foo <- f
- = do
+sepEndBy' f g acc = do
   itemOrResult <- catch f (\(_ :: Error) -> return $ Left $ reverse acc)
-  -- itemOrResult <- catchError f (const $ return $ Left $ reverse acc)
   g
   case itemOrResult of
     Right item -> sepEndBy' f g (item : acc)
     Left result -> return result
-  -- itemOrResult <- catch f (const $ return $ Left $ reverse acc)
-  -- -- itemOrResult <- catchError f (const $ return $ Left $ reverse acc)
-  -- g
-  -- case itemOrResult of
-  --   Right item -> sepEndBy' f g (item : acc)
-  --   Left result -> return result
 
 symbol :: Tokenizer T.Text
 symbol = do
@@ -238,4 +223,3 @@ raiseTokenizeError :: T.Text -> Tokenizer a
 raiseTokenizeError txt = do
   m <- currentMeta
   throw $ Error [logError (getPosInfo m) txt]
-  -- throwError $ logError (getPosInfo m) txt

@@ -10,7 +10,6 @@ module Elaborate.Infer
   , Context
   ) where
 
--- import Control.Monad.Except
 import Control.Monad.State.Lazy
 
 import qualified Data.HashMap.Strict as Map

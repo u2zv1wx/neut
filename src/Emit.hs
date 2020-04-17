@@ -6,7 +6,6 @@ module Emit
   , emitDeclarations
   ) where
 
--- import Control.Monad.Except
 import Control.Monad.State.Lazy
 import Data.ByteString.Builder
 import Numeric.Half

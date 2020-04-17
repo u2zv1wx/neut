@@ -6,8 +6,6 @@ module Elaborate.Synthesize
   ) where
 
 import Control.Exception.Safe
-
--- import Control.Monad.Except
 import Control.Monad.State.Lazy
 import Data.List (nub, sortOn)
 
@@ -164,7 +162,6 @@ throwTypeErrors = do
   let pcs = sortOn fst $ nub $ setupPosInfo $ Q.toList q
   errorList <- constructErrors [] pcs
   throw $ Error errorList
-  -- throwError errorList
 
 setupPosInfo :: [EnrichedConstraint] -> [(PosInfo, PreConstraint)]
 setupPosInfo [] = []

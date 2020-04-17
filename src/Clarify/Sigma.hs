@@ -6,7 +6,6 @@ module Clarify.Sigma
   , returnClosureType
   ) where
 
--- import Control.Monad.Except
 import Control.Monad.State.Lazy
 
 import qualified Data.Text as T

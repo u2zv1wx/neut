@@ -13,7 +13,6 @@ module Parse.Interpret
 
 import Codec.Binary.UTF8.String
 
--- import Control.Monad.Except
 import Control.Exception.Safe
 import Control.Monad.State.Lazy
 import Data.List (elemIndex, sortOn)
@@ -362,7 +361,6 @@ interpretEnumValueMaybe t = do
   catch
     (interpretEnumValue t >>= \x -> return (Just x))
     (\(_ :: Error) -> return Nothing)
-  -- (Just <$> interpretEnumValue t) `catch` (const $ return Nothing)
 
 interpretEnumValue :: TreePlus -> WithEnv EnumValue
 interpretEnumValue (_, TreeLeaf x) = return $ EnumValueLabel x

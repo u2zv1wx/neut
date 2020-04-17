@@ -5,7 +5,6 @@ module Build
   , link
   ) where
 
--- import Control.Monad.Except
 import Control.Monad.State.Lazy
 import Data.ByteString.Builder
 import Path
