@@ -35,11 +35,12 @@ build (WeakStmtVisit path ss1 ss2) = do
     then skip path ss1 >> gets cachePathList
     else do
       outputVisitHeader path
-      withStack $ do
-        e1 <- build' ss1
-        e2 <- build' ss2
-        letBind e1 e2 >>= clarify >>= toLLVM >>= emit >>= compileObject path
-        gets cachePathList
+      modify (\env -> env {nestLevel = (nestLevel env) + 1})
+      main1 <- toMain ss1
+      main2 <- toMain ss2
+      main <- concatMain main1 main2
+      compileMain main path
+      gets cachePathList
 build _ = raiseCritical' "build"
 
 link :: Path Abs File -> [Path Abs File] -> [String] -> IO ()
@@ -48,46 +49,49 @@ link outputPath pathList opt = do
     map toFilePath pathList ++
     opt ++ ["-Wno-override-module", "-o" ++ toFilePath outputPath]
 
-build' :: WeakStmt -> WithEnv TermPlus
-build' (WeakStmtReturn e) = do
+toMain :: WeakStmt -> WithEnv TermPlus
+toMain (WeakStmtReturn e) = do
   (e', _) <- infer e
   analyze >> synthesize >> refine
   acc <- gets argAcc
   modify (\env -> env {argAcc = []})
   elaborate e' >>= bind acc
-build' (WeakStmtLet _ (mx, x, t) e cont) = do
+toMain (WeakStmtLet _ (mx, x, t) e cont) = do
   (e', te) <- infer e
   t' <- inferType t
   insConstraintEnv te t'
-  build'' mx x e' t' cont
-build' (WeakStmtLetWT _ (mx, x, t) e cont) = do
+  toMain' mx x e' t' cont
+toMain (WeakStmtLetWT _ (mx, x, t) e cont) = do
   t' <- inferType t
-  build'' mx x e t' cont
-build' (WeakStmtVerify _ _ cont) = build' cont
-build' (WeakStmtImplicit m x idxList cont) = do
+  toMain' mx x e t' cont
+toMain (WeakStmtVerify _ _ cont) = toMain cont
+toMain (WeakStmtImplicit m x idxList cont) = do
   resolveImplicit m x idxList
-  build' cont
-build' (WeakStmtConstDecl _ (_, x, t) cont) = do
+  toMain cont
+toMain (WeakStmtConstDecl _ (_, x, t) cont) = do
   t' <- inferType t
   analyze >> synthesize >> refine >> cleanup
   t'' <- reduceTermPlus <$> elaborate t'
   insTypeEnv (Right x) t''
-  build' cont
-build' (WeakStmtVisit path ss1 ss2) = do
+  toMain cont
+toMain (WeakStmtVisit path ss1 ss2) = do
   b <- isCacheAvailable path
   if b
-    then skip path ss1 >> build' ss2
+    then skip path ss1 >> toMain ss2
     else do
       outputVisitHeader path
-      e <-
-        withStack $ do
-          e <- build' ss1
-          compileWithCurrentEnv path
-          return e
-      build' ss2 >>= letBind e
+      snapshot <- setupEnv
+      main1 <- toMain ss1
+      compileDefinitions path
+      revertEnv snapshot
+      main2 <- toMain ss2
+      concatMain main1 main2
 
-compileWithCurrentEnv :: Path Abs File -> WithEnv ()
-compileWithCurrentEnv path = toLLVM' >> emit' >>= compileObject path
+compileMain :: TermPlus -> Path Abs File -> WithEnv ()
+compileMain main path = clarify main >>= toLLVM >>= emit >>= compileObject path
+
+compileDefinitions :: Path Abs File -> WithEnv ()
+compileDefinitions path = toLLVM' >> emit' >>= compileObject path
 
 skip :: Path Abs File -> WeakStmt -> WithEnv ()
 skip path ss = do
@@ -95,8 +99,8 @@ skip path ss = do
   bypass ss
   toCacheFilePath path >>= insCachePath
 
-letBind :: TermPlus -> TermPlus -> WithEnv TermPlus
-letBind e cont = do
+concatMain :: TermPlus -> TermPlus -> WithEnv TermPlus
+concatMain e cont = do
   h <- newNameWith'' "_"
   let m = fst e
   let intType = (m, TermEnum (EnumTypeIntS 64))
@@ -111,13 +115,6 @@ outputSkipHeader :: Path Abs File -> WithEnv ()
 outputSkipHeader path = do
   i <- gets nestLevel
   note' $ T.replicate (i * 2) " " <> "✓ " <> T.pack (toFilePath path)
-
-withStack :: WithEnv a -> WithEnv a
-withStack f = do
-  snapshot <- setupEnv
-  result <- f
-  revertEnv snapshot
-  return result
 
 setupEnv :: WithEnv Env
 setupEnv = do
@@ -156,14 +153,14 @@ insCachePath :: Path Abs File -> WithEnv ()
 insCachePath path =
   modify (\env -> env {cachePathList = path : (cachePathList env)})
 
-build'' ::
+toMain' ::
      Meta
   -> T.Text
   -> WeakTermPlus
   -> WeakTermPlus
   -> WeakStmt
   -> WithEnv TermPlus
-build'' mx x e t cont = do
+toMain' mx x e t cont = do
   analyze >> synthesize >> refine >> cleanup
   e' <- reduceTermPlus <$> elaborate e
   t' <- reduceTermPlus <$> elaborate t
@@ -171,7 +168,7 @@ build'' mx x e t cont = do
   modify (\env -> env {cacheEnv = Map.insert x (Left e') (cacheEnv env)})
   clarify e' >>= insCodeEnv (showInHex x) []
   modify (\env -> env {argAcc = (mx, x, t') : (argAcc env)})
-  build' cont
+  toMain cont
 
 bypass :: WeakStmt -> WithEnv ()
 bypass (WeakStmtReturn _) = return ()
