@@ -30,13 +30,13 @@
 (keyword list:new)
 
 (notation (list:new)
-  (list:nil))
+  (list:nil *))
 
 (notation (list:new a)
-  (list:cons a (list:nil)))
+  (list:cons * a (list:nil *)))
 
 (notation (list:new a rest+)
-  (list:cons a (list:new rest+)))
+  (list:cons * a (list:new rest+)))
 
 (definition head
   ((a tau)
@@ -44,11 +44,11 @@
   (witness (option a)
     (case xs
       ((nil)
-        (none))
+        (none *))
       ((cons y _)
-        (some y)))))
+        (some * y)))))
 
-(attribute head (implicit 0))
+;; (attribute head (implicit 0))
 
 (definition length
   ((a tau)
@@ -60,7 +60,7 @@
       ((cons _ ys)
         (u64:add 1 (length a ys))))))
 
-(attribute length (implicit 0))
+;; (attribute length (implicit 0))
 
 (definition append
   ((a tau)
@@ -71,9 +71,9 @@
       ((nil)
         ys)
       ((cons z zs)
-        (cons z (append a zs ys))))))
+        (cons * z (append a zs ys))))))
 
-(attribute append (implicit 0))
+;; (attribute append (implicit 0))
 
 (definition is-null
   ((a tau)
@@ -85,7 +85,7 @@
       ((cons _ _)
         false))))
 
-(attribute is-null (implicit 0))
+;; (attribute is-null (implicit 0))
 
 (definition map
   ((a tau)
@@ -95,21 +95,22 @@
   (witness (list b)
     (case xs
       ((nil)
-        (nil))
+        (nil *))
       ((cons y ys)
         (cons
+          *
           (f y)
           (map a b f ys))))))
 
-(attribute map (implicit 0 1))
+;; (attribute map (implicit 0 1))
 
 (definition return
   ((a tau)
    (x a))
   (witness (list a)
-    (cons x (nil))))
+    (cons * x (nil *))))
 
-(attribute return (implicit 0))
+;; (attribute return (implicit 0))
 
 (definition concatenate
   ((a tau)
@@ -117,11 +118,11 @@
   (witness (list a)
     (case m
       ((nil)
-        (nil))
+        (nil *))
       ((cons x xs)
-        (append x (concatenate a xs))))))
+        (append * x (concatenate a xs))))))
 
-(attribute concatenate (implicit 0))
+;; (attribute concatenate (implicit 0))
 
 (definition bind
   ((a tau)
@@ -129,9 +130,9 @@
    (m (list a))
    (k (hom a (list b))))
   (witness (list b)
-    (concatenate (map k m))))
+    (concatenate * (map * * k m))))
 
-(attribute bind (implicit 0 1))
+;; (attribute bind (implicit 0 1))
 
 (provide head)
 

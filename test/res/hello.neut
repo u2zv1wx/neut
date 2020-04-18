@@ -6,7 +6,10 @@
 
 ;; (use string)
 
-(string:print "hello!\n")
+(definition foo
+  (lambda ((x string)) x))
+
+(string:print "hello, world!\n")
 
 ;; (string:print "a\n")
 

@@ -173,6 +173,11 @@ interpret tree@(m, TreeNode ((_, TreeLeaf "erase"):rest))
   | otherwise = do
     p' tree
     raiseSyntaxError m "(erase (LEAF ... LEAF) TREE)"
+interpret (m, TreeNode ((_, TreeLeaf "irreducible"):rest))
+  | [e] <- rest = do
+    e' <- interpret e
+    return ((fst e') {metaIsReducible = False}, snd e')
+  | otherwise = raiseSyntaxError m "(irreducible TREE)"
 interpret (m, TreeNode ((_, TreeLeaf "cocase"):rest))
   | codType:cocaseClauseList <- rest = do
     (a, args) <- interpretCoinductive codType
@@ -181,7 +186,8 @@ interpret (m, TreeNode ((_, TreeLeaf "cocase"):rest))
     let codType' = (m, WeakTermPiElim (m, WeakTermUpsilon ai) args)
     es <- cocaseAsSigmaIntro m a codType' cocaseClauseList'
     let f = (m, WeakTermUpsilon $ asIdent $ a <> ":unfold")
-    return (m, WeakTermPiElim f es)
+    hs <- mapM (const $ newHole m) args
+    return (m, WeakTermPiElim f $ hs ++ es)
   | otherwise = raiseSyntaxError m "(cocase TREE TREE*)"
 --
 -- auxiliary interpretations
@@ -198,8 +204,13 @@ interpret (m, TreeNode ((_, TreeLeaf "record"):rest))
     clauseList' <- mapM interpretCocaseClause' clauseList
     let codType' = (m, WeakTermPiElim (m, WeakTermUpsilon ai) args)
     es <- cocaseAsSigmaIntro m a codType' [((ai, args), clauseList')]
+    -- p "ai:"
+    -- p' ai
+    -- p "args:"
+    -- p' args
     let f = (m, WeakTermUpsilon $ asIdent $ a <> ":unfold")
-    return (m, WeakTermPiElim f es)
+    hs <- mapM (const $ newHole m) args
+    return (m, WeakTermPiElim f $ hs ++ es)
   | otherwise = raiseSyntaxError m "(record TREE TREE*)"
 interpret t@(_, TreeNode ((_, TreeLeaf "with"):_)) = interpretWith t
 interpret (m, TreeLeaf x)
@@ -218,12 +229,12 @@ interpret (m, TreeLeaf x)
     case T.uncons x of
       Nothing -> raiseCritical m "encountered a variable with empty identifier"
       Just (c, rest)
-        | c == '@' ->
-          if T.length rest == 0
-            then raiseError m "found a explicit variable with empty identifier"
-            else do
-              (m', e) <- interpret (m, TreeLeaf rest)
-              return (m' {metaIsExplicit = True}, e)
+        -- | c == '@' ->
+        --   if T.length rest == 0
+        --     then raiseError m "found a explicit variable with empty identifier"
+        --     else do
+        --       (m', e) <- interpret (m, TreeLeaf rest)
+        --       return (m' {metaIsExplicit = True}, e)
         | c == '?' ->
           if T.length rest == 0
             then raiseError m "found a note-variable with empty identifier"

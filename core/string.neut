@@ -15,7 +15,7 @@
   (witness top
     (with let-bind
       (let char (array-introduction u8 value))
-      (os:write os:stdout char 1)
+      (os:write * os:stdout char 1)
       top:unit)))
 
 (definition string:print ((str string))
@@ -23,7 +23,7 @@
     ;; (let (tuple n content) str) ← こんなふうに書けると嬉しい？
     ;; (...)
     (destruct str (n content)
-      (let len (write stdout &content n))
+      (let len (write * stdout &content n))
       (tuple (tuple n content) len))))
 
 (provide print-character)

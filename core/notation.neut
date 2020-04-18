@@ -27,6 +27,10 @@
 
 (notation hole (zeta _))
 
+(keyword *)
+
+(notation * (zeta _))
+
 (keyword lambda)
 
 (notation lambda pi-introduction)
