@@ -224,19 +224,12 @@ parse' ((m, TreeNode ((mLet, TreeLeaf "let"):rest)):as)
     return $ QuasiStmtLet m' xt' e' : defList
   | otherwise = raiseSyntaxError m "(let LEAF TREE TREE) | (let TREE TREE)"
 parse' ((m, TreeNode ((_, TreeLeaf "verify"):rest)):as)
-  | [(_, TreeLeaf proposition)] <- rest = do
-    parse' $
-      (m, TreeLeaf proposition) :
-      ( m
-      , TreeNode
-          [ (m, TreeLeaf "string:print")
-          , ( m
-            , TreeLeaf $
-              "\"verified: " <>
-              proposition <> " (" <> T.pack (showMeta m) <> ")\n\"")
-          ]) :
-      as
-  | otherwise = raiseSyntaxError m "(verify LEAF)"
+  | [e] <- rest = do
+    e' <- adjustPhase e >>= macroExpand >>= interpret
+    m' <- adjustPhase' m
+    defList <- parse' as
+    return $ QuasiStmtVerify m' e' : defList
+  | otherwise = raiseSyntaxError m "(include LEAF) | (include library LEAF)"
 parse' (a:as) = do
   e <- adjustPhase a >>= macroExpand
   if isSpecialForm e
@@ -443,7 +436,6 @@ keywordSet =
     , "unuse"
     , "section"
     , "end"
-    , "verify"
     , "statement"
     , "introspect"
     , "let"
@@ -467,6 +459,9 @@ concatQuasiStmtList (QuasiStmtLet m xt e:es) = do
 concatQuasiStmtList (QuasiStmtLetWT m xt e:es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtLetWT m xt e cont
+concatQuasiStmtList (QuasiStmtVerify m e:es) = do
+  cont <- concatQuasiStmtList es
+  return $ WeakStmtVerify m e cont
 concatQuasiStmtList (QuasiStmtEnum {}:ss) = concatQuasiStmtList ss
 concatQuasiStmtList (QuasiStmtDef xds:ss) = do
   let ds = map snd xds

@@ -95,6 +95,7 @@ data QuasiStmt
   --     ...
   --     ((fn An) (ARGS-n) en))
   | QuasiStmtDef [(T.Text, Def)]
+  | QuasiStmtVerify Meta WeakTermPlus
   | QuasiStmtEnum Meta T.Text [(T.Text, Int)]
   | QuasiStmtConstDecl Meta WeakTextPlus
   | QuasiStmtLetInductive Int Meta WeakTextPlus WeakTermPlus
@@ -108,6 +109,7 @@ data WeakStmt
   = WeakStmtReturn WeakTermPlus
   | WeakStmtLet Meta WeakTextPlus WeakTermPlus WeakStmt
   | WeakStmtLetWT Meta WeakTextPlus WeakTermPlus WeakStmt
+  | WeakStmtVerify Meta WeakTermPlus WeakStmt
   | WeakStmtConstDecl Meta WeakTextPlus WeakStmt
   | WeakStmtVisit (Path Abs File) WeakStmt WeakStmt
   deriving (Show)
