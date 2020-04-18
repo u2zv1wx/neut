@@ -46,10 +46,6 @@ discern' nenv ((QuasiStmtConstDecl m (mx, x, t)):ss) = do
   t' <- discern'' nenv t
   ss' <- discern' nenv ss
   return $ QuasiStmtConstDecl m (mx, x, t') : ss'
-discern' nenv ((QuasiStmtVerify m e):ss) = do
-  e' <- discern'' nenv e
-  ss' <- discern' nenv ss
-  return $ QuasiStmtVerify m e' : ss'
 discern' nenv ((QuasiStmtEnum m name xis):ss) = do
   insEnumEnv m name xis
   ss' <- discern' nenv ss

@@ -79,12 +79,23 @@
   (assume (_)
     (assume (x) x)))
 
-(verify ((λ ((x tau)) x) top))
+;; (verify ((λ ((x tau)) x) top))
+
+(string:print "\n")
 
 (verify some-theorem)
 
 (definition my-verify ((A tau) (p A))
   ((irreducible (lambda ((x A)) (string:print "verified"))) p))
+
+(definition loop ((x i64))
+  (witness i64
+    (loop x)))
+
+(let _ some-theorem) ;; 普通にこれでverifyになるのでは？なった。
+;; pureだとreduceされてしまうという問題はあるか。いや、reduceできたらreduceできたでいいのか。
+
+;; (let _ (loop 3))
 
 ;; (@os:write 3 os:stdout "あ" 3)
 ;; (@os:write 3 os:stdout "あ" 3)
@@ -200,6 +211,13 @@
 ;; (list:nil *)とか(cons * 10 (cons * 20 (nil *)))とかはめんどくさいだろうか？
 ;; でも真実じゃん？
 ;; さらに言えば、機能としてはべつにnotationで同じことが実現できるわけで。
+
+(keyword id*)
+
+(notation (id* e)
+  (id * e))
+
+(id* (i64 3)) ;; こうできるわけでさ。
 
 (let p (equal:refl * (i64 3)))
 

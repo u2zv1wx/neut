@@ -6,8 +6,6 @@ module Elaborate
 
 import Control.Monad.State.Lazy
 import Data.List (nub)
-import Data.Time
-import Numeric
 
 import qualified Data.HashMap.Lazy as Map
 import qualified Data.IntMap as IntMap
@@ -52,17 +50,6 @@ elaborateStmt (WeakStmtLetWT m (mx, x, t) e cont) = do
   modify (\env -> env {cacheEnv = Map.insert x (Left e') (cacheEnv env)})
   cont' <- elaborateStmt cont
   return $ StmtLet m (mx, x, t'') e' cont'
-elaborateStmt (WeakStmtVerify m e cont) = do
-  whenCheck $ do
-    (e', _) <- infer e
-    e'' <- elaborate' e'
-    start <- liftIO $ getCurrentTime
-    _ <- normalize e''
-    stop <- liftIO $ getCurrentTime
-    let sec = realToFrac $ diffUTCTime stop start :: Float
-    note m $
-      "verification succeeded (" <> T.pack (showFloat' sec) <> " seconds)"
-  elaborateStmt cont
 elaborateStmt (WeakStmtConstDecl _ (_, x, t) cont) = do
   t' <- inferType t
   analyze >> synthesize >> refine >> cleanup
@@ -83,9 +70,6 @@ cleanup = do
 refine :: WithEnv ()
 refine =
   modify (\env -> env {substEnv = IntMap.map reduceWeakTermPlus (substEnv env)})
-
-showFloat' :: Float -> String
-showFloat' x = showFFloat Nothing x ""
 
 elaborate' :: WeakTermPlus -> WithEnv TermPlus
 elaborate' (m, WeakTermTau) = return (m, TermTau)
