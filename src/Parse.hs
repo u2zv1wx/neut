@@ -274,7 +274,6 @@ asInductive (t:ts) = do
   ts' <- asInductive $ map (substTree sub) ts
   return $ t' : ts'
 
--- test2 (for tig)
 asInductive' :: TreePlus -> WithEnv ((T.Text, T.Text), TreePlus)
 asInductive' (m, TreeNode ((_, TreeLeaf a):(_, TreeNode xts):rules)) = do
   let a' = "(" <> a <> ")"
