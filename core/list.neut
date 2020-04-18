@@ -130,7 +130,7 @@
    (m (list a))
    (k (hom a (list b))))
   (witness (list b)
-    (concatenate * (map * * k m))))
+    (concatenate b (map a (list b) k m))))
 
 ;; (attribute bind (implicit 0 1))
 
