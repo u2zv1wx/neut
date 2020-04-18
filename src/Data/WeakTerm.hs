@@ -15,7 +15,7 @@ data WeakTerm
   | WeakTermUpsilon Identifier
   | WeakTermPi (Maybe T.Text) [IdentifierPlus] WeakTermPlus
   | WeakTermPiIntro
-      (Maybe ((T.Text, [IdentifierPlus])))
+      (Maybe (T.Text, [IdentifierPlus]))
       [IdentifierPlus]
       WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
