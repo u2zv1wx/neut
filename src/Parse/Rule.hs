@@ -193,7 +193,7 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
       [ QuasiStmtLetInductiveIntro
           m
           (mb, bi, (m, weakTermPi (xts' ++ yts) cod))
-          ( m -- m {metaIsReducible = False}
+          ( m {metaIsReducible = False}
           , weakTermPiIntro
               (xts' ++ yts)
               ( m
