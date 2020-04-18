@@ -206,20 +206,20 @@
 
 (definition id ((a tau) (x a)) x)
 
-(id * (i64 3)) ;; これでよくね？
+(id i64 (i64 3)) ;; これでよくね？
 ;; (equal * 10 20)とかって書けるわけだし。
 ;; (list:nil *)とか(cons * 10 (cons * 20 (nil *)))とかはめんどくさいだろうか？
 ;; でも真実じゃん？
 ;; さらに言えば、機能としてはべつにnotationで同じことが実現できるわけで。
 
-(keyword id*)
+;; (keyword id*)
 
-(notation (id* e)
-  (id * e))
+;; (notation (id* e)
+;;   (id * e))
 
-(id* (i64 3)) ;; こうできるわけでさ。
+;; (id* (i64 3)) ;; こうできるわけでさ。
 
-(let p (equal:refl * (i64 3)))
+(let p (equal:refl i64 3))
 
 ;; (i64:add top tau)
 

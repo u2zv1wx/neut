@@ -169,7 +169,7 @@ parse' ((m, TreeNode ((_, TreeLeaf "introspect"):rest)):as2)
   | otherwise = raiseSyntaxError m "(introspect LEAF TREE*)"
 parse' ((m, TreeNode ((_, TreeLeaf "constant"):rest)):as)
   | [(mn, TreeLeaf name), t] <- rest = do
-    t' <- adjustPhase t >>= macroExpand >>= interpret
+    t' <- adjustPhase t >>= macroExpand >>= interpret -- たとえばここでdiscernも行う
     name' <- withSectionPrefix name
     set <- gets constantSet
     if S.member name' set

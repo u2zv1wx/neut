@@ -44,9 +44,9 @@
   (witness (option a)
     (case xs
       ((nil)
-        (none *))
+        (none a))
       ((cons y _)
-        (some * y)))))
+        (some a y)))))
 
 ;; (attribute head (implicit 0))
 
@@ -71,7 +71,7 @@
       ((nil)
         ys)
       ((cons z zs)
-        (cons * z (append a zs ys))))))
+        (cons a z (append a zs ys))))))
 
 ;; (attribute append (implicit 0))
 
@@ -95,10 +95,10 @@
   (witness (list b)
     (case xs
       ((nil)
-        (nil *))
+        (nil b))
       ((cons y ys)
         (cons
-          *
+          b
           (f y)
           (map a b f ys))))))
 
@@ -108,7 +108,8 @@
   ((a tau)
    (x a))
   (witness (list a)
-    (cons * x (nil *))))
+    (list:new x)))
+    ;; (cons a x (nil a))))
 
 ;; (attribute return (implicit 0))
 
@@ -118,9 +119,9 @@
   (witness (list a)
     (case m
       ((nil)
-        (nil *))
+        (nil a))
       ((cons x xs)
-        (append * x (concatenate a xs))))))
+        (append a x (concatenate a xs))))))
 
 ;; (attribute concatenate (implicit 0))
 

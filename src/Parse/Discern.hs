@@ -252,6 +252,20 @@ newDefinedNameWith m (I (s, _)) = do
   insertIntoIntactSet m s
   return x
 
+-- newDefinedNameWith :: Meta -> Identifier -> WithEnv Identifier
+-- newDefinedNameWith m (I (s, _)) = do
+--   j <- newCount
+--   modify (\env -> env {nameEnv = Map.insert s s (nameEnv env)})
+--   let x = I (s, j)
+--   insertIntoIntactSet m x
+--   return x
+-- newDefinedNameWith' :: Meta -> NameEnv -> Identifier -> WithEnv Identifier
+-- newDefinedNameWith' m nenv x = do
+--   case Map.lookup (asText x) nenv of
+--     Nothing -> newDefinedNameWith m x
+--     Just _ ->
+--       raiseError m $
+--       "the identifier `" <> asText x <> "` is already defined at top level"
 insertConstant :: Meta -> T.Text -> WithEnv ()
 insertConstant m x = do
   cset <- gets constantSet
