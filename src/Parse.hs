@@ -158,12 +158,6 @@ parse' ((m, TreeNode ((_, TreeLeaf "ensure"):rest)):as)
       install item path
     parse' as
   | otherwise = raiseSyntaxError m "(ensure LEAF LEAF)"
--- parse' ((m, TreeNode ((_, TreeLeaf "attribute"):rest)):as)
---   | (_, TreeLeaf name):attrList <- rest = do
---     ss1 <- mapM (parseAttr name) attrList
---     ss2 <- parse' as
---     return $ ss1 ++ ss2
---   | otherwise = raiseSyntaxError m "(attribute LEAF TREE ... TREE)"
 parse' ((_, TreeNode ((_, TreeLeaf "statement"):as1)):as2) = parse' $ as1 ++ as2
 parse' ((m, TreeNode ((_, TreeLeaf "introspect"):rest)):as2)
   | ((mx, TreeLeaf x):stmtClauseList) <- rest = do
@@ -349,13 +343,6 @@ parseString m quotedStr =
     Nothing -> raiseError m "the argument of `include` must be a string"
     Just str -> return str
 
--- parseAttr :: T.Text -> TreePlus -> WithEnv QuasiStmt
--- parseAttr name (m, TreeNode ((_, TreeLeaf "implicit"):rest))
---   | Just mxs <- mapM asLeaf rest = do
---     case mapM (readMaybe . T.unpack . snd) mxs of
---       Nothing -> raiseError m "the argument of `implicit` must be an integer"
---       Just is -> return $ QuasiStmtImplicit m name is
--- parseAttr _ t = raiseSyntaxError (fst t) "(implicit LEAF ... LEAF)"
 includeFile ::
      Meta
   -> Meta
@@ -450,7 +437,6 @@ keywordSet =
     , "section"
     , "end"
     , "statement"
-    -- , "attribute"
     , "introspect"
     , "let"
     , "definition"
@@ -476,10 +462,6 @@ concatQuasiStmtList (QuasiStmtLetWT m xt e:es) = do
 concatQuasiStmtList (QuasiStmtVerify m e:es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtVerify m e cont
--- concatQuasiStmtList (QuasiStmtImplicit _ x idxList:es) = do
---   ienv <- gets impEnv
---   modify (\env -> env {impEnv = Map.insertWith (++) x idxList ienv})
---   concatQuasiStmtList es
 concatQuasiStmtList (QuasiStmtEnum {}:ss) = concatQuasiStmtList ss
 concatQuasiStmtList (QuasiStmtDef xds:ss) = do
   let ds = map snd xds

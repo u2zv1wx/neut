@@ -204,10 +204,6 @@ interpret (m, TreeNode ((_, TreeLeaf "record"):rest))
     clauseList' <- mapM interpretCocaseClause' clauseList
     let codType' = (m, WeakTermPiElim (m, WeakTermUpsilon ai) args)
     es <- cocaseAsSigmaIntro m a codType' [((ai, args), clauseList')]
-    -- p "ai:"
-    -- p' ai
-    -- p "args:"
-    -- p' args
     let f = (m, WeakTermUpsilon $ asIdent $ a <> ":unfold")
     hs <- mapM (const $ newHole m) args
     return (m, WeakTermPiElim f $ hs ++ es)

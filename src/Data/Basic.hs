@@ -54,7 +54,6 @@ data Meta =
   Meta
     { metaFileName :: Path Abs File
     , metaLocation :: Loc
-    -- , metaIsExplicit :: Bool
     , metaIsReducible :: Bool
     }
   deriving (Generic)
@@ -63,18 +62,15 @@ instance Binary Meta where
   put m = do
     put $ unwrapPath $ metaFileName m
     put $ metaLocation m
-    -- put $ metaIsExplicit m
     put $ metaIsReducible m
   get = do
     path <- get
     loc <- get
-    -- isExplicit <- get
     isReducible <- get
     return $
       Meta
         { metaFileName = Path path
         , metaLocation = loc
-        -- , metaIsExplicit = isExplicit
         , metaIsReducible = isReducible
         }
 
@@ -105,7 +101,6 @@ supMeta m1 m2 =
   Meta
     { metaFileName = supFileName m1 m2
     , metaLocation = supLocation m1 m2
-    -- , metaIsExplicit = metaIsExplicit m1 || metaIsExplicit m2
     , metaIsReducible = metaIsReducible m1 && metaIsReducible m2
     }
 
@@ -123,12 +118,7 @@ supLocation m1 m2 =
 
 newMeta :: Int -> Int -> Path Abs File -> Meta
 newMeta l c path = do
-  Meta
-    { metaFileName = path
-    , metaLocation = (0, l, c)
-    -- , metaIsExplicit = False
-    , metaIsReducible = True
-    }
+  Meta {metaFileName = path, metaLocation = (0, l, c), metaIsReducible = True}
 
 type PosInfo = (Path Abs File, Loc)
 

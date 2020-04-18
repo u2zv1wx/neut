@@ -91,7 +91,6 @@ generateProjections ts = do
         (dom@(my, y, ty), cod) <- separate tb
         v <- newNameWith'' "base"
         let b' = a <> ":" <> b
-        -- let attr = QuasiStmtImplicit mb b' [0 .. length xts - 1]
         return
           [ QuasiStmtLetWT
               mb
@@ -112,7 +111,6 @@ generateProjections ts = do
                               (mb, WeakTermUpsilon $ asIdent b)
                               [(mb, WeakTermUpsilon v)]))
                       ]))
-          -- , attr
           ]
   return $ concat $ concat stmtListList
 
@@ -205,7 +203,6 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
                       (mb, WeakTermUpsilon (asIdent bi))
                       (map toVar' yts))))
           (map (\(_, x, _) -> asText x) ats)
-      -- , QuasiStmtImplicit m bi [0 .. length xts' - 1]
       ]
   | otherwise =
     raiseError m $

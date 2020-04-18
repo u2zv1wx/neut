@@ -6,8 +6,8 @@
 
 ;; (use string)
 
-(definition foo
-  (lambda ((x string)) x))
+;; (definition foo
+;;   (lambda ((x string)) x))
 
 (string:print "hello, world!\n")
 
