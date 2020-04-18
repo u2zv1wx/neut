@@ -38,7 +38,12 @@ linearize' nm ((x, t):xts) e = do
 withHeader :: NameMap -> Identifier -> CodePlus -> CodePlus -> WithEnv CodePlus
 withHeader nm x t e =
   case IntMap.lookup (asInt x) nm of
-    Nothing -> withHeaderAffine x t e
+    Nothing -> do
+      p "is-affine:"
+      p' x
+      p "cont:"
+      p' e
+      withHeaderAffine x t e
     Just [] -> raiseCritical' $ "impossible. x: " <> asText' x
     Just [z] -> withHeaderLinear z x e
     Just (z1:z2:zs) -> withHeaderRelevant x t z1 z2 zs e

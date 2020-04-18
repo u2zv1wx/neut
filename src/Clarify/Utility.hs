@@ -59,13 +59,6 @@ returnCartesianImmediate m = do
   v <- cartesianImmediate m
   return (m, CodeUpIntro v)
 
-newConstInfo :: T.Text -> Meta -> WithEnv (T.Text, DataPlus)
-newConstInfo name m = do
-  time <- gets timestamp
-  i <- newCount
-  let name' = "_" <> T.pack (show time) <> "-" <> name <> "-" <> T.pack (show i)
-  return (name', (m, DataConst name'))
-
 switch :: CodePlus -> CodePlus -> [(Case, CodePlus)]
 switch e1 e2 = [(CaseValue (EnumValueIntS 64 0), e1), (CaseDefault, e2)]
 

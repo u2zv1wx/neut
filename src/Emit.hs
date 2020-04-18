@@ -409,7 +409,6 @@ showLowType (LowTypeArray i t) = do
   "[" <> intDec i <> " x " <> s <> "]"
 showLowType (LowTypePtr t) = showLowType t <> "*"
 
-{-# INLINE showLLVMData #-}
 showLLVMData :: LLVMData -> Builder
 showLLVMData (LLVMDataLocal (I (_, i))) = "%_" <> intDec i
 showLLVMData (LLVMDataGlobal x) = "@" <> TE.encodeUtf8Builder x

@@ -5,7 +5,6 @@
 --
 module Clarify
   ( clarify
-  , insCodeEnv
   ) where
 
 import Control.Monad.State.Lazy
@@ -23,8 +22,6 @@ import Data.Basic
 import Data.Code
 import Data.Env
 import Data.Term
-
--- import Data.WeakTerm (toText)
 import Reduce.Code
 import Reduce.Term
 
@@ -38,11 +35,7 @@ clarifyStmt :: Stmt -> WithEnv CodePlus
 clarifyStmt (StmtReturn e) = do
   tenv <- gets typeEnv
   clarify' tenv e
-clarifyStmt (StmtLet _ (_, x, _) e cont)
-  -- p "-------------"
-  -- p' x
-  -- p $ T.unpack $ toText $ weaken e
- = do
+clarifyStmt (StmtLet m (mx, x, t) e cont) = do
   tenv <- gets typeEnv
   let x' = showInHex x
   modify (\env -> env {nameSet = S.empty})
@@ -50,7 +43,9 @@ clarifyStmt (StmtLet _ (_, x, _) e cont)
   insCodeEnv x' [] e' -- 実質的にはbox-introへの変換
   cont' <- clarifyStmt cont
   h <- newNameWith'' "comp"
-  return (fst e', CodeUpElim h e' cont')
+  cls <- retClosure tenv Nothing [] m [(mx, h, t)] cont'
+  (varName, var) <- newDataUpsilonWith m "var"
+  callClosure m cls [(varName, e', var)]
 clarifyStmt (StmtVisit _ ss1 ss2) = do
   e1' <- clarifyStmt ss1 -- ここでss1のキャッシュを利用できそう？
   e2' <- clarifyStmt ss2
