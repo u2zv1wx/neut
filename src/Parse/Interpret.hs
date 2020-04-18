@@ -225,12 +225,6 @@ interpret (m, TreeLeaf x)
     case T.uncons x of
       Nothing -> raiseCritical m "encountered a variable with empty identifier"
       Just (c, rest)
-        -- | c == '@' ->
-        --   if T.length rest == 0
-        --     then raiseError m "found a explicit variable with empty identifier"
-        --     else do
-        --       (m', e) <- interpret (m, TreeLeaf rest)
-        --       return (m' {metaIsExplicit = True}, e)
         | c == '?' ->
           if T.length rest == 0
             then raiseError m "found a note-variable with empty identifier"

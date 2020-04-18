@@ -225,5 +225,3 @@ splitAtMaybe i xs = do
   if 0 <= i && toEnum i < T.length xs
     then return $ T.splitAt (toEnum i) xs
     else Nothing
--- findIndex :: (Char -> Bool) -> T.Text -> Maybe Int
--- findIndex p t = TS.findIndex p (TS.stream t)
