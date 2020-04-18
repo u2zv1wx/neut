@@ -12,7 +12,6 @@ import Data.List (nubBy)
 
 import qualified Data.HashMap.Lazy as Map
 import qualified Data.IntMap as IntMap
-import qualified Data.Set as S
 import qualified Data.Text as T
 
 import Clarify.Linearize
@@ -22,35 +21,13 @@ import Data.Basic
 import Data.Code
 import Data.Env
 import Data.Term
-import Reduce.Code
+
 import Reduce.Term
 
-clarify :: Stmt -> WithEnv CodePlus
-clarify stmt = do
-  e <- clarifyStmt stmt
-  modify (\env -> env {nameSet = S.empty})
-  reduceCodePlus e
-
-clarifyStmt :: Stmt -> WithEnv CodePlus
-clarifyStmt (StmtReturn e) = do
+clarify :: TermPlus -> WithEnv CodePlus
+clarify e = do
   tenv <- gets typeEnv
   clarify' tenv e
-clarifyStmt (StmtLet m (mx, x, t) e cont) = do
-  tenv <- gets typeEnv
-  let x' = showInHex x
-  modify (\env -> env {nameSet = S.empty})
-  e' <- clarify' tenv e >>= reduceCodePlus
-  insCodeEnv x' [] e' -- 実質的にはbox-introへの変換
-  cont' <- clarifyStmt cont
-  h <- newNameWith'' "comp"
-  cls <- retClosure tenv Nothing [] m [(mx, h, t)] cont'
-  (varName, var) <- newDataUpsilonWith m "var"
-  callClosure m cls [(varName, e', var)]
-clarifyStmt (StmtVisit _ ss1 ss2) = do
-  e1' <- clarifyStmt ss1 -- ここでss1のキャッシュを利用できそう？
-  e2' <- clarifyStmt ss2
-  h <- newNameWith'' "visit"
-  return (fst e1', CodeUpElim h e1' e2')
 
 clarify' :: TypeEnv -> TermPlus -> WithEnv CodePlus
 clarify' _ (m, TermTau) = returnCartesianImmediate m

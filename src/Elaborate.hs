@@ -23,15 +23,14 @@ import Elaborate.Synthesize
 import Reduce.Term
 import Reduce.WeakTerm
 
-elaborate :: WeakStmt -> WithEnv Stmt
+elaborate :: WeakStmt -> WithEnv TermPlus
 elaborate = elaborateStmt
 
-elaborateStmt :: WeakStmt -> WithEnv Stmt
+elaborateStmt :: WeakStmt -> WithEnv TermPlus
 elaborateStmt (WeakStmtReturn e) = do
   (e', _) <- infer e
   analyze >> synthesize >> refine
-  e'' <- elaborate' e'
-  return $ StmtReturn e''
+  elaborate' e'
 elaborateStmt (WeakStmtLet m (mx, x, t) e cont) = do
   (e', te) <- infer e
   t' <- inferType t
@@ -42,7 +41,8 @@ elaborateStmt (WeakStmtLet m (mx, x, t) e cont) = do
   insTypeEnv (Right x) t''
   modify (\env -> env {cacheEnv = Map.insert x (Left e'') (cacheEnv env)})
   cont' <- elaborateStmt cont
-  return $ StmtLet m (mx, x, t'') e'' cont'
+  x' <- newNameWith'' "_"
+  return (m, TermPiElim (m, termPiIntro [(mx, x', t'')] cont') [e''])
 elaborateStmt (WeakStmtLetWT m (mx, x, t) e cont) = do
   t' <- inferType t
   analyze >> synthesize >> refine >> cleanup
@@ -51,7 +51,8 @@ elaborateStmt (WeakStmtLetWT m (mx, x, t) e cont) = do
   insTypeEnv (Right x) t''
   modify (\env -> env {cacheEnv = Map.insert x (Left e') (cacheEnv env)})
   cont' <- elaborateStmt cont
-  return $ StmtLet m (mx, x, t'') e' cont'
+  x' <- newNameWith'' "_"
+  return (m, TermPiElim (m, termPiIntro [(mx, x', t'')] cont') [e'])
 elaborateStmt (WeakStmtVerify m e cont) = do
   whenCheck $ do
     (e', _) <- infer e
@@ -69,10 +70,16 @@ elaborateStmt (WeakStmtConstDecl _ (_, x, t) cont) = do
   t'' <- reduceTermPlus <$> elaborate' t'
   insTypeEnv (Right x) t''
   elaborateStmt cont
-elaborateStmt (WeakStmtVisit path ss1 ss2) = do
-  ss1' <- elaborateStmt ss1
-  ss2' <- elaborateStmt ss2
-  return $ StmtVisit path ss1' ss2'
+elaborateStmt (WeakStmtVisit _ ss1 ss2) = do
+  e1 <- elaborateStmt ss1
+  e2 <- elaborateStmt ss2
+  h <- newNameWith'' "_"
+  let m = fst e1
+  return
+    ( m
+    , TermPiElim
+        (m, termPiIntro [(m, h, (m, TermEnum (EnumTypeIntS 64)))] e2)
+        [e1])
 
 cleanup :: WithEnv ()
 cleanup = do

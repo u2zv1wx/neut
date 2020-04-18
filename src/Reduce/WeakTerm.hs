@@ -32,7 +32,7 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
   let es' = map reduceWeakTermPlus es
   let app = WeakTermPiElim e' es'
   case e' of
-    (mLam, WeakTermPiIntro _ xts body) -- justのときはreduceしない
+    (mLam, WeakTermPiIntro _ xts body)
       | length xts == length es'
       , metaIsReducible mLam -> do
         let xs = map (\(_, x, _) -> Left $ asInt x) xts

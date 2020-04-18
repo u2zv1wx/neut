@@ -124,6 +124,11 @@ discern'' nenv (m, WeakTermIter (mx, x, t) xts e) = do
   (xt', xts', e') <- discernIter nenv (mx, x, t') xts e
   return (m, WeakTermIter xt' xts' e')
 discern'' _ (m, WeakTermConst x) = return (m, WeakTermConst x)
+-- discern'' nenv (m, WeakTermConstDecl x t e) = do
+--   t' <- discern'' nenv t
+--   insertConstant m x
+--   e' <- discern'' nenv e
+--   return (m, WeakTermConstDecl x t' e')
 discern'' _ (m, WeakTermZeta h) = do
   return (m, WeakTermZeta h)
 discern'' nenv (m, WeakTermInt t x) = do

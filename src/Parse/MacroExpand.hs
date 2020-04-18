@@ -29,7 +29,6 @@ macroExpand1 :: TreePlus -> WithEnv TreePlus
 macroExpand1 t@(i, _) = do
   nenv <- gets notationEnv
   kenv <- gets keywordEnv
-  -- the computation of atomListOf could be memoized
   if atomListOf t `S.disjoint` kenv
     then return t -- t is already resolved
     else do

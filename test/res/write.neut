@@ -79,14 +79,14 @@
   (assume (_)
     (assume (x) x)))
 
-;; (verify ((λ ((x tau)) x) top))
+(verify ((λ ((x tau)) x) top))
 
 (string:print "\n")
 
 (verify some-theorem)
 
-(definition my-verify ((A tau) (p A))
-  ((irreducible (lambda ((x A)) (string:print "verified"))) p))
+;; (definition my-verify ((A tau) (p A))
+;;   ((irreducible (lambda ((x A)) (string:print "verified"))) p))
 
 (definition loop ((x i64))
   (witness i64
@@ -264,7 +264,6 @@
       ((choice:item-2)
         ?admit) ;; (F @ c) {c := (choice:item-2)}
         ))) ;; F @ c
-
 
 ?double-flip-is-identity
 
