@@ -142,7 +142,6 @@ initialEnv =
     , formationEnv = Map.empty
     , indEnv = Map.empty
     , labelEnv = Map.empty
-    -- , impEnv = Map.empty
     , weakTypeEnv = IntMap.empty
     , typeEnv = Map.empty
     , cacheEnv = Map.empty

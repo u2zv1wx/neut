@@ -22,7 +22,6 @@ data WeakTerm
   | WeakTermIter IdentifierPlus [IdentifierPlus] WeakTermPlus
   | WeakTermZeta Identifier
   | WeakTermConst T.Text
-  -- | WeakTermConstDecl T.Text WeakTermPlus WeakTermPlus
   | WeakTermInt WeakTermPlus Integer
   | WeakTermFloat WeakTermPlus Double
   | WeakTermEnum EnumType
@@ -132,10 +131,6 @@ varWeakTermPlus (_, WeakTermIter (_, x, t) xts e) = do
   let set2 = S.filter (/= x) (varWeakTermPlus' xts [e])
   S.union set1 set2
 varWeakTermPlus (_, WeakTermConst _) = S.empty
--- varWeakTermPlus (_, WeakTermConstDecl _ t e) = do
---   let set1 = varWeakTermPlus t
---   let set2 = varWeakTermPlus e
---   S.union set1 set2
 varWeakTermPlus (_, WeakTermZeta _) = S.empty
 varWeakTermPlus (_, WeakTermInt t _) = varWeakTermPlus t
 varWeakTermPlus (_, WeakTermFloat t _) = varWeakTermPlus t
@@ -191,10 +186,6 @@ holeWeakTermPlus (_, WeakTermIter (_, _, t) xts e) = do
   S.union set1 set2
 holeWeakTermPlus (_, WeakTermZeta h) = S.singleton h
 holeWeakTermPlus (_, WeakTermConst _) = S.empty
--- holeWeakTermPlus (_, WeakTermConstDecl _ t e) = do
---   let set1 = holeWeakTermPlus t
---   let set2 = holeWeakTermPlus e
---   S.union set1 set2
 holeWeakTermPlus (_, WeakTermInt t _) = holeWeakTermPlus t
 holeWeakTermPlus (_, WeakTermFloat t _) = holeWeakTermPlus t
 holeWeakTermPlus (_, WeakTermEnum _) = S.empty
@@ -250,10 +241,6 @@ constWeakTermPlus (_, WeakTermIter (_, _, t) xts e) = do
   let set2 = constWeakTermPlus' xts [e]
   S.union set1 set2
 constWeakTermPlus (_, WeakTermConst x) = S.singleton x
--- constWeakTermPlus (_, WeakTermConstDecl _ t e) = do
---   let set1 = constWeakTermPlus t
---   let set2 = constWeakTermPlus e
---   S.union set1 set2
 constWeakTermPlus (_, WeakTermZeta _) = S.empty
 constWeakTermPlus (_, WeakTermInt t _) = constWeakTermPlus t
 constWeakTermPlus (_, WeakTermFloat t _) = constWeakTermPlus t
@@ -320,10 +307,6 @@ substWeakTermPlus sub e@(_, WeakTermConst x) = do
   case Map.lookup (Right x) sub of
     Nothing -> e
     Just e2 -> (supMeta (metaOf e) (metaOf e2), snd e2)
--- substWeakTermPlus sub (m, WeakTermConstDecl x t e) = do
---   let t' = substWeakTermPlus sub t
---   let e' = substWeakTermPlus sub e
---   (m, WeakTermConstDecl x t' e')
 substWeakTermPlus sub e1@(_, WeakTermZeta x) = do
   case Map.lookup (Left $ asInt x) sub of
     Nothing -> e1
@@ -441,7 +424,6 @@ toText (_, WeakTermIter (_, x, _) xts e) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["μ", asText x, argStr, toText e]
 toText (_, WeakTermConst x) = x
--- toText (_, WeakTermConstDecl _ _ e) = toText e
 toText (_, WeakTermZeta (I (_, i))) = "?M" <> T.pack (show i)
 toText (_, WeakTermInt _ a) = T.pack $ show a
 toText (_, WeakTermFloat _ a) = T.pack $ show a
