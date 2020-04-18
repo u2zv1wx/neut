@@ -111,7 +111,6 @@ data WeakStmt
   | WeakStmtLet Meta WeakTextPlus WeakTermPlus WeakStmt
   | WeakStmtLetWT Meta WeakTextPlus WeakTermPlus WeakStmt
   | WeakStmtVerify Meta WeakTermPlus WeakStmt
-  | WeakStmtImplicit Meta T.Text [Int] WeakStmt
   | WeakStmtConstDecl Meta WeakTextPlus WeakStmt
   | WeakStmtVisit (Path Abs File) WeakStmt WeakStmt
   deriving (Show)

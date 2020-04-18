@@ -477,9 +477,10 @@ concatQuasiStmtList (QuasiStmtLetWT m xt e:es) = do
 concatQuasiStmtList (QuasiStmtVerify m e:es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtVerify m e cont
-concatQuasiStmtList (QuasiStmtImplicit m x i:es) = do
-  cont <- concatQuasiStmtList es
-  return $ WeakStmtImplicit m x i cont
+concatQuasiStmtList (QuasiStmtImplicit _ x idxList:es) = do
+  ienv <- gets impEnv
+  modify (\env -> env {impEnv = Map.insertWith (++) x idxList ienv})
+  concatQuasiStmtList es
 concatQuasiStmtList (QuasiStmtEnum {}:ss) = concatQuasiStmtList ss
 concatQuasiStmtList (QuasiStmtDef xds:ss) = do
   let ds = map snd xds
