@@ -5,7 +5,7 @@ import Data.Binary
 import qualified Data.IntMap as IntMap
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
-import Data.WeakTerm hiding (IdentPlus)
+import Data.WeakTerm
 import GHC.Generics (Generic)
 
 data Term

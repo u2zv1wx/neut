@@ -14,7 +14,7 @@ import Data.Basic
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import qualified Data.IntMap as IntMap
-import Data.Term hiding (WeakIdentPlus)
+import Data.Term
 import qualified Data.Text as T
 import Data.WeakTerm
 
