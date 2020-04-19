@@ -32,8 +32,7 @@ tokenize input = do
   resultOrError <- liftIO $ try $ runStateT program env
   case resultOrError of
     Left (Error err) -> throw $ Error err
-    Right (result, _) -> do
-      return result
+    Right (result, _) -> return result
 
 program :: Tokenizer [TreePlus]
 program = program' []
@@ -73,7 +72,7 @@ leaf = do
           "unexpected character: '"
             <> T.singleton c
             <> "'\nexpecting: SYMBOL-CHAR"
-    Nothing -> raiseTokenizeError $ "unexpected end of input\nexpecting: LEAF"
+    Nothing -> raiseTokenizeError "unexpected end of input\nexpecting: LEAF"
 
 node :: Tokenizer TreePlus
 node = do
@@ -91,7 +90,7 @@ char c = do
       raiseTokenizeError $
         "unexpected end of input\nexpecting: '" <> T.singleton c <> "'"
     Just (c', rest)
-      | c == c' -> do
+      | c == c' ->
         if c == '\n'
           then updateStreamL rest
           else updateStreamC 1 rest
@@ -162,7 +161,7 @@ string = do
 type EscapeFlag = Bool
 
 headStringLengthOf :: EscapeFlag -> T.Text -> Int -> Tokenizer Int
-headStringLengthOf flag s i = do
+headStringLengthOf flag s i =
   case T.uncons s of
     Nothing -> raiseTokenizeError "unexpected end of input while lexing string"
     Just (c, rest)

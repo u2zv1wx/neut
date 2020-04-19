@@ -14,7 +14,7 @@ import Data.Tree
 type MacroSubst = [(T.Text, TreePlus)]
 
 macroExpand :: TreePlus -> WithEnv TreePlus
-macroExpand t = recurM (macroExpand1 . splice) t
+macroExpand = recurM (macroExpand1 . splice)
 
 recurM :: (Monad m) => (TreePlus -> m TreePlus) -> TreePlus -> m TreePlus
 recurM f (m, TreeLeaf s) = f (m, TreeLeaf s)
@@ -70,7 +70,7 @@ macroMatch (m1, TreeNode ts1) (_, TreeNode ts2)
   | otherwise = return Nothing
 
 applySubst :: MacroSubst -> Notation -> TreePlus
-applySubst sub (i, TreeLeaf s) = do
+applySubst sub (i, TreeLeaf s) =
   case lookup s sub of
     Nothing -> (i, TreeLeaf s)
     Just t -> replaceMeta i t
@@ -107,7 +107,7 @@ checkPlusCondition (_, TreeNode ts) = do
     ts' -> checkPlusCondition ts'
 
 splice :: TreePlus -> TreePlus
-splice t = splice' t
+splice = splice'
 
 -- (a b (splice (c (splice (p q)) e)) f) ~> (a b c p q d e)
 splice' :: TreePlus -> TreePlus
@@ -117,7 +117,7 @@ splice' (m, TreeNode ts) = do
   (m, TreeNode $ expandSplice $ map findSplice ts')
 
 findSplice :: TreePlus -> Either TreePlus [TreePlus]
-findSplice (_, TreeNode [(_, TreeLeaf "splice"), (_, TreeNode ts)]) = do
+findSplice (_, TreeNode [(_, TreeLeaf "splice"), (_, TreeNode ts)]) =
   Right ts
 findSplice t = Left t
 
