@@ -21,19 +21,12 @@ discern' _ [] = return []
 discern' nenv (QuasiStmtLet m (mx, x, t) e : ss) = do
   t' <- discern'' nenv t
   e' <- discern'' nenv e
-  -- insertConstant mx x
   x' <- newDefinedNameWith mx x
-  ss' <- discern' nenv ss -- xはconstだからnenvの更新の必要なし
-  return $ QuasiStmtLet m (mx, x, t') e' : ss'
-discern' nenv (QuasiStmtLetWT m (mx, x, t) e : ss) = do
-  set <- gets intactSet
-  t' <- discern'' nenv t
-  e' <- discern'' nenv e
-  set' <- gets intactSet
-  whenCheck $ modify (\env -> env {intactSet = S.intersection set set'})
-  -- insertConstant mx x
-  ss' <- discern' nenv ss
-  return $ QuasiStmtLetWT m (mx, x, t') e' : ss'
+  ss' <- discern' (insertName x x' nenv) ss
+  return $ QuasiStmtLet m (mx, x', t') e' : ss'
+discern' nenv (QuasiStmtLetWT m xt e : ss) = do
+  (xt', e', ss') <- discernWT nenv xt e ss
+  return $ QuasiStmtLetWT m xt' e' : ss'
 discern' nenv (QuasiStmtDef xds : ss) = do
   forM_ xds $ \(x, (m, _, _, _)) -> insertConstant m x
   let (xs, ds) = unzip xds
@@ -52,24 +45,12 @@ discern' nenv (QuasiStmtEnum m name xis : ss) = do
   insEnumEnv m name xis
   ss' <- discern' nenv ss
   return $ QuasiStmtEnum m name xis : ss'
-discern' nenv (QuasiStmtLetInductive n m (mx, a, t) e : ss) = do
-  set <- gets intactSet
-  t' <- discern'' nenv t
-  e' <- discern'' nenv e
-  set' <- gets intactSet
-  whenCheck $ modify (\env -> env {intactSet = S.intersection set set'})
-  -- insertConstant mx a
-  ss' <- discern' nenv ss
-  return $ QuasiStmtLetInductive n m (mx, a, t') e' : ss'
-discern' nenv (QuasiStmtLetInductiveIntro m (mx, x, t) e as : ss) = do
-  set <- gets intactSet
-  t' <- discern'' nenv t
-  e' <- discern'' nenv e
-  set' <- gets intactSet
-  whenCheck $ modify (\env -> env {intactSet = S.intersection set set'})
-  -- insertConstant mx x
-  ss' <- discern' nenv ss
-  return $ QuasiStmtLetInductiveIntro m (mx, x, t') e' as : ss'
+discern' nenv (QuasiStmtLetInductive n m xt e : ss) = do
+  (xt', e', ss') <- discernWT nenv xt e ss
+  return $ QuasiStmtLetInductive n m xt' e' : ss'
+discern' nenv (QuasiStmtLetInductiveIntro m xt e as : ss) = do
+  (xt', e', ss') <- discernWT nenv xt e ss
+  return $ QuasiStmtLetInductiveIntro m xt' e' as : ss'
 discern' nenv (QuasiStmtUse prefix : ss) = do
   modify (\e -> e {prefixEnv = prefix : prefixEnv e})
   ss' <- discern' nenv ss
@@ -83,6 +64,22 @@ discern' nenv (QuasiStmtVisit path ss1 : ss2) = do
   let ss1' = take (length ss1) ssss
   let ss2' = drop (length ss1) ssss
   return $ QuasiStmtVisit path ss1' : ss2'
+
+discernWT ::
+  NameEnv ->
+  WeakIdentPlus ->
+  WeakTermPlus ->
+  [QuasiStmt] ->
+  WithEnv (WeakIdentPlus, WeakTermPlus, [QuasiStmt])
+discernWT nenv (mx, x, t) e ss = do
+  set <- gets intactSet
+  t' <- discern'' nenv t
+  e' <- discern'' nenv e
+  x' <- newDefinedNameWith mx x
+  set' <- gets intactSet
+  whenCheck $ modify (\env -> env {intactSet = S.intersection set set'})
+  ss' <- discern' (insertName x x' nenv) ss
+  return ((mx, x', t'), e', ss')
 
 discernDef :: NameEnv -> Def -> WithEnv Def
 discernDef nenv (m, (mx, x, t), xts, e) = do
@@ -249,20 +246,6 @@ newDefinedNameWith m (I (s, _)) = do
   insertIntoIntactSet m s
   return x
 
--- newDefinedNameWith :: Meta -> Ident -> WithEnv Ident
--- newDefinedNameWith m (I (s, _)) = do
---   j <- newCount
---   modify (\env -> env {nameEnv = Map.insert s s (nameEnv env)})
---   let x = I (s, j)
---   insertIntoIntactSet m x
---   return x
--- newDefinedNameWith' :: Meta -> NameEnv -> Ident -> WithEnv Ident
--- newDefinedNameWith' m nenv x = do
---   case Map.lookup (asText x) nenv of
---     Nothing -> newDefinedNameWith m x
---     Just _ ->
---       raiseError m $
---       "the identifier `" <> asText x <> "` is already defined at top level"
 insertConstant :: Meta -> T.Text -> WithEnv ()
 insertConstant m x = do
   cset <- gets constantSet
