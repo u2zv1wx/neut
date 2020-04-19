@@ -35,7 +35,8 @@ elaborateStmt (WeakStmtLet m (mx, x, t) e cont) = do
   analyze >> synthesize >> refine >> cleanup
   e'' <- reduceTermPlus <$> elaborate' e'
   t'' <- reduceTermPlus <$> elaborate' t'
-  insTypeEnv (Right x) t''
+  insTypeEnv (Left $ asInt x) t''
+  -- insTypeEnv (Right x) t''
   modify (\env -> env {cacheEnv = Map.insert x (Left e'') (cacheEnv env)})
   cont' <- elaborateStmt cont
   x' <- newNameWith'' "_"
@@ -45,7 +46,8 @@ elaborateStmt (WeakStmtLetWT m (mx, x, t) e cont) = do
   analyze >> synthesize >> refine >> cleanup
   e' <- reduceTermPlus <$> elaborate' e -- `e` is supposed to be well-typed
   t'' <- reduceTermPlus <$> elaborate' t'
-  insTypeEnv (Right x) t''
+  -- insTypeEnv (Right x) t''
+  insTypeEnv (Left $ asInt x) t''
   modify (\env -> env {cacheEnv = Map.insert x (Left e') (cacheEnv env)})
   cont' <- elaborateStmt cont
   x' <- newNameWith'' "_"
@@ -67,17 +69,18 @@ elaborateStmt (WeakStmtConstDecl _ (_, x, t) cont) = do
   t'' <- reduceTermPlus <$> elaborate' t'
   insTypeEnv (Right x) t''
   elaborateStmt cont
-elaborateStmt (WeakStmtVisit _ ss1 ss2) = do
-  e1 <- elaborateStmt ss1
-  e2 <- elaborateStmt ss2
-  h <- newNameWith'' "_"
-  let m = fst e1
-  return
-    ( m,
-      TermPiElim
-        (m, termPiIntro [(m, h, (m, TermEnum (EnumTypeIntS 64)))] e2)
-        [e1]
-    )
+
+-- elaborateStmt (WeakStmtVisit _ ss1 ss2) = do
+--   e1 <- elaborateStmt ss1
+--   e2 <- elaborateStmt ss2
+--   h <- newNameWith'' "_"
+--   let m = fst e1
+--   return
+--     ( m,
+--       TermPiElim
+--         (m, termPiIntro [(m, h, (m, TermEnum (EnumTypeIntS 64)))] e2)
+--         [e1]
+--     )
 
 cleanup :: WithEnv ()
 cleanup = do

@@ -207,8 +207,7 @@ parse' ((m, TreeNode ((mLet, TreeLeaf "let") : rest)) : as)
   | [xt, e] <- rest = do
     m' <- adjustPhase' m
     e' <- adjustPhase e >>= macroExpand >>= interpret
-    xt' <-
-      adjustPhase xt >>= macroExpand >>= prefixTextPlus >>= interpretIdentPlus
+    xt' <- adjustPhase xt >>= macroExpand >>= prefixTextPlus >>= interpretIdentPlus
     defList <- parse' as
     return $ QuasiStmtLet m' xt' e' : defList
   | otherwise = raiseSyntaxError m "(let LEAF TREE TREE) | (let TREE TREE)"
@@ -482,14 +481,6 @@ concatQuasiStmtList (QuasiStmtVerify m e : es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtVerify m e cont
 concatQuasiStmtList (QuasiStmtEnum {} : ss) = concatQuasiStmtList ss
--- concatQuasiStmtList (QuasiStmtDef xds : ss) = do
---   let ds = map snd xds
---   let baseSub = Map.fromList $ map defToSub ds
---   let sub = selfCompose (length baseSub) baseSub
---   let varList = map (\(_, (m, x, _), _, _) -> (m, WeakTermUpsilon x)) ds
---   let iterList = map (substWeakTermPlus sub) varList
---   concatQuasiStmtList $ (toLetList $ zip xds iterList) ++ ss
-
 concatQuasiStmtList (QuasiStmtLetInductive n m at e : es) = do
   insForm n at e
   cont <- concatQuasiStmtList es
@@ -519,11 +510,6 @@ concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt e as : ss) =
     _ -> raiseCritical m "inductive-intro"
 concatQuasiStmtList (QuasiStmtUse _ : ss) = concatQuasiStmtList ss
 concatQuasiStmtList (QuasiStmtUnuse _ : ss) = concatQuasiStmtList ss
-
--- concatQuasiStmtList (QuasiStmtVisit path ss1 : ss2) = do
---   ss1' <- concatQuasiStmtList ss1
---   ss2' <- concatQuasiStmtList ss2
---   return $ WeakStmtVisit path ss1' ss2'
 
 checkKeywordSanity :: Meta -> T.Text -> WithEnv ()
 checkKeywordSanity m "" = raiseError m "empty string for a keyword"

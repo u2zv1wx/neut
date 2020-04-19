@@ -4,7 +4,7 @@ import Data.Basic
 import qualified Data.HashMap.Lazy as Map
 import qualified Data.Set as S
 import qualified Data.Text as T
-import Path
+-- import Path
 
 data WeakTerm
   = WeakTermTau
@@ -98,7 +98,7 @@ data QuasiStmt
   | QuasiStmtLetInductiveIntro Meta WeakIdentPlus WeakTermPlus [T.Text]
   | QuasiStmtUse T.Text
   | QuasiStmtUnuse T.Text
-  | QuasiStmtVisit (Path Abs File) [QuasiStmt]
+  -- | QuasiStmtVisit (Path Abs File) [QuasiStmt]
   deriving (Show)
 
 data WeakStmt
@@ -107,7 +107,7 @@ data WeakStmt
   | WeakStmtLetWT Meta WeakIdentPlus WeakTermPlus WeakStmt
   | WeakStmtVerify Meta WeakTermPlus WeakStmt
   | WeakStmtConstDecl Meta WeakTextPlus WeakStmt
-  | WeakStmtVisit (Path Abs File) WeakStmt WeakStmt
+  -- | WeakStmtVisit (Path Abs File) WeakStmt WeakStmt
   deriving (Show)
 
 weakTermPi :: [WeakIdentPlus] -> WeakTermPlus -> WeakTerm
