@@ -25,7 +25,7 @@ cartesianSigma Nothing m k mxts = do
   let h = "sigma-" <> T.pack (show i)
   insCodeEnv h args e
   return (m, DataConst h)
-cartesianSigma (Just name) m k mxts = do
+cartesianSigma (Just name) m k mxts =
   tryCache m name $ do
     (args, e) <- makeSwitcher m (affineSigma m k mxts) (relevantSigma m k mxts)
     insCodeEnv name args e
@@ -110,9 +110,10 @@ transposeSigma ::
 transposeSigma m k ds = do
   (xList, xVarList) <- unzip <$> mapM (const $ newDataUpsilonWith m "sig-x") ds
   (yList, yVarList) <- unzip <$> mapM (const $ newDataUpsilonWith m "sig-y") ds
-  return
-    $ bindSigmaElim (zip (zip xList yList) ds)
-    $ ( m,
+  return $
+    bindSigmaElim
+      (zip (zip xList yList) ds)
+      ( m,
         CodeUpIntro
           ( m,
             sigmaIntro
