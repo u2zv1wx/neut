@@ -26,15 +26,15 @@ toLLVM mainTerm@(m, _) = do
   (cast, castThen) <- llvmCast (Just "cast") resultVar (LowTypeIntS 64)
   castResult <- castThen (LLVMReturn cast)
   -- let result: i8* := (main-term) in {cast result to i64}
-  commConv result mainTerm'' $ castResult
+  commConv result mainTerm'' castResult
 
 llvmCode :: CodePlus -> WithEnv LLVM
 llvmCode (m, CodeConst theta) = llvmCodeConst m theta
 llvmCode (_, CodePiElimDownElim v ds) = do
-  (xs, vs) <- unzip <$> mapM (\d -> newDataLocal $ takeBaseName d) ds
+  (xs, vs) <- unzip <$> mapM (newDataLocal . takeBaseName) ds
   (fun, castThen) <- llvmCast (Just $ takeBaseName v) v $ toFunPtrType ds
   castThenCall <- castThen $ LLVMCall fun vs
-  llvmDataLet' (zip xs ds) $ castThenCall
+  llvmDataLet' (zip xs ds) castThenCall
 llvmCode (_, CodeSigmaElim k xs v e) = do
   let et = arrayKindToLowType k -- elem type
   let bt = LowTypePtr $ LowTypeArray (length xs) et -- base pointer type  ([(length xs) x ARRAY_ELEM_TYPE])
@@ -192,7 +192,7 @@ llvmCast mName v ptrType = do
   x <- newNameWith'' mName
   return
     ( LLVMDataLocal x,
-      \cont -> do
+      \cont ->
         llvmDataLet tmp v $
           LLVMLet x (LLVMOpBitcast (LLVMDataLocal tmp) voidPtr ptrType) cont
     )
@@ -207,10 +207,12 @@ llvmCastInt mName v lowType = do
   y <- newNameWith'' mName
   return
     ( LLVMDataLocal y,
-      \cont -> do
-        llvmDataLet x v
-          $ LLVMLet y (LLVMOpPointerToInt (LLVMDataLocal x) voidPtr lowType)
-          $ cont
+      \cont ->
+        llvmDataLet x v $
+          LLVMLet
+            y
+            (LLVMOpPointerToInt (LLVMDataLocal x) voidPtr lowType)
+            cont
     )
 
 llvmCastFloat ::
@@ -226,7 +228,7 @@ llvmCastFloat mName v size = do
   z <- newNameWith'' mName
   return
     ( LLVMDataLocal z,
-      \cont -> do
+      \cont ->
         llvmDataLet xName v
           $ LLVMLet yName (LLVMOpPointerToInt x voidPtr intType)
           $ LLVMLet z (LLVMOpBitcast y intType floatType) cont
@@ -284,7 +286,7 @@ llvmDataLet x (m, DataConst y) cont = do
           let argType = map (const voidPtr) xts
           modify (\env -> env {declEnv = Map.insert y' (argType, voidPtr) denv})
           llvmUncastLet x (LLVMDataGlobal y') (toFunPtrType xts) cont
-        Just t -> do
+        Just t ->
           raiseError m $
             "external constants must have pi-type, but the type of `"
               <> y
@@ -301,7 +303,7 @@ llvmDataLet x (m, DataConst y) cont = do
         llvm <- llvmCode e'
         insLLVMEnv y args llvm
         llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
-      | otherwise -> do
+      | otherwise ->
         llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
 llvmDataLet x (_, DataUpsilon y) cont =
   llvmUncastLet x (LLVMDataLocal y) voidPtr cont
@@ -312,7 +314,7 @@ llvmDataLet x (m, DataSigmaIntro k ds) cont = do
   storeContent m x arrayType dts cont
 llvmDataLet x (_, DataFloat size f) cont =
   llvmUncastLet x (LLVMDataFloat size f) (LowTypeFloat size) cont
-llvmDataLet x (m, DataEnumIntro intOrLabel) cont = do
+llvmDataLet x (m, DataEnumIntro intOrLabel) cont =
   case intOrLabel of
     EnumValueIntS size i ->
       llvmUncastLet x (LLVMDataInt i) (LowTypeIntS size) cont
@@ -328,7 +330,7 @@ llvmDataLet x (m, DataStructIntro dks) cont = do
   storeContent m x structType (zip ds ts) cont
 
 syscallToLLVM :: Syscall -> [LLVMData] -> WithEnv LLVM
-syscallToLLVM syscall ds = do
+syscallToLLVM syscall ds =
   case syscall of
     Left name -> do
       denv <- gets declEnv
@@ -410,7 +412,7 @@ storeContent m reg aggPtrType dts cont = do
   let lowType = toLowType aggPtrType
   (cast, castThen) <- llvmCast (Just $ asText reg) (m, DataUpsilon reg) lowType
   storeThenCont <- storeContent' cast lowType (zip [0 ..] dts) cont
-  castThenStoreThenCont <- castThen $ storeThenCont
+  castThenStoreThenCont <- castThen storeThenCont
   -- Use getelementptr to realize `sizeof`. More info:
   --   http://nondot.org/sabre/LLVMNotes/SizeOf-OffsetOf-VariableSizedStructs.txt
   case aggPtrType of
@@ -463,18 +465,18 @@ arrayKindToLowType (ArrayKindFloat size) = LowTypeFloat size
 arrayKindToLowType ArrayKindVoidPtr = voidPtr
 
 toFunPtrType :: [a] -> LowType
-toFunPtrType xs = do
+toFunPtrType xs =
   LowTypeFunctionPtr (map (const voidPtr) xs) voidPtr
 
 newDataLocal :: T.Text -> WithEnv (Ident, LLVMData)
 newDataLocal name = do
   x <- newNameWith' name
-  return $ (x, LLVMDataLocal x)
+  return (x, LLVMDataLocal x)
 
 newDataLocal' :: Maybe T.Text -> WithEnv (Ident, LLVMData)
 newDataLocal' mName = do
   x <- newNameWith'' mName
-  return $ (x, LLVMDataLocal x)
+  return (x, LLVMDataLocal x)
 
 i64 :: LowType
 i64 = LowTypeIntS 64
