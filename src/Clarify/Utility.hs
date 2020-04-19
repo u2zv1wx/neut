@@ -9,14 +9,14 @@ import qualified Data.IntMap as IntMap
 import Data.Term
 import qualified Data.Text as T
 
-type Context = [(Identifier, TermPlus)]
+type Context = [(Ident, TermPlus)]
 
 -- toAffineApp meta x t ~>
 --   bind exp := t in
 --   exp @ (0, x)
 --
 -- {} toAffineApp {}
-toAffineApp :: Meta -> Identifier -> CodePlus -> WithEnv CodePlus
+toAffineApp :: Meta -> Ident -> CodePlus -> WithEnv CodePlus
 toAffineApp m x t = do
   (expVarName, expVar) <- newDataUpsilonWith m "aff-app-exp"
   return
@@ -35,7 +35,7 @@ toAffineApp m x t = do
 --   bind exp := t in
 --   exp @ (1, x)
 --
-toRelevantApp :: Meta -> Identifier -> CodePlus -> WithEnv CodePlus
+toRelevantApp :: Meta -> Ident -> CodePlus -> WithEnv CodePlus
 toRelevantApp m x t = do
   (expVarName, expVar) <- newDataUpsilonWith m "rel-app-exp"
   return
@@ -50,7 +50,7 @@ toRelevantApp m x t = do
         )
     )
 
-bindLet :: [(Identifier, CodePlus)] -> CodePlus -> CodePlus
+bindLet :: [(Ident, CodePlus)] -> CodePlus -> CodePlus
 bindLet [] cont = cont
 bindLet ((x, e) : xes) cont = (fst e, CodeUpElim x e $ bindLet xes cont)
 
@@ -75,7 +75,7 @@ makeSwitcher ::
   Meta ->
   (DataPlus -> WithEnv CodePlus) ->
   (DataPlus -> WithEnv CodePlus) ->
-  WithEnv ([Identifier], CodePlus)
+  WithEnv ([Ident], CodePlus)
 makeSwitcher m compAff compRel = do
   (switchVarName, switchVar) <- newDataUpsilonWith m "switch"
   (argVarName, argVar) <- newDataUpsilonWith m "argimm"
@@ -134,7 +134,7 @@ relevantStruct ks argVar@(m, _) = do
         )
     )
 
-insCodeEnv :: T.Text -> [Identifier] -> CodePlus -> WithEnv ()
+insCodeEnv :: T.Text -> [Ident] -> CodePlus -> WithEnv ()
 insCodeEnv name args e = do
   let def = Definition (IsFixed False) args e
   modify (\env -> env {codeEnv = Map.insert name def (codeEnv env)})

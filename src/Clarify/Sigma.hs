@@ -17,7 +17,7 @@ cartesianSigma ::
   Maybe T.Text ->
   Meta ->
   ArrayKind ->
-  [Either CodePlus (Identifier, CodePlus)] ->
+  [Either CodePlus (Ident, CodePlus)] ->
   WithEnv DataPlus
 cartesianSigma Nothing m k mxts = do
   (args, e) <- makeSwitcher m (affineSigma m k mxts) (relevantSigma m k mxts)
@@ -48,7 +48,7 @@ cartesianSigma (Just name) m k mxts = do
 affineSigma ::
   Meta ->
   ArrayKind ->
-  [Either CodePlus (Identifier, CodePlus)] ->
+  [Either CodePlus (Ident, CodePlus)] ->
   DataPlus ->
   WithEnv CodePlus
 affineSigma m k mxts argVar = do
@@ -80,7 +80,7 @@ affineSigma m k mxts argVar = do
 relevantSigma ::
   Meta ->
   ArrayKind ->
-  [Either CodePlus (Identifier, CodePlus)] ->
+  [Either CodePlus (Ident, CodePlus)] ->
   DataPlus ->
   WithEnv CodePlus
 relevantSigma m k mxts argVar = do
@@ -95,7 +95,7 @@ relevantSigma m k mxts argVar = do
   return (m, CodeSigmaElim k (map fst xts) argVar body')
 
 toPairInfo ::
-  (Identifier, CodePlus) -> WithEnv (Identifier, (DataPlus, CodePlus))
+  (Ident, CodePlus) -> WithEnv (Ident, (DataPlus, CodePlus))
 toPairInfo (_, t@(m, _)) = do
   (name, var) <- newDataUpsilonWith m "pair"
   return (name, (var, t))
@@ -121,12 +121,12 @@ transposeSigma m k ds = do
       )
 
 bindSigmaElim ::
-  [((Identifier, Identifier), (DataPlus, CodePlus))] -> CodePlus -> CodePlus
+  [((Ident, Ident), (DataPlus, CodePlus))] -> CodePlus -> CodePlus
 bindSigmaElim [] cont = cont
 bindSigmaElim (((x, y), (d, _)) : xyds) cont =
   (fst cont, sigmaElim [x, y] d $ bindSigmaElim xyds cont)
 
-supplyName :: Either b (Identifier, b) -> WithEnv (Identifier, b)
+supplyName :: Either b (Ident, b) -> WithEnv (Ident, b)
 supplyName (Right (x, t)) = return (x, t)
 supplyName (Left t) = do
   x <- newNameWith' "unused-sigarg"

@@ -56,7 +56,7 @@ emitDefinition retType name args asm = do
 sig :: Builder -> Builder -> [Builder] -> Builder
 sig retType name args = "define " <> retType <> " @" <> name <> showLocals args
 
-emitBlock :: Builder -> Identifier -> LLVM -> WithEnv [Builder]
+emitBlock :: Builder -> Ident -> LLVM -> WithEnv [Builder]
 emitBlock funName (I (_, i)) asm = do
   a <- emitLLVM funName asm
   return $ emitLabel ("_" <> intDec i) : a
@@ -332,7 +332,7 @@ emitRet retType d = emitOp $ unwordsL ["ret", retType, showLLVMData d]
 emitLabel :: Builder -> Builder
 emitLabel s = s <> ":"
 
-constructLabelList :: [a] -> WithEnv [Identifier]
+constructLabelList :: [a] -> WithEnv [Ident]
 constructLabelList [] = return []
 constructLabelList (_ : rest) = do
   label <- newNameWith' "case"
@@ -343,7 +343,7 @@ showRegList :: [Builder] -> Builder
 showRegList [] = ""
 showRegList (s : ss) = ",{" <> s <> "}" <> showRegList ss
 
-showBranchList :: LowType -> [(Int, Identifier)] -> Builder
+showBranchList :: LowType -> [(Int, Ident)] -> Builder
 showBranchList lowType xs =
   "[" <> showItems (uncurry (showBranch lowType)) xs <> "]"
 
@@ -352,7 +352,7 @@ showIndex [] = ""
 showIndex [(d, t)] = showLowType t <> " " <> showLLVMData d
 showIndex ((d, t) : dts) = showIndex [(d, t)] <> ", " <> showIndex dts
 
-showBranch :: LowType -> Int -> Identifier -> Builder
+showBranch :: LowType -> Int -> Ident -> Builder
 showBranch lowType i label =
   showLowType lowType
     <> " "

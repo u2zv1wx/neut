@@ -34,7 +34,7 @@ synthesize = do
     _ -> throwTypeErrors
 
 resolveStuck ::
-  WeakTermPlus -> WeakTermPlus -> Identifier -> WeakTermPlus -> WithEnv ()
+  WeakTermPlus -> WeakTermPlus -> Ident -> WeakTermPlus -> WithEnv ()
 resolveStuck e1 e2 h e = do
   let s = Map.singleton (Left $ asInt h) e
   let e1' = substWeakTermPlus s e1
@@ -54,7 +54,7 @@ resolveStuck e1 e2 h e = do
 -- If the given pattern is a flex-rigid pattern like ?M @ x @ x @ e1 @ y == e,
 -- this function replaces all the arguments that are not variable by
 -- fresh variables, and try to resolve the new quasi-pattern ?M @ x @ x @ z @ y == e.
-resolvePiElim :: Identifier -> [[WeakTermPlus]] -> WeakTermPlus -> WithEnv ()
+resolvePiElim :: Ident -> [[WeakTermPlus]] -> WeakTermPlus -> WithEnv ()
 resolvePiElim h ess e = do
   let lengthInfo = map length ess
   let es = concat ess
@@ -62,10 +62,10 @@ resolvePiElim h ess e = do
   let xsss = map (takeByCount lengthInfo) xss
   let lamList = map (bindFormalArgs e) xsss
   deleteMin
-  tryPlanList (metaOf e) $ map (resolveIdentifier h) lamList
+  tryPlanList (metaOf e) $ map (resolveIdent h) lamList
 
-resolveIdentifier :: Identifier -> WeakTermPlus -> WithEnv ()
-resolveIdentifier h@(I (_, i)) e = do
+resolveIdent :: Ident -> WeakTermPlus -> WithEnv ()
+resolveIdent h@(I (_, i)) e = do
   modify (\env -> env {substEnv = IntMap.insert i e (substEnv env)})
   q <- gets constraintQueue
   let (q1, q2) = Q.partition (\(Enriched _ hs _) -> h `elem` hs) q
@@ -95,7 +95,7 @@ deleteMin = do
 --   ]
 -- (p, q : fresh variables)
 -- {} toAltList {それぞれのlistはlinear list}
-toAltList :: [IdentifierPlus] -> WithEnv [[IdentifierPlus]]
+toAltList :: [IdentPlus] -> WithEnv [[IdentPlus]]
 toAltList xts = do
   let xs = map (\(_, x, _) -> x) xts
   result <- mapM (discardInactive xts) $ chooseActive $ toIndexInfo xs
@@ -120,7 +120,7 @@ toIndexInfo'' x ((y, i) : ys) = do
     then (i : is, ys') -- remove x from the list
     else (is, (y, i) : ys')
 
-chooseActive :: [(Identifier, [Int])] -> [[(Identifier, Int)]]
+chooseActive :: [(Ident, [Int])] -> [[(Ident, Int)]]
 chooseActive xs = do
   let xs' = map (\(x, is) -> zip (repeat x) is) xs
   pickup xs'
@@ -133,7 +133,7 @@ pickup (xs : xss) = do
   map (\ys -> x : ys) yss
 
 discardInactive ::
-  [IdentifierPlus] -> [(Identifier, Int)] -> WithEnv [IdentifierPlus]
+  [IdentPlus] -> [(Ident, Int)] -> WithEnv [IdentPlus]
 discardInactive xs indexList =
   forM (zip xs [0 ..]) $ \((mx, x, t), i) ->
     case lookup x indexList of
@@ -245,7 +245,7 @@ unravel (m, WeakTermCase indName e cxtes) = do
 unravel (_, WeakTermQuestion e _) = unravel e
 unravel (_, WeakTermErase _ e) = unravel e
 
-unravelUpsilon :: Identifier -> WithEnv Identifier
+unravelUpsilon :: Ident -> WithEnv Ident
 unravelUpsilon (I (s, i)) = do
   nenv <- gets nameEnv
   case Map.lookup s nenv of
@@ -256,7 +256,7 @@ unravelUpsilon (I (s, i)) = do
       modify (\e -> e {nameEnv = Map.insert s s' nenv})
       return $ I (s', i)
 
-unravelZeta :: Identifier -> WithEnv Identifier
+unravelZeta :: Ident -> WithEnv Ident
 unravelZeta (I (s, i)) = do
   rnenv <- gets revNameEnv
   case IntMap.lookup i rnenv of
@@ -267,9 +267,9 @@ unravelZeta (I (s, i)) = do
       return $ I (s, j)
 
 unravelBinder ::
-  [IdentifierPlus] ->
+  [IdentPlus] ->
   WeakTermPlus ->
-  WithEnv ([IdentifierPlus], WeakTermPlus)
+  WithEnv ([IdentPlus], WeakTermPlus)
 unravelBinder [] e = do
   e' <- unravel e
   return ([], e')
@@ -294,9 +294,9 @@ unravelWeakCase (m, WeakCaseInt t a) = do
 unravelWeakCase l = return l
 
 unravelStruct ::
-  [(Meta, Identifier, ArrayKind)] ->
+  [(Meta, Ident, ArrayKind)] ->
   WeakTermPlus ->
-  WithEnv ([(Meta, Identifier, ArrayKind)], WeakTermPlus)
+  WithEnv ([(Meta, Ident, ArrayKind)], WeakTermPlus)
 unravelStruct [] e = do
   e' <- unravel e
   return ([], e')

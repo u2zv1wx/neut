@@ -16,9 +16,9 @@ import Parse
 import Parse.Tokenize
 import Path
 
-type CompInfo = [(Identifier, Meta)]
+type CompInfo = [(Ident, Meta)]
 
-type CursorName = Identifier
+type CursorName = Ident
 
 type Prefix = T.Text
 
@@ -114,7 +114,7 @@ compInfoQuasiStmtList c info ((QuasiStmtConstDecl _ (mx, x, t)) : ss) = do
 compInfoQuasiStmtList c info (_ : ss) = compInfoQuasiStmtList c info ss
 
 compInfoDef ::
-  CursorName -> CompInfo -> Def -> Either CompInfo (Identifier, Meta)
+  CursorName -> CompInfo -> Def -> Either CompInfo (Ident, Meta)
 compInfoDef c info (_, (mx, x, t), xts, e) = do
   compInfoWeakTermPlus c info t
   let info' = (x, mx) : info
@@ -175,7 +175,7 @@ compInfoWeakTermPlus c info (_, WeakTermErase _ e) =
 compInfoBinder ::
   CursorName ->
   CompInfo ->
-  [IdentifierPlus] ->
+  [IdentPlus] ->
   WeakTermPlus ->
   Either CompInfo ()
 compInfoBinder s info [] e = compInfoWeakTermPlus s info e
@@ -187,7 +187,7 @@ compInfoBinder s info ((mx, x, t) : xts) e = do
 compInfoArrayElim ::
   CursorName ->
   CompInfo ->
-  [(Meta, Identifier, ArrayKind)] ->
+  [(Meta, Ident, ArrayKind)] ->
   WeakTermPlus ->
   Either CompInfo ()
 compInfoArrayElim s info [] e = compInfoWeakTermPlus s info e
@@ -195,17 +195,17 @@ compInfoArrayElim s info ((mx, x, _) : xts) e = do
   let info' = (x, mx) : info
   compInfoArrayElim s info' xts e
 
-filterCompInfo :: Prefix -> (Identifier, Meta) -> Bool
+filterCompInfo :: Prefix -> (Ident, Meta) -> Bool
 filterCompInfo _ (I (x, _), _)
   | "private:" `T.isPrefixOf` x = False
 filterCompInfo prefix (I (x, _), _) =
   prefix `T.isPrefixOf` x && T.all (`S.notMember` S.fromList "()") x
 
-enrich :: (Identifier, Meta) -> [(Identifier, Meta)]
+enrich :: (Ident, Meta) -> [(Ident, Meta)]
 enrich (x, m) = map (\y -> (y, m)) $ toSuffixList x
 
 -- "bar:buz:qux" ~> ["bar:buz:qux", "buz:qux", "qux"]
-toSuffixList :: Identifier -> [Identifier]
+toSuffixList :: Ident -> [Ident]
 toSuffixList (I (s, i)) = map (\x -> I (x, i)) $ toSuffixList' s
 
 toSuffixList' :: T.Text -> [T.Text]

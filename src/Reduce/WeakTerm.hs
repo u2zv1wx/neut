@@ -105,5 +105,5 @@ reduceWeakTermPlus (m, WeakTermCase indName e cxtes) = do
 reduceWeakTermPlus (_, WeakTermQuestion e _) = reduceWeakTermPlus e
 reduceWeakTermPlus e = e
 
-reduceWeakTermIdentPlus :: IdentifierPlus -> IdentifierPlus
+reduceWeakTermIdentPlus :: IdentPlus -> IdentPlus
 reduceWeakTermIdentPlus (m, x, t) = (m, x, reduceWeakTermPlus t)

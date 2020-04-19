@@ -74,7 +74,7 @@ llvmCode (m, CodeCase sub v branchList) = do
   modify (\env -> env {nameSet = ns})
   llvmCodeCase m v $ zip ls es''
 
-uncastList :: [(Identifier, (Identifier, LowType))] -> CodePlus -> WithEnv LLVM
+uncastList :: [(Ident, (Ident, LowType))] -> CodePlus -> WithEnv LLVM
 uncastList [] e = llvmCode e
 uncastList ((y, (x, et)) : yxs) e = do
   e' <- uncastList yxs e
@@ -107,7 +107,7 @@ takeBaseName' LLVMDataNull = "null"
 loadContent ::
   DataPlus -> -- base pointer
   LowType -> -- the type of base pointer
-  [((LLVMData, LowType), (Identifier, (Identifier, LowType)))] -> -- [(the index of an element, the variable to load the element)]
+  [((LLVMData, LowType), (Ident, (Ident, LowType)))] -> -- [(the index of an element, the variable to load the element)]
   CodePlus -> -- continuation
   WithEnv LLVM
 loadContent _ _ [] cont = llvmCode cont -- don't call redundant free
@@ -122,7 +122,7 @@ loadContent v bt iyxs cont = do
 loadContent' ::
   LLVMData -> -- base pointer
   LowType -> -- the type of base pointer
-  [((LLVMData, LowType), (Identifier, LowType))] -> -- [(the index of an element, the variable to keep the loaded content)]
+  [((LLVMData, LowType), (Ident, LowType))] -> -- [(the index of an element, the variable to keep the loaded content)]
   LLVM -> -- continuation
   WithEnv LLVM
 loadContent' bp bt [] cont = do
@@ -263,14 +263,14 @@ llvmUncastFloat mName floatResult i = do
     $ LLVMLet x (LLVMOpIntToPointer (LLVMDataLocal tmp) intType voidPtr)
     $ LLVMReturn (LLVMDataLocal x)
 
-llvmUncastLet :: Identifier -> LLVMData -> LowType -> LLVM -> WithEnv LLVM
+llvmUncastLet :: Ident -> LLVMData -> LowType -> LLVM -> WithEnv LLVM
 llvmUncastLet x@(I (s, _)) d lowType cont = do
   l <- llvmUncast (Just s) d lowType
   commConv x l cont
 
 -- `llvmDataLet x d cont` binds the data `d` to the variable `x`, and computes the
 -- continuation `cont`.
-llvmDataLet :: Identifier -> DataPlus -> LLVM -> WithEnv LLVM
+llvmDataLet :: Ident -> DataPlus -> LLVM -> WithEnv LLVM
 llvmDataLet x (m, DataConst y) cont = do
   cenv <- gets codeEnv
   ns <- gets nameSet
@@ -343,7 +343,7 @@ syscallToLLVM syscall ds = do
         $ LLVMLet res (LLVMOpSysCall num ds)
         $ LLVMReturn (LLVMDataLocal res)
 
-llvmDataLet' :: [(Identifier, DataPlus)] -> LLVM -> WithEnv LLVM
+llvmDataLet' :: [(Ident, DataPlus)] -> LLVM -> WithEnv LLVM
 llvmDataLet' [] cont = return cont
 llvmDataLet' ((x, d) : rest) cont = do
   cont' <- llvmDataLet' rest cont
@@ -401,7 +401,7 @@ toLowType (AggPtrTypeStruct ts) = LowTypePtr $ LowTypeStruct ts
 
 storeContent ::
   Meta ->
-  Identifier ->
+  Ident ->
   AggPtrType ->
   [(DataPlus, LowType)] ->
   LLVM ->
@@ -438,7 +438,7 @@ storeContent' bp bt ((i, (d, et)) : ids) cont = do
     $ LLVMCont (LLVMOpStore et cast loc) cont'
 
 storeContent'' ::
-  Identifier -> LowType -> SizeInfo -> Int -> LLVM -> WithEnv LLVM
+  Ident -> LowType -> SizeInfo -> Int -> LLVM -> WithEnv LLVM
 storeContent'' reg elemType sizeInfo len cont = do
   (c, cVar) <- newDataLocal $ "sizeof-" <> asText reg
   (i, iVar) <- newDataLocal $ "sizeof-" <> asText reg
@@ -466,12 +466,12 @@ toFunPtrType :: [a] -> LowType
 toFunPtrType xs = do
   LowTypeFunctionPtr (map (const voidPtr) xs) voidPtr
 
-newDataLocal :: T.Text -> WithEnv (Identifier, LLVMData)
+newDataLocal :: T.Text -> WithEnv (Ident, LLVMData)
 newDataLocal name = do
   x <- newNameWith' name
   return $ (x, LLVMDataLocal x)
 
-newDataLocal' :: Maybe T.Text -> WithEnv (Identifier, LLVMData)
+newDataLocal' :: Maybe T.Text -> WithEnv (Ident, LLVMData)
 newDataLocal' mName = do
   x <- newNameWith'' mName
   return $ (x, LLVMDataLocal x)
@@ -482,7 +482,7 @@ i64 = LowTypeIntS 64
 i32 :: LowType
 i32 = LowTypeIntS 32
 
-newNameWith'' :: Maybe T.Text -> WithEnv Identifier
+newNameWith'' :: Maybe T.Text -> WithEnv Ident
 newNameWith'' Nothing = newNameWith' "var"
 newNameWith'' (Just name) = newNameWith' name
 
@@ -500,11 +500,11 @@ getEnumNum m label = do
     Nothing -> raiseCritical m $ "no such enum is defined: " <> label
     Just (_, i) -> return i
 
-insLLVMEnv :: T.Text -> [Identifier] -> LLVM -> WithEnv ()
+insLLVMEnv :: T.Text -> [Ident] -> LLVM -> WithEnv ()
 insLLVMEnv funName args e =
   modify (\env -> env {llvmEnv = Map.insert funName (args, e) (llvmEnv env)})
 
-commConv :: Identifier -> LLVM -> LLVM -> WithEnv LLVM
+commConv :: Ident -> LLVM -> LLVM -> WithEnv LLVM
 commConv x (LLVMReturn d) cont =
   return $ LLVMLet x (LLVMOpBitcast d voidPtr voidPtr) cont -- nop
 commConv x (LLVMLet y op cont1) cont2 = do

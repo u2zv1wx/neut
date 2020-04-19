@@ -11,18 +11,18 @@ import qualified Data.IntMap as IntMap
 
 -- insert header for a closed chain
 linearize ::
-  [(Identifier, CodePlus)] -> -- [(x1, t1), ..., (xn, tn)]  (closed chain)
+  [(Ident, CodePlus)] -> -- [(x1, t1), ..., (xn, tn)]  (closed chain)
   CodePlus ->
   WithEnv CodePlus
 linearize xts e = do
   (nm, e') <- distinguishCode (map fst xts) e
   linearize' nm (reverse xts) e'
 
-type NameMap = IntMap.IntMap [Identifier]
+type NameMap = IntMap.IntMap [Ident]
 
 linearize' ::
   NameMap ->
-  [(Identifier, CodePlus)] -> -- [(xn, tn), ..., (x1, t1)]  (reversed closed chain)
+  [(Ident, CodePlus)] -> -- [(xn, tn), ..., (x1, t1)]  (reversed closed chain)
   CodePlus ->
   WithEnv CodePlus
 linearize' _ [] e = return e
@@ -33,7 +33,7 @@ linearize' nm ((x, t) : xts) e = do
   linearize' newNm xts e'
 
 -- insert header for a variable
-withHeader :: NameMap -> Identifier -> CodePlus -> CodePlus -> WithEnv CodePlus
+withHeader :: NameMap -> Ident -> CodePlus -> CodePlus -> WithEnv CodePlus
 withHeader nm x t e =
   case IntMap.lookup (asInt x) nm of
     Nothing -> withHeaderAffine x t e
@@ -53,7 +53,7 @@ withHeader nm x t e =
 --     exp @ (0, x) in           --
 --   e
 -- 変数xに型t由来のaffineを適用して破棄する。
-withHeaderAffine :: Identifier -> CodePlus -> CodePlus -> WithEnv CodePlus
+withHeaderAffine :: Ident -> CodePlus -> CodePlus -> WithEnv CodePlus
 withHeaderAffine x t e@(m, _) = do
   hole <- newNameWith' "unit"
   discardUnusedVar <- toAffineApp m x t
@@ -63,7 +63,7 @@ withHeaderAffine x t e@(m, _) = do
 --   bind z := return x in
 --   e
 -- renameするだけ。
-withHeaderLinear :: Identifier -> Identifier -> CodePlus -> WithEnv CodePlus
+withHeaderLinear :: Ident -> Ident -> CodePlus -> WithEnv CodePlus
 withHeaderLinear z x e@(m, _) =
   return (m, CodeUpElim z (m, CodeUpIntro (m, DataUpsilon x)) e)
 
@@ -77,11 +77,11 @@ withHeaderLinear z x e@(m, _) =
 --   e                                             --
 -- (assuming N >= 2)
 withHeaderRelevant ::
-  Identifier ->
+  Ident ->
   CodePlus ->
-  Identifier ->
-  Identifier ->
-  [Identifier] ->
+  Ident ->
+  Ident ->
+  [Ident] ->
   CodePlus ->
   WithEnv CodePlus
 withHeaderRelevant x t x1 x2 xs e@(m, _) = do
@@ -90,7 +90,7 @@ withHeaderRelevant x t x1 x2 xs e@(m, _) = do
   rel <- withHeaderRelevant' t expVar linearChain e
   return (m, CodeUpElim expVarName t rel)
 
-type LinearChain = [(Identifier, (Identifier, Identifier))]
+type LinearChain = [(Ident, (Ident, Ident))]
 
 --    toLinearChain [x0, x1, x2, ..., x{N-1}] (N >= 3)
 -- ~> [(x0, (x1, tmp1)), (tmp1, (x2, tmp2)), ..., (tmp{N-3}, (x{N-2}, x{N-1}))]
@@ -110,7 +110,7 @@ type LinearChain = [(Identifier, (Identifier, Identifier))]
 --   tmpSeq' = [x1, x3]
 --   pairSeq = [(x2, x3)]
 --   result = [(x1, (x2, x3))]
-toLinearChain :: [Identifier] -> WithEnv LinearChain
+toLinearChain :: [Ident] -> WithEnv LinearChain
 toLinearChain xs = do
   let valueSeq = init $ tail xs
   tmpSeq <- mapM (const $ newNameWith' "chain") $ replicate (length xs - 3) ()
@@ -148,7 +148,7 @@ merge :: [NameMap] -> NameMap
 merge [] = IntMap.empty
 merge (m : ms) = IntMap.unionWith (++) m $ merge ms
 
-distinguishData :: [Identifier] -> DataPlus -> WithEnv (NameMap, DataPlus)
+distinguishData :: [Ident] -> DataPlus -> WithEnv (NameMap, DataPlus)
 distinguishData zs d@(ml, DataUpsilon x) =
   if x `notElem` zs
     then return (IntMap.empty, d)
@@ -164,7 +164,7 @@ distinguishData zs (m, DataStructIntro dks) = do
   return (merge vss, (m, DataStructIntro $ zip ds' ks))
 distinguishData _ d = return (IntMap.empty, d)
 
-distinguishCode :: [Identifier] -> CodePlus -> WithEnv (NameMap, CodePlus)
+distinguishCode :: [Ident] -> CodePlus -> WithEnv (NameMap, CodePlus)
 distinguishCode zs (ml, CodeConst theta) = do
   (vs, theta') <- distinguishConst zs theta
   return (vs, (ml, CodeConst theta'))
@@ -205,7 +205,7 @@ distinguishCode zs (ml, CodeCase varInfo d branchList) = do
   let varInfo' = IntMap.fromList $ zip from to'
   return (merge (vs : vss), (ml, CodeCase varInfo' d' branchList))
 
-distinguishConst :: [Identifier] -> Const -> WithEnv (NameMap, Const)
+distinguishConst :: [Ident] -> Const -> WithEnv (NameMap, Const)
 distinguishConst zs (ConstUnaryOp op d) = do
   (vs, d') <- distinguishData zs d
   return (vs, ConstUnaryOp op d')

@@ -85,10 +85,10 @@ reduceLLVM sub _ (LLVMCall d ds) = do
   return $ LLVMCall d' ds'
 reduceLLVM _ _ LLVMUnreachable = return LLVMUnreachable
 
-isAlreadyDefined :: Identifier -> WithEnv Bool
+isAlreadyDefined :: Ident -> WithEnv Bool
 isAlreadyDefined x = do
   set <- gets defVarSet
   return $ S.member (asInt x) set
 
-insVar :: Identifier -> WithEnv ()
+insVar :: Ident -> WithEnv ()
 insVar x = modify (\env -> env {defVarSet = S.insert (asInt x) (defVarSet env)})

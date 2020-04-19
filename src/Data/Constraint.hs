@@ -6,12 +6,12 @@ import Data.WeakTerm
 
 type PreConstraint = (WeakTermPlus, WeakTermPlus)
 
-type IterInfo = (Meta, Identifier, [IdentifierPlus], WeakTermPlus, WeakTermPlus)
+type IterInfo = (Meta, Ident, [IdentPlus], WeakTermPlus, WeakTermPlus)
 
 data Constraint
   = ConstraintAnalyzable
-  | ConstraintQuasiPattern Identifier [[WeakTermPlus]] WeakTermPlus
-  | ConstraintFlexRigid Identifier [[WeakTermPlus]] WeakTermPlus
+  | ConstraintQuasiPattern Ident [[WeakTermPlus]] WeakTermPlus
+  | ConstraintFlexRigid Ident [[WeakTermPlus]] WeakTermPlus
   | ConstraintOther
   deriving (Show)
 
@@ -30,7 +30,7 @@ instance Ord Constraint where
 data EnrichedConstraint
   = Enriched
       PreConstraint
-      (S.Set Identifier) -- the set of metavariables that cause stuck
+      (S.Set Ident) -- the set of metavariables that cause stuck
       Constraint
   deriving (Show)
 

@@ -183,7 +183,7 @@ elaborate' (m, WeakTermEnumElim (e, t) les) = do
   t' <- reduceTermPlus <$> elaborate' t
   case t' of
     (_, TermEnum x) -> do
-      caseCheckEnumIdentifier m x $ map snd ls'
+      caseCheckEnumIdent m x $ map snd ls'
       return (m, TermEnumElim (e', t') (zip ls' es'))
     _ ->
       raiseError m $
@@ -297,17 +297,17 @@ elaboratePlus (m, x, t) = do
   t' <- elaborate' t
   return (m, x, t')
 
-caseCheckEnumIdentifier :: Meta -> EnumType -> [Case] -> WithEnv ()
-caseCheckEnumIdentifier m (EnumTypeLabel x) ls = do
+caseCheckEnumIdent :: Meta -> EnumType -> [Case] -> WithEnv ()
+caseCheckEnumIdent m (EnumTypeLabel x) ls = do
   es <- lookupEnumSet m x
-  caseCheckEnumIdentifier' m (length es) ls
-caseCheckEnumIdentifier m (EnumTypeIntS _) ls =
+  caseCheckEnumIdent' m (length es) ls
+caseCheckEnumIdent m (EnumTypeIntS _) ls =
   throwIfFalse m $ CaseDefault `elem` ls
-caseCheckEnumIdentifier m (EnumTypeIntU _) ls =
+caseCheckEnumIdent m (EnumTypeIntU _) ls =
   throwIfFalse m $ CaseDefault `elem` ls
 
-caseCheckEnumIdentifier' :: Meta -> Int -> [Case] -> WithEnv ()
-caseCheckEnumIdentifier' m i labelList = do
+caseCheckEnumIdent' :: Meta -> Int -> [Case] -> WithEnv ()
+caseCheckEnumIdent' m i labelList = do
   let len = length (nub labelList)
   throwIfFalse m $ i <= len || CaseDefault `elem` labelList
 

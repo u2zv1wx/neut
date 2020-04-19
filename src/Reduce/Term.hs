@@ -107,7 +107,7 @@ reduceTermPlus (m, TermCase indName e cxtes) = do
   (m, TermCase indName e' cxtes'')
 reduceTermPlus t = t
 
-reduceIdentPlus :: IdentifierPlus -> IdentifierPlus
+reduceIdentPlus :: IdentPlus -> IdentPlus
 reduceIdentPlus (m, x, t) = (m, x, reduceTermPlus t)
 
 isValue :: TermPlus -> Bool
@@ -238,7 +238,7 @@ normalize (m, TermCase indName e cxtes) = do
       return ((c, zip3 ms xs ts'), body')
   return (m, TermCase indName e' cxtes'')
 
-normalizeIdentPlus :: IdentifierPlus -> WithEnv IdentifierPlus
+normalizeIdentPlus :: IdentPlus -> WithEnv IdentPlus
 normalizeIdentPlus (m, x, t) = do
   t' <- normalize t
   return (m, x, t')

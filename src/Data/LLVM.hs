@@ -5,7 +5,7 @@ import qualified Data.IntMap as IntMap
 import qualified Data.Text as T
 
 data LLVMData
-  = LLVMDataLocal Identifier
+  = LLVMDataLocal Ident
   | LLVMDataGlobal T.Text
   | LLVMDataInt Integer
   | LLVMDataFloat FloatSize Double
@@ -14,7 +14,7 @@ data LLVMData
 
 data LLVM
   = LLVMReturn LLVMData -- UpIntro
-  | LLVMLet Identifier LLVMOp LLVM -- UpElim
+  | LLVMLet Ident LLVMOp LLVM -- UpElim
   | LLVMCont LLVMOp LLVM -- LLVMLet that discards the result of LLVMOp
   | LLVMSwitch (LLVMData, LowType) LLVM [(Int, LLVM)] -- EnumElim
   | LLVMBranch LLVMData LLVM LLVM

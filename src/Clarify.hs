@@ -106,17 +106,17 @@ clarify' tenv (m, TermCase _ e cxtes) = do
   cxtes' <- clarifyCase tenv m cxtes res env lam
   return $ bindLet [(cls, e')] (m, sigmaElim [res, env, lam] clsVar cxtes')
 
-clarifyPlus :: TypeEnv -> TermPlus -> WithEnv (Identifier, CodePlus, DataPlus)
+clarifyPlus :: TypeEnv -> TermPlus -> WithEnv (Ident, CodePlus, DataPlus)
 clarifyPlus tenv e@(m, _) = do
   e' <- clarify' tenv e
   (varName, var) <- newDataUpsilonWith m "var"
   return (varName, e', var)
 
-constructEnumFVS :: TypeEnv -> [TermPlus] -> WithEnv [IdentifierPlus]
+constructEnumFVS :: TypeEnv -> [TermPlus] -> WithEnv [IdentPlus]
 constructEnumFVS tenv es = nubFVS <$> concat <$> mapM (chainTermPlus tenv) es
 
 alignFVS ::
-  TypeEnv -> Meta -> [IdentifierPlus] -> [CodePlus] -> WithEnv [CodePlus]
+  TypeEnv -> Meta -> [IdentPlus] -> [CodePlus] -> WithEnv [CodePlus]
 alignFVS tenv m fvs es = do
   es' <- mapM (retClosure tenv Nothing fvs m []) es
   mapM (\cls -> callClosure m cls []) es'
@@ -125,9 +125,9 @@ clarifyCase ::
   TypeEnv ->
   Meta ->
   [Clause] ->
-  Identifier ->
-  Identifier ->
-  Identifier ->
+  Ident ->
+  Ident ->
+  Ident ->
   WithEnv CodePlus
 clarifyCase tenv m cxtes typeVarName envVarName lamVarName = do
   fvs <- constructCaseFVS tenv cxtes m typeVarName envVarName
@@ -143,9 +143,9 @@ constructCaseFVS ::
   TypeEnv ->
   [Clause] ->
   Meta ->
-  Identifier ->
-  Identifier ->
-  WithEnv [IdentifierPlus]
+  Ident ->
+  Ident ->
+  WithEnv [IdentPlus]
 constructCaseFVS tenv cxtes m typeVarName envVarName = do
   fvss <- mapM (chainCaseClause tenv) cxtes
   let fvs = nubFVS $ concat fvss
@@ -154,14 +154,14 @@ constructCaseFVS tenv cxtes m typeVarName envVarName = do
       : (m, envVarName, (m, TermUpsilon typeVarName))
       : fvs
 
-chainCaseClause :: TypeEnv -> Clause -> WithEnv [IdentifierPlus]
+chainCaseClause :: TypeEnv -> Clause -> WithEnv [IdentPlus]
 chainCaseClause tenv (((m, _), xts), body) =
   chainTermPlus tenv (m, termPiIntro xts body)
 
-nubFVS :: [IdentifierPlus] -> [IdentifierPlus]
+nubFVS :: [IdentPlus] -> [IdentPlus]
 nubFVS fvs = nubBy (\(_, x, _) (_, y, _) -> x == y) fvs
 
-clarifyCase' :: TypeEnv -> Meta -> Identifier -> Clause -> WithEnv CodePlus
+clarifyCase' :: TypeEnv -> Meta -> Ident -> Clause -> WithEnv CodePlus
 clarifyCase' tenv m envVarName ((_, xts), e) = do
   xts' <- clarifyBinder tenv xts
   e' <- clarify' tenv e >>= linearize (dropFst xts')
@@ -279,14 +279,14 @@ iterativeApp [] x = x
 iterativeApp (f : fs) x = f (iterativeApp fs x)
 
 clarifyBinder ::
-  TypeEnv -> [IdentifierPlus] -> WithEnv [(Meta, Identifier, CodePlus)]
+  TypeEnv -> [IdentPlus] -> WithEnv [(Meta, Ident, CodePlus)]
 clarifyBinder _ [] = return []
 clarifyBinder tenv ((m, x, t) : xts) = do
   t' <- clarify' tenv t
   xts' <- clarifyBinder (insTypeEnv' (Left (asInt x)) t tenv) xts
   return $ (m, x, t') : xts'
 
-knot :: Meta -> Identifier -> DataPlus -> WithEnv ()
+knot :: Meta -> Ident -> DataPlus -> WithEnv ()
 knot m z cls = do
   cenv <- gets codeEnv
   case Map.lookup (asText'' z) cenv of
@@ -341,10 +341,10 @@ data Arg
 
 toHeaderInfo ::
   Meta ->
-  Identifier -> -- argument
+  Ident -> -- argument
   TermPlus -> -- the type of argument
   Arg -> -- the way of use of argument (specifically)
-  WithEnv ([IdentifierPlus], [DataPlus], CodePlus -> CodePlus) -- ([borrow], arg-to-syscall, ADD_HEADER_TO_CONTINUATION)
+  WithEnv ([IdentPlus], [DataPlus], CodePlus -> CodePlus) -- ([borrow], arg-to-syscall, ADD_HEADER_TO_CONTINUATION)
 toHeaderInfo m x _ ArgImm = return ([], [(m, DataUpsilon x)], id)
 toHeaderInfo _ _ _ ArgUnused = return ([], [], id)
 toHeaderInfo m x t ArgStruct = do
@@ -384,9 +384,9 @@ toHeaderInfo m x t ArgArray = do
 
 computeHeader ::
   Meta ->
-  [IdentifierPlus] ->
+  [IdentPlus] ->
   [Arg] ->
-  WithEnv ([IdentifierPlus], [DataPlus], [CodePlus -> CodePlus])
+  WithEnv ([IdentPlus], [DataPlus], [CodePlus -> CodePlus])
 computeHeader m xts argInfoList = do
   let xtas = zip xts argInfoList
   (xss, dss, headerList) <-
@@ -399,7 +399,7 @@ toSysCallTail ::
   TermPlus -> -- cod type
   Syscall -> -- read, write, open, etc
   [DataPlus] -> -- args of syscall
-  [IdentifierPlus] -> -- borrowed variables
+  [IdentPlus] -> -- borrowed variables
   WithEnv CodePlus
 toSysCallTail tenv m cod syscall args xs = do
   resultVarName <- newNameWith' "result"
@@ -416,7 +416,7 @@ toArrayAccessTail ::
   TermPlus -> -- cod type
   DataPlus -> -- array (inner)
   DataPlus -> -- index
-  [IdentifierPlus] -> -- borrowed variables
+  [IdentPlus] -> -- borrowed variables
   WithEnv CodePlus
 toArrayAccessTail tenv m lowType cod arr index xs = do
   resultVarName <- newNameWith' "result"
@@ -433,8 +433,8 @@ retWithBorrowedVars ::
   TypeEnv ->
   Meta ->
   TermPlus ->
-  [IdentifierPlus] ->
-  Identifier ->
+  [IdentPlus] ->
+  Ident ->
   WithEnv CodePlus
 retWithBorrowedVars _ m _ [] resultVarName =
   return (m, CodeUpIntro (m, DataUpsilon resultVarName))
@@ -465,7 +465,7 @@ rightmostOf (_, TermPi _ xts _)
     return (m, t)
 rightmostOf (m, _) = raiseCritical m "rightmost"
 
-sigToPi :: Meta -> TermPlus -> WithEnv (IdentifierPlus, IdentifierPlus)
+sigToPi :: Meta -> TermPlus -> WithEnv (IdentPlus, IdentPlus)
 sigToPi m tPi = do
   case tPi of
     (_, TermPi _ [zu, kp] _) -> return (zu, kp)
@@ -473,9 +473,9 @@ sigToPi m tPi = do
 
 makeClosure ::
   Maybe T.Text ->
-  [(Meta, Identifier, CodePlus)] -> -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
+  [(Meta, Ident, CodePlus)] -> -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
   Meta -> -- meta of lambda
-  [(Meta, Identifier, CodePlus)] -> -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
+  [(Meta, Ident, CodePlus)] -> -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
   CodePlus -> -- the `e` in `lam (x1, ..., xn). e`
   WithEnv DataPlus
 makeClosure mName mxts2 m mxts1 e = do
@@ -497,8 +497,8 @@ toName Nothing = do
 registerIfNecessary ::
   Meta ->
   T.Text ->
-  [(Identifier, CodePlus)] ->
-  [(Identifier, CodePlus)] ->
+  [(Ident, CodePlus)] ->
+  [(Ident, CodePlus)] ->
   CodePlus ->
   WithEnv ()
 registerIfNecessary m name xts1 xts2 e = do
@@ -509,10 +509,10 @@ registerIfNecessary m name xts1 xts2 e = do
 
 toLamInfo ::
   Meta ->
-  [(Identifier, CodePlus)] ->
-  [(Identifier, CodePlus)] ->
+  [(Ident, CodePlus)] ->
+  [(Ident, CodePlus)] ->
   CodePlus ->
-  WithEnv ([Identifier], CodePlus)
+  WithEnv ([Ident], CodePlus)
 toLamInfo m xts1 xts2 e = do
   e' <- linearize (xts2 ++ xts1) e
   (envVarName, envVar) <- newDataUpsilonWith m "env"
@@ -523,9 +523,9 @@ toLamInfo m xts1 xts2 e = do
 makeClosure' ::
   TypeEnv ->
   Maybe T.Text -> -- the name of newly created closure
-  [IdentifierPlus] -> -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
+  [IdentPlus] -> -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
   Meta -> -- meta of lambda
-  [IdentifierPlus] -> -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
+  [IdentPlus] -> -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
   CodePlus -> -- the `e` in `lam (x1, ..., xn). e`
   WithEnv DataPlus
 makeClosure' tenv mName fvs m xts e = do
@@ -536,9 +536,9 @@ makeClosure' tenv mName fvs m xts e = do
 retClosure ::
   TypeEnv ->
   Maybe T.Text -> -- the name of newly created closure
-  [IdentifierPlus] -> -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
+  [IdentPlus] -> -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
   Meta -> -- meta of lambda
-  [IdentifierPlus] -> -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
+  [IdentPlus] -> -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
   CodePlus -> -- the `e` in `lam (x1, ..., xn). e`
   WithEnv CodePlus
 retClosure tenv mName fvs m xts e = do
@@ -547,10 +547,10 @@ retClosure tenv mName fvs m xts e = do
 
 retClosureFix ::
   TypeEnv ->
-  Identifier -> -- the name of newly created closure
-  [IdentifierPlus] -> -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
+  Ident -> -- the name of newly created closure
+  [IdentPlus] -> -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
   Meta -> -- meta of lambda
-  [IdentifierPlus] -> -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
+  [IdentPlus] -> -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
   CodePlus -> -- the `e` in `lam (x1, ..., xn). e`
   WithEnv CodePlus
 retClosureFix tenv x fvs m xts e = do
@@ -559,7 +559,7 @@ retClosureFix tenv x fvs m xts e = do
   return (m, CodeUpIntro cls)
 
 callClosure ::
-  Meta -> CodePlus -> [(Identifier, CodePlus, DataPlus)] -> WithEnv CodePlus
+  Meta -> CodePlus -> [(Ident, CodePlus, DataPlus)] -> WithEnv CodePlus
 callClosure m e zexes = do
   let (zs, es', xs) = unzip3 zexes
   (clsVarName, clsVar) <- newDataUpsilonWith m "closure"
@@ -576,7 +576,7 @@ callClosure m e zexes = do
           (m, CodePiElimDownElim lamVar (xs ++ [envVar]))
       )
 
-chainTermPlus :: TypeEnv -> TermPlus -> WithEnv [IdentifierPlus]
+chainTermPlus :: TypeEnv -> TermPlus -> WithEnv [IdentPlus]
 chainTermPlus _ (_, TermTau) = return []
 chainTermPlus tenv (m, TermUpsilon x) = do
   (xts, t) <- obtainChain m x tenv
@@ -623,7 +623,7 @@ chainTermPlus tenv (_, TermCase _ e cxtes) = do
   return $ xs ++ ys
 
 chainTermPlus' ::
-  TypeEnv -> [IdentifierPlus] -> [TermPlus] -> WithEnv [IdentifierPlus]
+  TypeEnv -> [IdentPlus] -> [TermPlus] -> WithEnv [IdentPlus]
 chainTermPlus' tenv [] es = concat <$> mapM (chainTermPlus tenv) es
 chainTermPlus' tenv ((_, x, t) : xts) es = do
   xs1 <- chainTermPlus tenv t
@@ -635,13 +635,13 @@ dropFst xyzs = do
   let (_, ys, zs) = unzip3 xyzs
   zip ys zs
 
-insTypeEnv1 :: [IdentifierPlus] -> TypeEnv -> TypeEnv
+insTypeEnv1 :: [IdentPlus] -> TypeEnv -> TypeEnv
 insTypeEnv1 [] tenv = tenv
 insTypeEnv1 ((_, x, t) : rest) tenv =
   insTypeEnv' (Left (asInt x)) t $ insTypeEnv1 rest tenv
 
 obtainChain ::
-  Meta -> Identifier -> TypeEnv -> WithEnv ([IdentifierPlus], TermPlus)
+  Meta -> Ident -> TypeEnv -> WithEnv ([IdentPlus], TermPlus)
 obtainChain m (I (name, x)) tenv = do
   cenv <- gets chainEnv
   case IntMap.lookup x cenv of

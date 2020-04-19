@@ -5,16 +5,16 @@ import Data.Binary
 import qualified Data.IntMap as IntMap
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
-import Data.WeakTerm hiding (IdentifierPlus)
+import Data.WeakTerm hiding (IdentPlus)
 import GHC.Generics (Generic)
 
 data Term
   = TermTau
-  | TermUpsilon Identifier
-  | TermPi (Maybe T.Text) [IdentifierPlus] TermPlus
-  | TermPiIntro (Maybe (T.Text, [IdentifierPlus])) [IdentifierPlus] TermPlus
+  | TermUpsilon Ident
+  | TermPi (Maybe T.Text) [IdentPlus] TermPlus
+  | TermPiIntro (Maybe (T.Text, [IdentPlus])) [IdentPlus] TermPlus
   | TermPiElim TermPlus [TermPlus]
-  | TermIter IdentifierPlus [IdentifierPlus] TermPlus
+  | TermIter IdentPlus [IdentPlus] TermPlus
   | TermConst T.Text
   | TermFloat FloatSize Double
   | TermEnum EnumType
@@ -24,12 +24,12 @@ data Term
   | TermArrayIntro ArrayKind [TermPlus]
   | TermArrayElim
       ArrayKind
-      [IdentifierPlus] -- [(x1, return t1), ..., (xn, return tn)] with xi : ti
+      [IdentPlus] -- [(x1, return t1), ..., (xn, return tn)] with xi : ti
       TermPlus
       TermPlus
   | TermStruct [ArrayKind] -- e.g. (struct u8 u8 f16 f32 u64)
   | TermStructIntro [(TermPlus, ArrayKind)]
-  | TermStructElim [(Meta, Identifier, ArrayKind)] TermPlus TermPlus
+  | TermStructElim [(Meta, Ident, ArrayKind)] TermPlus TermPlus
   | TermCase
       T.Text
       TermPlus -- (the `e` in `case e of (...)`, the type of `e`)
@@ -42,23 +42,23 @@ type TextPlus = (Meta, T.Text, TermPlus)
 
 type TermPlus = (Meta, Term)
 
-type Clause = (((Meta, T.Text), [IdentifierPlus]), TermPlus)
+type Clause = (((Meta, T.Text), [IdentPlus]), TermPlus)
 
 type SubstTerm = IntMap.IntMap TermPlus
 
-type IdentifierPlus = (Meta, Identifier, TermPlus)
+type IdentPlus = (Meta, Ident, TermPlus)
 
-termPi :: [IdentifierPlus] -> TermPlus -> Term
+termPi :: [IdentPlus] -> TermPlus -> Term
 termPi = TermPi Nothing
 
-termPiIntro :: [IdentifierPlus] -> TermPlus -> Term
+termPiIntro :: [IdentPlus] -> TermPlus -> Term
 termPiIntro = TermPiIntro Nothing
 
-asUpsilon :: TermPlus -> Maybe Identifier
+asUpsilon :: TermPlus -> Maybe Ident
 asUpsilon (_, TermUpsilon x) = Just x
 asUpsilon _ = Nothing
 
-varTermPlus :: TermPlus -> [Identifier]
+varTermPlus :: TermPlus -> [Ident]
 varTermPlus (_, TermTau) = []
 varTermPlus (_, TermUpsilon x) = [x]
 varTermPlus (_, TermPi _ xts t) = varTermPlus' xts [t]
@@ -93,7 +93,7 @@ varTermPlus (_, TermCase _ e cxes) = do
   let ys = concatMap (\((_, xts), body) -> varTermPlus' xts [body]) cxes
   xs ++ ys
 
-varTermPlus' :: [IdentifierPlus] -> [TermPlus] -> [Identifier]
+varTermPlus' :: [IdentPlus] -> [TermPlus] -> [Ident]
 varTermPlus' [] es = concatMap varTermPlus es
 varTermPlus' ((_, x, t) : xts) es = do
   let xs1 = varTermPlus t
@@ -160,7 +160,7 @@ substTermPlus sub (m, TermCase indName e cxtes) = do
           ((c, xts'), body')
   (m, TermCase indName e' cxtes')
 
-substTermPlus' :: SubstTerm -> [IdentifierPlus] -> [IdentifierPlus]
+substTermPlus' :: SubstTerm -> [IdentPlus] -> [IdentPlus]
 substTermPlus' _ [] = []
 substTermPlus' sub ((m, x, t) : xts) = do
   let sub' = IntMap.delete (asInt x) sub
@@ -169,7 +169,7 @@ substTermPlus' sub ((m, x, t) : xts) = do
   (m, x, t') : xts'
 
 substTermPlus'' ::
-  SubstTerm -> [IdentifierPlus] -> TermPlus -> ([IdentifierPlus], TermPlus)
+  SubstTerm -> [IdentPlus] -> TermPlus -> ([IdentPlus], TermPlus)
 substTermPlus'' sub [] e = ([], substTermPlus sub e)
 substTermPlus'' sub ((mx, x, t) : xts) e = do
   let sub' = IntMap.delete (asInt x) sub
@@ -241,7 +241,7 @@ weakenCase (m, CaseValue v) = (m, weakenEnumValue v)
 weakenCase (m, CaseDefault) = (m, WeakCaseDefault)
 
 weakenArgs ::
-  [(Meta, Identifier, TermPlus)] -> [(Meta, Identifier, WeakTermPlus)]
+  [(Meta, Ident, TermPlus)] -> [(Meta, Ident, WeakTermPlus)]
 weakenArgs xts = do
   let (ms, xs, ts) = unzip3 xts
   zip3 ms xs (map weaken ts)

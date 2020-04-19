@@ -188,11 +188,11 @@ simp' ((e1@(m1, _), e2@(m2, _)) : cs) = do
           insConstraintQueue $ Enriched (e1, e2) fmvs $ ConstraintOther
           simp cs
 
-simpBinder :: [IdentifierPlus] -> [IdentifierPlus] -> WithEnv ()
+simpBinder :: [IdentPlus] -> [IdentPlus] -> WithEnv ()
 simpBinder xts1 xts2 = simpBinder' Map.empty xts1 xts2
 
 simpBinder' ::
-  SubstWeakTerm -> [IdentifierPlus] -> [IdentifierPlus] -> WithEnv ()
+  SubstWeakTerm -> [IdentPlus] -> [IdentPlus] -> WithEnv ()
 simpBinder' sub ((m1, x1, t1) : xts1) ((m2, x2, t2) : xts2) = do
   simp [(t1, substWeakTermPlus sub t2)]
   let var1 = (supMeta m1 m2, WeakTermUpsilon x1)
@@ -201,11 +201,11 @@ simpBinder' sub ((m1, x1, t1) : xts1) ((m2, x2, t2) : xts2) = do
 simpBinder' _ _ _ = return ()
 
 simpPattern ::
-  Identifier ->
+  Ident ->
   [[WeakTermPlus]] ->
   WeakTermPlus ->
   WeakTermPlus ->
-  S.Set Identifier ->
+  S.Set Ident ->
   [PreConstraint] ->
   WithEnv ()
 simpPattern h1@(I (_, i)) ies1 _ e2 fvs2 cs = do
@@ -217,11 +217,11 @@ simpPattern h1@(I (_, i)) ies1 _ e2 fvs2 cs = do
   simp cs
 
 simpQuasiPattern ::
-  Identifier ->
+  Ident ->
   [[WeakTermPlus]] ->
   WeakTermPlus ->
   WeakTermPlus ->
-  S.Set Identifier ->
+  S.Set Ident ->
   [PreConstraint] ->
   WithEnv ()
 simpQuasiPattern h1 ies1 e1 e2 fmvs cs = do
@@ -230,18 +230,18 @@ simpQuasiPattern h1 ies1 e1 e2 fmvs cs = do
   simp cs
 
 simpFlexRigid ::
-  Identifier ->
+  Ident ->
   [[WeakTermPlus]] ->
   WeakTermPlus ->
   WeakTermPlus ->
-  S.Set Identifier ->
+  S.Set Ident ->
   [PreConstraint] ->
   WithEnv ()
 simpFlexRigid h1 ies1 e1 e2 fmvs cs = do
   insConstraintQueue $ Enriched (e1, e2) fmvs (ConstraintFlexRigid h1 ies1 e2)
   simp cs
 
-asIdentPlus :: Meta -> WeakTermPlus -> WithEnv IdentifierPlus
+asIdentPlus :: Meta -> WeakTermPlus -> WithEnv IdentPlus
 asIdentPlus m t = do
   h <- newNameWith' "hole"
   return (m, h, t)
@@ -259,9 +259,9 @@ asPairList (es1 : mess1) (es2 : mess2)
 asPairList _ _ = Nothing
 
 data Stuck
-  = StuckPiElimUpsilon Identifier [[WeakTermPlus]]
-  | StuckPiElimZeta Identifier [[WeakTermPlus]]
-  | StuckPiElimZetaStrict Identifier [[WeakTermPlus]]
+  = StuckPiElimUpsilon Ident [[WeakTermPlus]]
+  | StuckPiElimZeta Ident [[WeakTermPlus]]
+  | StuckPiElimZetaStrict Ident [[WeakTermPlus]]
   | StuckPiElimIter IterInfo [(Meta, [WeakTermPlus])]
   | StuckPiElimConst T.Text Meta [(Meta, [WeakTermPlus])]
 
@@ -297,13 +297,13 @@ asStuckedTerm (m, WeakTermPiElim e es) =
     Nothing -> Nothing
 asStuckedTerm _ = Nothing
 
-occurCheck :: Identifier -> S.Set Identifier -> Bool
+occurCheck :: Ident -> S.Set Ident -> Bool
 occurCheck h fmvs = h `S.notMember` fmvs
 
-includeCheck :: [Identifier] -> S.Set Identifier -> [Identifier]
+includeCheck :: [Ident] -> S.Set Ident -> [Ident]
 includeCheck xs ys = filter (`notElem` xs) $ S.toList ys
 
-getVarList :: [WeakTermPlus] -> [Identifier]
+getVarList :: [WeakTermPlus] -> [Ident]
 getVarList xs = catMaybes $ map asUpsilon xs
 
 toPiElim :: WeakTermPlus -> [(Meta, [WeakTermPlus])] -> WeakTermPlus
@@ -314,18 +314,18 @@ insConstraintQueue :: EnrichedConstraint -> WithEnv ()
 insConstraintQueue c =
   modify (\env -> env {constraintQueue = Q.insert c (constraintQueue env)})
 
-visit :: Identifier -> WithEnv ()
+visit :: Ident -> WithEnv ()
 visit h = do
   q <- gets constraintQueue
   let (q1, q2) = Q.partition (\(Enriched _ hs _) -> h `S.member` hs) q
   modify (\env -> env {constraintQueue = q2})
   simp $ map (\(Enriched c _ _) -> c) $ Q.toList q1
 
-toVarList :: S.Set Identifier -> [WeakTermPlus] -> WithEnv [IdentifierPlus]
+toVarList :: S.Set Ident -> [WeakTermPlus] -> WithEnv [IdentPlus]
 toVarList xs es = toVarList' [] xs es
 
 toVarList' ::
-  Context -> S.Set Identifier -> [WeakTermPlus] -> WithEnv [IdentifierPlus]
+  Context -> S.Set Ident -> [WeakTermPlus] -> WithEnv [IdentPlus]
 toVarList' _ _ [] = return []
 toVarList' ctx xs (e : es)
   | (m, WeakTermUpsilon x) <- e,
@@ -340,20 +340,20 @@ toVarList' ctx xs (e : es)
     xts <- toVarList' (ctx ++ [(m, x, t)]) xs es
     return $ (m, x, t) : xts
 
-bindFormalArgs :: WeakTermPlus -> [[IdentifierPlus]] -> WeakTermPlus
+bindFormalArgs :: WeakTermPlus -> [[IdentPlus]] -> WeakTermPlus
 bindFormalArgs e [] = e
 bindFormalArgs e (xts : xtss) = do
   let e' = bindFormalArgs e xtss
   (metaOf e', weakTermPiIntro xts e')
 
-lookupAny :: [Identifier] -> IntMap.IntMap a -> Maybe (Identifier, a)
+lookupAny :: [Ident] -> IntMap.IntMap a -> Maybe (Ident, a)
 lookupAny [] _ = Nothing
 lookupAny (h@(I (_, i)) : ks) sub = do
   case IntMap.lookup i sub of
     Just v -> Just (h, v)
     _ -> lookupAny ks sub
 
-lookupAll :: [Identifier] -> IntMap.IntMap a -> Maybe [a]
+lookupAll :: [Ident] -> IntMap.IntMap a -> Maybe [a]
 lookupAll [] _ = return []
 lookupAll ((I (_, i)) : xs) sub = do
   v <- IntMap.lookup i sub

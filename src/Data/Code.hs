@@ -7,7 +7,7 @@ import qualified Data.Text as T
 
 data Data
   = DataConst T.Text
-  | DataUpsilon Identifier
+  | DataUpsilon Ident
   | DataSigmaIntro ArrayKind [DataPlus]
   | DataEnumIntro EnumValue
   | DataFloat FloatSize Double
@@ -17,11 +17,11 @@ data Data
 data Code
   = CodeConst Const
   | CodePiElimDownElim DataPlus [DataPlus] -- ((force v) v1 ... vn)
-  | CodeSigmaElim ArrayKind [Identifier] DataPlus CodePlus
+  | CodeSigmaElim ArrayKind [Ident] DataPlus CodePlus
   | CodeUpIntro DataPlus
-  | CodeUpElim Identifier CodePlus CodePlus
+  | CodeUpElim Ident CodePlus CodePlus
   | CodeEnumElim SubstDataPlus DataPlus [(Case, CodePlus)]
-  | CodeStructElim [(Identifier, ArrayKind)] DataPlus CodePlus
+  | CodeStructElim [(Ident, ArrayKind)] DataPlus CodePlus
   | CodeCase SubstDataPlus DataPlus [((Meta, T.Text), CodePlus)]
   deriving (Show)
 
@@ -37,21 +37,21 @@ newtype IsFixed
   deriving (Show)
 
 data Definition
-  = Definition IsFixed [Identifier] CodePlus
+  = Definition IsFixed [Ident] CodePlus
   deriving (Show)
 
 type DataPlus = (Meta, Data)
 
 type CodePlus = (Meta, Code)
 
-asUpsilon :: DataPlus -> Maybe Identifier
+asUpsilon :: DataPlus -> Maybe Ident
 asUpsilon (_, DataUpsilon x) = Just x
 asUpsilon _ = Nothing
 
 sigmaIntro :: [DataPlus] -> Data
 sigmaIntro = DataSigmaIntro arrVoidPtr
 
-sigmaElim :: [Identifier] -> DataPlus -> CodePlus -> Code
+sigmaElim :: [Ident] -> DataPlus -> CodePlus -> Code
 sigmaElim = CodeSigmaElim arrVoidPtr
 
 type SubstDataPlus = IntMap.IntMap DataPlus

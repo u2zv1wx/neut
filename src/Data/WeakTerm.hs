@@ -8,15 +8,15 @@ import Path
 
 data WeakTerm
   = WeakTermTau
-  | WeakTermUpsilon Identifier
-  | WeakTermPi (Maybe T.Text) [IdentifierPlus] WeakTermPlus
+  | WeakTermUpsilon Ident
+  | WeakTermPi (Maybe T.Text) [IdentPlus] WeakTermPlus
   | WeakTermPiIntro
-      (Maybe (T.Text, [IdentifierPlus]))
-      [IdentifierPlus]
+      (Maybe (T.Text, [IdentPlus]))
+      [IdentPlus]
       WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
-  | WeakTermIter IdentifierPlus [IdentifierPlus] WeakTermPlus
-  | WeakTermZeta Identifier
+  | WeakTermIter IdentPlus [IdentPlus] WeakTermPlus
+  | WeakTermZeta Ident
   | WeakTermConst T.Text
   | WeakTermInt WeakTermPlus Integer
   | WeakTermFloat WeakTermPlus Double
@@ -27,16 +27,16 @@ data WeakTerm
   | WeakTermArrayIntro ArrayKind [WeakTermPlus]
   | WeakTermArrayElim
       ArrayKind
-      [IdentifierPlus] -- [(x1, return t1), ..., (xn, return tn)] with xi : ti
+      [IdentPlus] -- [(x1, return t1), ..., (xn, return tn)] with xi : ti
       WeakTermPlus
       WeakTermPlus
   | WeakTermStruct [ArrayKind] -- e.g. (struct u8 u8 f16 f32 u64)
   | WeakTermStructIntro [(WeakTermPlus, ArrayKind)]
-  | WeakTermStructElim [(Meta, Identifier, ArrayKind)] WeakTermPlus WeakTermPlus
+  | WeakTermStructElim [(Meta, Ident, ArrayKind)] WeakTermPlus WeakTermPlus
   | WeakTermCase
       T.Text
       WeakTermPlus
-      [(((Meta, T.Text), [IdentifierPlus]), WeakTermPlus)]
+      [(((Meta, T.Text), [IdentPlus]), WeakTermPlus)]
   | WeakTermQuestion WeakTermPlus WeakTermPlus -- e : t (output the type `t` as note)
   | WeakTermErase [(Meta, T.Text)] WeakTermPlus
   deriving (Show, Eq)
@@ -55,29 +55,29 @@ type WeakCasePlus = (Meta, WeakCase)
 
 type SubstWeakTerm = Map.HashMap (Either Int T.Text) WeakTermPlus
 
-type IdentifierPlus = (Meta, Identifier, WeakTermPlus)
+type IdentPlus = (Meta, Ident, WeakTermPlus)
 
 type WeakTextPlus = (Meta, T.Text, WeakTermPlus)
 
-type Def = (Meta, IdentifierPlus, [IdentifierPlus], WeakTermPlus)
+type Def = (Meta, IdentPlus, [IdentPlus], WeakTermPlus)
 
 type IdentDef = (T.Text, Def)
 
-weakTermPiIntro :: [IdentifierPlus] -> WeakTermPlus -> WeakTerm
+weakTermPiIntro :: [IdentPlus] -> WeakTermPlus -> WeakTerm
 weakTermPiIntro = WeakTermPiIntro Nothing
 
 type Rule = -- inference rule
   ( Meta, -- location of the name
     T.Text, -- the name of the rule
     Meta, -- location of the rule
-    [IdentifierPlus], -- the antecedents of the inference rule (e.g. [(x, A), (xs, list A)])
+    [IdentPlus], -- the antecedents of the inference rule (e.g. [(x, A), (xs, list A)])
     WeakTermPlus -- the consequent of the inference rule
   )
 
 type Connective =
   ( Meta, -- location of the connective
     T.Text, -- the name of the connective (e.g. nat, list)
-    [IdentifierPlus], -- parameter of the connective (e.g. the `A` in `list A`)
+    [IdentPlus], -- parameter of the connective (e.g. the `A` in `list A`)
     [Rule] -- list of introduction rule when inductive / list of elimination rule when coinductive
   )
 
@@ -110,10 +110,10 @@ data WeakStmt
   | WeakStmtVisit (Path Abs File) WeakStmt WeakStmt
   deriving (Show)
 
-weakTermPi :: [IdentifierPlus] -> WeakTermPlus -> WeakTerm
+weakTermPi :: [IdentPlus] -> WeakTermPlus -> WeakTerm
 weakTermPi = WeakTermPi Nothing
 
-varWeakTermPlus :: WeakTermPlus -> S.Set Identifier
+varWeakTermPlus :: WeakTermPlus -> S.Set Ident
 varWeakTermPlus (_, WeakTermTau) = S.empty
 varWeakTermPlus (_, WeakTermUpsilon x) = S.singleton x
 varWeakTermPlus (_, WeakTermPi _ xts t) = varWeakTermPlus' xts [t]
@@ -160,14 +160,14 @@ varWeakTermPlus (_, WeakTermQuestion e t) = do
   S.union set1 set2
 varWeakTermPlus (_, WeakTermErase _ e) = varWeakTermPlus e
 
-varWeakTermPlus' :: [IdentifierPlus] -> [WeakTermPlus] -> S.Set Identifier
+varWeakTermPlus' :: [IdentPlus] -> [WeakTermPlus] -> S.Set Ident
 varWeakTermPlus' [] es = S.unions $ map varWeakTermPlus es
 varWeakTermPlus' ((_, x, t) : xts) es = do
   let hs1 = varWeakTermPlus t
   let hs2 = varWeakTermPlus' xts es
   S.union hs1 $ S.filter (/= x) hs2
 
-holeWeakTermPlus :: WeakTermPlus -> S.Set Identifier
+holeWeakTermPlus :: WeakTermPlus -> S.Set Ident
 holeWeakTermPlus (_, WeakTermTau) = S.empty
 holeWeakTermPlus (_, WeakTermUpsilon _) = S.empty
 holeWeakTermPlus (_, WeakTermPi _ xts t) = holeWeakTermPlus' xts [t]
@@ -216,7 +216,7 @@ holeWeakTermPlus (_, WeakTermQuestion e t) = do
   S.union set1 set2
 holeWeakTermPlus (_, WeakTermErase _ e) = holeWeakTermPlus e
 
-holeWeakTermPlus' :: [IdentifierPlus] -> [WeakTermPlus] -> S.Set Identifier
+holeWeakTermPlus' :: [IdentPlus] -> [WeakTermPlus] -> S.Set Ident
 holeWeakTermPlus' [] es = S.unions $ map holeWeakTermPlus es
 holeWeakTermPlus' ((_, _, t) : xts) es = do
   let set1 = holeWeakTermPlus t
@@ -270,7 +270,7 @@ constWeakTermPlus (_, WeakTermQuestion e t) = do
   S.union set1 set2
 constWeakTermPlus (_, WeakTermErase _ e) = constWeakTermPlus e
 
-constWeakTermPlus' :: [IdentifierPlus] -> [WeakTermPlus] -> S.Set T.Text
+constWeakTermPlus' :: [IdentPlus] -> [WeakTermPlus] -> S.Set T.Text
 constWeakTermPlus' [] es = S.unions $ map constWeakTermPlus es
 constWeakTermPlus' ((_, _, t) : xts) es = do
   let hs1 = constWeakTermPlus t
@@ -360,7 +360,7 @@ substWeakTermPlus sub (m, WeakTermErase xs e) = do
   let e' = substWeakTermPlus sub e
   (m, WeakTermErase xs e')
 
-substWeakTermPlus' :: SubstWeakTerm -> [IdentifierPlus] -> [IdentifierPlus]
+substWeakTermPlus' :: SubstWeakTerm -> [IdentPlus] -> [IdentPlus]
 substWeakTermPlus' _ [] = []
 substWeakTermPlus' sub ((m, x, t) : xts) = do
   let sub' = Map.delete (Left $ asInt x) sub
@@ -370,9 +370,9 @@ substWeakTermPlus' sub ((m, x, t) : xts) = do
 
 substWeakTermPlus'' ::
   SubstWeakTerm ->
-  [IdentifierPlus] ->
+  [IdentPlus] ->
   WeakTermPlus ->
-  ([IdentifierPlus], WeakTermPlus)
+  ([IdentPlus], WeakTermPlus)
 substWeakTermPlus'' sub [] e = ([], substWeakTermPlus sub e)
 substWeakTermPlus'' sub ((m, x, t) : xts) e = do
   let sub' = Map.delete (Left $ asInt x) sub
@@ -383,7 +383,7 @@ substWeakTermPlus'' sub ((m, x, t) : xts) e = do
 metaOf :: WeakTermPlus -> Meta
 metaOf e = fst e
 
-asUpsilon :: WeakTermPlus -> Maybe Identifier
+asUpsilon :: WeakTermPlus -> Maybe Ident
 asUpsilon (_, WeakTermUpsilon x) = Just x
 asUpsilon _ = Nothing
 
@@ -469,10 +469,10 @@ inBrace s = "{" <> s <> "}"
 inBracket :: T.Text -> T.Text
 inBracket s = "[" <> s <> "]"
 
-showArg :: (Meta, Identifier, WeakTermPlus) -> T.Text
+showArg :: (Meta, Ident, WeakTermPlus) -> T.Text
 showArg (_, x, t) = inParen $ asText x <> " " <> toText t
 
-showTypeArgs :: [IdentifierPlus] -> WeakTermPlus -> T.Text
+showTypeArgs :: [IdentPlus] -> WeakTermPlus -> T.Text
 showTypeArgs [] _ = T.empty
 showTypeArgs [(_, x, t)] cod
   | x `S.member` varWeakTermPlus cod = inParen $ asText x <> " " <> toText t
@@ -487,7 +487,7 @@ showTypeArgs ((_, x, t) : xts) cod
     let s2 = showTypeArgs xts cod
     s1 <> " " <> s2
 
-isDependent :: [IdentifierPlus] -> WeakTermPlus -> Bool
+isDependent :: [IdentPlus] -> WeakTermPlus -> Bool
 isDependent [] _ = False
 isDependent ((_, x, _) : xts) cod
   | x `S.member` varWeakTermPlus' xts [cod] = True
@@ -534,7 +534,7 @@ showArray = inBracket . T.intercalate " "
 showStruct :: [T.Text] -> T.Text
 showStruct = inBrace . T.intercalate " "
 
-extractSigmaArg :: WeakTermPlus -> Maybe [IdentifierPlus]
+extractSigmaArg :: WeakTermPlus -> Maybe [IdentPlus]
 extractSigmaArg (_, WeakTermPi _ [(_, z, (_, WeakTermTau)), (_, _, (_, WeakTermPi _ xts (_, WeakTermUpsilon z')))] (_, WeakTermUpsilon z''))
   | z == z',
     z == z'' =

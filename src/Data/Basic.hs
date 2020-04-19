@@ -10,28 +10,28 @@ import Path
 import Path.Internal
 import Text.Read hiding (get)
 
-newtype Identifier
+newtype Ident
   = I (T.Text, Int)
   deriving (Eq, Ord, Generic)
 
-instance Binary Identifier
+instance Binary Ident
 
-asText :: Identifier -> T.Text
+asText :: Ident -> T.Text
 asText (I (s, _)) = s
 
-asText' :: Identifier -> T.Text
+asText' :: Ident -> T.Text
 asText' (I (s, i)) = s <> "-" <> T.pack (show i)
 
-asText'' :: Identifier -> T.Text
+asText'' :: Ident -> T.Text
 asText'' (I (_, i)) = "_" <> T.pack (show i)
 
-asIdent :: T.Text -> Identifier
+asIdent :: T.Text -> Ident
 asIdent s = I (s, 0)
 
-asInt :: Identifier -> Int
+asInt :: Ident -> Int
 asInt (I (_, i)) = i
 
-instance Show Identifier where
+instance Show Ident where
   show (I (s, i)) = T.unpack s ++ "-" ++ show i
 
 type Phase = Int

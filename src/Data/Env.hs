@@ -97,11 +97,11 @@ data Env
         -- f ~> thunk (lam (x1 ... xn) e)
         codeEnv :: Map.HashMap T.Text Definition,
         nameSet :: S.Set T.Text,
-        chainEnv :: IntMap.IntMap ([Data.Term.IdentifierPlus], TermPlus),
+        chainEnv :: IntMap.IntMap ([Data.Term.IdentPlus], TermPlus),
         --
         -- LLVM
         --
-        llvmEnv :: Map.HashMap T.Text ([Identifier], LLVM),
+        llvmEnv :: Map.HashMap T.Text ([Ident], LLVM),
         defVarSet :: S.Set Int,
         -- external functions that must be declared in LLVM IR
         declEnv :: Map.HashMap T.Text ([LowType], LowType),
@@ -197,19 +197,19 @@ newCountPP = do
     else return i
 
 {-# INLINE newNameWith #-}
-newNameWith :: Identifier -> WithEnv Identifier
+newNameWith :: Ident -> WithEnv Ident
 newNameWith (I (s, _)) = do
   j <- newCount
   return $ I (s, j)
 
 {-# INLINE newNameWith' #-}
-newNameWith' :: T.Text -> WithEnv Identifier
+newNameWith' :: T.Text -> WithEnv Ident
 newNameWith' s = do
   i <- newCount
   return $ I (s, i)
 
 {-# INLINE newNameWith'' #-}
-newNameWith'' :: T.Text -> WithEnv Identifier
+newNameWith'' :: T.Text -> WithEnv Ident
 newNameWith'' s = do
   i <- newCount
   return $ I ("(" <> s <> "-" <> T.pack (show i) <> ")", i)
@@ -250,7 +250,7 @@ getArch = do
     s -> raiseCritical' $ "unsupported target arch: " <> T.pack (show s)
 
 {-# INLINE newDataUpsilonWith #-}
-newDataUpsilonWith :: Meta -> T.Text -> WithEnv (Identifier, DataPlus)
+newDataUpsilonWith :: Meta -> T.Text -> WithEnv (Ident, DataPlus)
 newDataUpsilonWith m name = do
   x <- newNameWith' name
   return (x, (m, DataUpsilon x))
@@ -325,7 +325,7 @@ arrayAccessToType m lowType = do
   cod <- termSigma m [(m, x4, arr), (m, x5, t)]
   return (m, termPi xts cod)
 
-weakTermSigma :: Meta -> [Data.WeakTerm.IdentifierPlus] -> WithEnv WeakTermPlus
+weakTermSigma :: Meta -> [Data.WeakTerm.IdentPlus] -> WithEnv WeakTermPlus
 weakTermSigma m xts = do
   z <- newNameWith'' "sigma"
   let vz = (m, WeakTermUpsilon z)
@@ -333,7 +333,7 @@ weakTermSigma m xts = do
   let yts = [(m, z, (m, WeakTermTau)), (m, k, (m, weakTermPi xts vz))]
   return (m, weakTermPi yts vz)
 
-termSigma :: Meta -> [Data.Term.IdentifierPlus] -> WithEnv TermPlus
+termSigma :: Meta -> [Data.Term.IdentPlus] -> WithEnv TermPlus
 termSigma m xts = do
   z <- newNameWith'' "sigma"
   let vz = (m, TermUpsilon z)

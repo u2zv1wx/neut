@@ -14,7 +14,7 @@ import Data.WeakTerm
 discern :: [QuasiStmt] -> WithEnv [QuasiStmt]
 discern = discern' Map.empty
 
-type NameEnv = Map.HashMap T.Text Identifier
+type NameEnv = Map.HashMap T.Text Ident
 
 discern' :: NameEnv -> [QuasiStmt] -> WithEnv [QuasiStmt]
 discern' _ [] = return []
@@ -181,9 +181,9 @@ discern'' nenv (_, WeakTermErase mxs e) = do
 
 discernBinder ::
   NameEnv ->
-  [IdentifierPlus] ->
+  [IdentPlus] ->
   WeakTermPlus ->
-  WithEnv ([IdentifierPlus], WeakTermPlus)
+  WithEnv ([IdentPlus], WeakTermPlus)
 discernBinder nenv [] e = do
   e' <- discern'' nenv e
   return ([], e')
@@ -193,7 +193,7 @@ discernBinder nenv ((mx, x, t) : xts) e = do
   (xts', e') <- discernBinder (insertName x x' nenv) xts e
   return ((mx, x', t') : xts', e')
 
-discernIdentPlus :: NameEnv -> IdentifierPlus -> WithEnv IdentifierPlus
+discernIdentPlus :: NameEnv -> IdentPlus -> WithEnv IdentPlus
 discernIdentPlus nenv (m, x, t) = do
   t' <- discern'' nenv t
   penv <- gets prefixEnv
@@ -202,10 +202,10 @@ discernIdentPlus nenv (m, x, t) = do
 
 discernIter ::
   NameEnv ->
-  IdentifierPlus ->
-  [IdentifierPlus] ->
+  IdentPlus ->
+  [IdentPlus] ->
   WeakTermPlus ->
-  WithEnv (IdentifierPlus, [IdentifierPlus], WeakTermPlus)
+  WithEnv (IdentPlus, [IdentPlus], WeakTermPlus)
 discernIter nenv (mx, x, t') [] e = do
   x' <- newDefinedNameWith mx x
   removeFromIntactSet mx $ asText x'
@@ -230,9 +230,9 @@ discernWeakCase _ _ l = return l
 
 discernStruct ::
   NameEnv ->
-  [(Meta, Identifier, ArrayKind)] ->
+  [(Meta, Ident, ArrayKind)] ->
   WeakTermPlus ->
-  WithEnv ([(Meta, Identifier, ArrayKind)], WeakTermPlus)
+  WithEnv ([(Meta, Ident, ArrayKind)], WeakTermPlus)
 discernStruct nenv [] e = do
   e' <- discern'' nenv e
   return ([], e')
@@ -241,7 +241,7 @@ discernStruct nenv ((mx, x, t) : xts) e = do
   (xts', e') <- discernStruct (insertName x x' nenv) xts e
   return ((mx, x', t) : xts', e')
 
-newDefinedNameWith :: Meta -> Identifier -> WithEnv Identifier
+newDefinedNameWith :: Meta -> Ident -> WithEnv Ident
 newDefinedNameWith m (I (s, _)) = do
   j <- newCount
   modify (\env -> env {nameEnv = Map.insert s s (nameEnv env)})
@@ -249,14 +249,14 @@ newDefinedNameWith m (I (s, _)) = do
   insertIntoIntactSet m s
   return x
 
--- newDefinedNameWith :: Meta -> Identifier -> WithEnv Identifier
+-- newDefinedNameWith :: Meta -> Ident -> WithEnv Ident
 -- newDefinedNameWith m (I (s, _)) = do
 --   j <- newCount
 --   modify (\env -> env {nameEnv = Map.insert s s (nameEnv env)})
 --   let x = I (s, j)
 --   insertIntoIntactSet m x
 --   return x
--- newDefinedNameWith' :: Meta -> NameEnv -> Identifier -> WithEnv Identifier
+-- newDefinedNameWith' :: Meta -> NameEnv -> Ident -> WithEnv Ident
 -- newDefinedNameWith' m nenv x = do
 --   case Map.lookup (asText x) nenv of
 --     Nothing -> newDefinedNameWith m x
@@ -272,7 +272,7 @@ insertConstant m x = do
       modify (\env -> env {constantSet = S.insert x (constantSet env)})
       insertIntoIntactSet m x
 
-insertName :: Identifier -> Identifier -> NameEnv -> NameEnv
+insertName :: Ident -> Ident -> NameEnv -> NameEnv
 insertName (I (s, _)) y nenv = Map.insert s y nenv
 
 insertIntoIntactSet :: Meta -> T.Text -> WithEnv ()
@@ -284,7 +284,7 @@ removeFromIntactSet m x =
   whenCheck $ modify (\env -> env {intactSet = S.delete (m, x) (intactSet env)})
 
 lookupName ::
-  Meta -> [T.Text] -> NameEnv -> Identifier -> WithEnv (Maybe Identifier)
+  Meta -> [T.Text] -> NameEnv -> Ident -> WithEnv (Maybe Ident)
 lookupName m penv nenv x =
   case Map.lookup (asText x) nenv of
     Just x' -> do
@@ -293,7 +293,7 @@ lookupName m penv nenv x =
     Nothing -> lookupName' m penv nenv x
 
 lookupName' ::
-  Meta -> [T.Text] -> NameEnv -> Identifier -> WithEnv (Maybe Identifier)
+  Meta -> [T.Text] -> NameEnv -> Ident -> WithEnv (Maybe Ident)
 lookupName' _ [] _ _ = return Nothing
 lookupName' m (prefix : prefixList) nenv x = do
   let query = prefix <> ":" <> asText x
@@ -303,7 +303,7 @@ lookupName' m (prefix : prefixList) nenv x = do
       return $ Just x'
     Nothing -> lookupName' m prefixList nenv x
 
-lookupName'' :: Meta -> [T.Text] -> NameEnv -> Identifier -> WithEnv Identifier
+lookupName'' :: Meta -> [T.Text] -> NameEnv -> Ident -> WithEnv Ident
 lookupName'' m penv nenv x = do
   mx <- lookupName m penv nenv x
   case mx of
