@@ -49,8 +49,7 @@ visit path = do
   modify (\env -> env {phase = 1 + phase env})
   content <- liftIO $ TIO.readFile $ toFilePath path
   treeList <- tokenize content
-  ss <- parse' $ includeCore (newMeta 1 1 path) treeList
-  return [QuasiStmtVisit path ss]
+  parse' $ includeCore (newMeta 1 1 path) treeList
 
 leave :: WithEnv [QuasiStmt]
 leave = do
@@ -520,10 +519,11 @@ concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt e as : ss) =
     _ -> raiseCritical m "inductive-intro"
 concatQuasiStmtList (QuasiStmtUse _ : ss) = concatQuasiStmtList ss
 concatQuasiStmtList (QuasiStmtUnuse _ : ss) = concatQuasiStmtList ss
-concatQuasiStmtList (QuasiStmtVisit path ss1 : ss2) = do
-  ss1' <- concatQuasiStmtList ss1
-  ss2' <- concatQuasiStmtList ss2
-  return $ WeakStmtVisit path ss1' ss2'
+
+-- concatQuasiStmtList (QuasiStmtVisit path ss1 : ss2) = do
+--   ss1' <- concatQuasiStmtList ss1
+--   ss2' <- concatQuasiStmtList ss2
+--   return $ WeakStmtVisit path ss1' ss2'
 
 checkKeywordSanity :: Meta -> T.Text -> WithEnv ()
 checkKeywordSanity m "" = raiseError m "empty string for a keyword"

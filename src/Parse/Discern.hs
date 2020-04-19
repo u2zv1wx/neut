@@ -51,11 +51,12 @@ discern' nenv (QuasiStmtUnuse prefix : ss) = do
   modify (\e -> e {prefixEnv = filter (/= prefix) (prefixEnv e)})
   ss' <- discern' nenv ss
   return $ QuasiStmtUnuse prefix : ss'
-discern' nenv (QuasiStmtVisit path ss1 : ss2) = do
-  ssss <- discern' nenv $ ss1 ++ ss2 -- stmtの長さはdiscernにおいて不変なのでこれでオッケー
-  let ss1' = take (length ss1) ssss
-  let ss2' = drop (length ss1) ssss
-  return $ QuasiStmtVisit path ss1' : ss2'
+
+-- discern' nenv (QuasiStmtVisit path ss1 : ss2) = do
+--   ssss <- discern' nenv $ ss1 ++ ss2 -- stmtの長さはdiscernにおいて不変なのでこれでオッケー
+--   let ss1' = take (length ss1) ssss
+--   let ss2' = drop (length ss1) ssss
+--   return $ QuasiStmtVisit path ss1' : ss2'
 
 discernLet ::
   NameEnv ->
