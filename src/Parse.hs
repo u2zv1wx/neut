@@ -92,21 +92,25 @@ parse' ((m, TreeNode ((_, TreeLeaf "keyword") : es)) : as)
 parse' ((m, TreeNode ((_, TreeLeaf "use") : es)) : as)
   | [(_, TreeLeaf s)] <- es = do
     modify (\e -> e {prefixEnv = s : prefixEnv e}) -- required to check sanity of `include`
-    stmtList <- parse' as
-    return $ QuasiStmtUse s : stmtList
+    parse' as
+  -- stmtList <- parse' as
+  -- return $ QuasiStmtUse s : stmtList
   | otherwise = raiseSyntaxError m "(use LEAF)"
 parse' ((m, TreeNode ((_, TreeLeaf "unuse") : es)) : as)
   | [(_, TreeLeaf s)] <- es = do
     modify (\e -> e {prefixEnv = filter (/= s) (prefixEnv e)}) -- required to check sanity of `include`
-    stmtList <- parse' as
-    return $ QuasiStmtUnuse s : stmtList
+    parse' as
+  -- stmtList <- parse' as
+  -- return $ QuasiStmtUnuse s : stmtList
   | otherwise = raiseSyntaxError m "(unuse LEAF)"
 parse' ((m, TreeNode ((_, TreeLeaf "section") : es)) : as)
   | [(_, TreeLeaf s)] <- es = do
     modify (\e -> e {sectionEnv = s : sectionEnv e})
     n <- getCurrentSection
-    stmtList <- parse' as
-    return $ QuasiStmtUse n : QuasiStmtUse (n <> ":" <> "private") : stmtList
+    modify (\e -> e {prefixEnv = n : n <> ":" <> "private" : prefixEnv e})
+    parse' as
+  -- stmtList <- parse' as
+  -- return $ QuasiStmtUse n : QuasiStmtUse (n <> ":" <> "private") : stmtList
   -- auto-use
   | otherwise = raiseSyntaxError m "(section LEAF)"
 parse' ((m, TreeNode ((_, TreeLeaf "end") : es)) : as)
@@ -118,9 +122,12 @@ parse' ((m, TreeNode ((_, TreeLeaf "end") : es)) : as)
         | s == s' -> do
           n <- getCurrentSection
           modify (\e -> e {sectionEnv = ns'})
-          stmtList <- parse' as
-          return $
-            QuasiStmtUnuse n : QuasiStmtUnuse (n <> ":" <> "private") : stmtList
+          penv <- gets prefixEnv
+          modify (\env -> env {prefixEnv = filter (`notElem` [n, n <> ":" <> "private"]) penv})
+          parse' as
+        -- stmtList <- parse' as
+        -- return $
+        --   QuasiStmtUnuse n : QuasiStmtUnuse (n <> ":" <> "private") : stmtList
         | otherwise ->
           raiseError m $
             "the innermost section is not `" <> s <> "`, but is `" <> s' <> "`"
@@ -508,8 +515,9 @@ concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt e as : ss) =
           )
           cont
     _ -> raiseCritical m "inductive-intro"
-concatQuasiStmtList (QuasiStmtUse _ : ss) = concatQuasiStmtList ss
-concatQuasiStmtList (QuasiStmtUnuse _ : ss) = concatQuasiStmtList ss
+
+-- concatQuasiStmtList (QuasiStmtUse _ : ss) = concatQuasiStmtList ss
+-- concatQuasiStmtList (QuasiStmtUnuse _ : ss) = concatQuasiStmtList ss
 
 checkKeywordSanity :: Meta -> T.Text -> WithEnv ()
 checkKeywordSanity m "" = raiseError m "empty string for a keyword"

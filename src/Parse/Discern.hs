@@ -1,5 +1,7 @@
 module Parse.Discern
   ( discern,
+    discernLet,
+    discern'',
   )
 where
 
@@ -43,14 +45,15 @@ discern' nenv (QuasiStmtLetInductive n m xt e : ss) = do
 discern' nenv (QuasiStmtLetInductiveIntro m xt e as : ss) = do
   (xt', e', ss') <- discernLet nenv xt e ss
   return $ QuasiStmtLetInductiveIntro m xt' e' as : ss'
-discern' nenv (QuasiStmtUse prefix : ss) = do
-  modify (\e -> e {prefixEnv = prefix : prefixEnv e})
-  ss' <- discern' nenv ss
-  return $ QuasiStmtUse prefix : ss'
-discern' nenv (QuasiStmtUnuse prefix : ss) = do
-  modify (\e -> e {prefixEnv = filter (/= prefix) (prefixEnv e)})
-  ss' <- discern' nenv ss
-  return $ QuasiStmtUnuse prefix : ss'
+
+-- discern' nenv (QuasiStmtUse prefix : ss) = do
+--   modify (\e -> e {prefixEnv = prefix : prefixEnv e})
+--   ss' <- discern' nenv ss
+--   return $ QuasiStmtUse prefix : ss'
+-- discern' nenv (QuasiStmtUnuse prefix : ss) = do
+--   modify (\e -> e {prefixEnv = filter (/= prefix) (prefixEnv e)})
+--   ss' <- discern' nenv ss
+--   return $ QuasiStmtUnuse prefix : ss'
 
 discernLet ::
   NameEnv ->

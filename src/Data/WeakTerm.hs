@@ -96,8 +96,8 @@ data QuasiStmt
   | QuasiStmtConstDecl Meta WeakTextPlus
   | QuasiStmtLetInductive Int Meta WeakIdentPlus WeakTermPlus
   | QuasiStmtLetInductiveIntro Meta WeakIdentPlus WeakTermPlus [T.Text]
-  | QuasiStmtUse T.Text
-  | QuasiStmtUnuse T.Text
+  -- | QuasiStmtUse T.Text
+  -- | QuasiStmtUnuse T.Text
   -- | QuasiStmtVisit (Path Abs File) [QuasiStmt]
   deriving (Show)
 
