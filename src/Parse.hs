@@ -93,15 +93,11 @@ parse' ((m, TreeNode ((_, TreeLeaf "use") : es)) : as)
   | [(_, TreeLeaf s)] <- es = do
     modify (\e -> e {prefixEnv = s : prefixEnv e}) -- required to check sanity of `include`
     parse' as
-  -- stmtList <- parse' as
-  -- return $ QuasiStmtUse s : stmtList
   | otherwise = raiseSyntaxError m "(use LEAF)"
 parse' ((m, TreeNode ((_, TreeLeaf "unuse") : es)) : as)
   | [(_, TreeLeaf s)] <- es = do
     modify (\e -> e {prefixEnv = filter (/= s) (prefixEnv e)}) -- required to check sanity of `include`
     parse' as
-  -- stmtList <- parse' as
-  -- return $ QuasiStmtUnuse s : stmtList
   | otherwise = raiseSyntaxError m "(unuse LEAF)"
 parse' ((m, TreeNode ((_, TreeLeaf "section") : es)) : as)
   | [(_, TreeLeaf s)] <- es = do
@@ -109,9 +105,6 @@ parse' ((m, TreeNode ((_, TreeLeaf "section") : es)) : as)
     n <- getCurrentSection
     modify (\e -> e {prefixEnv = n : n <> ":" <> "private" : prefixEnv e})
     parse' as
-  -- stmtList <- parse' as
-  -- return $ QuasiStmtUse n : QuasiStmtUse (n <> ":" <> "private") : stmtList
-  -- auto-use
   | otherwise = raiseSyntaxError m "(section LEAF)"
 parse' ((m, TreeNode ((_, TreeLeaf "end") : es)) : as)
   | [(_, TreeLeaf s)] <- es = do
@@ -125,9 +118,6 @@ parse' ((m, TreeNode ((_, TreeLeaf "end") : es)) : as)
           penv <- gets prefixEnv
           modify (\env -> env {prefixEnv = filter (`notElem` [n, n <> ":" <> "private"]) penv})
           parse' as
-        -- stmtList <- parse' as
-        -- return $
-        --   QuasiStmtUnuse n : QuasiStmtUnuse (n <> ":" <> "private") : stmtList
         | otherwise ->
           raiseError m $
             "the innermost section is not `" <> s <> "`, but is `" <> s' <> "`"
