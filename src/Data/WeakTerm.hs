@@ -61,7 +61,7 @@ type WeakTextPlus = (Meta, T.Text, WeakTermPlus)
 
 type Def = (Meta, WeakIdentPlus, [WeakIdentPlus], WeakTermPlus)
 
-type IdentDef = (T.Text, Def)
+type IdentDef = (Ident, Def)
 
 weakTermPiIntro :: [WeakIdentPlus] -> WeakTermPlus -> WeakTerm
 weakTermPiIntro = WeakTermPiIntro Nothing
@@ -85,13 +85,13 @@ data QuasiStmt
   = QuasiStmtLet Meta WeakIdentPlus WeakTermPlus
   | -- special case of `let` in which the `e` in `let x := e` is known to be well-typed
     QuasiStmtLetWT Meta WeakIdentPlus WeakTermPlus
-  | -- mutually recursive definition (n >= 0)
-    --   (definition
-    --     ((f1 A1) (ARGS-1) e1)
-    --     ...
-    --     ((fn An) (ARGS-n) en))
-    QuasiStmtDef [(T.Text, Def)]
-  | QuasiStmtVerify Meta WeakTermPlus
+  | -- | -- mutually recursive definition (n >= 0)
+    --   --   (definition
+    --   --     ((f1 A1) (ARGS-1) e1)
+    --   --     ...
+    --   --     ((fn An) (ARGS-n) en))
+    --   QuasiStmtDef [(T.Text, Def)]
+    QuasiStmtVerify Meta WeakTermPlus
   | QuasiStmtEnum Meta T.Text [(T.Text, Int)]
   | QuasiStmtConstDecl Meta WeakTextPlus
   | QuasiStmtLetInductive Int Meta WeakIdentPlus WeakTermPlus

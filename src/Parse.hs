@@ -66,7 +66,7 @@ insDepGraph path = do
   tenv <- gets traceEnv
   case tenv of
     [] -> return ()
-    (foo : _) -> do
+    (foo : _) ->
       modify
         (\env -> env {depGraph = Map.insertWith (++) foo [path] (depGraph env)})
 
@@ -179,15 +179,15 @@ parse' ((m, TreeNode ((_, TreeLeaf "constant") : rest)) : as)
 parse' ((m, TreeNode (def@(mDef, TreeLeaf "definition") : rest)) : as)
   | [name@(_, TreeLeaf _), body] <- rest =
     parse' $ (m, TreeNode [(mDef, TreeLeaf "let"), name, body]) : as
-  | name@(mFun, TreeLeaf _) : xts@(_, TreeNode _) : body : rest' <- rest = do
+  | name@(mFun, TreeLeaf _) : xts@(_, TreeNode _) : body : rest' <- rest =
     parse' $
       (m, TreeNode [def, (mFun, TreeNode (name : xts : body : rest'))]) : as
   | otherwise = do
-    s <- parseDef rest
-    ss <- parse' as
-    return $ s : ss
+    ss1 <- parseDef rest
+    ss2 <- parse' as
+    return $ ss1 ++ ss2
 parse' ((m, TreeNode (ind@(_, TreeLeaf "inductive") : rest)) : as)
-  | name@(mFun, TreeLeaf _) : xts@(_, TreeNode _) : rest' <- rest = do
+  | name@(mFun, TreeLeaf _) : xts@(_, TreeNode _) : rest' <- rest =
     parse' $ (m, TreeNode [ind, (mFun, TreeNode (name : xts : rest'))]) : as
   | otherwise = do
     rest' <- mapM (adjustPhase >=> macroExpand) rest
@@ -196,7 +196,7 @@ parse' ((m, TreeNode (ind@(_, TreeLeaf "inductive") : rest)) : as)
     stmtList2 <- parse' as
     return $ stmtList1 ++ stmtList2
 parse' ((m, TreeNode (coind@(_, TreeLeaf "coinductive") : rest)) : as)
-  | name@(mFun, TreeLeaf _) : xts@(_, TreeNode _) : rest' <- rest = do
+  | name@(mFun, TreeLeaf _) : xts@(_, TreeNode _) : rest' <- rest =
     parse' $ (m, TreeNode [coind, (mFun, TreeNode (name : xts : rest'))]) : as
   | otherwise = do
     rest' <- mapM (adjustPhase >=> macroExpand) rest
@@ -214,7 +214,7 @@ parse' ((m, TreeNode ((mLet, TreeLeaf "let") : rest)) : as)
     m' <- adjustPhase' m
     e' <- adjustPhase e >>= macroExpand >>= interpret
     xt' <-
-      adjustPhase xt >>= macroExpand >>= prefixTextPlus >>= interpretTextPlus
+      adjustPhase xt >>= macroExpand >>= prefixTextPlus >>= interpretIdentPlus
     defList <- parse' as
     return $ QuasiStmtLet m' xt' e' : defList
   | otherwise = raiseSyntaxError m "(let LEAF TREE TREE) | (let TREE TREE)"
@@ -231,7 +231,7 @@ parse' (a : as) = do
     then parse' $ e : as
     else do
       e' <- interpret e
-      name <- newTextWith "_"
+      name <- asIdent <$> newTextWith "_"
       m' <- adjustPhase' $ metaOf e'
       t <- newHole m'
       defList <- parse' as
@@ -249,8 +249,7 @@ withSectionPrefix x = do
   return $ withSectionPrefix' ns x
 
 withSectionPrefix' :: [T.Text] -> T.Text -> T.Text
-withSectionPrefix' [] x = x
-withSectionPrefix' (n : ns) x = withSectionPrefix' ns $ n <> ":" <> x
+withSectionPrefix' ns x = foldl (\acc n -> n <> ":" <> acc) x ns
 
 getCurrentSection :: WithEnv T.Text
 getCurrentSection = do
@@ -325,7 +324,7 @@ extractArg (_, TreeNode [(m, TreeLeaf x), _]) = return (m, TreeLeaf x)
 extractArg t = raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
 
 styleRule :: TreePlus -> WithEnv TreePlus
-styleRule (m, TreeNode [(mName, TreeLeaf name), (_, TreeNode xts), t]) = do
+styleRule (m, TreeNode [(mName, TreeLeaf name), (_, TreeNode xts), t]) =
   return
     ( m,
       TreeNode
@@ -383,12 +382,16 @@ ensureEnvSanity m = do
       raiseError m "`include` can only be used with no prefix assumption"
     _ -> return ()
 
-parseDef :: [TreePlus] -> WithEnv QuasiStmt
+parseDef :: [TreePlus] -> WithEnv [QuasiStmt]
 parseDef xds = do
   xds' <- mapM (adjustPhase >=> prefixFunName >=> macroExpand) xds
-  xs <- mapM extractFunName xds'
   xds'' <- mapM interpretIter xds'
-  return $ QuasiStmtDef (zip xs xds'')
+  let baseSub = Map.fromList $ map defToSub xds''
+  let sub = selfCompose (length baseSub) baseSub
+  let varList = map (\(_, (m, x, _), _, _) -> (m, WeakTermUpsilon x)) xds''
+  let iterList = map (substWeakTermPlus sub) varList -- fixme: ここのsubstはintじゃなく名前に沿ったものにしないとだめ
+  xs <- mapM extractFunName xds'
+  return (toLetList $ zip (zip xs xds'') iterList)
 
 prefixFunName :: TreePlus -> WithEnv TreePlus
 prefixFunName (m, TreeNode [xt, xts, body]) = do
@@ -408,9 +411,9 @@ prefixTextPlus (m, TreeNode [(mx, TreeLeaf x), t]) = do
   return (m, TreeNode [(mx, TreeLeaf x'), t])
 prefixTextPlus t = raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
 
-extractFunName :: TreePlus -> WithEnv T.Text
-extractFunName (_, TreeNode ((_, TreeLeaf x) : _)) = return x
-extractFunName (_, TreeNode ((_, TreeNode [(_, TreeLeaf x), _]) : _)) = return x
+extractFunName :: TreePlus -> WithEnv Ident
+extractFunName (_, TreeNode ((_, TreeLeaf x) : _)) = return $ asIdent x
+extractFunName (_, TreeNode ((_, TreeNode [(_, TreeLeaf x), _]) : _)) = return $ asIdent x
 extractFunName t = raiseSyntaxError (fst t) "(LEAF ...) | ((LEAF TREE) ...)"
 
 parseStmtClause :: TreePlus -> WithEnv (T.Text, [TreePlus])
@@ -467,18 +470,19 @@ concatQuasiStmtList (QuasiStmtVerify m e : es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtVerify m e cont
 concatQuasiStmtList (QuasiStmtEnum {} : ss) = concatQuasiStmtList ss
-concatQuasiStmtList (QuasiStmtDef xds : ss) = do
-  let ds = map snd xds
-  let baseSub = Map.fromList $ map defToSub ds
-  let sub = selfCompose (length baseSub) baseSub
-  let varList = map (\(_, (m, x, _), _, _) -> (m, WeakTermUpsilon x)) ds
-  let iterList = map (substWeakTermPlus sub) varList
-  concatQuasiStmtList $ (toLetList $ zip xds iterList) ++ ss
-concatQuasiStmtList ((QuasiStmtLetInductive n m at e) : es) = do
+-- concatQuasiStmtList (QuasiStmtDef xds : ss) = do
+--   let ds = map snd xds
+--   let baseSub = Map.fromList $ map defToSub ds
+--   let sub = selfCompose (length baseSub) baseSub
+--   let varList = map (\(_, (m, x, _), _, _) -> (m, WeakTermUpsilon x)) ds
+--   let iterList = map (substWeakTermPlus sub) varList
+--   concatQuasiStmtList $ (toLetList $ zip xds iterList) ++ ss
+
+concatQuasiStmtList (QuasiStmtLetInductive n m at e : es) = do
   insForm n at e
   cont <- concatQuasiStmtList es
   return $ WeakStmtLetWT m at e cont
-concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt e as : ss) = do
+concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt e as : ss) =
   case e of
     (mLam, WeakTermPiIntro Nothing xtsyts (_, WeakTermPiIntro (Just (bi, _)) atsbts (_, WeakTermPiElim b _))) -> do
       (_, is) <- lookupRevIndEnv m bi
@@ -521,8 +525,9 @@ selfCompose :: Int -> SubstWeakTerm -> SubstWeakTerm
 selfCompose 0 sub = sub
 selfCompose n sub = compose sub $ selfCompose (n - 1) sub
 
+-- fixme: ここではintじゃなくてフルで比較するタイプのsubstを行う必要がある (discern以前にsubstをするので)
 compose :: SubstWeakTerm -> SubstWeakTerm -> SubstWeakTerm
-compose s1 s2 = do
+compose s1 s2 =
   Map.union (Map.map (substWeakTermPlus s1) s2) s1
 
 checkKeywordSanity :: Meta -> T.Text -> WithEnv ()
@@ -557,7 +562,7 @@ ensureFileExistence m path = do
     else raiseError m $ "no such file: " <> T.pack (toFilePath path)
 
 install :: L.ByteString -> Path Abs Dir -> WithEnv ()
-install bytestr pkgPath = do
+install bytestr pkgPath =
   liftIO $ Tar.unpack (toFilePath pkgPath) $ Tar.read $ GZip.decompress bytestr
 
 includeCore :: Meta -> [TreePlus] -> [TreePlus]

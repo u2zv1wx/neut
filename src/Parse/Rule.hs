@@ -249,16 +249,16 @@ toInternalRuleList (_, _, _, rules) = mapM ruleAsWeakTextPlus rules
 toVar' :: WeakIdentPlus -> WeakTermPlus
 toVar' (m, x, _) = (m, WeakTermUpsilon x)
 
-toConst :: WeakTextPlus -> WeakTermPlus
-toConst (m, x, _) = (m, WeakTermConst x)
+-- toConst :: WeakTextPlus -> WeakTermPlus
+-- toConst (m, x, _) = (m, WeakTermConst x)
 
-insForm :: Int -> WeakTextPlus -> WeakTermPlus -> WithEnv ()
-insForm 1 (_, x, _) e =
+insForm :: Int -> WeakIdentPlus -> WeakTermPlus -> WithEnv ()
+insForm 1 (_, I (x, _), _) e =
   modify (\env -> env {formationEnv = Map.insert x (Just e) (formationEnv env)})
-insForm _ (_, x, _) _ =
+insForm _ (_, I (x, _), _) _ =
   modify (\env -> env {formationEnv = Map.insert x Nothing (formationEnv env)})
 
-insInductive :: [T.Text] -> WeakTextPlus -> WithEnv ()
+insInductive :: [T.Text] -> WeakIdentPlus -> WithEnv ()
 insInductive [ai] bt = do
   ienv <- gets indEnv
   modify (\env -> env {indEnv = Map.insertWith optConcat ai (Just [bt]) ienv})
@@ -375,7 +375,7 @@ thetaInductiveNested ::
   WeakTermPlus -> -- list Aにおけるlist
   T.Text -> -- list (トップレベルで定義されている名前、つまりouterの名前)
   [WeakTermPlus] -> -- list AにおけるA
-  [WeakTextPlus] -> -- トップレベルで定義されているコンストラクタたち
+  [WeakIdentPlus] -> -- トップレベルで定義されているコンストラクタたち
   WithEnv WeakTermPlus
 thetaInductiveNested mode isub atsbts e va aOuter es bts = do
   (xts, (_, aInner, _), btsInner) <- lookupInductive (metaOf va) aOuter
@@ -430,7 +430,7 @@ toInternalizedArg ::
   [WeakIdentPlus] -> -- base caseでのinternalizeのための情報。
   [WeakTermPlus] -> -- list @ (e1, ..., en)の引数部分。
   [WeakTermPlus] -> -- eiをisubでsubstしたもの。
-  WeakTextPlus -> -- outerでのコンストラクタ。
+  WeakIdentPlus -> -- outerでのコンストラクタ。
   WeakIdentPlus -> -- innerでのコンストラクタ。xts部分の引数だけouterのコンストラクタと型がずれていることに注意。
   WithEnv WeakTermPlus
 toInternalizedArg mode isub aInner aOuter xts atsbts es es' b (mbInner, _, (_, WeakTermPi _ ytsInner _)) = do
@@ -463,7 +463,7 @@ toInternalizedArg mode isub aInner aOuter xts atsbts es es' b (mbInner, _, (_, W
     ( mbInner,
       weakTermPiIntro
         ytsInner'
-        (mbInner, WeakTermPiElim (toConst b) (es' ++ args))
+        (mbInner, WeakTermPiElim (toVar' b) (es' ++ args))
     )
 -- (mbInner, WeakTermPiElim (toVar' b) (es' ++ args)))
 toInternalizedArg _ _ _ _ _ _ _ _ _ (m, _, _) =

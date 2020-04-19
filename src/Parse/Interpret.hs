@@ -2,6 +2,7 @@ module Parse.Interpret
   ( interpret,
     interpretWeakIdentPlus,
     interpretTextPlus,
+    interpretIdentPlus,
     interpretIter,
     interpretEnumItem,
     raiseSyntaxError,
@@ -350,6 +351,17 @@ interpretTextPlus (_, TreeNode [x, t]) = do
   t' <- interpret t
   return (m, x', t')
 interpretTextPlus t = raiseSyntaxError (fst t) "(LEAF TREE)"
+
+interpretIdentPlus :: TreePlus -> WithEnv WeakIdentPlus
+interpretIdentPlus leaf@(_, TreeLeaf _) = do
+  (m, x') <- interpretLeafText leaf
+  h <- newHole m
+  return (m, asIdent x', h)
+interpretIdentPlus (_, TreeNode [x, t]) = do
+  (m, x') <- interpretLeafText x
+  t' <- interpret t
+  return (m, asIdent x', t')
+interpretIdentPlus t = raiseSyntaxError (fst t) "(LEAF TREE)"
 
 interpretLeafText :: TreePlus -> WithEnv (Meta, T.Text)
 interpretLeafText (m, TreeLeaf "_") = do
