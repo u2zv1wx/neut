@@ -21,10 +21,10 @@ import Data.WeakTerm
 type Context = [WeakIdentPlus]
 
 infer :: WeakTermPlus -> WithEnv (WeakTermPlus, WeakTermPlus)
-infer e = infer' [] e
+infer = infer' []
 
 inferType :: WeakTermPlus -> WithEnv WeakTermPlus
-inferType t = inferType' [] t
+inferType = inferType' []
 
 infer' :: Context -> WeakTermPlus -> WithEnv (WeakTermPlus, WeakTermPlus)
 infer' _ (m, WeakTermTau) = return ((m, WeakTermTau), (m, WeakTermTau))
@@ -84,7 +84,7 @@ infer' _ (m, WeakTermFloat t f) = do
   return ((m, WeakTermFloat t' f), t')
 infer' _ (m, WeakTermEnum name) =
   return ((m, WeakTermEnum name), (m, WeakTermTau))
-infer' _ (m, WeakTermEnumIntro v) = do
+infer' _ (m, WeakTermEnumIntro v) =
   case v of
     EnumValueIntS size _ -> do
       let t = (m, WeakTermEnum (EnumTypeIntS size))
@@ -109,7 +109,7 @@ infer' ctx (m, WeakTermEnumElim (e, t) ces) = do
       (cs', tcs) <- unzip <$> mapM (inferWeakCase ctx) cs
       forM_ (zip (repeat t') tcs) $ uncurry insConstraintEnv
       (es', ts) <- unzip <$> mapM (infer' ctx) es
-      constrainList $ ts
+      constrainList ts
       return ((m, WeakTermEnumElim (e', t') $ zip cs' es'), head ts)
 infer' ctx (m, WeakTermArray dom k) = do
   (dom', tDom) <- infer' ctx dom
@@ -156,8 +156,7 @@ infer' ctx (m, WeakTermCase indName e cxtes) = do
   (e', t') <- infer' ctx e
   resultType <- newTypeHoleInCtx ctx m
   if null cxtes
-    then do
-      return ((m, WeakTermCase indName e' []), resultType) -- ex falso quodlibet
+    then return ((m, WeakTermCase indName e' []), resultType) -- ex falso quodlibet
     else do
       (name, indInfo) <- getIndInfo $ map (fst . fst) cxtes
       (indType, argHoleList) <- constructIndType m ctx name
@@ -165,7 +164,7 @@ infer' ctx (m, WeakTermCase indName e cxtes) = do
       insConstraintEnv indType t'
       cxtes' <-
         forM (zip indInfo cxtes) $ \(is, (((mc, c), args), body)) -> do
-          let usedHoleList = map (\i -> argHoleList !! i) is
+          let usedHoleList = map (argHoleList !!) is
           args' <- inferPatArgs ctx args
           let items = map (\(mx, x, tx) -> ((mx, WeakTermUpsilon x), tx)) args'
           et <- infer' ctx (mc, WeakTermConst c)
@@ -197,7 +196,7 @@ inferArgs m ((e, t) : ets) ((_, x, tx) : xts) cod = do
   let sub = Map.singleton (Left $ asInt x) e
   let (xts', cod') = substWeakTermPlus'' sub xts cod
   inferArgs m ets xts' cod'
-inferArgs m _ _ _ = raiseCritical m $ "invalid argument passed to inferArgs"
+inferArgs m _ _ _ = raiseCritical m "invalid argument passed to inferArgs"
 
 constructIndType ::
   Meta ->
@@ -207,7 +206,7 @@ constructIndType ::
 constructIndType m ctx x = do
   cenv <- gets cacheEnv
   case Map.lookup x cenv of
-    Just (Left e) -> do
+    Just (Left e) ->
       case weaken e of
         e'@(me, WeakTermPiIntro Nothing xts cod) -> do
           holeList <- mapM (const $ newHoleInCtx ctx me) xts
@@ -267,8 +266,8 @@ inferType' ctx t = do
 inferKind :: Meta -> ArrayKind -> WithEnv WeakTermPlus
 inferKind m (ArrayKindIntS i) = return (m, WeakTermEnum (EnumTypeIntS i))
 inferKind m (ArrayKindIntU i) = return (m, WeakTermEnum (EnumTypeIntU i))
-inferKind m (ArrayKindFloat size) = do
-  return (m, (WeakTermConst ("f" <> T.pack (show (sizeAsInt size)))))
+inferKind m (ArrayKindFloat size) =
+  return (m, WeakTermConst ("f" <> T.pack (show (sizeAsInt size))))
 inferKind m _ = raiseCritical m "inferKind for void-pointer"
 
 inferPi ::
