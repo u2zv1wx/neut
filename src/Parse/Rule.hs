@@ -82,7 +82,7 @@ generateProjections ts = do
   bts <- concat <$> mapM toInternalRuleList connectiveList
   let bts' = map textPlusToWeakIdentPlus bts
   stmtListList <-
-    forM ats $ \(ma, a, ta) -> do
+    forM ats $ \(ma, a, ta) ->
       forM bts $ \(mb, b, tb) -> do
         xts <- takeXTS ta
         (dom@(my, y, ty), cod) <- separate tb
@@ -91,7 +91,7 @@ generateProjections ts = do
         return
           [ QuasiStmtLetWT
               mb
-              (mb, b', (mb, WeakTermPi Nothing (xts ++ [dom]) cod))
+              (mb, asIdent b', (mb, WeakTermPi Nothing (xts ++ [dom]) cod))
               ( mb,
                 weakTermPiIntro
                   (xts ++ [dom])
@@ -99,7 +99,7 @@ generateProjections ts = do
                     WeakTermCase
                       a
                       (my, WeakTermUpsilon y)
-                      [ ( ( (mb, (a <> ":" <> "unfold")),
+                      [ ( ( (mb, a <> ":" <> "unfold"),
                             -- `xts ++` is required since LetWT bypasses `infer`
                             xts
                               ++ [(ma, asIdent a, ta)]
@@ -145,12 +145,12 @@ toInductive ::
   [WeakTextPlus] -> [WeakTextPlus] -> Connective -> WithEnv [QuasiStmt]
 toInductive ats bts connective@(m, ai, xts, _) = do
   let a = asIdent ai
-  formationRule <- formationRuleOf connective >>= ruleAsWeakTextPlus
+  formationRule <- formationRuleOf connective >>= ruleAsWeakIdentPlus
   let cod = (m, WeakTermPiElim (m, WeakTermUpsilon a) (map toVar' xts))
   z <- newNameWith'' "_"
   let zt = (m, z, cod)
   let atsbts = map textPlusToWeakIdentPlus $ ats ++ bts
-  return $
+  return
     [ QuasiStmtLetInductive
         (length ats)
         m
@@ -161,7 +161,7 @@ toInductive ats bts connective@(m, ai, xts, _) = do
       QuasiStmtLetWT
         m
         ( m,
-          (ai <> ":" <> "induction"),
+          asIdent $ ai <> ":" <> "induction",
           (m, WeakTermPi Nothing (xts ++ [zt] ++ atsbts) cod)
         )
         ( m,
@@ -196,7 +196,7 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
     return
       [ QuasiStmtLetInductiveIntro
           m
-          (mb, bi, (m, weakTermPi (xts' ++ yts) cod))
+          (mb, asIdent bi, (m, weakTermPi (xts' ++ yts) cod))
           ( m {metaIsReducible = False},
             weakTermPiIntro
               (xts' ++ yts)
@@ -222,11 +222,11 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
         <> ")`"
 
 ruleAsWeakIdentPlus :: Rule -> WithEnv WeakIdentPlus
-ruleAsWeakIdentPlus (mb, b, m, xts, t) = do
+ruleAsWeakIdentPlus (mb, b, m, xts, t) =
   return (mb, asIdent b, (m, weakTermPi xts t))
 
 ruleAsWeakTextPlus :: Rule -> WithEnv WeakTextPlus
-ruleAsWeakTextPlus (mb, b, m, xts, t) = do
+ruleAsWeakTextPlus (mb, b, m, xts, t) =
   return (mb, b, (m, weakTermPi xts t))
 
 textPlusToWeakIdentPlus :: WeakTextPlus -> WeakIdentPlus
@@ -262,8 +262,8 @@ insInductive :: [T.Text] -> WeakTextPlus -> WithEnv ()
 insInductive [ai] bt = do
   ienv <- gets indEnv
   modify (\env -> env {indEnv = Map.insertWith optConcat ai (Just [bt]) ienv})
-insInductive as _ = do
-  forM_ as $ \ai -> do
+insInductive as _ =
+  forM_ as $ \ai ->
     modify (\env -> env {indEnv = Map.insert ai Nothing (indEnv env)})
 
 optConcat :: Maybe [a] -> Maybe [a] -> Maybe [a]
@@ -318,7 +318,7 @@ theta mode isub atsbts t e = do
       -- nestedの外側がmutualであるとき。このときはエラーとする。
       | Just Nothing <- Map.lookup ai ienv ->
         thetaInductiveNestedMutual (metaOf t) ai
-    _ -> do
+    _ ->
       if isResolved isub t
         then return e
         else
@@ -363,7 +363,7 @@ thetaInductive mode isub a atsbts es e
         <> a
         <> "` in the antecedent of an introduction rule"
   -- `list @ i64` のように、中身が処理済みであることをチェック (この場合はes == [i64])
-  | all (isResolved isub) es = do
+  | all (isResolved isub) es =
     return (fst e, WeakTermPiElim e (map toVar' atsbts))
   | otherwise = raiseError (metaOf e) "found a self-nested inductive type"
 
