@@ -24,13 +24,8 @@ discern' nenv (QuasiStmtLet m xt e : ss) = do
 discern' nenv (QuasiStmtLetWT m xt e : ss) = do
   (xt', e', ss') <- discernLet nenv xt e ss
   return $ QuasiStmtLetWT m xt' e' : ss'
--- discern' nenv (QuasiStmtDef xds : ss) = do
---   forM_ xds $ \(x, (m, _, _, _)) -> insertConstant m x
---   let (xs, ds) = unzip xds
---   ds' <- mapM (discernDef nenv) ds
---   ss' <- discern' nenv ss
---   return $ QuasiStmtDef (zip xs ds') : ss'
 discern' nenv (QuasiStmtConstDecl m (mx, x, t) : ss) = do
+  insertConstant mx x
   t' <- discern'' nenv t
   ss' <- discern' nenv ss
   return $ QuasiStmtConstDecl m (mx, x, t') : ss'
@@ -74,13 +69,6 @@ discernLet nenv (mx, x, t) e ss = do
   x' <- newDefinedNameWith mx x
   ss' <- discern' (insertName x x' nenv) ss
   return ((mx, x', t'), e', ss')
-
--- discernDef :: NameEnv -> Def -> WithEnv Def
--- discernDef nenv (m, (mx, x, t), xts, e) = do
---   t' <- discern'' nenv t
---   x' <- newDefinedNameWith mx x
---   (xts', e') <- discernBinder (insertName x x' nenv) xts e
---   return (m, (mx, x', t'), xts', e')
 
 -- Alpha-convert all the variables so that different variables have different names.
 discern'' :: NameEnv -> WeakTermPlus -> WithEnv WeakTermPlus
@@ -240,14 +228,14 @@ newDefinedNameWith m (I (s, _)) = do
   insertIntoIntactSet m s
   return x
 
--- insertConstant :: Meta -> T.Text -> WithEnv ()
--- insertConstant m x = do
---   cset <- gets constantSet
---   if S.member x cset
---     then raiseError m $ "the constant `" <> x <> "` is already defined"
---     else do
---       modify (\env -> env {constantSet = S.insert x (constantSet env)})
---       insertIntoIntactSet m x
+insertConstant :: Meta -> T.Text -> WithEnv ()
+insertConstant m x = do
+  cset <- gets constantSet
+  if S.member x cset
+    then raiseError m $ "the constant `" <> x <> "` is already defined"
+    else do
+      modify (\env -> env {constantSet = S.insert x (constantSet env)})
+      insertIntoIntactSet m x
 
 insertName :: Ident -> Ident -> NameEnv -> NameEnv
 insertName (I (s, _)) = Map.insert s

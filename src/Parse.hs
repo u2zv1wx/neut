@@ -166,15 +166,10 @@ parse' ((m, TreeNode ((_, TreeLeaf "constant") : rest)) : as)
   | [(mn, TreeLeaf name), t] <- rest = do
     t' <- adjustPhase t >>= macroExpand >>= interpret -- たとえばここでdiscernも行う
     name' <- withSectionPrefix name
-    set <- gets constantSet
-    if S.member name' set
-      then raiseError m $ "the constant " <> name' <> " is already defined"
-      else do
-        modify (\env -> env {constantSet = S.insert name' set})
-        defList <- parse' as
-        m' <- adjustPhase' m
-        mn' <- adjustPhase' mn
-        return $ QuasiStmtConstDecl m' (mn', name', t') : defList
+    defList <- parse' as
+    m' <- adjustPhase' m
+    mn' <- adjustPhase' mn
+    return $ QuasiStmtConstDecl m' (mn', name', t') : defList
   | otherwise = raiseSyntaxError m "(constant LEAF TREE)"
 parse' ((m, TreeNode (def@(mDef, TreeLeaf "definition") : rest)) : as)
   | [name@(_, TreeLeaf _), body] <- rest =
