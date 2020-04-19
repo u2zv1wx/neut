@@ -416,6 +416,24 @@ extractFunName (_, TreeNode ((_, TreeLeaf x) : _)) = return $ asIdent x
 extractFunName (_, TreeNode ((_, TreeNode [(_, TreeLeaf x), _]) : _)) = return $ asIdent x
 extractFunName t = raiseSyntaxError (fst t) "(LEAF ...) | ((LEAF TREE) ...)"
 
+toLetList :: [(IdentDef, WeakTermPlus)] -> [QuasiStmt]
+toLetList [] = []
+toLetList (((x, (m, (mx, _, t), _, _)), iter) : rest) =
+  QuasiStmtLet m (mx, x, t) iter : toLetList rest
+
+defToSub :: Def -> (Key, WeakTermPlus)
+defToSub (m, (mx, x, t), xts, e) =
+  (Left $ asInt x, (m, WeakTermIter (mx, x, t) xts e))
+
+selfCompose :: Int -> SubstWeakTerm -> SubstWeakTerm
+selfCompose 0 sub = sub
+selfCompose n sub = compose sub $ selfCompose (n - 1) sub
+
+-- fixme: ここではintじゃなくてフルで比較するタイプのsubstを行う必要がある (discern以前にsubstをするので)
+compose :: SubstWeakTerm -> SubstWeakTerm -> SubstWeakTerm
+compose s1 s2 =
+  Map.union (Map.map (substWeakTermPlus s1) s2) s1
+
 parseStmtClause :: TreePlus -> WithEnv (T.Text, [TreePlus])
 parseStmtClause (_, TreeNode ((_, TreeLeaf x) : stmtList)) = return (x, stmtList)
 parseStmtClause (m, _) = raiseSyntaxError m "(LEAF TREE*)"
@@ -511,24 +529,6 @@ concatQuasiStmtList (QuasiStmtVisit path ss1 : ss2) = do
   ss1' <- concatQuasiStmtList ss1
   ss2' <- concatQuasiStmtList ss2
   return $ WeakStmtVisit path ss1' ss2'
-
-toLetList :: [(IdentDef, WeakTermPlus)] -> [QuasiStmt]
-toLetList [] = []
-toLetList (((x, (m, (mx, _, t), _, _)), iter) : rest) =
-  QuasiStmtLet m (mx, x, t) iter : toLetList rest
-
-defToSub :: Def -> (Key, WeakTermPlus)
-defToSub (m, (mx, x, t), xts, e) =
-  (Left $ asInt x, (m, WeakTermIter (mx, x, t) xts e))
-
-selfCompose :: Int -> SubstWeakTerm -> SubstWeakTerm
-selfCompose 0 sub = sub
-selfCompose n sub = compose sub $ selfCompose (n - 1) sub
-
--- fixme: ここではintじゃなくてフルで比較するタイプのsubstを行う必要がある (discern以前にsubstをするので)
-compose :: SubstWeakTerm -> SubstWeakTerm -> SubstWeakTerm
-compose s1 s2 =
-  Map.union (Map.map (substWeakTermPlus s1) s2) s1
 
 checkKeywordSanity :: Meta -> T.Text -> WithEnv ()
 checkKeywordSanity m "" = raiseError m "empty string for a keyword"
