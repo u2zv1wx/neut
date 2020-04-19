@@ -18,62 +18,63 @@ type NameEnv = Map.HashMap T.Text Ident
 
 discern' :: NameEnv -> [QuasiStmt] -> WithEnv [QuasiStmt]
 discern' _ [] = return []
-discern' nenv ((QuasiStmtLet m (mx, x, t) e) : ss) = do
+discern' nenv (QuasiStmtLet m (mx, x, t) e : ss) = do
   t' <- discern'' nenv t
   e' <- discern'' nenv e
-  insertConstant mx x
+  -- insertConstant mx x
+  x' <- newDefinedNameWith mx x
   ss' <- discern' nenv ss -- xはconstだからnenvの更新の必要なし
   return $ QuasiStmtLet m (mx, x, t') e' : ss'
-discern' nenv ((QuasiStmtLetWT m (mx, x, t) e) : ss) = do
+discern' nenv (QuasiStmtLetWT m (mx, x, t) e : ss) = do
   set <- gets intactSet
   t' <- discern'' nenv t
   e' <- discern'' nenv e
   set' <- gets intactSet
   whenCheck $ modify (\env -> env {intactSet = S.intersection set set'})
-  insertConstant mx x
+  -- insertConstant mx x
   ss' <- discern' nenv ss
   return $ QuasiStmtLetWT m (mx, x, t') e' : ss'
-discern' nenv ((QuasiStmtDef xds) : ss) = do
+discern' nenv (QuasiStmtDef xds : ss) = do
   forM_ xds $ \(x, (m, _, _, _)) -> insertConstant m x
   let (xs, ds) = unzip xds
   ds' <- mapM (discernDef nenv) ds
   ss' <- discern' nenv ss
   return $ QuasiStmtDef (zip xs ds') : ss'
-discern' nenv ((QuasiStmtConstDecl m (mx, x, t)) : ss) = do
+discern' nenv (QuasiStmtConstDecl m (mx, x, t) : ss) = do
   t' <- discern'' nenv t
   ss' <- discern' nenv ss
   return $ QuasiStmtConstDecl m (mx, x, t') : ss'
-discern' nenv ((QuasiStmtVerify m e) : ss) = do
+discern' nenv (QuasiStmtVerify m e : ss) = do
   e' <- discern'' nenv e
   ss' <- discern' nenv ss
   return $ QuasiStmtVerify m e' : ss'
-discern' nenv ((QuasiStmtEnum m name xis) : ss) = do
+discern' nenv (QuasiStmtEnum m name xis : ss) = do
   insEnumEnv m name xis
   ss' <- discern' nenv ss
   return $ QuasiStmtEnum m name xis : ss'
-discern' nenv ((QuasiStmtLetInductive n m (mx, a, t) e) : ss) = do
+discern' nenv (QuasiStmtLetInductive n m (mx, a, t) e : ss) = do
   set <- gets intactSet
   t' <- discern'' nenv t
   e' <- discern'' nenv e
   set' <- gets intactSet
   whenCheck $ modify (\env -> env {intactSet = S.intersection set set'})
-  insertConstant mx a
+  -- insertConstant mx a
   ss' <- discern' nenv ss
   return $ QuasiStmtLetInductive n m (mx, a, t') e' : ss'
-discern' nenv ((QuasiStmtLetInductiveIntro m (mx, x, t) e as) : ss) = do
+discern' nenv (QuasiStmtLetInductiveIntro m (mx, x, t) e as : ss) = do
   set <- gets intactSet
   t' <- discern'' nenv t
   e' <- discern'' nenv e
   set' <- gets intactSet
   whenCheck $ modify (\env -> env {intactSet = S.intersection set set'})
-  insertConstant mx x
+  -- insertConstant mx x
   ss' <- discern' nenv ss
   return $ QuasiStmtLetInductiveIntro m (mx, x, t') e' as : ss'
-discern' nenv ((QuasiStmtUse prefix) : ss) = do
+discern' nenv (QuasiStmtUse prefix : ss) = do
   modify (\e -> e {prefixEnv = prefix : prefixEnv e})
   ss' <- discern' nenv ss
   return $ QuasiStmtUse prefix : ss'
-discern' nenv ((QuasiStmtUnuse prefix) : ss) = do
+discern' nenv (QuasiStmtUnuse prefix : ss) = do
   modify (\e -> e {prefixEnv = filter (/= prefix) (prefixEnv e)})
   ss' <- discern' nenv ss
   return $ QuasiStmtUnuse prefix : ss'
@@ -121,8 +122,7 @@ discern'' nenv (m, WeakTermIter (mx, x, t) xts e) = do
   (xt', xts', e') <- discernIter nenv (mx, x, t') xts e
   return (m, WeakTermIter xt' xts' e')
 discern'' _ (m, WeakTermConst x) = return (m, WeakTermConst x)
-discern'' _ (m, WeakTermZeta h) = do
-  return (m, WeakTermZeta h)
+discern'' _ (m, WeakTermZeta h) = return (m, WeakTermZeta h)
 discern'' nenv (m, WeakTermInt t x) = do
   t' <- discern'' nenv t
   return (m, WeakTermInt t' x)
@@ -273,7 +273,7 @@ insertConstant m x = do
       insertIntoIntactSet m x
 
 insertName :: Ident -> Ident -> NameEnv -> NameEnv
-insertName (I (s, _)) y nenv = Map.insert s y nenv
+insertName (I (s, _)) = Map.insert s
 
 insertIntoIntactSet :: Meta -> T.Text -> WithEnv ()
 insertIntoIntactSet m x =
@@ -357,10 +357,10 @@ lookupEnum' f (prefix : prefixList) name = do
     else lookupEnum' f prefixList name
 
 lookupEnumValueNameWithPrefix :: T.Text -> WithEnv (Maybe T.Text)
-lookupEnumValueNameWithPrefix name = lookupEnum isDefinedEnumValue name
+lookupEnumValueNameWithPrefix = lookupEnum isDefinedEnumValue
 
 lookupEnumTypeNameWithPrefix :: T.Text -> WithEnv (Maybe T.Text)
-lookupEnumTypeNameWithPrefix name = lookupEnum isDefinedEnumType name
+lookupEnumTypeNameWithPrefix = lookupEnum isDefinedEnumType
 
 isDefinedEnumValue :: T.Text -> WithEnv Bool
 isDefinedEnumValue name = do
