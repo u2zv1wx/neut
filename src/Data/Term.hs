@@ -1,14 +1,12 @@
 module Data.Term where
 
-import Data.Binary
-import Data.Maybe (fromMaybe)
-import GHC.Generics (Generic)
-
-import qualified Data.IntMap as IntMap
-import qualified Data.Text as T
-
 import Data.Basic
+import Data.Binary
+import qualified Data.IntMap as IntMap
+import Data.Maybe (fromMaybe)
+import qualified Data.Text as T
 import Data.WeakTerm hiding (IdentifierPlus)
+import GHC.Generics (Generic)
 
 data Term
   = TermTau
@@ -97,7 +95,7 @@ varTermPlus (_, TermCase _ e cxes) = do
 
 varTermPlus' :: [IdentifierPlus] -> [TermPlus] -> [Identifier]
 varTermPlus' [] es = concatMap varTermPlus es
-varTermPlus' ((_, x, t):xts) es = do
+varTermPlus' ((_, x, t) : xts) es = do
   let xs1 = varTermPlus t
   let xs2 = varTermPlus' xts es
   xs1 ++ filter (\y -> y /= x) xs2
@@ -164,16 +162,16 @@ substTermPlus sub (m, TermCase indName e cxtes) = do
 
 substTermPlus' :: SubstTerm -> [IdentifierPlus] -> [IdentifierPlus]
 substTermPlus' _ [] = []
-substTermPlus' sub ((m, x, t):xts) = do
+substTermPlus' sub ((m, x, t) : xts) = do
   let sub' = IntMap.delete (asInt x) sub
   let xts' = substTermPlus' sub' xts
   let t' = substTermPlus sub t
   (m, x, t') : xts'
 
 substTermPlus'' ::
-     SubstTerm -> [IdentifierPlus] -> TermPlus -> ([IdentifierPlus], TermPlus)
+  SubstTerm -> [IdentifierPlus] -> TermPlus -> ([IdentifierPlus], TermPlus)
 substTermPlus'' sub [] e = ([], substTermPlus sub e)
-substTermPlus'' sub ((mx, x, t):xts) e = do
+substTermPlus'' sub ((mx, x, t) : xts) e = do
   let sub' = IntMap.delete (asInt x) sub
   let (xts', e') = substTermPlus'' sub' xts e
   ((mx, x, substTermPlus sub t) : xts', e')
@@ -243,7 +241,7 @@ weakenCase (m, CaseValue v) = (m, weakenEnumValue v)
 weakenCase (m, CaseDefault) = (m, WeakCaseDefault)
 
 weakenArgs ::
-     [(Meta, Identifier, TermPlus)] -> [(Meta, Identifier, WeakTermPlus)]
+  [(Meta, Identifier, TermPlus)] -> [(Meta, Identifier, WeakTermPlus)]
 weakenArgs xts = do
   let (ms, xs, ts) = unzip3 xts
   zip3 ms xs (map weaken ts)

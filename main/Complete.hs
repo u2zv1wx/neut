@@ -1,22 +1,20 @@
 module Complete
-  ( complete
-  ) where
+  ( complete,
+  )
+where
 
 import Control.Monad.State.Lazy
-import Data.List hiding (findIndex)
-import Path
-
-import qualified Data.HashMap.Lazy as Map
-import qualified Data.Set as S
-
-import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
-
 import Data.Basic
 import Data.Env
+import qualified Data.HashMap.Lazy as Map
+import Data.List hiding (findIndex)
+import qualified Data.Set as S
+import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 import Data.WeakTerm
 import Parse
 import Parse.Tokenize
+import Path
 
 type CompInfo = [(Identifier, Meta)]
 
@@ -31,13 +29,20 @@ complete inputPath l c = do
 
 showCompInfo :: CompInfo -> [String]
 showCompInfo [] = []
-showCompInfo ((x, m):xms) = do
+showCompInfo ((x, m) : xms) = do
   let (path, (_, l, c)) = getPosInfo m
   let pathStr = "\"" <> toFilePath path <> "\""
   let x' = T.unpack $ asText x
   let str =
-        "(\"" ++
-        x' ++ "\" (" ++ pathStr ++ " " ++ show l ++ " " ++ show c ++ "))"
+        "(\""
+          ++ x'
+          ++ "\" ("
+          ++ pathStr
+          ++ " "
+          ++ show l
+          ++ " "
+          ++ show c
+          ++ "))"
   str : showCompInfo xms
 
 parseForCompletion :: Path Abs File -> Line -> Column -> WithEnv CompInfo
@@ -61,7 +66,7 @@ parseForCompletion path l c = do
           return $ nub $ sortBy (\(_, m1) (_, m2) -> compareLoc m1 m2) info'
 
 modifyFileForCompletion ::
-     CursorName -> T.Text -> Line -> Column -> Maybe (Prefix, T.Text)
+  CursorName -> T.Text -> Line -> Column -> Maybe (Prefix, T.Text)
 modifyFileForCompletion (I (s, _)) content l c = do
   let xs = T.lines content
   let (ys, ws) = splitAt (l - 1) xs
@@ -91,25 +96,25 @@ compInfo :: CursorName -> [QuasiStmt] -> Either CompInfo ()
 compInfo c ss = compInfoQuasiStmtList c [] ss
 
 compInfoQuasiStmtList ::
-     CursorName -> CompInfo -> [QuasiStmt] -> Either CompInfo ()
+  CursorName -> CompInfo -> [QuasiStmt] -> Either CompInfo ()
 compInfoQuasiStmtList _ _ [] = return ()
-compInfoQuasiStmtList c info ((QuasiStmtLet _ (mx, x, t) e):ss) = do
+compInfoQuasiStmtList c info ((QuasiStmtLet _ (mx, x, t) e) : ss) = do
   compInfoWeakTermPlus c info t
   let info' = (asIdent x, mx) : info
   compInfoWeakTermPlus c info' e
   compInfoQuasiStmtList c info' ss
-compInfoQuasiStmtList c info ((QuasiStmtDef xds):ss) = do
+compInfoQuasiStmtList c info ((QuasiStmtDef xds) : ss) = do
   xms <- mapM (compInfoDef c info . snd) xds
   let info' = xms ++ info
   compInfoQuasiStmtList c info' ss
-compInfoQuasiStmtList c info ((QuasiStmtConstDecl _ (mx, x, t)):ss) = do
+compInfoQuasiStmtList c info ((QuasiStmtConstDecl _ (mx, x, t)) : ss) = do
   compInfoWeakTermPlus c info t
   let info' = (asIdent x, mx) : info
   compInfoQuasiStmtList c info' ss
-compInfoQuasiStmtList c info (_:ss) = compInfoQuasiStmtList c info ss
+compInfoQuasiStmtList c info (_ : ss) = compInfoQuasiStmtList c info ss
 
 compInfoDef ::
-     CursorName -> CompInfo -> Def -> Either CompInfo (Identifier, Meta)
+  CursorName -> CompInfo -> Def -> Either CompInfo (Identifier, Meta)
 compInfoDef c info (_, (mx, x, t), xts, e) = do
   compInfoWeakTermPlus c info t
   let info' = (x, mx) : info
@@ -117,7 +122,7 @@ compInfoDef c info (_, (mx, x, t), xts, e) = do
   return (x, mx)
 
 compInfoWeakTermPlus ::
-     CursorName -> CompInfo -> WeakTermPlus -> Either CompInfo ()
+  CursorName -> CompInfo -> WeakTermPlus -> Either CompInfo ()
 compInfoWeakTermPlus _ _ (_, WeakTermTau) = return ()
 compInfoWeakTermPlus c info (_, WeakTermUpsilon x)
   | asText c == asText x = Left info
@@ -168,25 +173,25 @@ compInfoWeakTermPlus c info (_, WeakTermErase _ e) =
   compInfoWeakTermPlus c info e
 
 compInfoBinder ::
-     CursorName
-  -> CompInfo
-  -> [IdentifierPlus]
-  -> WeakTermPlus
-  -> Either CompInfo ()
+  CursorName ->
+  CompInfo ->
+  [IdentifierPlus] ->
+  WeakTermPlus ->
+  Either CompInfo ()
 compInfoBinder s info [] e = compInfoWeakTermPlus s info e
-compInfoBinder s info ((mx, x, t):xts) e = do
+compInfoBinder s info ((mx, x, t) : xts) e = do
   compInfoWeakTermPlus s info t
   let info' = (x, mx) : info
   compInfoBinder s info' xts e
 
 compInfoArrayElim ::
-     CursorName
-  -> CompInfo
-  -> [(Meta, Identifier, ArrayKind)]
-  -> WeakTermPlus
-  -> Either CompInfo ()
+  CursorName ->
+  CompInfo ->
+  [(Meta, Identifier, ArrayKind)] ->
+  WeakTermPlus ->
+  Either CompInfo ()
 compInfoArrayElim s info [] e = compInfoWeakTermPlus s info e
-compInfoArrayElim s info ((mx, x, _):xts) e = do
+compInfoArrayElim s info ((mx, x, _) : xts) e = do
   let info' = (x, mx) : info
   compInfoArrayElim s info' xts e
 
@@ -211,7 +216,7 @@ toSuffixList' s =
 
 headTailMaybe :: [a] -> Maybe (a, [a])
 headTailMaybe [] = Nothing
-headTailMaybe (x:xs) = return (x, xs)
+headTailMaybe (x : xs) = return (x, xs)
 
 headTailMaybeText :: T.Text -> Maybe (Char, T.Text)
 headTailMaybeText s

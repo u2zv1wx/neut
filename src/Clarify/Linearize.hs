@@ -1,19 +1,19 @@
 module Clarify.Linearize
-  ( linearize
-  ) where
-
-import qualified Data.IntMap as IntMap
+  ( linearize,
+  )
+where
 
 import Clarify.Utility
 import Data.Basic
 import Data.Code
 import Data.Env
+import qualified Data.IntMap as IntMap
 
 -- insert header for a closed chain
 linearize ::
-     [(Identifier, CodePlus)] -- [(x1, t1), ..., (xn, tn)]  (closed chain)
-  -> CodePlus
-  -> WithEnv CodePlus
+  [(Identifier, CodePlus)] -> -- [(x1, t1), ..., (xn, tn)]  (closed chain)
+  CodePlus ->
+  WithEnv CodePlus
 linearize xts e = do
   (nm, e') <- distinguishCode (map fst xts) e
   linearize' nm (reverse xts) e'
@@ -21,12 +21,12 @@ linearize xts e = do
 type NameMap = IntMap.IntMap [Identifier]
 
 linearize' ::
-     NameMap
-  -> [(Identifier, CodePlus)] -- [(xn, tn), ..., (x1, t1)]  (reversed closed chain)
-  -> CodePlus
-  -> WithEnv CodePlus
+  NameMap ->
+  [(Identifier, CodePlus)] -> -- [(xn, tn), ..., (x1, t1)]  (reversed closed chain)
+  CodePlus ->
+  WithEnv CodePlus
 linearize' _ [] e = return e
-linearize' nm ((x, t):xts) e = do
+linearize' nm ((x, t) : xts) e = do
   (nmT, t') <- distinguishCode (map fst xts) t
   let newNm = merge [nmT, nm]
   e' <- withHeader newNm x t' e
@@ -39,7 +39,7 @@ withHeader nm x t e =
     Nothing -> withHeaderAffine x t e
     Just [] -> raiseCritical' $ "impossible. x: " <> asText' x
     Just [z] -> withHeaderLinear z x e
-    Just (z1:z2:zs) -> withHeaderRelevant x t z1 z2 zs e
+    Just (z1 : z2 : zs) -> withHeaderRelevant x t z1 z2 zs e
 
 -- withHeaderAffine x t e ~>
 --   bind _ :=
@@ -77,13 +77,13 @@ withHeaderLinear z x e@(m, _) =
 --   e                                             --
 -- (assuming N >= 2)
 withHeaderRelevant ::
-     Identifier
-  -> CodePlus
-  -> Identifier
-  -> Identifier
-  -> [Identifier]
-  -> CodePlus
-  -> WithEnv CodePlus
+  Identifier ->
+  CodePlus ->
+  Identifier ->
+  Identifier ->
+  [Identifier] ->
+  CodePlus ->
+  WithEnv CodePlus
 withHeaderRelevant x t x1 x2 xs e@(m, _) = do
   (expVarName, expVar) <- newDataUpsilonWith m "exp"
   linearChain <- toLinearChain $ x : x1 : x2 : xs
@@ -127,24 +127,26 @@ toLinearChain xs = do
 --   let (x3, x4) := sigVar3 in
 --   e
 withHeaderRelevant' ::
-     CodePlus -> DataPlus -> LinearChain -> CodePlus -> WithEnv CodePlus
+  CodePlus -> DataPlus -> LinearChain -> CodePlus -> WithEnv CodePlus
 withHeaderRelevant' _ _ [] cont = return cont
-withHeaderRelevant' t expVar ((x, (x1, x2)):chain) cont@(m, _) = do
+withHeaderRelevant' t expVar ((x, (x1, x2)) : chain) cont@(m, _) = do
   cont' <- withHeaderRelevant' t expVar chain cont
   (sigVarName, sigVar) <- newDataUpsilonWith m "sig"
   return $
-    ( m
-    , CodeUpElim
+    ( m,
+      CodeUpElim
         sigVarName
-        ( m
-        , CodePiElimDownElim
+        ( m,
+          CodePiElimDownElim
             expVar
-            [(m, DataEnumIntro (EnumValueIntS 64 1)), (m, DataUpsilon x)])
-        (m, sigmaElim [x1, x2] sigVar cont'))
+            [(m, DataEnumIntro (EnumValueIntS 64 1)), (m, DataUpsilon x)]
+        )
+        (m, sigmaElim [x1, x2] sigVar cont')
+    )
 
 merge :: [NameMap] -> NameMap
 merge [] = IntMap.empty
-merge (m:ms) = IntMap.unionWith (++) m $ merge ms
+merge (m : ms) = IntMap.unionWith (++) m $ merge ms
 
 distinguishData :: [Identifier] -> DataPlus -> WithEnv (NameMap, DataPlus)
 distinguishData zs d@(ml, DataUpsilon x) =

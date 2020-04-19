@@ -1,8 +1,7 @@
 module Data.Constraint where
 
-import qualified Data.Set as S
-
 import Data.Basic
+import qualified Data.Set as S
 import Data.WeakTerm
 
 type PreConstraint = (WeakTermPlus, WeakTermPlus)
@@ -28,11 +27,11 @@ instance Eq Constraint where
 instance Ord Constraint where
   compare c1 c2 = compare (constraintToInt c1) (constraintToInt c2)
 
-data EnrichedConstraint =
-  Enriched
-    PreConstraint
-    (S.Set Identifier) -- the set of metavariables that cause stuck
-    Constraint
+data EnrichedConstraint
+  = Enriched
+      PreConstraint
+      (S.Set Identifier) -- the set of metavariables that cause stuck
+      Constraint
   deriving (Show)
 
 instance Eq EnrichedConstraint where

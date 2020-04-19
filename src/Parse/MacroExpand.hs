@@ -1,15 +1,14 @@
 module Parse.MacroExpand
-  ( macroExpand
-  , checkNotationSanity
-  ) where
+  ( macroExpand,
+    checkNotationSanity,
+  )
+where
 
 import Control.Monad.State.Lazy
-
-import qualified Data.Set as S
-import qualified Data.Text as T
-
 import Data.Basic
 import Data.Env
+import qualified Data.Set as S
+import qualified Data.Text as T
 import Data.Tree
 
 type MacroSubst = [(T.Text, TreePlus)]
@@ -38,9 +37,9 @@ macroExpand1 t@(i, _) = do
 type Notation = TreePlus
 
 macroMatch ::
-     TreePlus -- input tree
-  -> Notation -- registered notation
-  -> WithEnv (Maybe MacroSubst) -- {symbols in a pattern} -> {trees}
+  TreePlus -> -- input tree
+  Notation -> -- registered notation
+  WithEnv (Maybe MacroSubst) -- {symbols in a pattern} -> {trees}
 macroMatch t1@(_, TreeLeaf s1) (_, TreeLeaf s2) = do
   kenv <- gets keywordEnv
   case s2 `elem` kenv of
@@ -58,9 +57,9 @@ macroMatch (_, TreeNode []) (_, TreeNode []) = return $ Just []
 macroMatch (_, TreeNode _) (_, TreeNode []) = return Nothing
 macroMatch (_, TreeNode []) (_, TreeNode _) = return Nothing
 macroMatch (m1, TreeNode ts1) (_, TreeNode ts2)
-  | (_, TreeLeaf s2) <- last ts2
-  , T.last s2 == '+'
-  , length ts1 >= length ts2 = do
+  | (_, TreeLeaf s2) <- last ts2,
+    T.last s2 == '+',
+    length ts1 >= length ts2 = do
     let (xs, rest) = splitAt (length ts2 - 1) ts1
     let ys = take (length ts2 - 1) ts2
     mzs <- sequence <$> zipWithM macroMatch xs ys
@@ -96,9 +95,10 @@ checkPlusCondition :: Notation -> WithEnv ()
 checkPlusCondition (m, TreeLeaf s) =
   if T.last s /= '+'
     then return ()
-    else raiseError
-           m
-           "The '+'-suffixed name can be occurred only at the end of a list"
+    else
+      raiseError
+        m
+        "The '+'-suffixed name can be occurred only at the end of a list"
 checkPlusCondition (_, TreeNode []) = return ()
 checkPlusCondition (_, TreeNode ts) = do
   mapM_ checkPlusCondition $ init ts
@@ -123,13 +123,13 @@ findSplice t = Left t
 
 expandSplice :: [Either TreePlus [TreePlus]] -> [TreePlus]
 expandSplice [] = []
-expandSplice (Left t:rest) = t : expandSplice rest
-expandSplice (Right ts:rest) = ts ++ expandSplice rest
+expandSplice (Left t : rest) = t : expandSplice rest
+expandSplice (Right ts : rest) = ts ++ expandSplice rest
 
 -- returns the first "Just"
 try :: (Monad m) => (a -> m (Maybe b)) -> [(a, c)] -> m (Maybe (b, c))
 try _ [] = return Nothing
-try f ((s, t):as) = do
+try f ((s, t) : as) = do
   mx <- f s
   case mx of
     Nothing -> try f as

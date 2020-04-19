@@ -2,18 +2,16 @@ module Data.Basic where
 
 import Codec.Binary.UTF8.String
 import Data.Binary hiding (encode)
-import GHC.Generics hiding (Meta)
-import Path
-import Path.Internal
-
 import qualified Data.IntMap as IntMap
 import qualified Data.Set as S
 import qualified Data.Text as T
-
+import GHC.Generics hiding (Meta)
+import Path
+import Path.Internal
 import Text.Read hiding (get)
 
-newtype Identifier =
-  I (T.Text, Int)
+newtype Identifier
+  = I (T.Text, Int)
   deriving (Eq, Ord, Generic)
 
 instance Binary Identifier
@@ -47,12 +45,12 @@ type Loc = (Phase, Line, Column)
 unwrapPath :: Path a b -> FilePath
 unwrapPath (Path path) = path
 
-data Meta =
-  Meta
-    { metaFileName :: Path Abs File
-    , metaLocation :: Loc
-    , metaIsReducible :: Bool
-    }
+data Meta
+  = Meta
+      { metaFileName :: Path Abs File,
+        metaLocation :: Loc,
+        metaIsReducible :: Bool
+      }
   deriving (Generic)
 
 instance Binary Meta where
@@ -66,9 +64,9 @@ instance Binary Meta where
     isReducible <- get
     return $
       Meta
-        { metaFileName = Path path
-        , metaLocation = loc
-        , metaIsReducible = isReducible
+        { metaFileName = Path path,
+          metaLocation = loc,
+          metaIsReducible = isReducible
         }
 
 -- required to derive the eqality on WeakTerm
@@ -96,9 +94,9 @@ showMeta' m = do
 supMeta :: Meta -> Meta -> Meta
 supMeta m1 m2 =
   Meta
-    { metaFileName = supFileName m1 m2
-    , metaLocation = supLocation m1 m2
-    , metaIsReducible = metaIsReducible m1 && metaIsReducible m2
+    { metaFileName = supFileName m1 m2,
+      metaLocation = supLocation m1 m2,
+      metaIsReducible = metaIsReducible m1 && metaIsReducible m2
     }
 
 supFileName :: Meta -> Meta -> Path Abs File
@@ -187,14 +185,17 @@ asLowTypeMaybe :: T.Text -> Maybe LowType
 asLowTypeMaybe s =
   case T.uncons s of
     Just ('i', rest)
-      | Just n <- readMaybe $ T.unpack rest
-      , 0 < n && n <= 64 -> Just $ LowTypeIntS n
+      | Just n <- readMaybe $ T.unpack rest,
+        0 < n && n <= 64 ->
+        Just $ LowTypeIntS n
     Just ('u', rest)
-      | Just n <- readMaybe $ T.unpack rest
-      , 0 < n && n <= 64 -> Just $ LowTypeIntU n
+      | Just n <- readMaybe $ T.unpack rest,
+        0 < n && n <= 64 ->
+        Just $ LowTypeIntU n
     Just ('f', rest)
-      | Just n <- readMaybe $ T.unpack rest
-      , Just size <- asFloatSize n -> Just $ LowTypeFloat size
+      | Just n <- readMaybe $ T.unpack rest,
+        Just size <- asFloatSize n ->
+        Just $ LowTypeFloat size
     _ -> Nothing
 
 sizeAsInt :: FloatSize -> Int
@@ -232,17 +233,20 @@ lowTypeToArrayKindMaybe _ = Nothing
 asArrayKindMaybe :: T.Text -> Maybe ArrayKind
 asArrayKindMaybe "" = Nothing
 asArrayKindMaybe s
-  | 'i' <- T.head s
-  , Just n <- readMaybe $ T.unpack $ T.tail s
-  , 0 < n && n <= 64 = Just $ ArrayKindIntS n
+  | 'i' <- T.head s,
+    Just n <- readMaybe $ T.unpack $ T.tail s,
+    0 < n && n <= 64 =
+    Just $ ArrayKindIntS n
 asArrayKindMaybe s
-  | 'u' <- T.head s
-  , Just n <- readMaybe $ T.unpack $ T.tail s
-  , 0 < n && n <= 64 = Just $ ArrayKindIntU n
+  | 'u' <- T.head s,
+    Just n <- readMaybe $ T.unpack $ T.tail s,
+    0 < n && n <= 64 =
+    Just $ ArrayKindIntU n
 asArrayKindMaybe s
-  | 'f' <- T.head s
-  , Just n <- readMaybe $ T.unpack $ T.tail s
-  , Just size <- asFloatSize n = Just $ ArrayKindFloat size
+  | 'f' <- T.head s,
+    Just n <- readMaybe $ T.unpack $ T.tail s,
+    Just size <- asFloatSize n =
+    Just $ ArrayKindFloat size
 asArrayKindMaybe _ = Nothing
 
 data UnaryOp
@@ -256,14 +260,16 @@ data UnaryOp
 
 asUnaryOpMaybe :: T.Text -> Maybe UnaryOp
 asUnaryOpMaybe name
-  | Just (typeStr, "neg") <- breakOnMaybe ":" name
-  , Just lowType <- asLowTypeMaybe typeStr = Just $ UnaryOpNeg lowType
+  | Just (typeStr, "neg") <- breakOnMaybe ":" name,
+    Just lowType <- asLowTypeMaybe typeStr =
+    Just $ UnaryOpNeg lowType
 asUnaryOpMaybe name
-  | Just (domTypeStr, rest) <- breakOnMaybe ":" name
-  , Just (convOpStr, codTypeStr) <- breakOnMaybe ":" rest
-  , Just domType <- asLowTypeMaybe domTypeStr
-  , Just codType <- asLowTypeMaybe codTypeStr
-  , Just op <- asConvOpMaybe domType codType convOpStr = Just op
+  | Just (domTypeStr, rest) <- breakOnMaybe ":" name,
+    Just (convOpStr, codTypeStr) <- breakOnMaybe ":" rest,
+    Just domType <- asLowTypeMaybe domTypeStr,
+    Just codType <- asLowTypeMaybe codTypeStr,
+    Just op <- asConvOpMaybe domType codType convOpStr =
+    Just op
 asUnaryOpMaybe _ = Nothing
 
 unaryOpToDomCod :: UnaryOp -> (LowType, LowType)
@@ -304,9 +310,10 @@ data BinaryOp
 
 asBinaryOpMaybe :: T.Text -> Maybe BinaryOp
 asBinaryOpMaybe name
-  | Just (typeStr, opStr) <- breakOnMaybe ":" name -- e.g. name == "i8.add"
-  , Just lowType <- asLowTypeMaybe typeStr
-  , Just f <- asBinaryOpMaybe' opStr = Just $ f lowType
+  | Just (typeStr, opStr) <- breakOnMaybe ":" name, -- e.g. name == "i8.add"
+    Just lowType <- asLowTypeMaybe typeStr,
+    Just f <- asBinaryOpMaybe' opStr =
+    Just $ f lowType
 asBinaryOpMaybe _ = Nothing
 
 binaryOpToDomCod :: BinaryOp -> (LowType, LowType)
@@ -360,8 +367,8 @@ showOS :: OS -> T.Text
 showOS OSLinux = "linux"
 showOS OSDarwin = "darwin"
 
-data Arch =
-  Arch64
+data Arch
+  = Arch64
   deriving (Eq, Show)
 
 showArch :: Arch -> T.Text
@@ -377,9 +384,9 @@ linearCheck xs = linearCheck' S.empty xs
 
 linearCheck' :: (Eq a, Ord a) => (S.Set a) -> [a] -> Bool
 linearCheck' _ [] = True
-linearCheck' found (x:_)
+linearCheck' found (x : _)
   | x `S.member` found = False
-linearCheck' found (x:xs) = linearCheck' (S.insert x found) xs
+linearCheck' found (x : xs) = linearCheck' (S.insert x found) xs
 
 {-# INLINE breakOnMaybe #-}
 breakOnMaybe :: T.Text -> T.Text -> Maybe (T.Text, T.Text)
@@ -394,7 +401,7 @@ breakOnMaybe needle text =
 
 deleteKeys :: IntMap.IntMap a -> [Int] -> IntMap.IntMap a
 deleteKeys sub [] = sub
-deleteKeys sub (i:is) = IntMap.delete i $ deleteKeys sub is
+deleteKeys sub (i : is) = IntMap.delete i $ deleteKeys sub is
 
 showInHex :: T.Text -> T.Text
 showInHex x = "x" <> foldr (<>) "" (map showInHex' (encode $ T.unpack x))

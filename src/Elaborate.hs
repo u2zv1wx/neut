@@ -1,23 +1,22 @@
 module Elaborate
-  ( elaborate
-  ) where
+  ( elaborate,
+  )
+where
 
 import Control.Monad.State.Lazy
-import Data.List (nub)
-import Data.Time
-import Numeric
-
-import qualified Data.HashMap.Lazy as Map
-import qualified Data.IntMap as IntMap
-import qualified Data.Text as T
-
 import Data.Basic
 import Data.Env
+import qualified Data.HashMap.Lazy as Map
+import qualified Data.IntMap as IntMap
+import Data.List (nub)
 import Data.Term
+import qualified Data.Text as T
+import Data.Time
 import Data.WeakTerm
 import Elaborate.Analyze
 import Elaborate.Infer
 import Elaborate.Synthesize
+import Numeric
 import Reduce.Term
 import Reduce.WeakTerm
 
@@ -74,10 +73,11 @@ elaborateStmt (WeakStmtVisit _ ss1 ss2) = do
   h <- newNameWith'' "_"
   let m = fst e1
   return
-    ( m
-    , TermPiElim
+    ( m,
+      TermPiElim
         (m, termPiIntro [(m, h, (m, TermEnum (EnumTypeIntS 64)))] e2)
-        [e1])
+        [e1]
+    )
 
 cleanup :: WithEnv ()
 cleanup = do
@@ -132,28 +132,35 @@ elaborate' (m, WeakTermInt t x) = do
   t' <- reduceTermPlus <$> elaborate' t
   case t' of
     (_, TermEnum (EnumTypeIntS size))
-      | (-1) * (2 ^ (size - 1)) <= x
-      , x < 2 ^ size -> return (m, TermEnumIntro (EnumValueIntS size x))
+      | (-1) * (2 ^ (size - 1)) <= x,
+        x < 2 ^ size ->
+        return (m, TermEnumIntro (EnumValueIntS size x))
       | otherwise ->
         raiseError m $
-        "the signed integer " <>
-        T.pack (show x) <>
-        " is inferred to be of type i" <>
-        T.pack (show size) <> ", but is out of range of i" <> T.pack (show size)
+          "the signed integer "
+            <> T.pack (show x)
+            <> " is inferred to be of type i"
+            <> T.pack (show size)
+            <> ", but is out of range of i"
+            <> T.pack (show size)
     (_, TermEnum (EnumTypeIntU size))
-      | 0 <= x
-      , x < 2 ^ size -> return (m, TermEnumIntro (EnumValueIntU size x))
+      | 0 <= x,
+        x < 2 ^ size ->
+        return (m, TermEnumIntro (EnumValueIntU size x))
       | otherwise ->
         raiseError m $
-        "the unsigned integer " <>
-        T.pack (show x) <>
-        " is inferred to be of type u" <>
-        T.pack (show size) <> ", but is out of range of u" <> T.pack (show size)
+          "the unsigned integer "
+            <> T.pack (show x)
+            <> " is inferred to be of type u"
+            <> T.pack (show size)
+            <> ", but is out of range of u"
+            <> T.pack (show size)
     _ ->
       raiseError m $
-      "the term `" <>
-      T.pack (show x) <>
-      "` is an integer, but its type is: " <> toText (weaken t')
+        "the term `"
+          <> T.pack (show x)
+          <> "` is an integer, but its type is: "
+          <> toText (weaken t')
 elaborate' (m, WeakTermFloat t x) = do
   t' <- reduceTermPlus <$> elaborate' t
   case t' of
@@ -162,9 +169,10 @@ elaborate' (m, WeakTermFloat t x) = do
         return (m, TermFloat size x)
     _ ->
       raiseError m $
-      "the term `" <>
-      T.pack (show x) <>
-      "` is a float, but its type is:\n" <> toText (weaken t')
+        "the term `"
+          <> T.pack (show x)
+          <> "` is a float, but its type is:\n"
+          <> toText (weaken t')
 elaborate' (m, WeakTermEnum k) = return (m, TermEnum k)
 elaborate' (m, WeakTermEnumIntro x) = return (m, TermEnumIntro x)
 elaborate' (m, WeakTermEnumElim (e, t) les) = do
@@ -179,9 +187,10 @@ elaborate' (m, WeakTermEnumElim (e, t) les) = do
       return (m, TermEnumElim (e', t') (zip ls' es'))
     _ ->
       raiseError m $
-      "the type of `" <>
-      toText (weaken e') <>
-      "` must be an enum type, but is:\n" <> toText (weaken t')
+        "the type of `"
+          <> toText (weaken e')
+          <> "` must be an enum type, but is:\n"
+          <> toText (weaken t')
 elaborate' (m, WeakTermArray dom k) = do
   dom' <- elaborate' dom
   return (m, TermArray dom' k)
@@ -217,7 +226,7 @@ elaborate' (m, WeakTermCase indName e cxtes) = do
         Just [] -> return (m, TermCase indName e' cxtes')
         Just _ ->
           raiseError m $
-          "the inductive type `" <> indName <> "` is not a bottom-type"
+            "the inductive type `" <> indName <> "` is not a bottom-type"
     _ -> do
       case Map.lookup indName eenv of
         Nothing -> raiseError m $ "no such inductive type defined: " <> indName
@@ -256,7 +265,7 @@ showFormArgs :: Int -> [Int] -> [T.Text]
 showFormArgs _ [] = []
 showFormArgs k [_]
   | otherwise = ["#" <> T.pack (show k)]
-showFormArgs k (_:is)
+showFormArgs k (_ : is)
   | otherwise = "#" <> T.pack (show k) : showFormArgs (k + 1) is
 
 elaborateWeakCase :: WeakCasePlus -> WithEnv CasePlus
@@ -271,9 +280,10 @@ elaborateWeakCase (m, WeakCaseInt t x) = do
       return (m, CaseValue (EnumValueIntS 1 x))
     _ -> do
       raiseError m $
-        "the type of `" <>
-        T.pack (show x) <>
-        "` must be an integer type, but is: " <> toText (weaken t')
+        "the type of `"
+          <> T.pack (show x)
+          <> "` must be an integer type, but is: "
+          <> toText (weaken t')
 elaborateWeakCase (m, WeakCaseLabel l) =
   return (m, CaseValue $ EnumValueLabel l)
 elaborateWeakCase (m, WeakCaseIntS t a) =

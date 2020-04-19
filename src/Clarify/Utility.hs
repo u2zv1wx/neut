@@ -1,15 +1,13 @@
 module Clarify.Utility where
 
 import Control.Monad.State.Lazy
-
-import qualified Data.HashMap.Lazy as Map
-import qualified Data.IntMap as IntMap
-import qualified Data.Text as T
-
 import Data.Basic
 import Data.Code
 import Data.Env
+import qualified Data.HashMap.Lazy as Map
+import qualified Data.IntMap as IntMap
 import Data.Term
+import qualified Data.Text as T
 
 type Context = [(Identifier, TermPlus)]
 
@@ -22,14 +20,16 @@ toAffineApp :: Meta -> Identifier -> CodePlus -> WithEnv CodePlus
 toAffineApp m x t = do
   (expVarName, expVar) <- newDataUpsilonWith m "aff-app-exp"
   return
-    ( m
-    , CodeUpElim
+    ( m,
+      CodeUpElim
         expVarName
         t
-        ( m
-        , CodePiElimDownElim
+        ( m,
+          CodePiElimDownElim
             expVar
-            [(m, DataEnumIntro (EnumValueIntS 64 0)), (m, DataUpsilon x)]))
+            [(m, DataEnumIntro (EnumValueIntS 64 0)), (m, DataUpsilon x)]
+        )
+    )
 
 -- toRelevantApp meta x t ~>
 --   bind exp := t in
@@ -39,18 +39,20 @@ toRelevantApp :: Meta -> Identifier -> CodePlus -> WithEnv CodePlus
 toRelevantApp m x t = do
   (expVarName, expVar) <- newDataUpsilonWith m "rel-app-exp"
   return
-    ( m
-    , CodeUpElim
+    ( m,
+      CodeUpElim
         expVarName
         t
-        ( m
-        , CodePiElimDownElim
+        ( m,
+          CodePiElimDownElim
             expVar
-            [(m, DataEnumIntro (EnumValueIntS 64 1)), (m, DataUpsilon x)]))
+            [(m, DataEnumIntro (EnumValueIntS 64 1)), (m, DataUpsilon x)]
+        )
+    )
 
 bindLet :: [(Identifier, CodePlus)] -> CodePlus -> CodePlus
 bindLet [] cont = cont
-bindLet ((x, e):xes) cont = (fst e, CodeUpElim x e $ bindLet xes cont)
+bindLet ((x, e) : xes) cont = (fst e, CodeUpElim x e $ bindLet xes cont)
 
 returnCartesianImmediate :: Meta -> WithEnv CodePlus
 returnCartesianImmediate m = do
@@ -70,22 +72,24 @@ tryCache m key doInsertion = do
   return (m, DataConst key)
 
 makeSwitcher ::
-     Meta
-  -> (DataPlus -> WithEnv CodePlus)
-  -> (DataPlus -> WithEnv CodePlus)
-  -> WithEnv ([Identifier], CodePlus)
+  Meta ->
+  (DataPlus -> WithEnv CodePlus) ->
+  (DataPlus -> WithEnv CodePlus) ->
+  WithEnv ([Identifier], CodePlus)
 makeSwitcher m compAff compRel = do
   (switchVarName, switchVar) <- newDataUpsilonWith m "switch"
   (argVarName, argVar) <- newDataUpsilonWith m "argimm"
   aff <- compAff argVar
   rel <- compRel argVar
   return
-    ( [switchVarName, argVarName]
-    , ( m
-      , CodeEnumElim
+    ( [switchVarName, argVarName],
+      ( m,
+        CodeEnumElim
           (IntMap.fromList [(asInt argVarName, argVar)])
           switchVar
-          (switch aff rel)))
+          (switch aff rel)
+      )
+    )
 
 cartesianImmediate :: Meta -> WithEnv DataPlus
 cartesianImmediate m = do
@@ -120,13 +124,15 @@ relevantStruct ks argVar@(m, _) = do
   xs <- mapM (const $ newNameWith' "var") ks
   let vks = zip (map (\y -> (m, DataUpsilon y)) xs) ks
   return
-    ( m
-    , CodeStructElim
+    ( m,
+      CodeStructElim
         (zip xs ks)
         argVar
-        ( m
-        , CodeUpIntro
-            (m, sigmaIntro [(m, DataStructIntro vks), (m, DataStructIntro vks)])))
+        ( m,
+          CodeUpIntro
+            (m, sigmaIntro [(m, DataStructIntro vks), (m, DataStructIntro vks)])
+        )
+    )
 
 insCodeEnv :: T.Text -> [Identifier] -> CodePlus -> WithEnv ()
 insCodeEnv name args e = do

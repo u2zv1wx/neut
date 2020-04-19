@@ -1,15 +1,14 @@
 module Reduce.Code
-  ( reduceCodePlus
-  ) where
+  ( reduceCodePlus,
+  )
+where
 
 import Control.Monad.State.Lazy
-
-import qualified Data.HashMap.Lazy as Map
-import qualified Data.IntMap as IntMap
-
 import Data.Basic
 import Data.Code
 import Data.Env
+import qualified Data.HashMap.Lazy as Map
+import qualified Data.IntMap as IntMap
 import qualified Data.Set as S
 
 reduceCodePlus :: CodePlus -> WithEnv CodePlus
@@ -19,14 +18,14 @@ reduceCodePlus (m, CodePiElimDownElim v ds) = do
   ns <- gets nameSet
   case v of
     (_, DataConst x)
-      | Just (Definition (IsFixed False) xs body) <- Map.lookup x cenv
-      , length xs == length ds -> do
+      | Just (Definition (IsFixed False) xs body) <- Map.lookup x cenv,
+        length xs == length ds -> do
         let sub = IntMap.fromList (zip (map asInt xs) ds)
         reduceCodePlus $ substCodePlus sub body
     (_, DataConst x)
-      | Just (Definition (IsFixed True) xs body) <- Map.lookup x cenv
-      , length xs == length ds
-      , not (x `S.member` ns) -> do
+      | Just (Definition (IsFixed True) xs body) <- Map.lookup x cenv,
+        length xs == length ds,
+        not (x `S.member` ns) -> do
         modify (\env -> env {nameSet = S.insert x ns})
         body' <- reduceCodePlus body
         let def = Definition (IsFixed True) xs body'
@@ -37,16 +36,17 @@ reduceCodePlus (m, CodePiElimDownElim v ds) = do
 reduceCodePlus (m, CodeSigmaElim mk xs v e) = do
   case v of
     (_, DataSigmaIntro mk' ds)
-      | length ds == length xs
-      , mk == mk' -> do
+      | length ds == length xs,
+        mk == mk' -> do
         let sub = IntMap.fromList (zip (map asInt xs) ds)
         reduceCodePlus $ substCodePlus sub e
     _ -> do
       e' <- reduceCodePlus e
       case e' of
         (mUp, CodeUpIntro (_, DataSigmaIntro _ ds))
-          | Just ys <- mapM asUpsilon ds
-          , xs == ys -> return (mUp, CodeUpIntro v) -- eta-reduce
+          | Just ys <- mapM asUpsilon ds,
+            xs == ys ->
+            return (mUp, CodeUpIntro v) -- eta-reduce
         _ -> do
           return (m, CodeSigmaElim mk xs v e')
 reduceCodePlus (m, CodeUpIntro v) = return (m, CodeUpIntro v)
@@ -78,25 +78,26 @@ reduceCodePlus (m, CodeEnumElim varInfo v les) = do
           case lookup CaseDefault les of
             Just body -> reduceCodePlus $ substCodePlus varInfo body
             Nothing -> return (m, CodeEnumElim varInfo v les)
-              -- return (m, CodeEnumElim IntMap.empty v $ zip ls es'')
+    -- return (m, CodeEnumElim IntMap.empty v $ zip ls es'')
     _ -> return (m, CodeEnumElim varInfo v les)
-      -- return (m, CodeEnumElim IntMap.empty v $ zip ls es'')
+-- return (m, CodeEnumElim IntMap.empty v $ zip ls es'')
 reduceCodePlus (m, CodeStructElim xks d e) = do
   let (xs, ks1) = unzip xks
   case d of
     (_, DataStructIntro eks)
-      | (es, ks2) <- unzip eks
-      , ks1 == ks2 -> do
+      | (es, ks2) <- unzip eks,
+        ks1 == ks2 -> do
         let sub = IntMap.fromList (zip (map asInt xs) es)
         reduceCodePlus $ substCodePlus sub e
     _ -> do
       e' <- reduceCodePlus e
       case e' of
         (mUp, CodeUpIntro (_, DataStructIntro dks))
-          | (ds2, ks2) <- unzip dks
-          , ks1 == ks2
-          , Just ys <- mapM asUpsilon ds2
-          , xs == ys -> return (mUp, CodeUpIntro d) -- eta-reduce
+          | (ds2, ks2) <- unzip dks,
+            ks1 == ks2,
+            Just ys <- mapM asUpsilon ds2,
+            xs == ys ->
+            return (mUp, CodeUpIntro d) -- eta-reduce
         _ -> return (m, CodeStructElim xks d e')
 reduceCodePlus e = return e
 -- reduceCodePlus (m, CodeCase sub d mces) = do

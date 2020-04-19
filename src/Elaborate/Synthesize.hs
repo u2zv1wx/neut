@@ -1,21 +1,20 @@
 module Elaborate.Synthesize
-  ( synthesize
-  ) where
+  ( synthesize,
+  )
+where
 
 import Control.Exception.Safe
 import Control.Monad.State.Lazy
-import Data.List (nub, sortOn)
-
-import qualified Data.HashMap.Lazy as Map
-import qualified Data.IntMap as IntMap
-import qualified Data.PQueue.Min as Q
-import qualified Data.Set as S
-import qualified Data.Text as T
-
 import Data.Basic
 import Data.Constraint
 import Data.Env
+import qualified Data.HashMap.Lazy as Map
+import qualified Data.IntMap as IntMap
+import Data.List (nub, sortOn)
 import Data.Log
+import qualified Data.PQueue.Min as Q
+import qualified Data.Set as S
+import qualified Data.Text as T
 import Data.WeakTerm
 import Elaborate.Analyze
 
@@ -35,7 +34,7 @@ synthesize = do
     _ -> throwTypeErrors
 
 resolveStuck ::
-     WeakTermPlus -> WeakTermPlus -> Identifier -> WeakTermPlus -> WithEnv ()
+  WeakTermPlus -> WeakTermPlus -> Identifier -> WeakTermPlus -> WithEnv ()
 resolveStuck e1 e2 h e = do
   let s = Map.singleton (Left $ asInt h) e
   let e1' = substWeakTermPlus s e1
@@ -81,7 +80,7 @@ asAnalyzable (Enriched cs hs _) = Enriched cs hs ConstraintAnalyzable
 tryPlanList :: Meta -> [WithEnv a] -> WithEnv a
 tryPlanList m [] = raiseError m $ "cannot synthesize(tryPlanList)."
 tryPlanList _ [plan] = plan
-tryPlanList m (plan:planList) =
+tryPlanList m (plan : planList) =
   catch plan (\(_ :: Error) -> tryPlanList m planList)
 
 deleteMin :: WithEnv ()
@@ -108,14 +107,14 @@ toIndexInfo xs = toIndexInfo' $ zip xs [0 ..]
 
 toIndexInfo' :: Eq a => [(a, Int)] -> [(a, [Int])]
 toIndexInfo' [] = []
-toIndexInfo' ((x, i):xs) = do
+toIndexInfo' ((x, i) : xs) = do
   let (is, xs') = toIndexInfo'' x xs
   let xs'' = toIndexInfo' xs'
   (x, i : is) : xs''
 
 toIndexInfo'' :: Eq a => a -> [(a, Int)] -> ([Int], [(a, Int)])
 toIndexInfo'' _ [] = ([], [])
-toIndexInfo'' x ((y, i):ys) = do
+toIndexInfo'' x ((y, i) : ys) = do
   let (is, ys') = toIndexInfo'' x ys
   if x == y
     then (i : is, ys') -- remove x from the list
@@ -128,13 +127,13 @@ chooseActive xs = do
 
 pickup :: Eq a => [[a]] -> [[a]]
 pickup [] = [[]]
-pickup (xs:xss) = do
+pickup (xs : xss) = do
   let yss = pickup xss
   x <- xs
   map (\ys -> x : ys) yss
 
 discardInactive ::
-     [IdentifierPlus] -> [(Identifier, Int)] -> WithEnv [IdentifierPlus]
+  [IdentifierPlus] -> [(Identifier, Int)] -> WithEnv [IdentifierPlus]
 discardInactive xs indexList =
   forM (zip xs [0 ..]) $ \((mx, x, t), i) ->
     case lookup x indexList of
@@ -147,7 +146,7 @@ discardInactive xs indexList =
 -- takeByCount [1, 3, 2] [a, b, c, d, e, f, g, h] ~> [[a], [b, c, d], [e, f]]
 takeByCount :: [Int] -> [a] -> [[a]]
 takeByCount [] _ = []
-takeByCount (i:is) xs = do
+takeByCount (i : is) xs = do
   let ys = take i xs
   let yss = takeByCount is (drop i xs)
   ys : yss
@@ -161,7 +160,7 @@ throwTypeErrors = do
 
 setupPosInfo :: [EnrichedConstraint] -> [(PosInfo, PreConstraint)]
 setupPosInfo [] = []
-setupPosInfo ((Enriched (e1, e2) _ _):cs) = do
+setupPosInfo ((Enriched (e1, e2) _ _) : cs) = do
   let pos1 = getPosInfo $ metaOf e1
   let pos2 = getPosInfo $ metaOf e2
   case snd pos1 `compare` snd pos2 of
@@ -170,7 +169,7 @@ setupPosInfo ((Enriched (e1, e2) _ _):cs) = do
 
 constructErrors :: [PosInfo] -> [(PosInfo, PreConstraint)] -> WithEnv [Log]
 constructErrors _ [] = return []
-constructErrors ps ((pos, (e1, e2)):pcs) = do
+constructErrors ps ((pos, (e1, e2)) : pcs) = do
   e1' <- unravel e1
   e2' <- unravel e2
   let msg = constructErrorMsg e1' e2'
@@ -179,8 +178,10 @@ constructErrors ps ((pos, (e1, e2)):pcs) = do
 
 constructErrorMsg :: WeakTermPlus -> WeakTermPlus -> T.Text
 constructErrorMsg e1 e2 =
-  "couldn't verify the definitional equality of the following two terms:\n- " <>
-  toText e1 <> "\n- " <> toText e2
+  "couldn't verify the definitional equality of the following two terms:\n- "
+    <> toText e1
+    <> "\n- "
+    <> toText e2
 
 unravel :: WeakTermPlus -> WithEnv WeakTermPlus
 unravel (m, WeakTermTau) = return (m, WeakTermTau)
@@ -266,20 +267,20 @@ unravelZeta (I (s, i)) = do
       return $ I (s, j)
 
 unravelBinder ::
-     [IdentifierPlus]
-  -> WeakTermPlus
-  -> WithEnv ([IdentifierPlus], WeakTermPlus)
+  [IdentifierPlus] ->
+  WeakTermPlus ->
+  WithEnv ([IdentifierPlus], WeakTermPlus)
 unravelBinder [] e = do
   e' <- unravel e
   return ([], e')
-unravelBinder ((mx, x, t):xts) e = do
+unravelBinder ((mx, x, t) : xts) e = do
   t' <- unravel t
   x' <- unravelUpsilon x
   (xts', e') <- unravelBinder xts e
   return ((mx, x', t') : xts', e')
 
 unravelCaseList ::
-     [(WeakCasePlus, WeakTermPlus)] -> WithEnv [(WeakCasePlus, WeakTermPlus)]
+  [(WeakCasePlus, WeakTermPlus)] -> WithEnv [(WeakCasePlus, WeakTermPlus)]
 unravelCaseList caseList = do
   let (ls, es) = unzip caseList
   ls' <- mapM unravelWeakCase ls
@@ -293,13 +294,13 @@ unravelWeakCase (m, WeakCaseInt t a) = do
 unravelWeakCase l = return l
 
 unravelStruct ::
-     [(Meta, Identifier, ArrayKind)]
-  -> WeakTermPlus
-  -> WithEnv ([(Meta, Identifier, ArrayKind)], WeakTermPlus)
+  [(Meta, Identifier, ArrayKind)] ->
+  WeakTermPlus ->
+  WithEnv ([(Meta, Identifier, ArrayKind)], WeakTermPlus)
 unravelStruct [] e = do
   e' <- unravel e
   return ([], e')
-unravelStruct ((mx, x, t):xts) e = do
+unravelStruct ((mx, x, t) : xts) e = do
   x' <- unravelUpsilon x
   (xts', e') <- unravelStruct xts e
   return ((mx, x', t) : xts', e')

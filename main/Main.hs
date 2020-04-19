@@ -1,31 +1,29 @@
 module Main
-  ( main
-  ) where
+  ( main,
+  )
+where
 
+import Clarify
+import qualified Codec.Archive.Tar as Tar
+import qualified Codec.Compression.GZip as GZip
+import Complete
 import Control.Monad.State.Lazy
 import Data.ByteString.Builder
+import qualified Data.ByteString.Lazy as L
+import Data.Env
+import Data.Log
 import Data.Time.Clock.POSIX
+import Elaborate
+import Emit
+import LLVM
 import Options.Applicative
+import Parse
 import Path
 import Path.IO
 import System.Directory (listDirectory)
 import System.Exit
-
 import System.Process
 import Text.Read (readMaybe)
-
-import qualified Codec.Archive.Tar as Tar
-import qualified Codec.Compression.GZip as GZip
-import qualified Data.ByteString.Lazy as L
-
-import Clarify
-import Complete
-import Data.Env
-import Data.Log
-import Elaborate
-import Emit
-import LLVM
-import Parse
 
 type InputPath = String
 
@@ -65,48 +63,50 @@ main = execParser (info (helper <*> parseOpt) fullDesc) >>= run
 parseOpt :: Parser Command
 parseOpt =
   subparser $
-  (command
-     "build"
-     (info (helper <*> parseBuildOpt) (progDesc "build given file")) <>
-   command
-     "check"
-     (info (helper <*> parseCheckOpt) (progDesc "check specified file")) <>
-   command
-     "archive"
-     (info
-        (helper <*> parseArchiveOpt)
-        (progDesc "create archive from given path")) <>
-   command
-     "complete"
-     (info (helper <*> parseCompleteOpt) (progDesc "show completion info")))
+    ( command
+        "build"
+        (info (helper <*> parseBuildOpt) (progDesc "build given file"))
+        <> command
+          "check"
+          (info (helper <*> parseCheckOpt) (progDesc "check specified file"))
+        <> command
+          "archive"
+          ( info
+              (helper <*> parseArchiveOpt)
+              (progDesc "create archive from given path")
+          )
+        <> command
+          "complete"
+          (info (helper <*> parseCompleteOpt) (progDesc "show completion info"))
+    )
 
 parseBuildOpt :: Parser Command
 parseBuildOpt = do
   let inputPathOpt =
         argument str $ mconcat [metavar "INPUT", help "The path of input file"]
   let outputPathOpt =
-        optional $
-        strOption $
-        mconcat
-          [ long "output"
-          , short 'o'
-          , metavar "OUTPUT"
-          , help "The path of output file"
-          ]
+        optional
+          $ strOption
+          $ mconcat
+            [ long "output",
+              short 'o',
+              metavar "OUTPUT",
+              help "The path of output file"
+            ]
   let outputKindOpt =
         option kindReader $
-        mconcat
-          [ long "emit"
-          , metavar "KIND"
-          , value OutputKindObject
-          , help "The type of output file"
-          ]
+          mconcat
+            [ long "emit",
+              metavar "KIND",
+              value OutputKindObject,
+              help "The type of output file"
+            ]
   let incrementalOpt =
         flag False True $
-        mconcat
-          [ long "incremental"
-          , help "Set this to enable incremental compilation"
-          ]
+          mconcat
+            [ long "incremental",
+              help "Set this to enable incremental compilation"
+            ]
   Build <$> inputPathOpt <*> outputPathOpt <*> outputKindOpt <*> incrementalOpt
 
 kindReader :: ReadM OutputKind
@@ -122,34 +122,34 @@ parseCheckOpt = do
         argument str $ mconcat [metavar "INPUT", help "The path of input file"]
   let colorizeOpt =
         flag True False $
-        mconcat
-          [ long "no-color"
-          , help "Set this to disable colorization of the output"
-          ]
+          mconcat
+            [ long "no-color",
+              help "Set this to disable colorization of the output"
+            ]
   let footerOpt =
         strOption $
-        mconcat
-          [ long "end-of-entry"
-          , value ""
-          , help "String printed after each entry"
-          , metavar "STRING"
-          ]
+          mconcat
+            [ long "end-of-entry",
+              value "",
+              help "String printed after each entry",
+              metavar "STRING"
+            ]
   Check <$> inputPathOpt <*> colorizeOpt <*> footerOpt
 
 parseArchiveOpt :: Parser Command
 parseArchiveOpt = do
   let inputPathOpt =
         argument str $
-        mconcat [metavar "INPUT", help "The path of input directory"]
+          mconcat [metavar "INPUT", help "The path of input directory"]
   let outputPathOpt =
-        optional $
-        strOption $
-        mconcat
-          [ long "output"
-          , short 'o'
-          , metavar "OUTPUT"
-          , help "The path of output"
-          ]
+        optional
+          $ strOption
+          $ mconcat
+            [ long "output",
+              short 'o',
+              metavar "OUTPUT",
+              help "The path of output"
+            ]
   Archive <$> inputPathOpt <*> outputPathOpt
 
 parseCompleteOpt :: Parser Command
@@ -167,7 +167,7 @@ run (Build inputPathStr mOutputPathStr outputKind _) = do
   time <- round <$> getPOSIXTime
   resultOrErr <-
     evalWithEnv (runBuild inputPath) $
-    initialEnv {shouldColorize = True, endOfEntry = "", timestamp = time}
+      initialEnv {shouldColorize = True, endOfEntry = "", timestamp = time}
   (basename, _) <- splitExtension $ filename inputPath
   mOutputPath <- mapM resolveFile' mOutputPathStr
   outputPath <- constructOutputPath basename mOutputPath outputKind
@@ -184,9 +184,9 @@ run (Build inputPathStr mOutputPathStr outputKind _) = do
           L.writeFile tmpOutputPathStr result'
           callProcess
             "clang"
-            [ tmpOutputPathStr
-            , "-Wno-override-module"
-            , "-o" ++ toFilePath outputPath
+            [ tmpOutputPathStr,
+              "-Wno-override-module",
+              "-o" ++ toFilePath outputPath
             ]
           removeFile tmpOutputPath
         OutputKindAsm -> do
@@ -195,10 +195,10 @@ run (Build inputPathStr mOutputPathStr outputKind _) = do
           L.writeFile tmpOutputPathStr result'
           callProcess
             "clang"
-            [ "-S"
-            , tmpOutputPathStr
-            , "-Wno-override-module"
-            , "-o" ++ toFilePath outputPath
+            [ "-S",
+              tmpOutputPathStr,
+              "-Wno-override-module",
+              "-o" ++ toFilePath outputPath
             ]
           removeFile tmpOutputPath
 run (Check inputPathStr colorizeFlag eoe) = do
@@ -206,12 +206,12 @@ run (Check inputPathStr colorizeFlag eoe) = do
   time <- round <$> getPOSIXTime
   resultOrErr <-
     evalWithEnv (runCheck inputPath) $
-    initialEnv
-      { shouldColorize = colorizeFlag
-      , endOfEntry = eoe
-      , isCheck = True
-      , timestamp = time
-      }
+      initialEnv
+        { shouldColorize = colorizeFlag,
+          endOfEntry = eoe,
+          isCheck = True,
+          timestamp = time
+        }
   case resultOrErr of
     Right _ -> return ()
     Left (Error err) ->
@@ -232,7 +232,7 @@ run (Complete inputPathStr l c) = do
     Right result -> mapM_ putStrLn result
 
 constructOutputPath ::
-     Path Rel File -> Maybe (Path Abs File) -> OutputKind -> IO (Path Abs File)
+  Path Rel File -> Maybe (Path Abs File) -> OutputKind -> IO (Path Abs File)
 constructOutputPath basename Nothing OutputKindLLVM = do
   dir <- getCurrentDir
   addExtension ".ll" (dir </> basename)
@@ -245,7 +245,7 @@ constructOutputPath basename Nothing OutputKindObject = do
 constructOutputPath _ (Just path) _ = return path
 
 constructOutputArchivePath ::
-     Path Abs Dir -> Maybe (Path Abs File) -> IO (Path Abs File)
+  Path Abs Dir -> Maybe (Path Abs File) -> IO (Path Abs File)
 constructOutputArchivePath inputPath Nothing = do
   let baseName = fromRelDir $ dirname inputPath
   outputPath <- resolveFile' baseName
@@ -260,7 +260,7 @@ runCheck = parse >=> elaborate >=> \_ -> return ()
 
 seqIO :: [IO ()] -> IO ()
 seqIO [] = return ()
-seqIO (a:as) = a >> seqIO as
+seqIO (a : as) = a >> seqIO as
 
 archive :: FilePath -> FilePath -> [FilePath] -> IO ()
 archive tarPath base dir = do

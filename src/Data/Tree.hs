@@ -1,7 +1,6 @@
 module Data.Tree where
 
 import Data.Basic
-
 import qualified Data.Set as S
 import qualified Data.Text as T
 

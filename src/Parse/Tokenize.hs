@@ -1,26 +1,25 @@
 module Parse.Tokenize
-  ( tokenize
-  ) where
+  ( tokenize,
+  )
+where
 
 import Control.Exception.Safe
 import Control.Monad.State.Lazy
-import Path
-
-import qualified Data.Set as S
-import qualified Data.Text as T
-
 import Data.Basic
 import Data.Env
 import Data.Log
+import qualified Data.Set as S
+import qualified Data.Text as T
 import Data.Tree
+import Path
 
-data TEnv =
-  TEnv
-    { text :: T.Text
-    , line :: Int
-    , column :: Int
-    , filePath :: Path Abs File
-    }
+data TEnv
+  = TEnv
+      { text :: T.Text,
+        line :: Int,
+        column :: Int,
+        filePath :: Path Abs File
+      }
   deriving (Show)
 
 type Tokenizer a = StateT TEnv IO a
@@ -71,8 +70,9 @@ leaf = do
         return (m, TreeLeaf x)
       | otherwise ->
         raiseTokenizeError $
-        "unexpected character: '" <>
-        T.singleton c <> "'\nexpecting: SYMBOL-CHAR"
+          "unexpected character: '"
+            <> T.singleton c
+            <> "'\nexpecting: SYMBOL-CHAR"
     Nothing -> raiseTokenizeError $ "unexpected end of input\nexpecting: LEAF"
 
 node :: Tokenizer TreePlus
@@ -89,7 +89,7 @@ char c = do
   case T.uncons s of
     Nothing ->
       raiseTokenizeError $
-      "unexpected end of input\nexpecting: '" <> T.singleton c <> "'"
+        "unexpected end of input\nexpecting: '" <> T.singleton c <> "'"
     Just (c', rest)
       | c == c' -> do
         if c == '\n'
@@ -97,8 +97,11 @@ char c = do
           else updateStreamC 1 rest
       | otherwise ->
         raiseTokenizeError $
-        "unexpected character: '" <>
-        T.singleton c' <> "'\nexpecting: '" <> T.singleton c <> "'"
+          "unexpected character: '"
+            <> T.singleton c'
+            <> "'\nexpecting: '"
+            <> T.singleton c
+            <> "'"
 
 skip :: Tokenizer ()
 skip = do

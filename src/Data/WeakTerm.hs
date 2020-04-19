@@ -1,12 +1,10 @@
 module Data.WeakTerm where
 
-import Path
-
+import Data.Basic
 import qualified Data.HashMap.Lazy as Map
 import qualified Data.Set as S
 import qualified Data.Text as T
-
-import Data.Basic
+import Path
 
 data WeakTerm
   = WeakTermTau
@@ -68,31 +66,31 @@ type IdentDef = (T.Text, Def)
 weakTermPiIntro :: [IdentifierPlus] -> WeakTermPlus -> WeakTerm
 weakTermPiIntro = WeakTermPiIntro Nothing
 
-type Rule -- inference rule
-   = ( Meta -- location of the name
-     , T.Text -- the name of the rule
-     , Meta -- location of the rule
-     , [IdentifierPlus] -- the antecedents of the inference rule (e.g. [(x, A), (xs, list A)])
-     , WeakTermPlus -- the consequent of the inference rule
-      )
+type Rule = -- inference rule
+  ( Meta, -- location of the name
+    T.Text, -- the name of the rule
+    Meta, -- location of the rule
+    [IdentifierPlus], -- the antecedents of the inference rule (e.g. [(x, A), (xs, list A)])
+    WeakTermPlus -- the consequent of the inference rule
+  )
 
-type Connective
-   = ( Meta -- location of the connective
-     , T.Text -- the name of the connective (e.g. nat, list)
-     , [IdentifierPlus] -- parameter of the connective (e.g. the `A` in `list A`)
-     , [Rule] -- list of introduction rule when inductive / list of elimination rule when coinductive
-      )
+type Connective =
+  ( Meta, -- location of the connective
+    T.Text, -- the name of the connective (e.g. nat, list)
+    [IdentifierPlus], -- parameter of the connective (e.g. the `A` in `list A`)
+    [Rule] -- list of introduction rule when inductive / list of elimination rule when coinductive
+  )
 
 data QuasiStmt
   = QuasiStmtLet Meta WeakTextPlus WeakTermPlus
-  -- special case of `let` in which the `e` in `let x := e` is known to be well-typed
-  | QuasiStmtLetWT Meta WeakTextPlus WeakTermPlus
-  -- mutually recursive definition (n >= 0)
-  --   (definition
-  --     ((f1 A1) (ARGS-1) e1)
-  --     ...
-  --     ((fn An) (ARGS-n) en))
-  | QuasiStmtDef [(T.Text, Def)]
+  | -- special case of `let` in which the `e` in `let x := e` is known to be well-typed
+    QuasiStmtLetWT Meta WeakTextPlus WeakTermPlus
+  | -- mutually recursive definition (n >= 0)
+    --   (definition
+    --     ((f1 A1) (ARGS-1) e1)
+    --     ...
+    --     ((fn An) (ARGS-n) en))
+    QuasiStmtDef [(T.Text, Def)]
   | QuasiStmtVerify Meta WeakTermPlus
   | QuasiStmtEnum Meta T.Text [(T.Text, Int)]
   | QuasiStmtConstDecl Meta WeakTextPlus
@@ -164,7 +162,7 @@ varWeakTermPlus (_, WeakTermErase _ e) = varWeakTermPlus e
 
 varWeakTermPlus' :: [IdentifierPlus] -> [WeakTermPlus] -> S.Set Identifier
 varWeakTermPlus' [] es = S.unions $ map varWeakTermPlus es
-varWeakTermPlus' ((_, x, t):xts) es = do
+varWeakTermPlus' ((_, x, t) : xts) es = do
   let hs1 = varWeakTermPlus t
   let hs2 = varWeakTermPlus' xts es
   S.union hs1 $ S.filter (/= x) hs2
@@ -220,7 +218,7 @@ holeWeakTermPlus (_, WeakTermErase _ e) = holeWeakTermPlus e
 
 holeWeakTermPlus' :: [IdentifierPlus] -> [WeakTermPlus] -> S.Set Identifier
 holeWeakTermPlus' [] es = S.unions $ map holeWeakTermPlus es
-holeWeakTermPlus' ((_, _, t):xts) es = do
+holeWeakTermPlus' ((_, _, t) : xts) es = do
   let set1 = holeWeakTermPlus t
   let set2 = holeWeakTermPlus' xts es
   S.union set1 set2
@@ -274,7 +272,7 @@ constWeakTermPlus (_, WeakTermErase _ e) = constWeakTermPlus e
 
 constWeakTermPlus' :: [IdentifierPlus] -> [WeakTermPlus] -> S.Set T.Text
 constWeakTermPlus' [] es = S.unions $ map constWeakTermPlus es
-constWeakTermPlus' ((_, _, t):xts) es = do
+constWeakTermPlus' ((_, _, t) : xts) es = do
   let hs1 = constWeakTermPlus t
   let hs2 = constWeakTermPlus' xts es
   S.union hs1 hs2
@@ -364,19 +362,19 @@ substWeakTermPlus sub (m, WeakTermErase xs e) = do
 
 substWeakTermPlus' :: SubstWeakTerm -> [IdentifierPlus] -> [IdentifierPlus]
 substWeakTermPlus' _ [] = []
-substWeakTermPlus' sub ((m, x, t):xts) = do
+substWeakTermPlus' sub ((m, x, t) : xts) = do
   let sub' = Map.delete (Left $ asInt x) sub
   let xts' = substWeakTermPlus' sub' xts
   let t' = substWeakTermPlus sub t
   (m, x, t') : xts'
 
 substWeakTermPlus'' ::
-     SubstWeakTerm
-  -> [IdentifierPlus]
-  -> WeakTermPlus
-  -> ([IdentifierPlus], WeakTermPlus)
+  SubstWeakTerm ->
+  [IdentifierPlus] ->
+  WeakTermPlus ->
+  ([IdentifierPlus], WeakTermPlus)
 substWeakTermPlus'' sub [] e = ([], substWeakTermPlus sub e)
-substWeakTermPlus'' sub ((m, x, t):xts) e = do
+substWeakTermPlus'' sub ((m, x, t) : xts) e = do
   let sub' = Map.delete (Left $ asInt x) sub
   let (xts', e') = substWeakTermPlus'' sub' xts e
   let t' = substWeakTermPlus sub t
@@ -449,11 +447,13 @@ toText (_, WeakTermStructElim xts e1 e2) = do
   showCons ["struct-elimination", argStr, toText e1, toText e2]
 toText (_, WeakTermCase _ e cxtes) = do
   showCons
-    ("case" :
-     toText e :
-     (flip map cxtes $ \((c, xts), body) -> do
-        let xs = map (\(_, x, _) -> asText x) xts
-        showCons [showCons ((snd c) : xs), toText body]))
+    ( "case"
+        : toText e
+        : ( flip map cxtes $ \((c, xts), body) -> do
+              let xs = map (\(_, x, _) -> asText x) xts
+              showCons [showCons ((snd c) : xs), toText body]
+          )
+    )
 toText (_, WeakTermQuestion e _) = toText e
 toText (_, WeakTermErase _ e) = toText e
 
@@ -477,7 +477,7 @@ showTypeArgs [] _ = T.empty
 showTypeArgs [(_, x, t)] cod
   | x `S.member` varWeakTermPlus cod = inParen $ asText x <> " " <> toText t
   | otherwise = inParen $ "_" <> " " <> toText t
-showTypeArgs ((_, x, t):xts) cod
+showTypeArgs ((_, x, t) : xts) cod
   | x `S.member` varWeakTermPlus' xts [cod] = do
     let s1 = inParen $ asText x <> " " <> toText t
     let s2 = showTypeArgs xts cod
@@ -489,7 +489,7 @@ showTypeArgs ((_, x, t):xts) cod
 
 isDependent :: [IdentifierPlus] -> WeakTermPlus -> Bool
 isDependent [] _ = False
-isDependent ((_, x, _):xts) cod
+isDependent ((_, x, _) : xts) cod
   | x `S.member` varWeakTermPlus' xts [cod] = True
   | otherwise = isDependent xts cod
 
@@ -536,14 +536,15 @@ showStruct = inBrace . T.intercalate " "
 
 extractSigmaArg :: WeakTermPlus -> Maybe [IdentifierPlus]
 extractSigmaArg (_, WeakTermPi _ [(_, z, (_, WeakTermTau)), (_, _, (_, WeakTermPi _ xts (_, WeakTermUpsilon z')))] (_, WeakTermUpsilon z''))
-  | z == z'
-  , z == z'' = return xts
+  | z == z',
+    z == z'' =
+    return xts
 extractSigmaArg _ = Nothing
 
 splitLast :: [a] -> Maybe ([a], a)
 splitLast [] = Nothing
 splitLast [x] = return ([], x)
-splitLast (x:xs) = do
+splitLast (x : xs) = do
   (xs', z) <- splitLast xs
   return (x : xs', z)
 
@@ -551,4 +552,4 @@ type Key = Either Int T.Text
 
 deleteKeys' :: Map.HashMap Key a -> [Key] -> Map.HashMap Key a
 deleteKeys' sub [] = sub
-deleteKeys' sub (i:is) = Map.delete i $ deleteKeys' sub is
+deleteKeys' sub (i : is) = Map.delete i $ deleteKeys' sub is

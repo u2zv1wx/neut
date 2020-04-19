@@ -1,15 +1,14 @@
 module Parse.Discern
-  ( discern
-  ) where
+  ( discern,
+  )
+where
 
 import Control.Monad.State.Lazy
-
+import Data.Basic
+import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import qualified Data.Set as S
 import qualified Data.Text as T
-
-import Data.Basic
-import Data.Env
 import Data.WeakTerm
 
 discern :: [QuasiStmt] -> WithEnv [QuasiStmt]
@@ -19,13 +18,13 @@ type NameEnv = Map.HashMap T.Text Identifier
 
 discern' :: NameEnv -> [QuasiStmt] -> WithEnv [QuasiStmt]
 discern' _ [] = return []
-discern' nenv ((QuasiStmtLet m (mx, x, t) e):ss) = do
+discern' nenv ((QuasiStmtLet m (mx, x, t) e) : ss) = do
   t' <- discern'' nenv t
   e' <- discern'' nenv e
   insertConstant mx x
   ss' <- discern' nenv ss -- xはconstだからnenvの更新の必要なし
   return $ QuasiStmtLet m (mx, x, t') e' : ss'
-discern' nenv ((QuasiStmtLetWT m (mx, x, t) e):ss) = do
+discern' nenv ((QuasiStmtLetWT m (mx, x, t) e) : ss) = do
   set <- gets intactSet
   t' <- discern'' nenv t
   e' <- discern'' nenv e
@@ -34,25 +33,25 @@ discern' nenv ((QuasiStmtLetWT m (mx, x, t) e):ss) = do
   insertConstant mx x
   ss' <- discern' nenv ss
   return $ QuasiStmtLetWT m (mx, x, t') e' : ss'
-discern' nenv ((QuasiStmtDef xds):ss) = do
+discern' nenv ((QuasiStmtDef xds) : ss) = do
   forM_ xds $ \(x, (m, _, _, _)) -> insertConstant m x
   let (xs, ds) = unzip xds
   ds' <- mapM (discernDef nenv) ds
   ss' <- discern' nenv ss
   return $ QuasiStmtDef (zip xs ds') : ss'
-discern' nenv ((QuasiStmtConstDecl m (mx, x, t)):ss) = do
+discern' nenv ((QuasiStmtConstDecl m (mx, x, t)) : ss) = do
   t' <- discern'' nenv t
   ss' <- discern' nenv ss
   return $ QuasiStmtConstDecl m (mx, x, t') : ss'
-discern' nenv ((QuasiStmtVerify m e):ss) = do
+discern' nenv ((QuasiStmtVerify m e) : ss) = do
   e' <- discern'' nenv e
   ss' <- discern' nenv ss
   return $ QuasiStmtVerify m e' : ss'
-discern' nenv ((QuasiStmtEnum m name xis):ss) = do
+discern' nenv ((QuasiStmtEnum m name xis) : ss) = do
   insEnumEnv m name xis
   ss' <- discern' nenv ss
   return $ QuasiStmtEnum m name xis : ss'
-discern' nenv ((QuasiStmtLetInductive n m (mx, a, t) e):ss) = do
+discern' nenv ((QuasiStmtLetInductive n m (mx, a, t) e) : ss) = do
   set <- gets intactSet
   t' <- discern'' nenv t
   e' <- discern'' nenv e
@@ -61,7 +60,7 @@ discern' nenv ((QuasiStmtLetInductive n m (mx, a, t) e):ss) = do
   insertConstant mx a
   ss' <- discern' nenv ss
   return $ QuasiStmtLetInductive n m (mx, a, t') e' : ss'
-discern' nenv ((QuasiStmtLetInductiveIntro m (mx, x, t) e as):ss) = do
+discern' nenv ((QuasiStmtLetInductiveIntro m (mx, x, t) e as) : ss) = do
   set <- gets intactSet
   t' <- discern'' nenv t
   e' <- discern'' nenv e
@@ -70,15 +69,15 @@ discern' nenv ((QuasiStmtLetInductiveIntro m (mx, x, t) e as):ss) = do
   insertConstant mx x
   ss' <- discern' nenv ss
   return $ QuasiStmtLetInductiveIntro m (mx, x, t') e' as : ss'
-discern' nenv ((QuasiStmtUse prefix):ss) = do
+discern' nenv ((QuasiStmtUse prefix) : ss) = do
   modify (\e -> e {prefixEnv = prefix : prefixEnv e})
   ss' <- discern' nenv ss
   return $ QuasiStmtUse prefix : ss'
-discern' nenv ((QuasiStmtUnuse prefix):ss) = do
+discern' nenv ((QuasiStmtUnuse prefix) : ss) = do
   modify (\e -> e {prefixEnv = filter (/= prefix) (prefixEnv e)})
   ss' <- discern' nenv ss
   return $ QuasiStmtUnuse prefix : ss'
-discern' nenv (QuasiStmtVisit path ss1:ss2) = do
+discern' nenv (QuasiStmtVisit path ss1 : ss2) = do
   ssss <- discern' nenv $ ss1 ++ ss2 -- stmtの長さはdiscernにおいて不変なのでこれでオッケー
   let ss1' = take (length ss1) ssss
   let ss2' = drop (length ss1) ssss
@@ -181,14 +180,14 @@ discern'' nenv (_, WeakTermErase mxs e) = do
   discern'' nenv' e
 
 discernBinder ::
-     NameEnv
-  -> [IdentifierPlus]
-  -> WeakTermPlus
-  -> WithEnv ([IdentifierPlus], WeakTermPlus)
+  NameEnv ->
+  [IdentifierPlus] ->
+  WeakTermPlus ->
+  WithEnv ([IdentifierPlus], WeakTermPlus)
 discernBinder nenv [] e = do
   e' <- discern'' nenv e
   return ([], e')
-discernBinder nenv ((mx, x, t):xts) e = do
+discernBinder nenv ((mx, x, t) : xts) e = do
   t' <- discern'' nenv t
   x' <- newDefinedNameWith mx x
   (xts', e') <- discernBinder (insertName x x' nenv) xts e
@@ -202,17 +201,17 @@ discernIdentPlus nenv (m, x, t) = do
   return (m, x', t')
 
 discernIter ::
-     NameEnv
-  -> IdentifierPlus
-  -> [IdentifierPlus]
-  -> WeakTermPlus
-  -> WithEnv (IdentifierPlus, [IdentifierPlus], WeakTermPlus)
+  NameEnv ->
+  IdentifierPlus ->
+  [IdentifierPlus] ->
+  WeakTermPlus ->
+  WithEnv (IdentifierPlus, [IdentifierPlus], WeakTermPlus)
 discernIter nenv (mx, x, t') [] e = do
   x' <- newDefinedNameWith mx x
   removeFromIntactSet mx $ asText x'
   e' <- discern'' (insertName x x' nenv) e
   return ((mx, x', t'), [], e')
-discernIter nenv xt ((mx, x, t):xts) e = do
+discernIter nenv xt ((mx, x, t) : xts) e = do
   t' <- discern'' nenv t
   x' <- newDefinedNameWith mx x
   (xt', xts', e') <- discernIter (insertName x x' nenv) xt xts e
@@ -230,14 +229,14 @@ discernWeakCase m _ (WeakCaseLabel l) = do
 discernWeakCase _ _ l = return l
 
 discernStruct ::
-     NameEnv
-  -> [(Meta, Identifier, ArrayKind)]
-  -> WeakTermPlus
-  -> WithEnv ([(Meta, Identifier, ArrayKind)], WeakTermPlus)
+  NameEnv ->
+  [(Meta, Identifier, ArrayKind)] ->
+  WeakTermPlus ->
+  WithEnv ([(Meta, Identifier, ArrayKind)], WeakTermPlus)
 discernStruct nenv [] e = do
   e' <- discern'' nenv e
   return ([], e')
-discernStruct nenv ((mx, x, t):xts) e = do
+discernStruct nenv ((mx, x, t) : xts) e = do
   x' <- newDefinedNameWith mx x
   (xts', e') <- discernStruct (insertName x x' nenv) xts e
   return ((mx, x', t) : xts', e')
@@ -285,7 +284,7 @@ removeFromIntactSet m x =
   whenCheck $ modify (\env -> env {intactSet = S.delete (m, x) (intactSet env)})
 
 lookupName ::
-     Meta -> [T.Text] -> NameEnv -> Identifier -> WithEnv (Maybe Identifier)
+  Meta -> [T.Text] -> NameEnv -> Identifier -> WithEnv (Maybe Identifier)
 lookupName m penv nenv x =
   case Map.lookup (asText x) nenv of
     Just x' -> do
@@ -294,9 +293,9 @@ lookupName m penv nenv x =
     Nothing -> lookupName' m penv nenv x
 
 lookupName' ::
-     Meta -> [T.Text] -> NameEnv -> Identifier -> WithEnv (Maybe Identifier)
+  Meta -> [T.Text] -> NameEnv -> Identifier -> WithEnv (Maybe Identifier)
 lookupName' _ [] _ _ = return Nothing
-lookupName' m (prefix:prefixList) nenv x = do
+lookupName' m (prefix : prefixList) nenv x = do
   let query = prefix <> ":" <> asText x
   case Map.lookup query nenv of
     Just x' -> do
@@ -322,7 +321,7 @@ lookupConstantMaybe m penv x = do
 
 lookupConstantMaybe' :: Meta -> [T.Text] -> T.Text -> WithEnv (Maybe T.Text)
 lookupConstantMaybe' _ [] _ = return Nothing
-lookupConstantMaybe' m (prefix:prefixList) x = do
+lookupConstantMaybe' m (prefix : prefixList) x = do
   let query = prefix <> ":" <> x
   b <- isConstant query
   if b
@@ -348,9 +347,9 @@ lookupEnum f name = do
       lookupEnum' f penv name
 
 lookupEnum' ::
-     (T.Text -> WithEnv Bool) -> [T.Text] -> T.Text -> WithEnv (Maybe T.Text)
+  (T.Text -> WithEnv Bool) -> [T.Text] -> T.Text -> WithEnv (Maybe T.Text)
 lookupEnum' _ [] _ = return Nothing
-lookupEnum' f (prefix:prefixList) name = do
+lookupEnum' f (prefix : prefixList) name = do
   let name' = prefix <> ":" <> name
   b <- f name'
   if b

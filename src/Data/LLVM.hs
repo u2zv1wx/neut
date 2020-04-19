@@ -1,9 +1,8 @@
 module Data.LLVM where
 
+import Data.Basic
 import qualified Data.IntMap as IntMap
 import qualified Data.Text as T
-
-import Data.Basic
 
 data LLVMData
   = LLVMDataLocal Identifier

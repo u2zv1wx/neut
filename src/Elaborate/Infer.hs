@@ -1,22 +1,21 @@
 module Elaborate.Infer
-  ( infer
-  , inferType
-  , inferSigma
-  , insConstraintEnv
-  , insWeakTypeEnv
-  , newTypeHoleInCtx
-  , Context
-  ) where
+  ( infer,
+    inferType,
+    inferSigma,
+    insConstraintEnv,
+    insWeakTypeEnv,
+    newTypeHoleInCtx,
+    Context,
+  )
+where
 
 import Control.Monad.State.Lazy
-
-import qualified Data.HashMap.Lazy as Map
-import qualified Data.IntMap as IntMap
-import qualified Data.Text as T
-
 import Data.Basic
 import Data.Env
+import qualified Data.HashMap.Lazy as Map
+import qualified Data.IntMap as IntMap
 import Data.Term hiding (IdentifierPlus)
+import qualified Data.Text as T
 import Data.WeakTerm
 
 type Context = [IdentifierPlus]
@@ -43,8 +42,9 @@ infer' ctx (m, WeakTermPiIntro info xts e) = do
       (ai, _) <- lookupRevIndEnv m name
       args' <- inferSigma ctx args
       return
-        ( (m, WeakTermPiIntro (Just (name, args')) xts' e')
-        , (m, WeakTermPi (Just ai) xts' t'))
+        ( (m, WeakTermPiIntro (Just (name, args')) xts' e'),
+          (m, WeakTermPi (Just ai) xts' t')
+        )
 infer' ctx (m, WeakTermPiElim e es) = do
   etls <- mapM (infer' ctx) es
   etl <- infer' ctx e
@@ -186,13 +186,13 @@ toIdentPlus m (_, t) = do
   return (m, x, t)
 
 inferArgs ::
-     Meta
-  -> [(WeakTermPlus, WeakTermPlus)]
-  -> [IdentifierPlus]
-  -> WeakTermPlus
-  -> WithEnv WeakTermPlus
+  Meta ->
+  [(WeakTermPlus, WeakTermPlus)] ->
+  [IdentifierPlus] ->
+  WeakTermPlus ->
+  WithEnv WeakTermPlus
 inferArgs _ [] [] cod = return cod
-inferArgs m ((e, t):ets) ((_, x, tx):xts) cod = do
+inferArgs m ((e, t) : ets) ((_, x, tx) : xts) cod = do
   insConstraintEnv t tx
   let sub = Map.singleton (Left $ asInt x) e
   let (xts', cod') = substWeakTermPlus'' sub xts cod
@@ -200,10 +200,10 @@ inferArgs m ((e, t):ets) ((_, x, tx):xts) cod = do
 inferArgs m _ _ _ = raiseCritical m $ "invalid argument passed to inferArgs"
 
 constructIndType ::
-     Meta
-  -> Context
-  -> T.Text
-  -> WithEnv (WeakTermPlus, [(WeakTermPlus, WeakTermPlus)])
+  Meta ->
+  Context ->
+  T.Text ->
+  WithEnv (WeakTermPlus, [(WeakTermPlus, WeakTermPlus)])
 constructIndType m ctx x = do
   cenv <- gets cacheEnv
   case Map.lookup x cenv of
@@ -216,8 +216,8 @@ constructIndType m ctx x = do
           return ((me, WeakTermPiElim e' es), holeList)
         e' ->
           raiseCritical m $
-          "the definition of inductive type must be of the form `(lambda (xts) (...))`, but is:\n" <>
-          toText e'
+            "the definition of inductive type must be of the form `(lambda (xts) (...))`, but is:\n"
+              <> toText e'
     _ -> raiseCritical m $ "no such inductive type defined: " <> x
 
 getIndInfo :: [(Meta, T.Text)] -> WithEnv (T.Text, [[Int]])
@@ -235,25 +235,25 @@ getIndInfo' (m, c) = do
 
 checkIntegrity :: [(Meta, T.Text)] -> WithEnv ()
 checkIntegrity [] = return ()
-checkIntegrity (mi:is) = checkIntegrity' mi is
+checkIntegrity (mi : is) = checkIntegrity' mi is
 
 checkIntegrity' :: (Meta, T.Text) -> [(Meta, T.Text)] -> WithEnv ()
 checkIntegrity' _ [] = return ()
-checkIntegrity' i (j:js) =
+checkIntegrity' i (j : js) =
   if snd i == snd j
     then checkIntegrity' i js
     else raiseError (supMeta (fst i) (fst j)) "foo"
 
 inferPatArgs :: Context -> [IdentifierPlus] -> WithEnv [IdentifierPlus]
 inferPatArgs _ [] = return []
-inferPatArgs ctx ((mx, x, t):xts) = do
+inferPatArgs ctx ((mx, x, t) : xts) = do
   t' <- inferType' ctx t
   insWeakTypeEnv x t'
   xts' <- inferPatArgs (ctx ++ [(mx, x, t')]) xts
   return $ (mx, x, t') : xts'
 
 inferExternal ::
-     Meta -> T.Text -> WithEnv TermPlus -> WithEnv (WeakTermPlus, WeakTermPlus)
+  Meta -> T.Text -> WithEnv TermPlus -> WithEnv (WeakTermPlus, WeakTermPlus)
 inferExternal m x comp = do
   t <- comp
   return ((m, WeakTermConst x), (m, snd $ weaken t))
@@ -272,14 +272,14 @@ inferKind m (ArrayKindFloat size) = do
 inferKind m _ = raiseCritical m "inferKind for void-pointer"
 
 inferPi ::
-     Context
-  -> [IdentifierPlus]
-  -> WeakTermPlus
-  -> WithEnv ([IdentifierPlus], WeakTermPlus)
+  Context ->
+  [IdentifierPlus] ->
+  WeakTermPlus ->
+  WithEnv ([IdentifierPlus], WeakTermPlus)
 inferPi ctx [] cod = do
   (cod', mlPiCod) <- inferType' ctx cod
   return ([], (cod', mlPiCod))
-inferPi ctx ((mx, x, t):xts) cod = do
+inferPi ctx ((mx, x, t) : xts) cod = do
   t' <- inferType' ctx t
   insWeakTypeEnv x t'
   (xtls', tlCod) <- inferPi (ctx ++ [(mx, x, t')]) xts cod
@@ -287,32 +287,32 @@ inferPi ctx ((mx, x, t):xts) cod = do
 
 inferSigma :: Context -> [IdentifierPlus] -> WithEnv [IdentifierPlus]
 inferSigma _ [] = return []
-inferSigma ctx ((mx, x, t):xts) = do
+inferSigma ctx ((mx, x, t) : xts) = do
   t' <- inferType' ctx t
   insWeakTypeEnv x t'
   xts' <- inferSigma (ctx ++ [(mx, x, t')]) xts
   return $ (mx, x, t') : xts'
 
 inferBinder ::
-     Context
-  -> [IdentifierPlus]
-  -> WeakTermPlus
-  -> WithEnv ([IdentifierPlus], (WeakTermPlus, WeakTermPlus))
+  Context ->
+  [IdentifierPlus] ->
+  WeakTermPlus ->
+  WithEnv ([IdentifierPlus], (WeakTermPlus, WeakTermPlus))
 inferBinder ctx [] e = do
   etl' <- infer' ctx e
   return ([], etl')
-inferBinder ctx ((mx, x, t):xts) e = do
+inferBinder ctx ((mx, x, t) : xts) e = do
   t' <- inferType' ctx t
   insWeakTypeEnv x t'
   (xts', etl') <- inferBinder (ctx ++ [(mx, x, t')]) xts e
   return ((mx, x, t') : xts', etl')
 
 inferPiElim ::
-     Context
-  -> Meta
-  -> (WeakTermPlus, WeakTermPlus)
-  -> [(WeakTermPlus, WeakTermPlus)]
-  -> WithEnv (WeakTermPlus, WeakTermPlus)
+  Context ->
+  Meta ->
+  (WeakTermPlus, WeakTermPlus) ->
+  [(WeakTermPlus, WeakTermPlus)] ->
+  WithEnv (WeakTermPlus, WeakTermPlus)
 inferPiElim ctx m (e, t) ets = do
   let es = map fst ets
   case t of
@@ -362,9 +362,9 @@ newTypeHoleInCtx ctx m = do
 --
 -- inserting type information `yi : ?Mi @ (x1, ..., xn, y1, ..., y{i-1})
 newTypeHoleListInCtx ::
-     Context -> [(Identifier, Meta)] -> WithEnv [IdentifierPlus]
+  Context -> [(Identifier, Meta)] -> WithEnv [IdentifierPlus]
 newTypeHoleListInCtx _ [] = return []
-newTypeHoleListInCtx ctx ((x, m):rest) = do
+newTypeHoleListInCtx ctx ((x, m) : rest) = do
   t <- newTypeHoleInCtx ctx m
   insWeakTypeEnv x t
   ts <- newTypeHoleListInCtx (ctx ++ [(m, x, t)]) rest
@@ -388,7 +388,7 @@ inferWeakCase ctx (m, WeakCaseDefault) = do
 constrainList :: [WeakTermPlus] -> WithEnv ()
 constrainList [] = return ()
 constrainList [_] = return ()
-constrainList (t1:t2:ts) = do
+constrainList (t1 : t2 : ts) = do
   insConstraintEnv t1 t2
   constrainList $ t2 : ts
 
@@ -407,7 +407,7 @@ lookupWeakTypeEnv m s = do
     Just t -> return t
     Nothing ->
       raiseCritical m $
-      asText' s <> " is not found in the weak type environment."
+        asText' s <> " is not found in the weak type environment."
 
 lookupWeakTypeEnvMaybe :: Identifier -> WithEnv (Maybe WeakTermPlus)
 lookupWeakTypeEnvMaybe (I (_, s)) = do

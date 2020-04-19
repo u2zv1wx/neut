@@ -1,16 +1,15 @@
 module Reduce.LLVM
-  ( reduceLLVM
-  ) where
+  ( reduceLLVM,
+  )
+where
 
 import Control.Monad.State.Lazy
-
-import qualified Data.IntMap as IntMap
-import qualified Data.Map as Map
-import qualified Data.Set as S
-
 import Data.Basic
 import Data.Env
+import qualified Data.IntMap as IntMap
 import Data.LLVM
+import qualified Data.Map as Map
+import qualified Data.Set as S
 
 type SizeMap = Map.Map SizeInfo [(Int, LLVMData)]
 
@@ -28,7 +27,7 @@ reduceLLVM sub sm (LLVMLet x (LLVMOpAlloc _ (LowTypePtr (LowTypeStruct []))) con
   reduceLLVM sub' sm cont
 reduceLLVM sub sm (LLVMLet x op@(LLVMOpAlloc _ size) cont) = do
   case Map.lookup size sm of
-    Just ((j, d):rest) -> do
+    Just ((j, d) : rest) -> do
       modify (\env -> env {nopFreeSet = S.insert j (nopFreeSet env)})
       let sm' = Map.insert size rest sm
       let sub' = IntMap.insert (asInt x) (substLLVMData sub d) sub

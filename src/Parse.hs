@@ -1,40 +1,37 @@
 module Parse
-  ( parse
-  , parse'
-  , includeCore
-  , pushTrace
-  ) where
-
-import Control.Monad.State.Lazy hiding (get)
-import Data.ByteString.Builder
-import Network.Http.Client
-import Path
-import Path.IO
-import System.IO.Streams (InputStream)
-import Text.Read (readMaybe)
+  ( parse,
+    parse',
+    includeCore,
+    pushTrace,
+  )
+where
 
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
+import Control.Monad.State.Lazy hiding (get)
+import Data.Basic
 import qualified Data.ByteString as B
+import Data.ByteString.Builder
 import qualified Data.ByteString.Lazy as L
+import Data.Env
 import qualified Data.HashMap.Lazy as Map
-
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Data.Text.IO as TIO
-
-import qualified System.IO.Streams as Streams
-
-import Data.Basic
-import Data.Env
 import Data.Tree
 import Data.WeakTerm
+import Network.Http.Client
 import Parse.Discern
 import Parse.Interpret
 import Parse.MacroExpand
 import Parse.Rule
 import Parse.Tokenize
+import Path
+import Path.IO
+import System.IO.Streams (InputStream)
+import qualified System.IO.Streams as Streams
+import Text.Read (readMaybe)
 
 parse :: Path Abs File -> WithEnv WeakStmt
 parse inputPath = do
@@ -69,7 +66,7 @@ insDepGraph path = do
   tenv <- gets traceEnv
   case tenv of
     [] -> return ()
-    (foo:_) -> do
+    (foo : _) -> do
       modify
         (\env -> env {depGraph = Map.insertWith (++) foo [path] (depGraph env)})
 
@@ -81,44 +78,44 @@ popTrace = modify (\env -> env {traceEnv = tail (traceEnv env)})
 
 parse' :: [TreePlus] -> WithEnv [QuasiStmt]
 parse' [] = leave
-parse' ((m, TreeNode ((_, TreeLeaf "notation"):es)):as)
+parse' ((m, TreeNode ((_, TreeLeaf "notation") : es)) : as)
   | [from, to] <- es = do
     checkNotationSanity from
     modify (\e -> e {notationEnv = (from, to) : notationEnv e})
     parse' as
   | otherwise = raiseSyntaxError m "(notation TREE TREE)"
-parse' ((m, TreeNode ((_, TreeLeaf "keyword"):es)):as)
+parse' ((m, TreeNode ((_, TreeLeaf "keyword") : es)) : as)
   | [(_, TreeLeaf s)] <- es = do
     checkKeywordSanity m s
     modify (\e -> e {keywordEnv = S.insert s (keywordEnv e)})
     parse' as
   | otherwise = raiseSyntaxError m "(keyword LEAF)"
-parse' ((m, TreeNode ((_, TreeLeaf "use"):es)):as)
+parse' ((m, TreeNode ((_, TreeLeaf "use") : es)) : as)
   | [(_, TreeLeaf s)] <- es = do
     modify (\e -> e {prefixEnv = s : prefixEnv e}) -- required to check sanity of `include`
     stmtList <- parse' as
     return $ QuasiStmtUse s : stmtList
   | otherwise = raiseSyntaxError m "(use LEAF)"
-parse' ((m, TreeNode ((_, TreeLeaf "unuse"):es)):as)
+parse' ((m, TreeNode ((_, TreeLeaf "unuse") : es)) : as)
   | [(_, TreeLeaf s)] <- es = do
     modify (\e -> e {prefixEnv = filter (/= s) (prefixEnv e)}) -- required to check sanity of `include`
     stmtList <- parse' as
     return $ QuasiStmtUnuse s : stmtList
   | otherwise = raiseSyntaxError m "(unuse LEAF)"
-parse' ((m, TreeNode ((_, TreeLeaf "section"):es)):as)
+parse' ((m, TreeNode ((_, TreeLeaf "section") : es)) : as)
   | [(_, TreeLeaf s)] <- es = do
     modify (\e -> e {sectionEnv = s : sectionEnv e})
     n <- getCurrentSection
     stmtList <- parse' as
     return $ QuasiStmtUse n : QuasiStmtUse (n <> ":" <> "private") : stmtList
-    -- auto-use
+  -- auto-use
   | otherwise = raiseSyntaxError m "(section LEAF)"
-parse' ((m, TreeNode ((_, TreeLeaf "end"):es)):as)
+parse' ((m, TreeNode ((_, TreeLeaf "end") : es)) : as)
   | [(_, TreeLeaf s)] <- es = do
     ns <- gets sectionEnv
     case ns of
       [] -> raiseError m "there is no section to end"
-      (s':ns')
+      (s' : ns')
         | s == s' -> do
           n <- getCurrentSection
           modify (\e -> e {sectionEnv = ns'})
@@ -127,22 +124,22 @@ parse' ((m, TreeNode ((_, TreeLeaf "end"):es)):as)
             QuasiStmtUnuse n : QuasiStmtUnuse (n <> ":" <> "private") : stmtList
         | otherwise ->
           raiseError m $
-          "the innermost section is not `" <> s <> "`, but is `" <> s' <> "`"
+            "the innermost section is not `" <> s <> "`, but is `" <> s' <> "`"
   | otherwise = raiseSyntaxError m "(end LEAF)"
-parse' ((m, TreeNode ((_, TreeLeaf "enum"):rest)):as)
-  | (_, TreeLeaf name):ts <- rest = do
+parse' ((m, TreeNode ((_, TreeLeaf "enum") : rest)) : as)
+  | (_, TreeLeaf name) : ts <- rest = do
     xis <- interpretEnumItem m name ts
     m' <- adjustPhase' m
     ss <- parse' as
     return $ QuasiStmtEnum m' name xis : ss
   | otherwise = raiseSyntaxError m "(enum LEAF TREE ... TREE)"
-parse' ((m, TreeNode ((_, TreeLeaf "include"):rest)):as)
+parse' ((m, TreeNode ((_, TreeLeaf "include") : rest)) : as)
   | [(mPath, TreeLeaf pathString)] <- rest =
     includeFile m mPath pathString getCurrentDirPath as
   | [(_, TreeLeaf "library"), (mPath, TreeLeaf pathString)] <- rest =
     includeFile m mPath pathString getLibraryDirPath as
   | otherwise = raiseSyntaxError m "(include LEAF) | (include library LEAF)"
-parse' ((m, TreeNode ((_, TreeLeaf "ensure"):rest)):as)
+parse' ((m, TreeNode ((_, TreeLeaf "ensure") : rest)) : as)
   | [(_, TreeLeaf pkg), (mUrl, TreeLeaf urlStr)] <- rest = do
     libDir <- getLibraryDirPath
     pkg' <- parseRelDir $ T.unpack pkg
@@ -156,16 +153,16 @@ parse' ((m, TreeNode ((_, TreeLeaf "ensure"):rest)):as)
       install item path
     parse' as
   | otherwise = raiseSyntaxError m "(ensure LEAF LEAF)"
-parse' ((_, TreeNode ((_, TreeLeaf "statement"):as1)):as2) = parse' $ as1 ++ as2
-parse' ((m, TreeNode ((_, TreeLeaf "introspect"):rest)):as2)
-  | ((mx, TreeLeaf x):stmtClauseList) <- rest = do
+parse' ((_, TreeNode ((_, TreeLeaf "statement") : as1)) : as2) = parse' $ as1 ++ as2
+parse' ((m, TreeNode ((_, TreeLeaf "introspect") : rest)) : as2)
+  | ((mx, TreeLeaf x) : stmtClauseList) <- rest = do
     val <- retrieveCompileTimeVarValue mx x
     stmtClauseList' <- mapM parseStmtClause stmtClauseList
     case lookup val stmtClauseList' of
       Nothing -> parse' as2
       Just as1 -> parse' $ as1 ++ as2
   | otherwise = raiseSyntaxError m "(introspect LEAF TREE*)"
-parse' ((m, TreeNode ((_, TreeLeaf "constant"):rest)):as)
+parse' ((m, TreeNode ((_, TreeLeaf "constant") : rest)) : as)
   | [(mn, TreeLeaf name), t] <- rest = do
     t' <- adjustPhase t >>= macroExpand >>= interpret -- たとえばここでdiscernも行う
     name' <- withSectionPrefix name
@@ -179,18 +176,18 @@ parse' ((m, TreeNode ((_, TreeLeaf "constant"):rest)):as)
         mn' <- adjustPhase' mn
         return $ QuasiStmtConstDecl m' (mn', name', t') : defList
   | otherwise = raiseSyntaxError m "(constant LEAF TREE)"
-parse' ((m, TreeNode (def@(mDef, TreeLeaf "definition"):rest)):as)
+parse' ((m, TreeNode (def@(mDef, TreeLeaf "definition") : rest)) : as)
   | [name@(_, TreeLeaf _), body] <- rest =
     parse' $ (m, TreeNode [(mDef, TreeLeaf "let"), name, body]) : as
-  | name@(mFun, TreeLeaf _):xts@(_, TreeNode _):body:rest' <- rest = do
+  | name@(mFun, TreeLeaf _) : xts@(_, TreeNode _) : body : rest' <- rest = do
     parse' $
       (m, TreeNode [def, (mFun, TreeNode (name : xts : body : rest'))]) : as
   | otherwise = do
     s <- parseDef rest
     ss <- parse' as
     return $ s : ss
-parse' ((m, TreeNode (ind@(_, TreeLeaf "inductive"):rest)):as)
-  | name@(mFun, TreeLeaf _):xts@(_, TreeNode _):rest' <- rest = do
+parse' ((m, TreeNode (ind@(_, TreeLeaf "inductive") : rest)) : as)
+  | name@(mFun, TreeLeaf _) : xts@(_, TreeNode _) : rest' <- rest = do
     parse' $ (m, TreeNode [ind, (mFun, TreeNode (name : xts : rest'))]) : as
   | otherwise = do
     rest' <- mapM (adjustPhase >=> macroExpand) rest
@@ -198,8 +195,8 @@ parse' ((m, TreeNode (ind@(_, TreeLeaf "inductive"):rest)):as)
     stmtList1 <- parseInductive m' rest'
     stmtList2 <- parse' as
     return $ stmtList1 ++ stmtList2
-parse' ((m, TreeNode (coind@(_, TreeLeaf "coinductive"):rest)):as)
-  | name@(mFun, TreeLeaf _):xts@(_, TreeNode _):rest' <- rest = do
+parse' ((m, TreeNode (coind@(_, TreeLeaf "coinductive") : rest)) : as)
+  | name@(mFun, TreeLeaf _) : xts@(_, TreeNode _) : rest' <- rest = do
     parse' $ (m, TreeNode [coind, (mFun, TreeNode (name : xts : rest'))]) : as
   | otherwise = do
     rest' <- mapM (adjustPhase >=> macroExpand) rest
@@ -209,7 +206,7 @@ parse' ((m, TreeNode (coind@(_, TreeLeaf "coinductive"):rest)):as)
     stmtList2 <- generateProjections rest'
     stmtList3 <- parse' as
     return $ stmtList1 ++ stmtList2 ++ stmtList3
-parse' ((m, TreeNode ((mLet, TreeLeaf "let"):rest)):as)
+parse' ((m, TreeNode ((mLet, TreeLeaf "let") : rest)) : as)
   | [(mx, TreeLeaf x), t, e] <- rest = do
     let xt = (mx, TreeNode [(mx, TreeLeaf x), t])
     parse' ((m, TreeNode [(mLet, TreeLeaf "let"), xt, e]) : as)
@@ -221,14 +218,14 @@ parse' ((m, TreeNode ((mLet, TreeLeaf "let"):rest)):as)
     defList <- parse' as
     return $ QuasiStmtLet m' xt' e' : defList
   | otherwise = raiseSyntaxError m "(let LEAF TREE TREE) | (let TREE TREE)"
-parse' ((m, TreeNode ((_, TreeLeaf "verify"):rest)):as)
+parse' ((m, TreeNode ((_, TreeLeaf "verify") : rest)) : as)
   | [e] <- rest = do
     e' <- adjustPhase e >>= macroExpand >>= interpret
     m' <- adjustPhase' m
     defList <- parse' as
     return $ QuasiStmtVerify m' e' : defList
   | otherwise = raiseSyntaxError m "(include LEAF) | (include library LEAF)"
-parse' (a:as) = do
+parse' (a : as) = do
   e <- adjustPhase a >>= macroExpand
   if isSpecialForm e
     then parse' $ e : as
@@ -253,7 +250,7 @@ withSectionPrefix x = do
 
 withSectionPrefix' :: [T.Text] -> T.Text -> T.Text
 withSectionPrefix' [] x = x
-withSectionPrefix' (n:ns) x = withSectionPrefix' ns $ n <> ":" <> x
+withSectionPrefix' (n : ns) x = withSectionPrefix' ns $ n <> ":" <> x
 
 getCurrentSection :: WithEnv T.Text
 getCurrentSection = do
@@ -263,17 +260,17 @@ getCurrentSection = do
 getCurrentSection' :: [T.Text] -> T.Text
 getCurrentSection' [] = ""
 getCurrentSection' [n] = n
-getCurrentSection' (n:ns) = getCurrentSection' ns <> ":" <> n
+getCurrentSection' (n : ns) = getCurrentSection' ns <> ":" <> n
 
 asInductive :: [TreePlus] -> WithEnv [TreePlus]
 asInductive [] = return []
-asInductive (t:ts) = do
+asInductive (t : ts) = do
   (sub, t') <- asInductive' t
   ts' <- asInductive $ map (substTree sub) ts
   return $ t' : ts'
 
 asInductive' :: TreePlus -> WithEnv ((T.Text, T.Text), TreePlus)
-asInductive' (m, TreeNode ((_, TreeLeaf a):(_, TreeNode xts):rules)) = do
+asInductive' (m, TreeNode ((_, TreeLeaf a) : (_, TreeNode xts) : rules)) = do
   let a' = "(" <> a <> ")"
   let sub = (a, a')
   let xts' = map (substTree sub) xts
@@ -281,37 +278,45 @@ asInductive' (m, TreeNode ((_, TreeLeaf a):(_, TreeNode xts):rules)) = do
   let hole = "(_)"
   argList <- mapM extractArg xts
   return
-    ( (a, a')
-    , ( m
-      , TreeNode
-          [ (m, TreeLeaf a)
-          , (m, TreeNode xts')
-          , ( m
-            , TreeNode
-                [ (m, TreeLeaf "unfold")
-                , ( m
-                  , TreeNode
-                      ([ ( m
-                         , TreeNode
-                             [ (m, TreeLeaf a')
-                             , ( m
-                               , TreeNode
-                                   [ (m, TreeLeaf "pi")
-                                   , (m, TreeNode xts')
-                                   , (m, TreeLeaf "tau")
-                                   ])
-                             ])
-                       ] ++
-                       rules'' ++
-                       [ ( m
-                         , TreeNode
-                             [ (m, TreeLeaf hole)
-                             , (m, TreeNode ((m, TreeLeaf a') : argList))
-                             ])
-                       ]))
-                , (m, TreeNode ((m, TreeLeaf a) : argList))
-                ])
-          ]))
+    ( (a, a'),
+      ( m,
+        TreeNode
+          [ (m, TreeLeaf a),
+            (m, TreeNode xts'),
+            ( m,
+              TreeNode
+                [ (m, TreeLeaf "unfold"),
+                  ( m,
+                    TreeNode
+                      ( [ ( m,
+                            TreeNode
+                              [ (m, TreeLeaf a'),
+                                ( m,
+                                  TreeNode
+                                    [ (m, TreeLeaf "pi"),
+                                      (m, TreeNode xts'),
+                                      (m, TreeLeaf "tau")
+                                    ]
+                                )
+                              ]
+                          )
+                        ]
+                          ++ rules''
+                          ++ [ ( m,
+                                 TreeNode
+                                   [ (m, TreeLeaf hole),
+                                     (m, TreeNode ((m, TreeLeaf a') : argList))
+                                   ]
+                               )
+                             ]
+                      )
+                  ),
+                  (m, TreeNode ((m, TreeLeaf a) : argList))
+                ]
+            )
+          ]
+      )
+    )
 asInductive' t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) ...)"
 
 extractArg :: TreePlus -> WithEnv TreePlus
@@ -322,11 +327,12 @@ extractArg t = raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
 styleRule :: TreePlus -> WithEnv TreePlus
 styleRule (m, TreeNode [(mName, TreeLeaf name), (_, TreeNode xts), t]) = do
   return
-    ( m
-    , TreeNode
-        [ (mName, TreeLeaf name)
-        , (m, TreeNode [(m, TreeLeaf "pi"), (m, TreeNode xts), t])
-        ])
+    ( m,
+      TreeNode
+        [ (mName, TreeLeaf name),
+          (m, TreeNode [(m, TreeLeaf "pi"), (m, TreeNode xts), t])
+        ]
+    )
 styleRule t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) TREE)"
 
 parseByteString :: Meta -> T.Text -> WithEnv B.ByteString
@@ -342,12 +348,12 @@ parseString m quotedStr =
     Just str -> return str
 
 includeFile ::
-     Meta
-  -> Meta
-  -> T.Text
-  -> WithEnv (Path Abs Dir)
-  -> [TreePlus]
-  -> WithEnv [QuasiStmt]
+  Meta ->
+  Meta ->
+  T.Text ->
+  WithEnv (Path Abs Dir) ->
+  [TreePlus] ->
+  WithEnv [QuasiStmt]
 includeFile m mPath pathString computeDirPath as = do
   ensureEnvSanity m
   path <- parseString mPath pathString
@@ -403,12 +409,12 @@ prefixTextPlus (m, TreeNode [(mx, TreeLeaf x), t]) = do
 prefixTextPlus t = raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
 
 extractFunName :: TreePlus -> WithEnv T.Text
-extractFunName (_, TreeNode ((_, TreeLeaf x):_)) = return x
-extractFunName (_, TreeNode ((_, TreeNode [(_, TreeLeaf x), _]):_)) = return x
+extractFunName (_, TreeNode ((_, TreeLeaf x) : _)) = return x
+extractFunName (_, TreeNode ((_, TreeNode [(_, TreeLeaf x), _]) : _)) = return x
 extractFunName t = raiseSyntaxError (fst t) "(LEAF ...) | ((LEAF TREE) ...)"
 
 parseStmtClause :: TreePlus -> WithEnv (T.Text, [TreePlus])
-parseStmtClause (_, TreeNode ((_, TreeLeaf x):stmtList)) = return (x, stmtList)
+parseStmtClause (_, TreeNode ((_, TreeLeaf x) : stmtList)) = return (x, stmtList)
 parseStmtClause (m, _) = raiseSyntaxError m "(LEAF TREE*)"
 
 retrieveCompileTimeVarValue :: Meta -> T.Text -> WithEnv T.Text
@@ -418,28 +424,28 @@ retrieveCompileTimeVarValue m var =
   raiseError m $ "no such compile-time variable defined: " <> var
 
 isSpecialForm :: TreePlus -> Bool
-isSpecialForm (_, TreeNode ((_, TreeLeaf x):_)) = S.member x keywordSet
+isSpecialForm (_, TreeNode ((_, TreeLeaf x) : _)) = S.member x keywordSet
 isSpecialForm _ = False
 
 keywordSet :: S.Set T.Text
 keywordSet =
   S.fromList
-    [ "notation"
-    , "keyword"
-    , "enum"
-    , "include"
-    , "ensure"
-    , "constant"
-    , "use"
-    , "unuse"
-    , "section"
-    , "end"
-    , "statement"
-    , "introspect"
-    , "let"
-    , "definition"
-    , "inductive"
-    , "coinductive"
+    [ "notation",
+      "keyword",
+      "enum",
+      "include",
+      "ensure",
+      "constant",
+      "use",
+      "unuse",
+      "section",
+      "end",
+      "statement",
+      "introspect",
+      "let",
+      "definition",
+      "inductive",
+      "coinductive"
     ]
 
 concatQuasiStmtList :: [QuasiStmt] -> WithEnv WeakStmt
@@ -448,31 +454,31 @@ concatQuasiStmtList [] = do
   content <- liftIO $ TIO.readFile $ toFilePath path
   let m = newMeta (length $ T.lines content) 1 path
   return $ WeakStmtReturn (m, WeakTermEnumIntro $ EnumValueIntS 64 0)
-concatQuasiStmtList (QuasiStmtConstDecl m xt:es) = do
+concatQuasiStmtList (QuasiStmtConstDecl m xt : es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtConstDecl m xt cont
-concatQuasiStmtList (QuasiStmtLet m xt e:es) = do
+concatQuasiStmtList (QuasiStmtLet m xt e : es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtLet m xt e cont
-concatQuasiStmtList (QuasiStmtLetWT m xt e:es) = do
+concatQuasiStmtList (QuasiStmtLetWT m xt e : es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtLetWT m xt e cont
-concatQuasiStmtList (QuasiStmtVerify m e:es) = do
+concatQuasiStmtList (QuasiStmtVerify m e : es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtVerify m e cont
-concatQuasiStmtList (QuasiStmtEnum {}:ss) = concatQuasiStmtList ss
-concatQuasiStmtList (QuasiStmtDef xds:ss) = do
+concatQuasiStmtList (QuasiStmtEnum {} : ss) = concatQuasiStmtList ss
+concatQuasiStmtList (QuasiStmtDef xds : ss) = do
   let ds = map snd xds
   let baseSub = Map.fromList $ map defToSub ds
   let sub = selfCompose (length baseSub) baseSub
   let varList = map (\(_, (m, x, _), _, _) -> (m, WeakTermUpsilon x)) ds
   let iterList = map (substWeakTermPlus sub) varList
   concatQuasiStmtList $ (toLetList $ zip xds iterList) ++ ss
-concatQuasiStmtList ((QuasiStmtLetInductive n m at e):es) = do
+concatQuasiStmtList ((QuasiStmtLetInductive n m at e) : es) = do
   insForm n at e
   cont <- concatQuasiStmtList es
   return $ WeakStmtLetWT m at e cont
-concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt e as:ss) = do
+concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt e as : ss) = do
   case e of
     (mLam, WeakTermPiIntro Nothing xtsyts (_, WeakTermPiIntro (Just (bi, _)) atsbts (_, WeakTermPiElim b _))) -> do
       (_, is) <- lookupRevIndEnv m bi
@@ -483,26 +489,28 @@ concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt e as:ss) = do
         WeakStmtLetWT
           m
           bt
-          ( mLam -- metaIsReducible mLam == False
-          , weakTermPiIntro
+          ( mLam, -- metaIsReducible mLam == False
+            weakTermPiIntro
               xtsyts
-              ( m
-              , WeakTermPiIntro
+              ( m,
+                WeakTermPiIntro
                   (Just (bi, xtsyts))
                   atsbts
-                  (m, WeakTermPiElim b yts')))
+                  (m, WeakTermPiElim b yts')
+              )
+          )
           cont
     _ -> raiseCritical m "inductive-intro"
-concatQuasiStmtList (QuasiStmtUse _:ss) = concatQuasiStmtList ss
-concatQuasiStmtList (QuasiStmtUnuse _:ss) = concatQuasiStmtList ss
-concatQuasiStmtList (QuasiStmtVisit path ss1:ss2) = do
+concatQuasiStmtList (QuasiStmtUse _ : ss) = concatQuasiStmtList ss
+concatQuasiStmtList (QuasiStmtUnuse _ : ss) = concatQuasiStmtList ss
+concatQuasiStmtList (QuasiStmtVisit path ss1 : ss2) = do
   ss1' <- concatQuasiStmtList ss1
   ss2' <- concatQuasiStmtList ss2
   return $ WeakStmtVisit path ss1' ss2'
 
 toLetList :: [(IdentDef, WeakTermPlus)] -> [QuasiStmt]
 toLetList [] = []
-toLetList (((x, (m, (mx, _, t), _, _)), iter):rest) =
+toLetList (((x, (m, (mx, _, t), _, _)), iter) : rest) =
   QuasiStmtLet m (mx, x, t) iter : toLetList rest
 
 defToSub :: Def -> (Key, WeakTermPlus)
@@ -526,13 +534,13 @@ checkKeywordSanity _ _ = return ()
 showCyclicPath :: [Path Abs File] -> T.Text
 showCyclicPath [] = ""
 showCyclicPath [path] = T.pack (toFilePath path)
-showCyclicPath (path:ps) =
+showCyclicPath (path : ps) =
   "     " <> T.pack (toFilePath path) <> showCyclicPath' ps
 
 showCyclicPath' :: [Path Abs File] -> T.Text
 showCyclicPath' [] = ""
 showCyclicPath' [path] = "\n  ~> " <> T.pack (toFilePath path)
-showCyclicPath' (path:ps) =
+showCyclicPath' (path : ps) =
   "\n  ~> " <> T.pack (toFilePath path) <> showCyclicPath' ps
 
 reportCyclicPath :: Meta -> Path Abs File -> WithEnv a
@@ -553,17 +561,18 @@ install bytestr pkgPath = do
   liftIO $ Tar.unpack (toFilePath pkgPath) $ Tar.read $ GZip.decompress bytestr
 
 includeCore :: Meta -> [TreePlus] -> [TreePlus]
-includeCore _ ((_, TreeNode [(_, TreeLeaf "no-implicit-core")]):rest) = rest
+includeCore _ ((_, TreeNode [(_, TreeLeaf "no-implicit-core")]) : rest) = rest
 includeCore m treeList = includeCore' m : treeList
 
 includeCore' :: Meta -> TreePlus
 includeCore' m =
-  ( m
-  , TreeNode
-      [ (m, TreeLeaf "include")
-      , (m, TreeLeaf "library")
-      , (m, TreeLeaf "\"core/core.neut\"")
-      ])
+  ( m,
+    TreeNode
+      [ (m, TreeLeaf "include"),
+        (m, TreeLeaf "library"),
+        (m, TreeLeaf "\"core/core.neut\"")
+      ]
+  )
 
 adjustPhase :: TreePlus -> WithEnv TreePlus
 adjustPhase (m, TreeLeaf x) = do
@@ -589,7 +598,7 @@ warnUnusedVar =
 
 warnUnusedVar' :: [(PosInfo, T.Text)] -> WithEnv ()
 warnUnusedVar' [] = return ()
-warnUnusedVar' ((pos, x):pxs)
+warnUnusedVar' ((pos, x) : pxs)
   | T.all (`S.notMember` S.fromList "()") x = do
     warn pos $ "defined but not used: `" <> x <> "`"
     warnUnusedVar' pxs

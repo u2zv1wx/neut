@@ -1,11 +1,11 @@
 module Reduce.WeakTerm
-  ( reduceWeakTermPlus
-  , reduceWeakTermIdentPlus
-  ) where
-
-import qualified Data.HashMap.Lazy as Map
+  ( reduceWeakTermPlus,
+    reduceWeakTermIdentPlus,
+  )
+where
 
 import Data.Basic
+import qualified Data.HashMap.Lazy as Map
 import Data.WeakTerm
 
 reduceWeakTermPlus :: WeakTermPlus -> WeakTermPlus
@@ -17,8 +17,9 @@ reduceWeakTermPlus (m, WeakTermPi mName xts cod) = do
 -- eta-reduce (note that reduceWeakTermPlus expects the argument to be pure; this reduction is
 -- unsound if `e` has certain sort of side-effect, like print)
 reduceWeakTermPlus (_, WeakTermPiIntro Nothing xts (_, WeakTermPiElim e args))
-  | Just ys <- mapM asUpsilon args
-  , ys == map (\(_, x, _) -> x) xts = e
+  | Just ys <- mapM asUpsilon args,
+    ys == map (\(_, x, _) -> x) xts =
+    e
 reduceWeakTermPlus (m, WeakTermPiIntro info xts e) = do
   let info' = fmap2 (map reduceWeakTermIdentPlus) info
   let (ms, xs, ts) = unzip3 xts
@@ -31,8 +32,8 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
   let app = WeakTermPiElim e' es'
   case e' of
     (mLam, WeakTermPiIntro _ xts body)
-      | length xts == length es'
-      , metaIsReducible mLam -> do
+      | length xts == length es',
+        metaIsReducible mLam -> do
         let xs = map (\(_, x, _) -> Left $ asInt x) xts
         let sub = Map.fromList $ zip xs es'
         reduceWeakTermPlus $ substWeakTermPlus sub body
@@ -72,8 +73,8 @@ reduceWeakTermPlus (m, WeakTermArrayElim k xts e1 e2) = do
   let e1' = reduceWeakTermPlus e1
   case e1' of
     (_, WeakTermArrayIntro k' es)
-      | length es == length xts
-      , k == k' -> do
+      | length es == length xts,
+        k == k' -> do
         let (_, xs, _) = unzip3 xts
         let sub = Map.fromList $ zip (map (Left . asInt) xs) es
         reduceWeakTermPlus $ substWeakTermPlus sub e2
@@ -86,9 +87,9 @@ reduceWeakTermPlus (m, WeakTermStructElim xks e1 e2) = do
   let e1' = reduceWeakTermPlus e1
   case e1' of
     (_, WeakTermStructIntro eks)
-      | (_, xs, ks1) <- unzip3 xks
-      , (es, ks2) <- unzip eks
-      , ks1 == ks2 -> do
+      | (_, xs, ks1) <- unzip3 xks,
+        (es, ks2) <- unzip eks,
+        ks1 == ks2 -> do
         let sub = Map.fromList $ zip (map (Left . asInt) xs) es
         reduceWeakTermPlus $ substWeakTermPlus sub e2
     _ -> (m, WeakTermStructElim xks e1' e2)

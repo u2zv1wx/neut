@@ -1,21 +1,20 @@
 module Data.Log
-  ( Log
-  , outputLog
-  , outputLog'
-  , logNote
-  , logNote'
-  , logWarning
-  , logError
-  , logCritical
-  , logCritical'
-  ) where
-
-import System.Console.ANSI
-
-import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
+  ( Log,
+    outputLog,
+    outputLog',
+    logNote,
+    logNote',
+    logWarning,
+    logError,
+    logCritical,
+    logCritical',
+  )
+where
 
 import Data.Basic
+import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
+import System.Console.ANSI
 
 data LogLevel
   = LogLevelNote

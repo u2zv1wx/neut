@@ -1,25 +1,24 @@
 module Clarify.Sigma
-  ( cartesianSigma
-  , returnArrayType
-  , returnClosureType
-  ) where
-
-import Control.Monad.State.Lazy
-
-import qualified Data.Text as T
+  ( cartesianSigma,
+    returnArrayType,
+    returnClosureType,
+  )
+where
 
 import Clarify.Linearize
 import Clarify.Utility
+import Control.Monad.State.Lazy
 import Data.Basic
 import Data.Code
 import Data.Env
+import qualified Data.Text as T
 
 cartesianSigma ::
-     Maybe T.Text
-  -> Meta
-  -> ArrayKind
-  -> [Either CodePlus (Identifier, CodePlus)]
-  -> WithEnv DataPlus
+  Maybe T.Text ->
+  Meta ->
+  ArrayKind ->
+  [Either CodePlus (Identifier, CodePlus)] ->
+  WithEnv DataPlus
 cartesianSigma Nothing m k mxts = do
   (args, e) <- makeSwitcher m (affineSigma m k mxts) (relevantSigma m k mxts)
   i <- newCount
@@ -47,11 +46,11 @@ cartesianSigma (Just name) m k mxts = do
 --     return ()                                     ---        ---
 --
 affineSigma ::
-     Meta
-  -> ArrayKind
-  -> [Either CodePlus (Identifier, CodePlus)]
-  -> DataPlus
-  -> WithEnv CodePlus
+  Meta ->
+  ArrayKind ->
+  [Either CodePlus (Identifier, CodePlus)] ->
+  DataPlus ->
+  WithEnv CodePlus
 affineSigma m k mxts argVar = do
   xts <- mapM supplyName mxts
   -- as == [APP-1, ..., APP-n]   (`a` here stands for `app`)
@@ -79,11 +78,11 @@ affineSigma m k mxts argVar = do
 --     let (pn1, pn2) := pair-n in               ---                   ---       ---
 --     return ((p11, ..., pn1), (p12, ..., pn2)) ---                   ---       ---
 relevantSigma ::
-     Meta
-  -> ArrayKind
-  -> [Either CodePlus (Identifier, CodePlus)]
-  -> DataPlus
-  -> WithEnv CodePlus
+  Meta ->
+  ArrayKind ->
+  [Either CodePlus (Identifier, CodePlus)] ->
+  DataPlus ->
+  WithEnv CodePlus
 relevantSigma m k mxts argVar = do
   xts <- mapM supplyName mxts
   -- as == [APP-1, ..., APP-n]
@@ -96,7 +95,7 @@ relevantSigma m k mxts argVar = do
   return (m, CodeSigmaElim k (map fst xts) argVar body')
 
 toPairInfo ::
-     (Identifier, CodePlus) -> WithEnv (Identifier, (DataPlus, CodePlus))
+  (Identifier, CodePlus) -> WithEnv (Identifier, (DataPlus, CodePlus))
 toPairInfo (_, t@(m, _)) = do
   (name, var) <- newDataUpsilonWith m "pair"
   return (name, (var, t))
@@ -107,22 +106,24 @@ toPairInfo (_, t@(m, _)) = do
 --   let (xn, yn) := dn in
 --   return ((x1, ..., xn), (y1, ..., yn))
 transposeSigma ::
-     Meta -> ArrayKind -> [(DataPlus, CodePlus)] -> WithEnv CodePlus
+  Meta -> ArrayKind -> [(DataPlus, CodePlus)] -> WithEnv CodePlus
 transposeSigma m k ds = do
   (xList, xVarList) <- unzip <$> mapM (const $ newDataUpsilonWith m "sig-x") ds
   (yList, yVarList) <- unzip <$> mapM (const $ newDataUpsilonWith m "sig-y") ds
-  return $
-    bindSigmaElim (zip (zip xList yList) ds) $
-    ( m
-    , CodeUpIntro
-        ( m
-        , sigmaIntro
-            [(m, DataSigmaIntro k xVarList), (m, DataSigmaIntro k yVarList)]))
+  return
+    $ bindSigmaElim (zip (zip xList yList) ds)
+    $ ( m,
+        CodeUpIntro
+          ( m,
+            sigmaIntro
+              [(m, DataSigmaIntro k xVarList), (m, DataSigmaIntro k yVarList)]
+          )
+      )
 
 bindSigmaElim ::
-     [((Identifier, Identifier), (DataPlus, CodePlus))] -> CodePlus -> CodePlus
+  [((Identifier, Identifier), (DataPlus, CodePlus))] -> CodePlus -> CodePlus
 bindSigmaElim [] cont = cont
-bindSigmaElim (((x, y), (d, _)):xyds) cont =
+bindSigmaElim (((x, y), (d, _)) : xyds) cont =
   (fst cont, sigmaElim [x, y] d $ bindSigmaElim xyds cont)
 
 supplyName :: Either b (Identifier, b) -> WithEnv (Identifier, b)

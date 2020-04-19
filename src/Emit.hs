@@ -1,21 +1,20 @@
 module Emit
-  ( emit
-  ) where
+  ( emit,
+  )
+where
 
 import Control.Monad.State.Lazy
+import Data.Basic
 import Data.ByteString.Builder
-import Numeric.Half
-
+import Data.Env
 import qualified Data.HashMap.Lazy as HashMap
 import qualified Data.IntMap as IntMap
+import Data.LLVM
 import qualified Data.Map as Map
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
-
-import Data.Basic
-import Data.Env
-import Data.LLVM
+import Numeric.Half
 import Reduce.LLVM
 
 emit :: LLVM -> WithEnv Builder
@@ -39,8 +38,13 @@ emitDeclarations = do
 declToBuilder :: (T.Text, ([LowType], LowType)) -> Builder
 declToBuilder (name, (dom, cod)) = do
   let name' = TE.encodeUtf8Builder name
-  "declare " <>
-    showLowType cod <> " @" <> name' <> "(" <> showItems showLowType dom <> ")"
+  "declare "
+    <> showLowType cod
+    <> " @"
+    <> name'
+    <> "("
+    <> showItems showLowType dom
+    <> ")"
 
 emitDefinition :: Builder -> Builder -> [Builder] -> LLVM -> WithEnv [Builder]
 emitDefinition retType name args asm = do
@@ -63,12 +67,12 @@ emitLLVM retType (LLVMCall f args) = do
   tmp <- newNameWith' "tmp"
   op <-
     emitOp $
-    unwordsL
-      [ showLLVMData (LLVMDataLocal tmp)
-      , "="
-      , "tail call fastcc i8*"
-      , showLLVMData f <> showArgs args
-      ]
+      unwordsL
+        [ showLLVMData (LLVMDataLocal tmp),
+          "=",
+          "tail call fastcc i8*",
+          showLLVMData f <> showArgs args
+        ]
   a <- emitRet retType (LLVMDataLocal tmp)
   return $ op <> a
 emitLLVM retType (LLVMSwitch (d, lowType) defaultBranch branchList) = do
@@ -76,36 +80,36 @@ emitLLVM retType (LLVMSwitch (d, lowType) defaultBranch branchList) = do
   labelList <- constructLabelList branchList
   op <-
     emitOp $
-    unwordsL
-      [ "switch"
-      , showLowType lowType
-      , showLLVMData d <> ","
-      , "label"
-      , showLLVMData (LLVMDataLocal defaultLabel)
-      , showBranchList lowType $ zip (map fst branchList) labelList
-      ]
+      unwordsL
+        [ "switch",
+          showLowType lowType,
+          showLLVMData d <> ",",
+          "label",
+          showLLVMData (LLVMDataLocal defaultLabel),
+          showBranchList lowType $ zip (map fst branchList) labelList
+        ]
   let asmList = map snd branchList
   xs <-
     forM (zip labelList asmList <> [(defaultLabel, defaultBranch)]) $
-    uncurry (emitBlock retType)
+      uncurry (emitBlock retType)
   return $ op <> concat xs
 emitLLVM retType (LLVMBranch d onTrue onFalse) = do
   onTrueLabel <- newNameWith' "case-true"
   onFalseLabel <- newNameWith' "case-false"
   op <-
     emitOp $
-    unwordsL
-      [ "br"
-      , "i1"
-      , showLLVMData d <> ","
-      , "label"
-      , showLLVMData (LLVMDataLocal onTrueLabel) <> ","
-      , "label"
-      , showLLVMData (LLVMDataLocal onFalseLabel)
-      ]
+      unwordsL
+        [ "br",
+          "i1",
+          showLLVMData d <> ",",
+          "label",
+          showLLVMData (LLVMDataLocal onTrueLabel) <> ",",
+          "label",
+          showLLVMData (LLVMDataLocal onFalseLabel)
+        ]
   xs <-
     forM ([(onTrueLabel, onTrue), (onFalseLabel, onFalse)]) $
-    uncurry (emitBlock retType)
+      uncurry (emitBlock retType)
   return $ op <> concat xs
 emitLLVM retType (LLVMCont (LLVMOpFree d _ j) cont) = do
   nenv <- gets nopFreeSet
@@ -114,7 +118,7 @@ emitLLVM retType (LLVMCont (LLVMOpFree d _ j) cont) = do
     else do
       str <-
         emitOp $
-        unwordsL ["call fastcc", "void", "@free(i8* " <> showLLVMData d <> ")"]
+          unwordsL ["call fastcc", "void", "@free(i8* " <> showLLVMData d <> ")"]
       a <- emitLLVM retType cont
       return $ str <> a
 emitLLVM retType (LLVMCont op cont) = do
@@ -135,11 +139,11 @@ emitLLVMOp (LLVMOpCall d ds) = do
 emitLLVMOp (LLVMOpGetElementPtr (base, n) is) = do
   return $
     unwordsL
-      [ "getelementptr"
-      , showLowTypeAsIfNonPtr n <> ","
-      , showLowType n
-      , showLLVMData base <> ","
-      , showIndex is
+      [ "getelementptr",
+        showLowTypeAsIfNonPtr n <> ",",
+        showLowType n,
+        showLLVMData base <> ",",
+        showIndex is
       ]
 emitLLVMOp (LLVMOpBitcast d fromType toType) =
   emitLLVMConvOp "bitcast" d fromType toType
@@ -150,19 +154,19 @@ emitLLVMOp (LLVMOpPointerToInt d fromType toType) =
 emitLLVMOp (LLVMOpLoad d lowType) = do
   return $
     unwordsL
-      [ "load"
-      , showLowType lowType <> ","
-      , showLowTypeAsIfPtr lowType
-      , showLLVMData d
+      [ "load",
+        showLowType lowType <> ",",
+        showLowTypeAsIfPtr lowType,
+        showLLVMData d
       ]
 emitLLVMOp (LLVMOpStore t d1 d2) = do
   return $
     unwordsL
-      [ "store"
-      , showLowType t
-      , showLLVMData d1 <> ","
-      , showLowTypeAsIfPtr t
-      , showLLVMData d2
+      [ "store",
+        showLowType t,
+        showLLVMData d1 <> ",",
+        showLowTypeAsIfPtr t,
+        showLLVMData d2
       ]
 emitLLVMOp (LLVMOpAlloc d _) = do
   return $
@@ -330,14 +334,14 @@ emitLabel s = s <> ":"
 
 constructLabelList :: [a] -> WithEnv [Identifier]
 constructLabelList [] = return []
-constructLabelList (_:rest) = do
+constructLabelList (_ : rest) = do
   label <- newNameWith' "case"
   labelList <- constructLabelList rest
   return $ label : labelList
 
 showRegList :: [Builder] -> Builder
 showRegList [] = ""
-showRegList (s:ss) = ",{" <> s <> "}" <> showRegList ss
+showRegList (s : ss) = ",{" <> s <> "}" <> showRegList ss
 
 showBranchList :: LowType -> [(Int, Identifier)] -> Builder
 showBranchList lowType xs =
@@ -346,12 +350,15 @@ showBranchList lowType xs =
 showIndex :: [(LLVMData, LowType)] -> Builder
 showIndex [] = ""
 showIndex [(d, t)] = showLowType t <> " " <> showLLVMData d
-showIndex ((d, t):dts) = showIndex [(d, t)] <> ", " <> showIndex dts
+showIndex ((d, t) : dts) = showIndex [(d, t)] <> ", " <> showIndex dts
 
 showBranch :: LowType -> Int -> Identifier -> Builder
 showBranch lowType i label =
-  showLowType lowType <>
-  " " <> intDec i <> ", label " <> showLLVMData (LLVMDataLocal label)
+  showLowType lowType
+    <> " "
+    <> intDec i
+    <> ", label "
+    <> showLLVMData (LLVMDataLocal label)
 
 showArg :: LLVMData -> Builder
 showArg d = "i8* " <> showLLVMData d
@@ -425,16 +432,16 @@ showLLVMData LLVMDataNull = "null"
 showItems :: (a -> Builder) -> [a] -> Builder
 showItems _ [] = ""
 showItems f [a] = f a
-showItems f (a:as) = f a <> ", " <> showItems f as
+showItems f (a : as) = f a <> ", " <> showItems f as
 
 {-# INLINE unwordsL #-}
 unwordsL :: [Builder] -> Builder
 unwordsL [] = ""
 unwordsL [b] = b
-unwordsL (b:bs) = b <> " " <> unwordsL bs
+unwordsL (b : bs) = b <> " " <> unwordsL bs
 
 {-# INLINE unlinesL #-}
 unlinesL :: [Builder] -> Builder
 unlinesL [] = ""
 unlinesL [b] = b
-unlinesL (b:bs) = b <> "\n" <> unlinesL bs
+unlinesL (b : bs) = b <> "\n" <> unlinesL bs

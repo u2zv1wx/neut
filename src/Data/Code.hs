@@ -1,11 +1,9 @@
 module Data.Code where
 
-import Data.Maybe (fromMaybe)
-
-import qualified Data.IntMap as IntMap
-import qualified Data.Text as T
-
 import Data.Basic
+import qualified Data.IntMap as IntMap
+import Data.Maybe (fromMaybe)
+import qualified Data.Text as T
 
 data Data
   = DataConst T.Text
@@ -34,12 +32,12 @@ data Const
   | ConstSysCall Syscall [DataPlus]
   deriving (Show)
 
-newtype IsFixed =
-  IsFixed Bool
+newtype IsFixed
+  = IsFixed Bool
   deriving (Show)
 
-data Definition =
-  Definition IsFixed [Identifier] CodePlus
+data Definition
+  = Definition IsFixed [Identifier] CodePlus
   deriving (Show)
 
 type DataPlus = (Meta, Data)

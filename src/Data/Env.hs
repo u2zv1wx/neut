@@ -2,29 +2,26 @@ module Data.Env where
 
 import Control.Exception.Safe
 import Control.Monad.State.Lazy
-import Data.List (find)
-import Path
-import Path.IO
-import System.Directory (createDirectoryIfMissing)
-import System.Info
-
 import Data.Basic
 import Data.Code
 import Data.Constraint
+import qualified Data.HashMap.Lazy as Map
+import qualified Data.IntMap as IntMap
 import Data.LLVM
+import Data.List (find)
 import Data.Log
+import qualified Data.PQueue.Min as Q
+import qualified Data.Set as S
 import Data.Term
+import qualified Data.Text as T
 import Data.Tree
 import Data.Version (showVersion)
 import Data.WeakTerm
+import Path
+import Path.IO
 import Paths_neut (version)
-
-import qualified Data.HashMap.Lazy as Map
-import qualified Data.IntMap as IntMap
-import qualified Data.PQueue.Min as Q
-import qualified Data.Set as S
-import qualified Data.Text as T
-
+import System.Directory (createDirectoryIfMissing)
+import System.Info
 import qualified Text.Show.Pretty as Pr
 
 type ConstraintQueue = Q.MinQueue EnrichedConstraint
@@ -43,127 +40,127 @@ type TypeEnvKey = Either Int T.Text
 
 type TypeEnv = Map.HashMap TypeEnvKey TermPlus
 
-data Env =
-  Env
-    { count :: Int
-    , ppCount :: Int -- count used only for pretty printing
-    , shouldColorize :: Bool
-    , endOfEntry :: String
-    , isCheck :: Bool
-    , timestamp :: Integer
-    --
-    -- parse
-    --
-    , phase :: Int
-    , target :: Maybe Target
-    -- list of reserved keywords
-    , keywordEnv :: S.Set T.Text
-    -- macro transformers
-    , notationEnv :: [(TreePlus, TreePlus)]
-    , constantSet :: S.Set T.Text
-    -- path ~> identifiers defined in the file at toplevel
-    , fileEnv :: FileEnv
-    , traceEnv :: [Path Abs File]
-    -- [("choice", [("left", 0), ("right", 1)]), ...]
-    , enumEnv :: Map.HashMap T.Text [(T.Text, Int)]
-    -- [("left", ("choice", 0)), ("right", ("choice", 1)), ...]
-    , revEnumEnv :: Map.HashMap T.Text (T.Text, Int)
-    , nameEnv :: Map.HashMap T.Text T.Text
-    -- [("foo.13", "foo"), ...] (as corresponding int)
-    , revNameEnv :: IntMap.IntMap Int
-    , prefixEnv :: [T.Text]
-    , sectionEnv :: [T.Text]
-    , formationEnv :: Map.HashMap T.Text (Maybe WeakTermPlus)
-    -- "stream" ~> ["stream", "other-record-type", "head", "tail", "other-destructor"]
-    , labelEnv :: Map.HashMap T.Text [T.Text]
-    -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
-    , indEnv :: RuleEnv
-    -- "list:cons" ~> ("list", [0])
-    , revIndEnv :: Map.HashMap T.Text (T.Text, [Int])
-    , intactSet :: S.Set (Meta, T.Text)
-    --
-    -- elaborate
-    --
-    -- const ~> (index of implicit arguments of the const)
-    -- , impEnv :: Map.HashMap T.Text [Int]
-    , weakTypeEnv :: IntMap.IntMap WeakTermPlus
-    , typeEnv :: TypeEnv
-    , constraintEnv :: [PreConstraint]
-    , constraintQueue :: ConstraintQueue
-    -- metavar ~> beta-equivalent weakterm
-    , substEnv :: IntMap.IntMap WeakTermPlus
-    , zetaEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus)
-    --
-    -- clarify
-    --
-    , cacheEnv :: Map.HashMap T.Text (Either TermPlus CodePlus)
-    -- f ~> thunk (lam (x1 ... xn) e)
-    , codeEnv :: Map.HashMap T.Text Definition
-    , nameSet :: S.Set T.Text
-    , chainEnv :: IntMap.IntMap ([Data.Term.IdentifierPlus], TermPlus)
-    --
-    -- LLVM
-    --
-    , llvmEnv :: Map.HashMap T.Text ([Identifier], LLVM)
-    , defVarSet :: S.Set Int
-    -- external functions that must be declared in LLVM IR
-    , declEnv :: Map.HashMap T.Text ([LowType], LowType)
-    , nopFreeSet :: S.Set Int
-    , cachePathList :: [Path Abs File]
-    , depGraph :: Map.HashMap (Path Abs File) [Path Abs File]
-    }
+data Env
+  = Env
+      { count :: Int,
+        ppCount :: Int, -- count used only for pretty printing
+        shouldColorize :: Bool,
+        endOfEntry :: String,
+        isCheck :: Bool,
+        timestamp :: Integer,
+        --
+        -- parse
+        --
+        phase :: Int,
+        target :: Maybe Target,
+        -- list of reserved keywords
+        keywordEnv :: S.Set T.Text,
+        -- macro transformers
+        notationEnv :: [(TreePlus, TreePlus)],
+        constantSet :: S.Set T.Text,
+        -- path ~> identifiers defined in the file at toplevel
+        fileEnv :: FileEnv,
+        traceEnv :: [Path Abs File],
+        -- [("choice", [("left", 0), ("right", 1)]), ...]
+        enumEnv :: Map.HashMap T.Text [(T.Text, Int)],
+        -- [("left", ("choice", 0)), ("right", ("choice", 1)), ...]
+        revEnumEnv :: Map.HashMap T.Text (T.Text, Int),
+        nameEnv :: Map.HashMap T.Text T.Text,
+        -- [("foo.13", "foo"), ...] (as corresponding int)
+        revNameEnv :: IntMap.IntMap Int,
+        prefixEnv :: [T.Text],
+        sectionEnv :: [T.Text],
+        formationEnv :: Map.HashMap T.Text (Maybe WeakTermPlus),
+        -- "stream" ~> ["stream", "other-record-type", "head", "tail", "other-destructor"]
+        labelEnv :: Map.HashMap T.Text [T.Text],
+        -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
+        indEnv :: RuleEnv,
+        -- "list:cons" ~> ("list", [0])
+        revIndEnv :: Map.HashMap T.Text (T.Text, [Int]),
+        intactSet :: S.Set (Meta, T.Text),
+        --
+        -- elaborate
+        --
+        -- const ~> (index of implicit arguments of the const)
+        -- , impEnv :: Map.HashMap T.Text [Int]
+        weakTypeEnv :: IntMap.IntMap WeakTermPlus,
+        typeEnv :: TypeEnv,
+        constraintEnv :: [PreConstraint],
+        constraintQueue :: ConstraintQueue,
+        -- metavar ~> beta-equivalent weakterm
+        substEnv :: IntMap.IntMap WeakTermPlus,
+        zetaEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus),
+        --
+        -- clarify
+        --
+        cacheEnv :: Map.HashMap T.Text (Either TermPlus CodePlus),
+        -- f ~> thunk (lam (x1 ... xn) e)
+        codeEnv :: Map.HashMap T.Text Definition,
+        nameSet :: S.Set T.Text,
+        chainEnv :: IntMap.IntMap ([Data.Term.IdentifierPlus], TermPlus),
+        --
+        -- LLVM
+        --
+        llvmEnv :: Map.HashMap T.Text ([Identifier], LLVM),
+        defVarSet :: S.Set Int,
+        -- external functions that must be declared in LLVM IR
+        declEnv :: Map.HashMap T.Text ([LowType], LowType),
+        nopFreeSet :: S.Set Int,
+        cachePathList :: [Path Abs File],
+        depGraph :: Map.HashMap (Path Abs File) [Path Abs File]
+      }
 
 initialEnv :: Env
 initialEnv =
   Env
-    { count = 0
-    , ppCount = 0
-    , shouldColorize = False
-    , timestamp = 0
-    , isCheck = False
-    , endOfEntry = ""
-    , phase = 0
-    , target = Nothing
-    , notationEnv = []
-    , keywordEnv = S.empty
-    , constantSet = S.empty
-    , enumEnv = Map.empty
-    , fileEnv = Map.empty
-    , traceEnv = []
-    , revEnumEnv = Map.empty
-    , nameEnv = Map.empty
-    , revNameEnv = IntMap.empty
-    , revIndEnv = Map.empty
-    , intactSet = S.empty
-    , prefixEnv = []
-    , sectionEnv = []
-    , formationEnv = Map.empty
-    , indEnv = Map.empty
-    , labelEnv = Map.empty
-    , weakTypeEnv = IntMap.empty
-    , typeEnv = Map.empty
-    , cacheEnv = Map.empty
-    , codeEnv = Map.empty
-    , chainEnv = IntMap.empty
-    , llvmEnv = Map.empty
-    , defVarSet = S.empty
-    , declEnv =
+    { count = 0,
+      ppCount = 0,
+      shouldColorize = False,
+      timestamp = 0,
+      isCheck = False,
+      endOfEntry = "",
+      phase = 0,
+      target = Nothing,
+      notationEnv = [],
+      keywordEnv = S.empty,
+      constantSet = S.empty,
+      enumEnv = Map.empty,
+      fileEnv = Map.empty,
+      traceEnv = [],
+      revEnumEnv = Map.empty,
+      nameEnv = Map.empty,
+      revNameEnv = IntMap.empty,
+      revIndEnv = Map.empty,
+      intactSet = S.empty,
+      prefixEnv = [],
+      sectionEnv = [],
+      formationEnv = Map.empty,
+      indEnv = Map.empty,
+      labelEnv = Map.empty,
+      weakTypeEnv = IntMap.empty,
+      typeEnv = Map.empty,
+      cacheEnv = Map.empty,
+      codeEnv = Map.empty,
+      chainEnv = IntMap.empty,
+      llvmEnv = Map.empty,
+      defVarSet = S.empty,
+      declEnv =
         Map.fromList
-          [ ("malloc", ([LowTypeIntS 64], voidPtr))
-          , ("free", ([voidPtr], LowTypeVoid))
-          ]
-    , constraintEnv = []
-    , constraintQueue = Q.empty
-    , substEnv = IntMap.empty
-    , zetaEnv = IntMap.empty
-    , nameSet = S.empty
-    , nopFreeSet = S.empty
-    , cachePathList = []
-    , depGraph = Map.empty
+          [ ("malloc", ([LowTypeIntS 64], voidPtr)),
+            ("free", ([voidPtr], LowTypeVoid))
+          ],
+      constraintEnv = [],
+      constraintQueue = Q.empty,
+      substEnv = IntMap.empty,
+      zetaEnv = IntMap.empty,
+      nameSet = S.empty,
+      nopFreeSet = S.empty,
+      cachePathList = [],
+      depGraph = Map.empty
     }
 
-newtype Error =
-  Error [Log]
+newtype Error
+  = Error [Log]
   deriving (Show)
 
 instance Exception Error
@@ -271,7 +268,7 @@ lookupTypeEnv m x name = do
     Just t -> return t
     Nothing ->
       raiseCritical m $
-      "the constant `" <> name <> "` is not found in the type environment."
+        "the constant `" <> name <> "` is not found in the type environment."
 
 lookupTypeEnv' :: Meta -> TypeEnvKey -> TypeEnv -> T.Text -> WithEnv TermPlus
 lookupTypeEnv' m (Right s) _ _
@@ -284,7 +281,7 @@ lookupTypeEnv' m key tenv name = do
     Just t -> return t
     Nothing ->
       raiseCritical m $
-      "the constant `" <> name <> "` is not found in the type environment."
+        "the constant `" <> name <> "` is not found in the type environment."
 
 lowTypeToType :: Meta -> LowType -> WithEnv TermPlus
 lowTypeToType m (LowTypeIntS s) = return (m, TermEnum (EnumTypeIntS s))
@@ -355,11 +352,12 @@ insEnumEnv m name xis = do
       let (xs, is) = unzip xis
       let rev = Map.fromList $ zip xs (zip (repeat name) is)
       modify
-        (\e ->
-           e
-             { enumEnv = Map.insert name xis (enumEnv e)
-             , revEnumEnv = rev `Map.union` (revEnumEnv e)
-             })
+        ( \e ->
+            e
+              { enumEnv = Map.insert name xis (enumEnv e),
+                revEnumEnv = rev `Map.union` (revEnumEnv e)
+              }
+        )
 
 isConstant :: T.Text -> WithEnv Bool
 isConstant name
