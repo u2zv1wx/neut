@@ -18,14 +18,11 @@ type NameEnv = Map.HashMap T.Text Ident
 
 discern' :: NameEnv -> [QuasiStmt] -> WithEnv [QuasiStmt]
 discern' _ [] = return []
-discern' nenv (QuasiStmtLet m (mx, x, t) e : ss) = do
-  t' <- discern'' nenv t
-  e' <- discern'' nenv e
-  x' <- newDefinedNameWith mx x
-  ss' <- discern' (insertName x x' nenv) ss
-  return $ QuasiStmtLet m (mx, x', t') e' : ss'
+discern' nenv (QuasiStmtLet m xt e : ss) = do
+  (xt', e', ss') <- discernLet nenv xt e ss
+  return $ QuasiStmtLet m xt' e' : ss'
 discern' nenv (QuasiStmtLetWT m xt e : ss) = do
-  (xt', e', ss') <- discernWT nenv xt e ss
+  (xt', e', ss') <- discernLet nenv xt e ss
   return $ QuasiStmtLetWT m xt' e' : ss'
 discern' nenv (QuasiStmtDef xds : ss) = do
   forM_ xds $ \(x, (m, _, _, _)) -> insertConstant m x
@@ -46,10 +43,10 @@ discern' nenv (QuasiStmtEnum m name xis : ss) = do
   ss' <- discern' nenv ss
   return $ QuasiStmtEnum m name xis : ss'
 discern' nenv (QuasiStmtLetInductive n m xt e : ss) = do
-  (xt', e', ss') <- discernWT nenv xt e ss
+  (xt', e', ss') <- discernLet nenv xt e ss
   return $ QuasiStmtLetInductive n m xt' e' : ss'
 discern' nenv (QuasiStmtLetInductiveIntro m xt e as : ss) = do
-  (xt', e', ss') <- discernWT nenv xt e ss
+  (xt', e', ss') <- discernLet nenv xt e ss
   return $ QuasiStmtLetInductiveIntro m xt' e' as : ss'
 discern' nenv (QuasiStmtUse prefix : ss) = do
   modify (\e -> e {prefixEnv = prefix : prefixEnv e})
@@ -65,19 +62,16 @@ discern' nenv (QuasiStmtVisit path ss1 : ss2) = do
   let ss2' = drop (length ss1) ssss
   return $ QuasiStmtVisit path ss1' : ss2'
 
-discernWT ::
+discernLet ::
   NameEnv ->
   WeakIdentPlus ->
   WeakTermPlus ->
   [QuasiStmt] ->
   WithEnv (WeakIdentPlus, WeakTermPlus, [QuasiStmt])
-discernWT nenv (mx, x, t) e ss = do
-  set <- gets intactSet
+discernLet nenv (mx, x, t) e ss = do
   t' <- discern'' nenv t
   e' <- discern'' nenv e
   x' <- newDefinedNameWith mx x
-  set' <- gets intactSet
-  whenCheck $ modify (\env -> env {intactSet = S.intersection set set'})
   ss' <- discern' (insertName x x' nenv) ss
   return ((mx, x', t'), e', ss')
 
