@@ -31,9 +31,9 @@ reduceCodePlus (m, CodePiElimDownElim v ds) = do
         let def = Definition (IsFixed True) xs body'
         modify (\env -> env {codeEnv = Map.insert x def cenv})
         return (m, CodePiElimDownElim v ds)
-    _ -> do
+    _ ->
       return (m, CodePiElimDownElim v ds)
-reduceCodePlus (m, CodeSigmaElim mk xs v e) = do
+reduceCodePlus (m, CodeSigmaElim mk xs v e) =
   case v of
     (_, DataSigmaIntro mk' ds)
       | length ds == length xs,
@@ -47,7 +47,7 @@ reduceCodePlus (m, CodeSigmaElim mk xs v e) = do
           | Just ys <- mapM asUpsilon ds,
             xs == ys ->
             return (mUp, CodeUpIntro v) -- eta-reduce
-        _ -> do
+        _ ->
           return (m, CodeSigmaElim mk xs v e')
 reduceCodePlus (m, CodeUpIntro v) = return (m, CodeUpIntro v)
 reduceCodePlus (m, CodeUpElim x e1 e2) = do
@@ -57,11 +57,11 @@ reduceCodePlus (m, CodeUpElim x e1 e2) = do
       | metaIsReducible mUp -> do
         let sub = IntMap.fromList [(asInt x, d)]
         reduceCodePlus $ substCodePlus sub e2
-    (my, CodeUpElim y ey1 ey2) -> do
+    (my, CodeUpElim y ey1 ey2) ->
       reduceCodePlus (my, CodeUpElim y ey1 (m, CodeUpElim x ey2 e2)) -- commutative conversion
-    (my, CodeSigmaElim mk yts vy ey) -> do
+    (my, CodeSigmaElim mk yts vy ey) ->
       reduceCodePlus (my, CodeSigmaElim mk yts vy (m, CodeUpElim x ey e2)) -- commutative conversion
-    (my, CodeStructElim yts vy ey) -> do
+    (my, CodeStructElim yts vy ey) ->
       reduceCodePlus (my, CodeStructElim yts vy (m, CodeUpElim x ey e2)) -- commutative conversion
     _ -> do
       e2' <- reduceCodePlus e2
@@ -69,7 +69,7 @@ reduceCodePlus (m, CodeUpElim x e1 e2) = do
         (_, CodeUpIntro (_, DataUpsilon y))
           | x == y -> return e1' -- eta-reduce
         _ -> return (m, CodeUpElim x e1' e2')
-reduceCodePlus (m, CodeEnumElim varInfo v les) = do
+reduceCodePlus (m, CodeEnumElim varInfo v les) =
   case v of
     (_, DataEnumIntro l) ->
       case lookup (CaseValue l) les of

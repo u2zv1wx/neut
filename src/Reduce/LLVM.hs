@@ -25,7 +25,7 @@ reduceLLVM sub sm (LLVMLet x (LLVMOpAlloc _ (LowTypePtr (LowTypeArray 0 _))) con
 reduceLLVM sub sm (LLVMLet x (LLVMOpAlloc _ (LowTypePtr (LowTypeStruct []))) cont) = do
   let sub' = IntMap.insert (asInt x) LLVMDataNull sub
   reduceLLVM sub' sm cont
-reduceLLVM sub sm (LLVMLet x op@(LLVMOpAlloc _ size) cont) = do
+reduceLLVM sub sm (LLVMLet x op@(LLVMOpAlloc _ size) cont) =
   case Map.lookup size sm of
     Just ((j, d) : rest) -> do
       modify (\env -> env {nopFreeSet = S.insert j (nopFreeSet env)})

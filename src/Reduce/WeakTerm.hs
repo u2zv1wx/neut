@@ -39,7 +39,7 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
         reduceWeakTermPlus $ substWeakTermPlus sub body
     _ -> (m, app)
 reduceWeakTermPlus (m, WeakTermIter (mx, x, t) xts e)
-  | x `notElem` varWeakTermPlus e = do
+  | x `notElem` varWeakTermPlus e =
     reduceWeakTermPlus (m, weakTermPiIntro xts e)
   | otherwise = do
     let t' = reduceWeakTermPlus t
