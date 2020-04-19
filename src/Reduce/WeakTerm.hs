@@ -1,6 +1,6 @@
 module Reduce.WeakTerm
   ( reduceWeakTermPlus,
-    reduceWeakTermIdentPlus,
+    reduceWeakTermWeakIdentPlus,
   )
 where
 
@@ -21,7 +21,7 @@ reduceWeakTermPlus (_, WeakTermPiIntro Nothing xts (_, WeakTermPiElim e args))
     ys == map (\(_, x, _) -> x) xts =
     e
 reduceWeakTermPlus (m, WeakTermPiIntro info xts e) = do
-  let info' = fmap2 (map reduceWeakTermIdentPlus) info
+  let info' = fmap2 (map reduceWeakTermWeakIdentPlus) info
   let (ms, xs, ts) = unzip3 xts
   let ts' = map reduceWeakTermPlus ts
   let e' = reduceWeakTermPlus e
@@ -105,5 +105,5 @@ reduceWeakTermPlus (m, WeakTermCase indName e cxtes) = do
 reduceWeakTermPlus (_, WeakTermQuestion e _) = reduceWeakTermPlus e
 reduceWeakTermPlus e = e
 
-reduceWeakTermIdentPlus :: IdentPlus -> IdentPlus
-reduceWeakTermIdentPlus (m, x, t) = (m, x, reduceWeakTermPlus t)
+reduceWeakTermWeakIdentPlus :: WeakIdentPlus -> WeakIdentPlus
+reduceWeakTermWeakIdentPlus (m, x, t) = (m, x, reduceWeakTermPlus t)

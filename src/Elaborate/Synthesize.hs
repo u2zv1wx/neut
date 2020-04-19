@@ -95,7 +95,7 @@ deleteMin = do
 --   ]
 -- (p, q : fresh variables)
 -- {} toAltList {それぞれのlistはlinear list}
-toAltList :: [IdentPlus] -> WithEnv [[IdentPlus]]
+toAltList :: [WeakIdentPlus] -> WithEnv [[WeakIdentPlus]]
 toAltList xts = do
   let xs = map (\(_, x, _) -> x) xts
   result <- mapM (discardInactive xts) $ chooseActive $ toIndexInfo xs
@@ -133,7 +133,7 @@ pickup (xs : xss) = do
   map (\ys -> x : ys) yss
 
 discardInactive ::
-  [IdentPlus] -> [(Ident, Int)] -> WithEnv [IdentPlus]
+  [WeakIdentPlus] -> [(Ident, Int)] -> WithEnv [WeakIdentPlus]
 discardInactive xs indexList =
   forM (zip xs [0 ..]) $ \((mx, x, t), i) ->
     case lookup x indexList of
@@ -267,9 +267,9 @@ unravelZeta (I (s, i)) = do
       return $ I (s, j)
 
 unravelBinder ::
-  [IdentPlus] ->
+  [WeakIdentPlus] ->
   WeakTermPlus ->
-  WithEnv ([IdentPlus], WeakTermPlus)
+  WithEnv ([WeakIdentPlus], WeakTermPlus)
 unravelBinder [] e = do
   e' <- unravel e
   return ([], e')

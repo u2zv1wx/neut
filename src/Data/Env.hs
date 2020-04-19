@@ -325,7 +325,7 @@ arrayAccessToType m lowType = do
   cod <- termSigma m [(m, x4, arr), (m, x5, t)]
   return (m, termPi xts cod)
 
-weakTermSigma :: Meta -> [Data.WeakTerm.IdentPlus] -> WithEnv WeakTermPlus
+weakTermSigma :: Meta -> [WeakIdentPlus] -> WithEnv WeakTermPlus
 weakTermSigma m xts = do
   z <- newNameWith'' "sigma"
   let vz = (m, WeakTermUpsilon z)
@@ -333,7 +333,7 @@ weakTermSigma m xts = do
   let yts = [(m, z, (m, WeakTermTau)), (m, k, (m, weakTermPi xts vz))]
   return (m, weakTermPi yts vz)
 
-termSigma :: Meta -> [Data.Term.IdentPlus] -> WithEnv TermPlus
+termSigma :: Meta -> [IdentPlus] -> WithEnv TermPlus
 termSigma m xts = do
   z <- newNameWith'' "sigma"
   let vz = (m, TermUpsilon z)

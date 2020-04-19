@@ -59,7 +59,7 @@ parseConnective m ts f g = do
 
 parseConnective' :: TreePlus -> WithEnv Connective
 parseConnective' (m, TreeNode ((_, TreeLeaf name) : (_, TreeNode xts) : rules)) = do
-  xts' <- mapM interpretIdentPlus xts
+  xts' <- mapM interpretWeakIdentPlus xts
   rules' <- mapM parseRule rules
   return (m, name, xts', rules')
 parseConnective' t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) ...)"
@@ -80,7 +80,7 @@ generateProjections ts = do
   fs <- mapM formationRuleOf connectiveList
   ats <- mapM ruleAsWeakTextPlus fs
   bts <- concat <$> mapM toInternalRuleList connectiveList
-  let bts' = map textPlusToIdentPlus bts
+  let bts' = map textPlusToWeakIdentPlus bts
   stmtListList <-
     forM ats $ \(ma, a, ta) -> do
       forM bts $ \(mb, b, tb) -> do
@@ -118,18 +118,18 @@ generateProjections ts = do
           ]
   return $ concat $ concat stmtListList
 
-separate :: WeakTermPlus -> WithEnv (IdentPlus, WeakTermPlus)
+separate :: WeakTermPlus -> WithEnv (WeakIdentPlus, WeakTermPlus)
 separate (_, WeakTermPi _ [xt] cod) = return (xt, cod)
 separate t = raiseSyntaxError (fst t) "(pi (TREE) TREE)"
 
-takeXTS :: WeakTermPlus -> WithEnv [IdentPlus]
+takeXTS :: WeakTermPlus -> WithEnv [WeakIdentPlus]
 takeXTS (_, WeakTermPi _ xts _) = return xts
 takeXTS t = raiseSyntaxError (fst t) "(pi (TREE ... TREE) TREE)"
 
 parseRule :: TreePlus -> WithEnv Rule
 parseRule (m, TreeNode [(mName, TreeLeaf name), (_, TreeNode xts), t]) = do
   t' <- interpret t
-  xts' <- mapM interpretIdentPlus xts
+  xts' <- mapM interpretWeakIdentPlus xts
   return (m, name, mName, xts', t')
 parseRule t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) TREE)"
 
@@ -149,7 +149,7 @@ toInductive ats bts connective@(m, ai, xts, _) = do
   let cod = (m, WeakTermPiElim (m, WeakTermUpsilon a) (map toVar' xts))
   z <- newNameWith'' "_"
   let zt = (m, z, cod)
-  let atsbts = map textPlusToIdentPlus $ ats ++ bts
+  let atsbts = map textPlusToWeakIdentPlus $ ats ++ bts
   return $
     [ QuasiStmtLetInductive
         (length ats)
@@ -173,15 +173,15 @@ toInductive ats bts connective@(m, ai, xts, _) = do
 
 toInductiveIntroList :: [WeakTextPlus] -> Connective -> WithEnv [QuasiStmt]
 toInductiveIntroList ats (_, a, xts, rules) = do
-  let ats' = map textPlusToIdentPlus ats
-  bts <- mapM ruleAsIdentPlus rules -- fixme: このbtsはmutualな別の部分からもとってくる必要があるはず
+  let ats' = map textPlusToWeakIdentPlus ats
+  bts <- mapM ruleAsWeakIdentPlus rules -- fixme: このbtsはmutualな別の部分からもとってくる必要があるはず
   concat <$> mapM (toInductiveIntro ats' bts xts a) rules
 
 -- represent the introduction rule within CoC
 toInductiveIntro ::
-  [IdentPlus] ->
-  [IdentPlus] ->
-  [IdentPlus] ->
+  [WeakIdentPlus] ->
+  [WeakIdentPlus] ->
+  [WeakIdentPlus] ->
   T.Text ->
   Rule ->
   WithEnv [QuasiStmt]
@@ -221,16 +221,16 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
         <> showItems (ai : map (const "_") xts)
         <> ")`"
 
-ruleAsIdentPlus :: Rule -> WithEnv IdentPlus
-ruleAsIdentPlus (mb, b, m, xts, t) = do
+ruleAsWeakIdentPlus :: Rule -> WithEnv WeakIdentPlus
+ruleAsWeakIdentPlus (mb, b, m, xts, t) = do
   return (mb, asIdent b, (m, weakTermPi xts t))
 
 ruleAsWeakTextPlus :: Rule -> WithEnv WeakTextPlus
 ruleAsWeakTextPlus (mb, b, m, xts, t) = do
   return (mb, b, (m, weakTermPi xts t))
 
-textPlusToIdentPlus :: WeakTextPlus -> IdentPlus
-textPlusToIdentPlus (mx, x, t) = (mx, asIdent x, t)
+textPlusToWeakIdentPlus :: WeakTextPlus -> WeakIdentPlus
+textPlusToWeakIdentPlus (mx, x, t) = (mx, asIdent x, t)
 
 formationRuleOf :: Connective -> WithEnv Rule
 formationRuleOf (m, a, xts, _) = return (m, a, m, xts, (m, WeakTermTau))
@@ -246,7 +246,7 @@ formationRuleOf' (m, x, xts, rules) = do
 toInternalRuleList :: Connective -> WithEnv [WeakTextPlus]
 toInternalRuleList (_, _, _, rules) = mapM ruleAsWeakTextPlus rules
 
-toVar' :: IdentPlus -> WeakTermPlus
+toVar' :: WeakIdentPlus -> WeakTermPlus
 toVar' (m, x, _) = (m, WeakTermUpsilon x)
 
 toConst :: WeakTextPlus -> WeakTermPlus
@@ -279,7 +279,7 @@ data Mode
   deriving (Show)
 
 internalize ::
-  [T.Text] -> [IdentPlus] -> IdentPlus -> WithEnv WeakTermPlus
+  [T.Text] -> [WeakIdentPlus] -> WeakIdentPlus -> WithEnv WeakTermPlus
 internalize as atsbts (m, y, t) = do
   let sub = Map.fromList $ zip (map Right as) (map toVar' atsbts)
   theta ModeForward sub atsbts t (m, WeakTermUpsilon y)
@@ -300,7 +300,7 @@ isResolved sub e = do
 theta ::
   Mode -> -- 現在の変換がflipしているかそうでないかの情報
   SubstWeakTerm -> -- out ~> in (substitution sub := {x1 := x1', ..., xn := xn'})
-  [IdentPlus] -> -- 現在定義しようとしているinductive typeのatsbts. base caseのinternalizeのために必要。
+  [WeakIdentPlus] -> -- 現在定義しようとしているinductive typeのatsbts. base caseのinternalizeのために必要。
   WeakTermPlus -> -- a type `A`
   WeakTermPlus -> -- a term `e` of type `A`
   WithEnv WeakTermPlus
@@ -328,8 +328,8 @@ theta mode isub atsbts t e = do
 thetaPi ::
   Mode ->
   SubstWeakTerm ->
-  [IdentPlus] ->
-  [IdentPlus] ->
+  [WeakIdentPlus] ->
+  [WeakIdentPlus] ->
   WeakTermPlus ->
   WeakTermPlus ->
   WithEnv WeakTermPlus
@@ -352,7 +352,7 @@ thetaInductive ::
   Mode ->
   SubstWeakTerm ->
   T.Text ->
-  [IdentPlus] ->
+  [WeakIdentPlus] ->
   [WeakTermPlus] ->
   WeakTermPlus ->
   WithEnv WeakTermPlus
@@ -370,7 +370,7 @@ thetaInductive mode isub a atsbts es e
 thetaInductiveNested ::
   Mode ->
   SubstWeakTerm -> -- inductiveのためのaのsubst (outer -> inner)
-  [IdentPlus] -> -- innerのためのatsbts
+  [WeakIdentPlus] -> -- innerのためのatsbts
   WeakTermPlus -> -- 変換されるべきterm
   WeakTermPlus -> -- list Aにおけるlist
   T.Text -> -- list (トップレベルで定義されている名前、つまりouterの名前)
@@ -403,7 +403,7 @@ thetaInductiveNestedMutual m ai =
 lookupInductive ::
   Meta ->
   T.Text ->
-  WithEnv ([IdentPlus], IdentPlus, [IdentPlus])
+  WithEnv ([WeakIdentPlus], WeakIdentPlus, [WeakIdentPlus])
 lookupInductive m ai = do
   fenv <- gets formationEnv
   case Map.lookup ai fenv of
@@ -426,12 +426,12 @@ toInternalizedArg ::
   SubstWeakTerm -> -- inductiveのためのaのsubst (outer -> inner)
   Ident -> -- innerでのaの名前。listの定義の中に出てくるほうのlist.
   T.Text -> -- outerでのaの名前。listとか。
-  [IdentPlus] -> -- aの引数。
-  [IdentPlus] -> -- base caseでのinternalizeのための情報。
+  [WeakIdentPlus] -> -- aの引数。
+  [WeakIdentPlus] -> -- base caseでのinternalizeのための情報。
   [WeakTermPlus] -> -- list @ (e1, ..., en)の引数部分。
   [WeakTermPlus] -> -- eiをisubでsubstしたもの。
   WeakTextPlus -> -- outerでのコンストラクタ。
-  IdentPlus -> -- innerでのコンストラクタ。xts部分の引数だけouterのコンストラクタと型がずれていることに注意。
+  WeakIdentPlus -> -- innerでのコンストラクタ。xts部分の引数だけouterのコンストラクタと型がずれていることに注意。
   WithEnv WeakTermPlus
 toInternalizedArg mode isub aInner aOuter xts atsbts es es' b (mbInner, _, (_, WeakTermPi _ ytsInner _)) = do
   let (ms, ys, ts) = unzip3 ytsInner
@@ -472,9 +472,9 @@ toInternalizedArg _ _ _ _ _ _ _ _ _ (m, _, _) =
     "the type of an introduction rule must be represented by a Pi-type, but its not"
 
 renameBinder ::
-  [IdentPlus] ->
+  [WeakIdentPlus] ->
   WeakTermPlus ->
-  WithEnv ([IdentPlus], WeakTermPlus)
+  WithEnv ([WeakIdentPlus], WeakTermPlus)
 renameBinder [] e = return ([], e)
 renameBinder ((m, x, t) : ats) e = do
   x' <- newNameWith x
@@ -575,7 +575,7 @@ substRuleType sub (m, WeakTermErase xs e) = do
   e' <- substRuleType sub e
   return (m, WeakTermErase xs e')
 
-substRuleType' :: SubstRule -> [IdentPlus] -> WithEnv [IdentPlus]
+substRuleType' :: SubstRule -> [WeakIdentPlus] -> WithEnv [WeakIdentPlus]
 substRuleType' _ [] = return []
 substRuleType' sub ((m, x, t) : xts) = do
   t' <- substRuleType sub t
@@ -587,9 +587,9 @@ substRuleType' sub ((m, x, t) : xts) = do
 
 substRuleType'' ::
   SubstRule ->
-  [IdentPlus] ->
+  [WeakIdentPlus] ->
   WeakTermPlus ->
-  WithEnv ([IdentPlus], WeakTermPlus)
+  WithEnv ([WeakIdentPlus], WeakTermPlus)
 substRuleType'' sub [] e = do
   e' <- substRuleType sub e
   return ([], e')

@@ -175,7 +175,7 @@ compInfoWeakTermPlus c info (_, WeakTermErase _ e) =
 compInfoBinder ::
   CursorName ->
   CompInfo ->
-  [IdentPlus] ->
+  [WeakIdentPlus] ->
   WeakTermPlus ->
   Either CompInfo ()
 compInfoBinder s info [] e = compInfoWeakTermPlus s info e

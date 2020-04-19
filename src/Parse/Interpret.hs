@@ -1,11 +1,11 @@
 module Parse.Interpret
   ( interpret,
-    interpretIdentPlus,
+    interpretWeakIdentPlus,
     interpretTextPlus,
     interpretIter,
     interpretEnumItem,
     raiseSyntaxError,
-    toIdentPlus,
+    toWeakIdentPlus,
   )
 where
 
@@ -45,7 +45,7 @@ interpret (m, TreeNode ((_, TreeLeaf "pi-elimination") : rest))
   | otherwise = raiseSyntaxError m "(pi-elimination TREE TREE*)" -- e' <- interpret e
 interpret (m, TreeNode ((_, TreeLeaf "sigma") : rest))
   | [(_, TreeNode xts), t] <- rest = do
-    xts' <- mapM interpretIdentPlus xts
+    xts' <- mapM interpretWeakIdentPlus xts
     t' <- interpret t
     placeholder <- newNameWith'' "cod"
     weakTermSigma m $ xts' ++ [(fst t', placeholder, t')]
@@ -55,7 +55,7 @@ interpret (m, TreeNode ((_, TreeLeaf "sigma-introduction") : es)) = do
   sigmaIntro m es'
 interpret (m, TreeNode ((_, TreeLeaf "sigma-elimination") : rest))
   | [(_, TreeNode xts), e1, e2] <- rest = do
-    xts' <- mapM interpretIdentPlus xts
+    xts' <- mapM interpretWeakIdentPlus xts
     e1' <- interpret e1
     e2' <- interpret e2
     h <- newHole m
@@ -302,32 +302,32 @@ sigmaIntroString m u8s = do
 sigmaElim ::
   Meta ->
   WeakTermPlus ->
-  [IdentPlus] ->
+  [WeakIdentPlus] ->
   WeakTermPlus ->
   WeakTermPlus ->
   WeakTermPlus
 sigmaElim m t xts e1 e2 =
   (m, WeakTermPiElim e1 [t, (m, weakTermPiIntro xts e2)])
 
-toIdentPlus :: (Meta, Ident) -> WithEnv IdentPlus
-toIdentPlus (m, x) = do
+toWeakIdentPlus :: (Meta, Ident) -> WithEnv WeakIdentPlus
+toWeakIdentPlus (m, x) = do
   h <- newHole m
   return (m, x, h)
 
-interpretIdentPlus :: TreePlus -> WithEnv IdentPlus
-interpretIdentPlus leaf@(_, TreeLeaf _) = do
+interpretWeakIdentPlus :: TreePlus -> WithEnv WeakIdentPlus
+interpretWeakIdentPlus leaf@(_, TreeLeaf _) = do
   (m, x') <- interpretLeaf leaf
   h <- newHole m
   return (m, x', h)
-interpretIdentPlus (_, TreeNode [x, t]) = do
+interpretWeakIdentPlus (_, TreeNode [x, t]) = do
   (m, x') <- interpretLeaf x
   t' <- interpret t
   return (m, x', t')
-interpretIdentPlus t = raiseSyntaxError (fst t) "(LEAF TREE)"
+interpretWeakIdentPlus t = raiseSyntaxError (fst t) "(LEAF TREE)"
 
 interpretIter :: TreePlus -> WithEnv Def
 interpretIter (m, TreeNode [xt, (_, TreeNode xts), e]) = do
-  xt' <- interpretIdentPlus xt
+  xt' <- interpretWeakIdentPlus xt
   (xts', e') <- interpretBinder xts e
   return (m, xt', xts', e')
 interpretIter t = raiseSyntaxError (fst t) "(TREE (TREE ... TREE) TREE)"
@@ -397,9 +397,9 @@ interpretEnumValue e@(m, TreeNode [(_, TreeLeaf t), (_, TreeLeaf x)]) = do
 interpretEnumValue t = raiseSyntaxError (fst t) "LEAF | (LEAF LEAF)"
 
 interpretBinder ::
-  [TreePlus] -> TreePlus -> WithEnv ([IdentPlus], WeakTermPlus)
+  [TreePlus] -> TreePlus -> WithEnv ([WeakIdentPlus], WeakTermPlus)
 interpretBinder xts t = do
-  xts' <- mapM interpretIdentPlus xts
+  xts' <- mapM interpretWeakIdentPlus xts
   t' <- interpret t
   return (xts', t')
 
@@ -444,9 +444,9 @@ interpretStructElim (_, TreeNode [(m, TreeLeaf x), k]) = do
 interpretStructElim e = raiseSyntaxError (fst e) "(LEAF TREE)"
 
 interpretCaseClause ::
-  TreePlus -> WithEnv (((Meta, T.Text), [IdentPlus]), WeakTermPlus)
+  TreePlus -> WithEnv (((Meta, T.Text), [WeakIdentPlus]), WeakTermPlus)
 interpretCaseClause (_, TreeNode [(_, TreeNode ((m, TreeLeaf c) : xts)), e]) = do
-  xts' <- mapM interpretIdentPlus xts
+  xts' <- mapM interpretWeakIdentPlus xts
   e' <- interpret e
   return (((m, c), xts'), e')
 interpretCaseClause t = raiseSyntaxError (fst t) "((LEAF TREE ... TREE) TREE)"
@@ -639,7 +639,7 @@ interpretWith (m, TreeNode (with@(_, TreeLeaf "with") : bind : (_, TreeNode ((_,
       h1 <- newHole m
       h2 <- newHole m
       e' <- interpretWith (m, TreeNode (with : bind : es'))
-      xt' <- interpretIdentPlus xt
+      xt' <- interpretWeakIdentPlus xt
       rest' <- interpretWith (m, TreeNode (with : bind : rest))
       let lam = (m, weakTermPiIntro [xt'] rest')
       return (m, WeakTermPiElim bind' [h1, h2, e', lam])

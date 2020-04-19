@@ -42,14 +42,14 @@ simp' (((m1, WeakTermPi name1 xts1 cod1), (m2, WeakTermPi name2 xts2 cod2)) : cs
           LT -> throwArityError m (length xts2) (length xts1)
           _ -> throwArityError m (length xts1) (length xts2)
       else do
-        xt1 <- asIdentPlus m1 cod1
-        xt2 <- asIdentPlus m2 cod2
+        xt1 <- asWeakIdentPlus m1 cod1
+        xt2 <- asWeakIdentPlus m2 cod2
         simpBinder (xts1 ++ [xt1]) (xts2 ++ [xt2])
         simp cs
 simp' (((m1, WeakTermPiIntro Nothing xts1 e1), (m2, WeakTermPiIntro Nothing xts2 e2)) : cs)
   | length xts1 == length xts2 = do
-    xt1 <- asIdentPlus m1 e1
-    xt2 <- asIdentPlus m2 e2
+    xt1 <- asWeakIdentPlus m1 e1
+    xt2 <- asWeakIdentPlus m2 e2
     simpBinder (xts1 ++ [xt1]) (xts2 ++ [xt2])
     simp cs
 simp' (((m1, WeakTermPiIntro (Just (name1, args1)) xts1 e1), (m2, WeakTermPiIntro (Just (name2, args2)) xts2 e2)) : cs)
@@ -60,8 +60,8 @@ simp' (((m1, WeakTermPiIntro (Just (name1, args1)) xts1 e1), (m2, WeakTermPiIntr
 simp' (((m1, WeakTermIter xt1@(_, x1, _) xts1 e1), (m2, WeakTermIter xt2@(_, x2, _) xts2 e2)) : cs)
   | x1 == x2,
     length xts1 == length xts2 = do
-    yt1 <- asIdentPlus m1 e1
-    yt2 <- asIdentPlus m2 e2
+    yt1 <- asWeakIdentPlus m1 e1
+    yt2 <- asWeakIdentPlus m2 e2
     simpBinder (xt1 : xts1 ++ [yt1]) (xt2 : xts2 ++ [yt2])
     simp cs
 simp' (((_, WeakTermInt t1 l1), (m, WeakTermEnumIntro (EnumValueIntS s2 l2))) : cs)
@@ -188,11 +188,11 @@ simp' ((e1@(m1, _), e2@(m2, _)) : cs) = do
           insConstraintQueue $ Enriched (e1, e2) fmvs $ ConstraintOther
           simp cs
 
-simpBinder :: [IdentPlus] -> [IdentPlus] -> WithEnv ()
+simpBinder :: [WeakIdentPlus] -> [WeakIdentPlus] -> WithEnv ()
 simpBinder xts1 xts2 = simpBinder' Map.empty xts1 xts2
 
 simpBinder' ::
-  SubstWeakTerm -> [IdentPlus] -> [IdentPlus] -> WithEnv ()
+  SubstWeakTerm -> [WeakIdentPlus] -> [WeakIdentPlus] -> WithEnv ()
 simpBinder' sub ((m1, x1, t1) : xts1) ((m2, x2, t2) : xts2) = do
   simp [(t1, substWeakTermPlus sub t2)]
   let var1 = (supMeta m1 m2, WeakTermUpsilon x1)
@@ -241,8 +241,8 @@ simpFlexRigid h1 ies1 e1 e2 fmvs cs = do
   insConstraintQueue $ Enriched (e1, e2) fmvs (ConstraintFlexRigid h1 ies1 e2)
   simp cs
 
-asIdentPlus :: Meta -> WeakTermPlus -> WithEnv IdentPlus
-asIdentPlus m t = do
+asWeakIdentPlus :: Meta -> WeakTermPlus -> WithEnv WeakIdentPlus
+asWeakIdentPlus m t = do
   h <- newNameWith' "hole"
   return (m, h, t)
 
@@ -321,11 +321,11 @@ visit h = do
   modify (\env -> env {constraintQueue = q2})
   simp $ map (\(Enriched c _ _) -> c) $ Q.toList q1
 
-toVarList :: S.Set Ident -> [WeakTermPlus] -> WithEnv [IdentPlus]
+toVarList :: S.Set Ident -> [WeakTermPlus] -> WithEnv [WeakIdentPlus]
 toVarList xs es = toVarList' [] xs es
 
 toVarList' ::
-  Context -> S.Set Ident -> [WeakTermPlus] -> WithEnv [IdentPlus]
+  Context -> S.Set Ident -> [WeakTermPlus] -> WithEnv [WeakIdentPlus]
 toVarList' _ _ [] = return []
 toVarList' ctx xs (e : es)
   | (m, WeakTermUpsilon x) <- e,
@@ -340,7 +340,7 @@ toVarList' ctx xs (e : es)
     xts <- toVarList' (ctx ++ [(m, x, t)]) xs es
     return $ (m, x, t) : xts
 
-bindFormalArgs :: WeakTermPlus -> [[IdentPlus]] -> WeakTermPlus
+bindFormalArgs :: WeakTermPlus -> [[WeakIdentPlus]] -> WeakTermPlus
 bindFormalArgs e [] = e
 bindFormalArgs e (xts : xtss) = do
   let e' = bindFormalArgs e xtss

@@ -109,7 +109,7 @@ discern'' nenv (m, WeakTermPi mName xts t) = do
   (xts', t') <- discernBinder nenv xts t
   return (m, WeakTermPi mName xts' t')
 discern'' nenv (m, WeakTermPiIntro info xts e) = do
-  info' <- fmap2M (mapM (discernIdentPlus nenv)) info
+  info' <- fmap2M (mapM (discernWeakIdentPlus nenv)) info
   (xts', e') <- discernBinder nenv xts e
   return (m, WeakTermPiIntro info' xts' e')
 discern'' nenv (m, WeakTermPiElim e es) = do
@@ -181,9 +181,9 @@ discern'' nenv (_, WeakTermErase mxs e) = do
 
 discernBinder ::
   NameEnv ->
-  [IdentPlus] ->
+  [WeakIdentPlus] ->
   WeakTermPlus ->
-  WithEnv ([IdentPlus], WeakTermPlus)
+  WithEnv ([WeakIdentPlus], WeakTermPlus)
 discernBinder nenv [] e = do
   e' <- discern'' nenv e
   return ([], e')
@@ -193,8 +193,8 @@ discernBinder nenv ((mx, x, t) : xts) e = do
   (xts', e') <- discernBinder (insertName x x' nenv) xts e
   return ((mx, x', t') : xts', e')
 
-discernIdentPlus :: NameEnv -> IdentPlus -> WithEnv IdentPlus
-discernIdentPlus nenv (m, x, t) = do
+discernWeakIdentPlus :: NameEnv -> WeakIdentPlus -> WithEnv WeakIdentPlus
+discernWeakIdentPlus nenv (m, x, t) = do
   t' <- discern'' nenv t
   penv <- gets prefixEnv
   x' <- lookupName'' m penv nenv x
@@ -202,10 +202,10 @@ discernIdentPlus nenv (m, x, t) = do
 
 discernIter ::
   NameEnv ->
-  IdentPlus ->
-  [IdentPlus] ->
+  WeakIdentPlus ->
+  [WeakIdentPlus] ->
   WeakTermPlus ->
-  WithEnv (IdentPlus, [IdentPlus], WeakTermPlus)
+  WithEnv (WeakIdentPlus, [WeakIdentPlus], WeakTermPlus)
 discernIter nenv (mx, x, t') [] e = do
   x' <- newDefinedNameWith mx x
   removeFromIntactSet mx $ asText x'
