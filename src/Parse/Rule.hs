@@ -10,7 +10,7 @@ where
 
 import Control.Monad.State.Lazy
 import Data.Basic
-import Data.Either (rights)
+import Data.Either
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import qualified Data.Set as S
@@ -49,7 +49,6 @@ parseConnective ::
 parseConnective m ts f g = do
   connectiveList <- mapM parseConnective' ts
   fs <- mapM formationRuleOf' connectiveList
-  -- fs <- mapM formationRuleOf connectiveList
   ats <- mapM ruleAsWeakTextPlus fs
   bts <- concat <$> mapM toInternalRuleList connectiveList
   checkNameSanity m $ ats ++ bts
@@ -64,22 +63,24 @@ parseConnective' (m, TreeNode ((_, TreeLeaf name) : (_, TreeNode xts) : rules)) 
   return (m, name, xts', rules')
 parseConnective' t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) ...)"
 
-registerLabelInfo :: [TreePlus] -> WithEnv ()
-registerLabelInfo ts = do
+toIndInfo :: [TreePlus] -> WithEnv ([WeakTextPlus], [WeakTextPlus])
+toIndInfo ts = do
   connectiveList <- mapM parseConnective' ts
   fs <- mapM formationRuleOf connectiveList
   ats <- mapM ruleAsWeakTextPlus fs
   bts <- concat <$> mapM toInternalRuleList connectiveList
+  return (ats, bts)
+
+registerLabelInfo :: [TreePlus] -> WithEnv ()
+registerLabelInfo ts = do
+  (ats, bts) <- toIndInfo ts
   forM_ ats $ \(_, a, _) -> do
     let asbs = map (\(_, x, _) -> x) $ ats ++ bts
     modify (\env -> env {labelEnv = Map.insert a asbs (labelEnv env)})
 
 generateProjections :: [TreePlus] -> WithEnv [QuasiStmt]
 generateProjections ts = do
-  connectiveList <- mapM parseConnective' ts
-  fs <- mapM formationRuleOf connectiveList
-  ats <- mapM ruleAsWeakTextPlus fs
-  bts <- concat <$> mapM toInternalRuleList connectiveList
+  (ats, bts) <- toIndInfo ts
   let bts' = map textPlusToWeakIdentPlus bts
   stmtListList <-
     forM ats $ \(ma, a, ta) ->
@@ -249,9 +250,6 @@ toInternalRuleList (_, _, _, rules) = mapM ruleAsWeakTextPlus rules
 toVar' :: WeakIdentPlus -> WeakTermPlus
 toVar' (m, x, _) = (m, WeakTermUpsilon x)
 
--- toConst :: WeakTextPlus -> WeakTermPlus
--- toConst (m, x, _) = (m, WeakTermConst x)
-
 insForm :: Int -> WeakIdentPlus -> WeakTermPlus -> WithEnv ()
 insForm 1 (_, I (x, _), _) e =
   modify (\env -> env {formationEnv = Map.insert x (Just e) (formationEnv env)})
@@ -290,8 +288,9 @@ flipMode ModeBackward = ModeForward
 
 isResolved :: SubstWeakTerm -> WeakTermPlus -> Bool
 isResolved sub e = do
-  let xs = rights $ Map.keys sub
-  all (`S.notMember` constWeakTermPlus e) xs
+  let outerVarList = lefts $ Map.keys sub
+  let freeVarSet = S.map asInt $ varWeakTermPlus e
+  all (`S.notMember` freeVarSet) outerVarList
 
 -- type SubstWeakTerm = Map.HashMap T.Text WeakTermPlus
 -- e : Aを受け取って、flipしていないときはIN(A) = BをみたすB型のtermを、

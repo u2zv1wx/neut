@@ -223,59 +223,59 @@ holeWeakTermPlus' ((_, _, t) : xts) es = do
   let set2 = holeWeakTermPlus' xts es
   S.union set1 set2
 
-constWeakTermPlus :: WeakTermPlus -> S.Set T.Text
-constWeakTermPlus (_, WeakTermTau) = S.empty
-constWeakTermPlus (_, WeakTermUpsilon _) = S.empty
-constWeakTermPlus (_, WeakTermPi _ xts t) = constWeakTermPlus' xts [t]
-constWeakTermPlus (_, WeakTermPiIntro _ xts e) = constWeakTermPlus' xts [e]
-constWeakTermPlus (_, WeakTermPiElim e es) = do
-  let xs = constWeakTermPlus e
-  let ys = S.unions $ map constWeakTermPlus es
-  S.union xs ys
-constWeakTermPlus (_, WeakTermIter (_, _, t) xts e) = do
-  let set1 = constWeakTermPlus t
-  let set2 = constWeakTermPlus' xts [e]
-  S.union set1 set2
-constWeakTermPlus (_, WeakTermConst x) = S.singleton x
-constWeakTermPlus (_, WeakTermZeta _) = S.empty
-constWeakTermPlus (_, WeakTermInt t _) = constWeakTermPlus t
-constWeakTermPlus (_, WeakTermFloat t _) = constWeakTermPlus t
-constWeakTermPlus (_, WeakTermEnum _) = S.empty
-constWeakTermPlus (_, WeakTermEnumIntro _) = S.empty
-constWeakTermPlus (_, WeakTermEnumElim (e, t) les) = do
-  let xs = constWeakTermPlus t
-  let ys = constWeakTermPlus e
-  let zs = S.unions $ map (constWeakTermPlus . snd) les
-  S.unions [xs, ys, zs]
-constWeakTermPlus (_, WeakTermArray dom _) = constWeakTermPlus dom
-constWeakTermPlus (_, WeakTermArrayIntro _ es) =
-  S.unions $ map constWeakTermPlus es
-constWeakTermPlus (_, WeakTermArrayElim _ xts d e) =
-  constWeakTermPlus d `S.union` constWeakTermPlus' xts [e]
-constWeakTermPlus (_, WeakTermStruct {}) = S.empty
-constWeakTermPlus (_, WeakTermStructIntro ets) =
-  S.unions $ map (constWeakTermPlus . fst) ets
-constWeakTermPlus (_, WeakTermStructElim _ d e) = do
-  let set1 = constWeakTermPlus d
-  let set2 = constWeakTermPlus e
-  S.union set1 set2
-constWeakTermPlus (_, WeakTermCase _ e cxes) = do
-  let xs = constWeakTermPlus e
-  let ys =
-        S.unions $ map (\((_, xts), body) -> constWeakTermPlus' xts [body]) cxes
-  S.union xs ys
-constWeakTermPlus (_, WeakTermQuestion e t) = do
-  let set1 = constWeakTermPlus e
-  let set2 = constWeakTermPlus t
-  S.union set1 set2
-constWeakTermPlus (_, WeakTermErase _ e) = constWeakTermPlus e
+-- constWeakTermPlus :: WeakTermPlus -> S.Set T.Text
+-- constWeakTermPlus (_, WeakTermTau) = S.empty
+-- constWeakTermPlus (_, WeakTermUpsilon _) = S.empty
+-- constWeakTermPlus (_, WeakTermPi _ xts t) = constWeakTermPlus' xts [t]
+-- constWeakTermPlus (_, WeakTermPiIntro _ xts e) = constWeakTermPlus' xts [e]
+-- constWeakTermPlus (_, WeakTermPiElim e es) = do
+--   let xs = constWeakTermPlus e
+--   let ys = S.unions $ map constWeakTermPlus es
+--   S.union xs ys
+-- constWeakTermPlus (_, WeakTermIter (_, _, t) xts e) = do
+--   let set1 = constWeakTermPlus t
+--   let set2 = constWeakTermPlus' xts [e]
+--   S.union set1 set2
+-- constWeakTermPlus (_, WeakTermConst x) = S.singleton x
+-- constWeakTermPlus (_, WeakTermZeta _) = S.empty
+-- constWeakTermPlus (_, WeakTermInt t _) = constWeakTermPlus t
+-- constWeakTermPlus (_, WeakTermFloat t _) = constWeakTermPlus t
+-- constWeakTermPlus (_, WeakTermEnum _) = S.empty
+-- constWeakTermPlus (_, WeakTermEnumIntro _) = S.empty
+-- constWeakTermPlus (_, WeakTermEnumElim (e, t) les) = do
+--   let xs = constWeakTermPlus t
+--   let ys = constWeakTermPlus e
+--   let zs = S.unions $ map (constWeakTermPlus . snd) les
+--   S.unions [xs, ys, zs]
+-- constWeakTermPlus (_, WeakTermArray dom _) = constWeakTermPlus dom
+-- constWeakTermPlus (_, WeakTermArrayIntro _ es) =
+--   S.unions $ map constWeakTermPlus es
+-- constWeakTermPlus (_, WeakTermArrayElim _ xts d e) =
+--   constWeakTermPlus d `S.union` constWeakTermPlus' xts [e]
+-- constWeakTermPlus (_, WeakTermStruct {}) = S.empty
+-- constWeakTermPlus (_, WeakTermStructIntro ets) =
+--   S.unions $ map (constWeakTermPlus . fst) ets
+-- constWeakTermPlus (_, WeakTermStructElim _ d e) = do
+--   let set1 = constWeakTermPlus d
+--   let set2 = constWeakTermPlus e
+--   S.union set1 set2
+-- constWeakTermPlus (_, WeakTermCase _ e cxes) = do
+--   let xs = constWeakTermPlus e
+--   let ys =
+--         S.unions $ map (\((_, xts), body) -> constWeakTermPlus' xts [body]) cxes
+--   S.union xs ys
+-- constWeakTermPlus (_, WeakTermQuestion e t) = do
+--   let set1 = constWeakTermPlus e
+--   let set2 = constWeakTermPlus t
+--   S.union set1 set2
+-- constWeakTermPlus (_, WeakTermErase _ e) = constWeakTermPlus e
 
-constWeakTermPlus' :: [WeakIdentPlus] -> [WeakTermPlus] -> S.Set T.Text
-constWeakTermPlus' [] es = S.unions $ map constWeakTermPlus es
-constWeakTermPlus' ((_, _, t) : xts) es = do
-  let hs1 = constWeakTermPlus t
-  let hs2 = constWeakTermPlus' xts es
-  S.union hs1 hs2
+-- constWeakTermPlus' :: [WeakIdentPlus] -> [WeakTermPlus] -> S.Set T.Text
+-- constWeakTermPlus' [] es = S.unions $ map constWeakTermPlus es
+-- constWeakTermPlus' ((_, _, t) : xts) es = do
+--   let hs1 = constWeakTermPlus t
+--   let hs2 = constWeakTermPlus' xts es
+--   S.union hs1 hs2
 
 substWeakTermPlus :: SubstWeakTerm -> WeakTermPlus -> WeakTermPlus
 substWeakTermPlus _ tau@(_, WeakTermTau) = tau
