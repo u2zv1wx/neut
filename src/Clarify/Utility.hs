@@ -68,7 +68,7 @@ cartImmName = "cartesian-immediate"
 tryCache :: Meta -> T.Text -> WithEnv () -> WithEnv DataPlus
 tryCache m key doInsertion = do
   cenv <- gets codeEnv
-  when (not $ Map.member key cenv) $ doInsertion
+  when (not $ Map.member key cenv) doInsertion
   return (m, DataConst key)
 
 makeSwitcher ::
@@ -92,7 +92,7 @@ makeSwitcher m compAff compRel = do
     )
 
 cartesianImmediate :: Meta -> WithEnv DataPlus
-cartesianImmediate m = do
+cartesianImmediate m =
   tryCache m cartImmName $ do
     (args, e) <- makeSwitcher m affineImmediate relevantImmediate
     insCodeEnv cartImmName args e
@@ -108,7 +108,7 @@ cartStructName :: T.Text
 cartStructName = "cartesian-struct"
 
 cartesianStruct :: Meta -> [ArrayKind] -> WithEnv DataPlus
-cartesianStruct m ks = do
+cartesianStruct m ks =
   tryCache m cartStructName $ do
     (args, e) <- makeSwitcher m (affineStruct ks) (relevantStruct ks)
     insCodeEnv cartStructName args e
