@@ -78,13 +78,13 @@ asAnalyzable (Enriched cs hs _) = Enriched cs hs ConstraintAnalyzable
 
 -- Try the list of alternatives.
 tryPlanList :: Meta -> [WithEnv a] -> WithEnv a
-tryPlanList m [] = raiseError m $ "cannot synthesize(tryPlanList)."
+tryPlanList m [] = raiseError m "cannot synthesize(tryPlanList)."
 tryPlanList _ [plan] = plan
 tryPlanList m (plan : planList) =
   catch plan (\(_ :: Error) -> tryPlanList m planList)
 
 deleteMin :: WithEnv ()
-deleteMin = do
+deleteMin =
   modify (\env -> env {constraintQueue = Q.deleteMin (constraintQueue env)})
 
 -- [x, x, y, z, z] ~>
@@ -98,8 +98,7 @@ deleteMin = do
 toAltList :: [WeakIdentPlus] -> WithEnv [[WeakIdentPlus]]
 toAltList xts = do
   let xs = map (\(_, x, _) -> x) xts
-  result <- mapM (discardInactive xts) $ chooseActive $ toIndexInfo xs
-  return result
+  mapM (discardInactive xts) $ chooseActive $ toIndexInfo xs
 
 -- [x, x, y, z, z] ~> [(x, [0, 1]), (y, [2]), (z, [3, 4])]
 toIndexInfo :: Eq a => [a] -> [(a, [Int])]
@@ -130,7 +129,7 @@ pickup [] = [[]]
 pickup (xs : xss) = do
   let yss = pickup xss
   x <- xs
-  map (\ys -> x : ys) yss
+  map (x :) yss
 
 discardInactive ::
   [WeakIdentPlus] -> [(Ident, Int)] -> WithEnv [WeakIdentPlus]
@@ -160,7 +159,7 @@ throwTypeErrors = do
 
 setupPosInfo :: [EnrichedConstraint] -> [(PosInfo, PreConstraint)]
 setupPosInfo [] = []
-setupPosInfo ((Enriched (e1, e2) _ _) : cs) = do
+setupPosInfo (Enriched (e1, e2) _ _ : cs) = do
   let pos1 = getPosInfo $ metaOf e1
   let pos2 = getPosInfo $ metaOf e2
   case snd pos1 `compare` snd pos2 of
@@ -206,9 +205,9 @@ unravel (m, WeakTermConst x) = return (m, WeakTermConst x)
 unravel (m, WeakTermZeta h) = do
   h' <- unravelZeta h
   return (m, WeakTermZeta h')
-unravel (m, WeakTermInt t x) = do
+unravel (m, WeakTermInt t x) =
   return (m, WeakTermInt t x)
-unravel (m, WeakTermFloat t x) = do
+unravel (m, WeakTermFloat t x) =
   return (m, WeakTermFloat t x)
 unravel (m, WeakTermEnum s) = return (m, WeakTermEnum s)
 unravel (m, WeakTermEnumIntro x) = return (m, WeakTermEnumIntro x)

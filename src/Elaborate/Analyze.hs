@@ -34,7 +34,7 @@ simp' [] = return ()
 simp' (((_, e1), (_, e2)) : cs)
   | e1 == e2 = simp cs
 simp' (((m1, WeakTermPi name1 xts1 cod1), (m2, WeakTermPi name2 xts2 cod2)) : cs)
-  | name1 == name2 = do
+  | name1 == name2 =
     if length xts1 /= length xts2
       then do
         let m = supMeta m1 m2
@@ -122,7 +122,7 @@ simp' ((e1@(m1, _), e2@(m2, _)) : cs) = do
         (Just (StuckPiElimConst x1 _ mess1), Just (StuckPiElimConst x2 _ mess2))
           | x1 == x2,
             Nothing <- Map.lookup x1 cenv,
-            Just pairList <- asPairList (map snd mess1) (map snd mess2) -> do
+            Just pairList <- asPairList (map snd mess1) (map snd mess2) ->
             simp $ pairList ++ cs
         (Just (StuckPiElimZetaStrict h1 ies1), _)
           | xs1 <- concatMap getVarList ies1,
@@ -185,11 +185,11 @@ simp' ((e1@(m1, _), e2@(m2, _)) : cs) = do
             [] <- includeCheck xs2 fvs1 ->
             simpFlexRigid h2 ies2 e2' e1' fmvs cs
         _ -> do
-          insConstraintQueue $ Enriched (e1, e2) fmvs $ ConstraintOther
+          insConstraintQueue $ Enriched (e1, e2) fmvs ConstraintOther
           simp cs
 
 simpBinder :: [WeakIdentPlus] -> [WeakIdentPlus] -> WithEnv ()
-simpBinder xts1 xts2 = simpBinder' Map.empty xts1 xts2
+simpBinder = simpBinder' Map.empty
 
 simpBinder' ::
   SubstWeakTerm -> [WeakIdentPlus] -> [WeakIdentPlus] -> WithEnv ()
@@ -287,7 +287,7 @@ asStuckedTerm (m, WeakTermPiElim e es)
 asStuckedTerm (m, WeakTermPiElim e es) =
   case asStuckedTerm e of
     Just (StuckPiElimZeta h iess) -> Just $ StuckPiElimZeta h $ iess ++ [es]
-    Just (StuckPiElimZetaStrict h iess) -> do
+    Just (StuckPiElimZetaStrict h iess) ->
       Just $ StuckPiElimZeta h $ iess ++ [es]
     Just (StuckPiElimIter mu ess) ->
       Just $ StuckPiElimIter mu $ ess ++ [(m, es)]
@@ -322,7 +322,7 @@ visit h = do
   simp $ map (\(Enriched c _ _) -> c) $ Q.toList q1
 
 toVarList :: S.Set Ident -> [WeakTermPlus] -> WithEnv [WeakIdentPlus]
-toVarList xs es = toVarList' [] xs es
+toVarList = toVarList' []
 
 toVarList' ::
   Context -> S.Set Ident -> [WeakTermPlus] -> WithEnv [WeakIdentPlus]
@@ -348,14 +348,14 @@ bindFormalArgs e (xts : xtss) = do
 
 lookupAny :: [Ident] -> IntMap.IntMap a -> Maybe (Ident, a)
 lookupAny [] _ = Nothing
-lookupAny (h@(I (_, i)) : ks) sub = do
+lookupAny (h@(I (_, i)) : ks) sub =
   case IntMap.lookup i sub of
     Just v -> Just (h, v)
     _ -> lookupAny ks sub
 
 lookupAll :: [Ident] -> IntMap.IntMap a -> Maybe [a]
 lookupAll [] _ = return []
-lookupAll ((I (_, i)) : xs) sub = do
+lookupAll (I (_, i) : xs) sub = do
   v <- IntMap.lookup i sub
   vs <- lookupAll xs sub
   return $ v : vs
