@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 --
 -- clarification == polarization + closure conversion + linearization
 --

@@ -8,6 +8,11 @@ maintainer:          "u2zv1wx@protonmail.ch"
 extra-source-files:
   - readme.org
 
+default-extensions:
+- OverloadedStrings
+- DeriveGeneric
+- ScopedTypeVariables
+
 dependencies:
 - ansi-terminal
 - base

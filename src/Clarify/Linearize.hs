@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Clarify.Linearize
   ( linearize
   ) where

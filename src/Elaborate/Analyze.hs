@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Elaborate.Analyze
   ( analyze
   , simp

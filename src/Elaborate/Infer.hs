@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Elaborate.Infer
   ( infer
   , inferType

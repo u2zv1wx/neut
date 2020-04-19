@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Reduce.Term
   ( reduceTermPlus
   , reduceIdentPlus
