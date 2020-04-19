@@ -132,7 +132,7 @@ withHeaderRelevant' _ _ [] cont = return cont
 withHeaderRelevant' t expVar ((x, (x1, x2)) : chain) cont@(m, _) = do
   cont' <- withHeaderRelevant' t expVar chain cont
   (sigVarName, sigVar) <- newDataUpsilonWith m "sig"
-  return $
+  return
     ( m,
       CodeUpElim
         sigVarName
@@ -145,8 +145,7 @@ withHeaderRelevant' t expVar ((x, (x1, x2)) : chain) cont@(m, _) = do
     )
 
 merge :: [NameMap] -> NameMap
-merge [] = IntMap.empty
-merge (m : ms) = IntMap.unionWith (++) m $ merge ms
+merge = foldr (IntMap.unionWith (++)) IntMap.empty
 
 distinguishData :: [Ident] -> DataPlus -> WithEnv (NameMap, DataPlus)
 distinguishData zs d@(ml, DataUpsilon x) =
@@ -188,22 +187,24 @@ distinguishCode zs (ml, CodeUpElim x e1 e2) = do
       (vs2, e2') <- distinguishCode zs e2
       return (merge [vs1, vs2], (ml, CodeUpElim x e1' e2'))
 distinguishCode zs (ml, CodeEnumElim varInfo d branchList) = do
-  (vs, d') <- distinguishData zs d
-  let (from, to) = unzip $ IntMap.toList varInfo
-  (vss, to') <- unzip <$> mapM (distinguishData zs) to
-  let varInfo' = IntMap.fromList $ zip from to'
-  return (merge (vs : vss), (ml, CodeEnumElim varInfo' d' branchList))
+  (vs, varInfo', d') <- distinguishBranch zs varInfo d
+  return (vs, (ml, CodeEnumElim varInfo' d' branchList))
 distinguishCode zs (ml, CodeStructElim xts d e) = do
   (vs1, d') <- distinguishData zs d
   let zs' = filter (`notElem` map fst xts) zs
   (vs2, e') <- distinguishCode zs' e
   return (merge [vs1, vs2], (ml, CodeStructElim xts d' e'))
 distinguishCode zs (ml, CodeCase varInfo d branchList) = do
+  (vs, varInfo', d') <- distinguishBranch zs varInfo d
+  return (vs, (ml, CodeCase varInfo' d' branchList))
+
+distinguishBranch :: [Ident] -> SubstDataPlus -> DataPlus -> WithEnv (NameMap, SubstDataPlus, DataPlus)
+distinguishBranch zs varInfo d = do
   (vs, d') <- distinguishData zs d
   let (from, to) = unzip $ IntMap.toList varInfo
   (vss, to') <- unzip <$> mapM (distinguishData zs) to
   let varInfo' = IntMap.fromList $ zip from to'
-  return (merge (vs : vss), (ml, CodeCase varInfo' d' branchList))
+  return (merge (vs : vss), varInfo', d')
 
 distinguishConst :: [Ident] -> Const -> WithEnv (NameMap, Const)
 distinguishConst zs (ConstUnaryOp op d) = do
