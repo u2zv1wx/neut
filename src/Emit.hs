@@ -108,7 +108,7 @@ emitLLVM retType (LLVMBranch d onTrue onFalse) = do
           showLLVMData (LLVMDataLocal onFalseLabel)
         ]
   xs <-
-    forM ([(onTrueLabel, onTrue), (onFalseLabel, onFalse)]) $
+    forM [(onTrueLabel, onTrue), (onFalseLabel, onFalse)] $
       uncurry (emitBlock retType)
   return $ op <> concat xs
 emitLLVM retType (LLVMCont (LLVMOpFree d _ j) cont) = do
@@ -134,9 +134,9 @@ emitLLVM retType (LLVMLet x op cont) = do
 emitLLVM _ LLVMUnreachable = emitOp $ unwordsL ["unreachable"]
 
 emitLLVMOp :: LLVMOp -> WithEnv Builder
-emitLLVMOp (LLVMOpCall d ds) = do
+emitLLVMOp (LLVMOpCall d ds) =
   return $ unwordsL ["call fastcc i8*", showLLVMData d <> showArgs ds]
-emitLLVMOp (LLVMOpGetElementPtr (base, n) is) = do
+emitLLVMOp (LLVMOpGetElementPtr (base, n) is) =
   return $
     unwordsL
       [ "getelementptr",
@@ -151,7 +151,7 @@ emitLLVMOp (LLVMOpIntToPointer d fromType toType) =
   emitLLVMConvOp "inttoptr" d fromType toType
 emitLLVMOp (LLVMOpPointerToInt d fromType toType) =
   emitLLVMConvOp "ptrtoint" d fromType toType
-emitLLVMOp (LLVMOpLoad d lowType) = do
+emitLLVMOp (LLVMOpLoad d lowType) =
   return $
     unwordsL
       [ "load",
@@ -159,7 +159,7 @@ emitLLVMOp (LLVMOpLoad d lowType) = do
         showLowTypeAsIfPtr lowType,
         showLLVMData d
       ]
-emitLLVMOp (LLVMOpStore t d1 d2) = do
+emitLLVMOp (LLVMOpStore t d1 d2) =
   return $
     unwordsL
       [ "store",
@@ -168,36 +168,36 @@ emitLLVMOp (LLVMOpStore t d1 d2) = do
         showLowTypeAsIfPtr t,
         showLLVMData d2
       ]
-emitLLVMOp (LLVMOpAlloc d _) = do
+emitLLVMOp (LLVMOpAlloc d _) =
   return $
     unwordsL ["call fastcc", "i8*", "@malloc(i64 " <> showLLVMData d <> ")"]
-emitLLVMOp (LLVMOpSysCall num ds) = do
+emitLLVMOp (LLVMOpSysCall num ds) =
   emitSysCallOp num ds
-emitLLVMOp (LLVMOpUnaryOp (UnaryOpNeg t@(LowTypeFloat _)) d) = do
+emitLLVMOp (LLVMOpUnaryOp (UnaryOpNeg t@(LowTypeFloat _)) d) =
   emitUnaryOp t "fneg" d
-emitLLVMOp (LLVMOpUnaryOp ((UnaryOpTrunc t1@(LowTypeIntS i1) t2@(LowTypeIntS i2))) d)
+emitLLVMOp (LLVMOpUnaryOp (UnaryOpTrunc t1@(LowTypeIntS i1) t2@(LowTypeIntS i2)) d)
   | i1 > i2 = emitLLVMConvOp "trunc" d t1 t2
-emitLLVMOp (LLVMOpUnaryOp ((UnaryOpTrunc t1@(LowTypeIntU i1) t2@(LowTypeIntU i2))) d)
+emitLLVMOp (LLVMOpUnaryOp (UnaryOpTrunc t1@(LowTypeIntU i1) t2@(LowTypeIntU i2)) d)
   | i1 > i2 = emitLLVMConvOp "trunc" d t1 t2
-emitLLVMOp (LLVMOpUnaryOp ((UnaryOpTrunc t1@(LowTypeFloat i1) t2@(LowTypeFloat i2))) d)
+emitLLVMOp (LLVMOpUnaryOp (UnaryOpTrunc t1@(LowTypeFloat i1) t2@(LowTypeFloat i2)) d)
   | sizeAsInt i1 > sizeAsInt i2 = emitLLVMConvOp "fptrunc" d t1 t2
-emitLLVMOp (LLVMOpUnaryOp ((UnaryOpZext t1@(LowTypeIntS i1) t2@(LowTypeIntS i2))) d)
+emitLLVMOp (LLVMOpUnaryOp (UnaryOpZext t1@(LowTypeIntS i1) t2@(LowTypeIntS i2)) d)
   | i1 < i2 = emitLLVMConvOp "zext" d t1 t2
-emitLLVMOp (LLVMOpUnaryOp ((UnaryOpZext t1@(LowTypeIntU i1) t2@(LowTypeIntU i2))) d)
+emitLLVMOp (LLVMOpUnaryOp (UnaryOpZext t1@(LowTypeIntU i1) t2@(LowTypeIntU i2)) d)
   | i1 < i2 = emitLLVMConvOp "zext" d t1 t2
-emitLLVMOp (LLVMOpUnaryOp ((UnaryOpSext t1@(LowTypeIntS i1) t2@(LowTypeIntS i2))) d)
+emitLLVMOp (LLVMOpUnaryOp (UnaryOpSext t1@(LowTypeIntS i1) t2@(LowTypeIntS i2)) d)
   | i1 < i2 = emitLLVMConvOp "sext" d t1 t2
-emitLLVMOp (LLVMOpUnaryOp ((UnaryOpSext t1@(LowTypeIntU i1) t2@(LowTypeIntU i2))) d)
+emitLLVMOp (LLVMOpUnaryOp (UnaryOpSext t1@(LowTypeIntU i1) t2@(LowTypeIntU i2)) d)
   | i1 < i2 = emitLLVMConvOp "sext" d t1 t2
-emitLLVMOp (LLVMOpUnaryOp ((UnaryOpFpExt t1@(LowTypeFloat i1) t2@(LowTypeFloat i2))) d)
+emitLLVMOp (LLVMOpUnaryOp (UnaryOpFpExt t1@(LowTypeFloat i1) t2@(LowTypeFloat i2)) d)
   | sizeAsInt i1 < sizeAsInt i2 = emitLLVMConvOp "fpext" d t1 t2
-emitLLVMOp (LLVMOpUnaryOp ((UnaryOpTo t1@(LowTypeIntS _) t2@(LowTypeFloat _))) d) =
+emitLLVMOp (LLVMOpUnaryOp (UnaryOpTo t1@(LowTypeIntS _) t2@(LowTypeFloat _)) d) =
   emitLLVMConvOp "sitofp" d t1 t2
-emitLLVMOp (LLVMOpUnaryOp ((UnaryOpTo t1@(LowTypeIntU _) t2@(LowTypeFloat _))) d) =
+emitLLVMOp (LLVMOpUnaryOp (UnaryOpTo t1@(LowTypeIntU _) t2@(LowTypeFloat _)) d) =
   emitLLVMConvOp "uitofp" d t1 t2
-emitLLVMOp (LLVMOpUnaryOp ((UnaryOpTo t1@(LowTypeFloat _) t2@(LowTypeIntS _))) d) =
+emitLLVMOp (LLVMOpUnaryOp (UnaryOpTo t1@(LowTypeFloat _) t2@(LowTypeIntS _)) d) =
   emitLLVMConvOp "fptosi" d t1 t2
-emitLLVMOp (LLVMOpUnaryOp ((UnaryOpTo t1@(LowTypeFloat _) t2@(LowTypeIntU _))) d) =
+emitLLVMOp (LLVMOpUnaryOp (UnaryOpTo t1@(LowTypeFloat _) t2@(LowTypeIntU _)) d) =
   emitLLVMConvOp "fptoui" d t1 t2
 emitLLVMOp (LLVMOpBinaryOp (BinaryOpAdd t@(LowTypeIntS _)) d1 d2) =
   emitBinaryOp t "add" d1 d2
@@ -298,16 +298,16 @@ emitLLVMOp foo = do
   raiseCritical' "ill-typed LLVMOp"
 
 emitUnaryOp :: LowType -> Builder -> LLVMData -> WithEnv Builder
-emitUnaryOp t inst d = do
+emitUnaryOp t inst d =
   return $ unwordsL [inst, showLowType t, showLLVMData d]
 
 emitBinaryOp :: LowType -> Builder -> LLVMData -> LLVMData -> WithEnv Builder
-emitBinaryOp t inst d1 d2 = do
+emitBinaryOp t inst d1 d2 =
   return $
     unwordsL [inst, showLowType t, showLLVMData d1 <> ",", showLLVMData d2]
 
 emitLLVMConvOp :: Builder -> LLVMData -> LowType -> LowType -> WithEnv Builder
-emitLLVMConvOp cast d dom cod = do
+emitLLVMConvOp cast d dom cod =
   return $
     unwordsL [cast, showLowType dom, showLLVMData d, "to", showLowType cod]
 
@@ -420,13 +420,13 @@ showLLVMData (LLVMDataGlobal x) = "@" <> TE.encodeUtf8Builder x
 showLLVMData (LLVMDataInt i) = integerDec i
 showLLVMData (LLVMDataFloat FloatSize16 x) = do
   let x' = realToFrac x :: Half
-  "0x" <> (doubleHexFixed $ realToFrac x')
+  "0x" <> doubleHexFixed (realToFrac x')
 showLLVMData (LLVMDataFloat FloatSize32 x) = do
   let x' = realToFrac x :: Float
-  "0x" <> (doubleHexFixed $ realToFrac x')
+  "0x" <> doubleHexFixed (realToFrac x')
 showLLVMData (LLVMDataFloat FloatSize64 x) = do
   let x' = realToFrac x :: Double
-  "0x" <> (doubleHexFixed $ realToFrac x')
+  "0x" <> doubleHexFixed (realToFrac x')
 showLLVMData LLVMDataNull = "null"
 
 showItems :: (a -> Builder) -> [a] -> Builder
