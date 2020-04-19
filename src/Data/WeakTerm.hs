@@ -82,9 +82,9 @@ type Connective =
   )
 
 data QuasiStmt
-  = QuasiStmtLet Meta WeakTextPlus WeakTermPlus
+  = QuasiStmtLet Meta WeakIdentPlus WeakTermPlus
   | -- special case of `let` in which the `e` in `let x := e` is known to be well-typed
-    QuasiStmtLetWT Meta WeakTextPlus WeakTermPlus
+    QuasiStmtLetWT Meta WeakIdentPlus WeakTermPlus
   | -- mutually recursive definition (n >= 0)
     --   (definition
     --     ((f1 A1) (ARGS-1) e1)
@@ -94,8 +94,8 @@ data QuasiStmt
   | QuasiStmtVerify Meta WeakTermPlus
   | QuasiStmtEnum Meta T.Text [(T.Text, Int)]
   | QuasiStmtConstDecl Meta WeakTextPlus
-  | QuasiStmtLetInductive Int Meta WeakTextPlus WeakTermPlus
-  | QuasiStmtLetInductiveIntro Meta WeakTextPlus WeakTermPlus [T.Text]
+  | QuasiStmtLetInductive Int Meta WeakIdentPlus WeakTermPlus
+  | QuasiStmtLetInductiveIntro Meta WeakIdentPlus WeakTermPlus [T.Text]
   | QuasiStmtUse T.Text
   | QuasiStmtUnuse T.Text
   | QuasiStmtVisit (Path Abs File) [QuasiStmt]
@@ -103,8 +103,8 @@ data QuasiStmt
 
 data WeakStmt
   = WeakStmtReturn WeakTermPlus
-  | WeakStmtLet Meta WeakTextPlus WeakTermPlus WeakStmt
-  | WeakStmtLetWT Meta WeakTextPlus WeakTermPlus WeakStmt
+  | WeakStmtLet Meta WeakIdentPlus WeakTermPlus WeakStmt
+  | WeakStmtLetWT Meta WeakIdentPlus WeakTermPlus WeakStmt
   | WeakStmtVerify Meta WeakTermPlus WeakStmt
   | WeakStmtConstDecl Meta WeakTextPlus WeakStmt
   | WeakStmtVisit (Path Abs File) WeakStmt WeakStmt
@@ -279,7 +279,7 @@ constWeakTermPlus' ((_, _, t) : xts) es = do
 
 substWeakTermPlus :: SubstWeakTerm -> WeakTermPlus -> WeakTermPlus
 substWeakTermPlus _ tau@(_, WeakTermTau) = tau
-substWeakTermPlus sub e1@(_, WeakTermUpsilon x) = do
+substWeakTermPlus sub e1@(_, WeakTermUpsilon x) =
   case Map.lookup (Left $ asInt x) sub of
     Nothing -> e1
     Just e2@(_, e) -> (supMeta (metaOf e1) (metaOf e2), e)
@@ -299,11 +299,11 @@ substWeakTermPlus sub (m, WeakTermIter (mx, x, t) xts e) = do
   let sub' = Map.delete (Left $ asInt x) sub
   let (xts', e') = substWeakTermPlus'' sub' xts e
   (m, WeakTermIter (mx, x, t') xts' e')
-substWeakTermPlus sub e@(_, WeakTermConst x) = do
+substWeakTermPlus sub e@(_, WeakTermConst x) =
   case Map.lookup (Right x) sub of
     Nothing -> e
     Just e2 -> (supMeta (metaOf e) (metaOf e2), snd e2)
-substWeakTermPlus sub e1@(_, WeakTermZeta x) = do
+substWeakTermPlus sub e1@(_, WeakTermZeta x) =
   case Map.lookup (Left $ asInt x) sub of
     Nothing -> e1
     Just e2@(_, e) -> (supMeta (metaOf e1) (metaOf e2), e)
@@ -313,9 +313,9 @@ substWeakTermPlus sub (m, WeakTermInt t x) = do
 substWeakTermPlus sub (m, WeakTermFloat t x) = do
   let t' = substWeakTermPlus sub t
   (m, WeakTermFloat t' x)
-substWeakTermPlus _ (m, WeakTermEnum x) = do
+substWeakTermPlus _ (m, WeakTermEnum x) =
   (m, WeakTermEnum x)
-substWeakTermPlus _ (m, WeakTermEnumIntro l) = do
+substWeakTermPlus _ (m, WeakTermEnumIntro l) =
   (m, WeakTermEnumIntro l)
 substWeakTermPlus sub (m, WeakTermEnumElim (e, t) branchList) = do
   let t' = substWeakTermPlus sub t
@@ -333,7 +333,7 @@ substWeakTermPlus sub (m, WeakTermArrayElim mk xts v e) = do
   let v' = substWeakTermPlus sub v
   let (xts', e') = substWeakTermPlus'' sub xts e
   (m, WeakTermArrayElim mk xts' v' e')
-substWeakTermPlus _ (m, WeakTermStruct ts) = do
+substWeakTermPlus _ (m, WeakTermStruct ts) =
   (m, WeakTermStruct ts)
 substWeakTermPlus sub (m, WeakTermStructIntro ets) = do
   let (es, ts) = unzip ets
@@ -381,7 +381,7 @@ substWeakTermPlus'' sub ((m, x, t) : xts) e = do
   ((m, x, t') : xts', e')
 
 metaOf :: WeakTermPlus -> Meta
-metaOf e = fst e
+metaOf = fst
 
 asUpsilon :: WeakTermPlus -> Maybe Ident
 asUpsilon (_, WeakTermUpsilon x) = Just x
@@ -390,9 +390,9 @@ asUpsilon _ = Nothing
 toText :: WeakTermPlus -> T.Text
 toText (_, WeakTermTau) = "tau"
 toText (_, WeakTermUpsilon x) = asText x
-toText piType@(_, WeakTermPi Nothing xts cod) = do
+toText piType@(_, WeakTermPi Nothing xts cod) =
   case extractSigmaArg piType of
-    Just yts -> do
+    Just yts ->
       case splitLast yts of
         Just (zts, (_, _, t))
           | isDependent zts t ->
@@ -412,9 +412,9 @@ toText (_, WeakTermPi (Just _) _ cod) = toText cod
 toText (_, WeakTermPiIntro Nothing xts e) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["λ", argStr, toText e]
-toText (_, WeakTermPiIntro (Just (name, _)) _ _) = do
+toText (_, WeakTermPiIntro (Just (name, _)) _ _) =
   "<#" <> name <> "-" <> "internal" <> "#>"
-toText (_, WeakTermPiElim e es) = do
+toText (_, WeakTermPiElim e es) =
   showCons $ map toText $ e : es
 toText (_, WeakTermIter (_, x, _) xts e) = do
   let argStr = inParen $ showItems $ map showArg xts
@@ -440,18 +440,21 @@ toText (_, WeakTermArrayElim _ xts e1 e2) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["array-elimination", argStr, toText e1, toText e2]
 toText (_, WeakTermStruct ks) = showCons $ "struct" : map showArrayKind ks
-toText (_, WeakTermStructIntro ets) = do
+toText (_, WeakTermStructIntro ets) =
   showStruct $ map (toText . fst) ets
 toText (_, WeakTermStructElim xts e1 e2) = do
   let argStr = inParen $ showItems $ map (\(_, x, _) -> asText x) xts
   showCons ["struct-elimination", argStr, toText e1, toText e2]
-toText (_, WeakTermCase _ e cxtes) = do
+toText (_, WeakTermCase _ e cxtes) =
   showCons
     ( "case"
         : toText e
-        : ( flip map cxtes $ \((c, xts), body) -> do
+        : flip
+          map
+          cxtes
+          ( \((c, xts), body) -> do
               let xs = map (\(_, x, _) -> asText x) xts
-              showCons [showCons ((snd c) : xs), toText body]
+              showCons [showCons (snd c : xs), toText body]
           )
     )
 toText (_, WeakTermQuestion e _) = toText e
@@ -551,5 +554,4 @@ splitLast (x : xs) = do
 type Key = Either Int T.Text
 
 deleteKeys' :: Map.HashMap Key a -> [Key] -> Map.HashMap Key a
-deleteKeys' sub [] = sub
-deleteKeys' sub (i : is) = Map.delete i $ deleteKeys' sub is
+deleteKeys' = foldr Map.delete
