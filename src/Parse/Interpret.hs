@@ -28,7 +28,7 @@ interpret :: TreePlus -> WithEnv WeakTermPlus
 --
 interpret (m, TreeLeaf "tau") = return (m, WeakTermTau)
 interpret (m, TreeNode ((_, TreeLeaf "upsilon") : rest))
-  | [(_, TreeLeaf x)] <- rest = do return (m, WeakTermUpsilon $ asIdent x)
+  | [(_, TreeLeaf x)] <- rest = return (m, WeakTermUpsilon $ asIdent x)
   | otherwise = raiseSyntaxError m "(upsilon TREE)"
 interpret (m, TreeNode ((_, TreeLeaf "pi") : rest))
   | [(_, TreeNode xts), t] <- rest = do
@@ -41,7 +41,7 @@ interpret (m, TreeNode ((_, TreeLeaf "pi-introduction") : rest))
     return (m, weakTermPiIntro xts' e')
   | otherwise = raiseSyntaxError m "(pi-introduction (TREE*) TREE)"
 interpret (m, TreeNode ((_, TreeLeaf "pi-elimination") : rest))
-  | e : es <- rest = do interpretPiElim m e es
+  | e : es <- rest = interpretPiElim m e es
   | otherwise = raiseSyntaxError m "(pi-elimination TREE TREE*)" -- e' <- interpret e
 interpret (m, TreeNode ((_, TreeLeaf "sigma") : rest))
   | [(_, TreeNode xts), t] <- rest = do
@@ -75,28 +75,28 @@ interpret (m, TreeNode ((_, TreeLeaf "constant") : rest))
   | [(_, TreeLeaf x)] <- rest = return (m, WeakTermConst x)
   | otherwise = raiseSyntaxError m "(constant LEAF)"
 interpret (m, TreeNode ((_, TreeLeaf "f16") : rest))
-  | [(mx, TreeLeaf x)] <- rest = do
+  | [(mx, TreeLeaf x)] <- rest =
     case readMaybe $ T.unpack x of
       Nothing -> raiseError mx "the argument of `f16` must be a float"
-      Just x' -> do
+      Just x' ->
         return (m, WeakTermFloat (m, WeakTermConst "f16") x')
   | otherwise = raiseSyntaxError m "(f16 LEAF)"
 interpret (m, TreeNode ((_, TreeLeaf "f32") : rest))
-  | [(mx, TreeLeaf x)] <- rest = do
+  | [(mx, TreeLeaf x)] <- rest =
     case readMaybe $ T.unpack x of
       Nothing -> raiseError mx "the argument of `f32` must be a float"
-      Just x' -> do
+      Just x' ->
         return (m, WeakTermFloat (m, WeakTermConst "f32") x')
   | otherwise = raiseSyntaxError m "(f32 LEAF)"
 interpret (m, TreeNode ((_, TreeLeaf "f64") : rest))
-  | [(mx, TreeLeaf x)] <- rest = do
+  | [(mx, TreeLeaf x)] <- rest =
     case readMaybe $ T.unpack x of
       Nothing -> raiseError mx "the argument of `f64` must be a float"
-      Just x' -> do
+      Just x' ->
         return (m, WeakTermFloat (m, WeakTermConst "f64") x')
   | otherwise = raiseSyntaxError m "(f64 LEAF)"
 interpret (m, TreeNode ((_, TreeLeaf "enum") : rest))
-  | [(_, TreeLeaf x)] <- rest = do
+  | [(_, TreeLeaf x)] <- rest =
     case (readEnumTypeIntS x, readEnumTypeIntU x) of
       (Just i, _) -> return (m, WeakTermEnum $ EnumTypeIntS i)
       (_, Just i) -> return (m, WeakTermEnum $ EnumTypeIntU i)
@@ -211,12 +211,12 @@ interpret (m, TreeLeaf x)
   | Just x' <- readMaybe $ T.unpack x = do
     h <- newHole m
     return (m, WeakTermFloat h x')
-  | Just i <- readEnumTypeIntS x = do return (m, WeakTermEnum $ EnumTypeIntS i)
-  | Just i <- readEnumTypeIntU x = do return (m, WeakTermEnum $ EnumTypeIntU i)
+  | Just i <- readEnumTypeIntS x = return (m, WeakTermEnum $ EnumTypeIntS i)
+  | Just i <- readEnumTypeIntU x = return (m, WeakTermEnum $ EnumTypeIntU i)
   | Just str <- readMaybe $ T.unpack x = do
     u8s <- forM (encode str) $ \u -> return (m, toValueIntU 8 (toInteger u))
     sigmaIntroString m u8s
-  | otherwise = do
+  | otherwise =
     case T.uncons x of
       Nothing -> raiseCritical m "encountered a variable with empty identifier"
       Just (c, rest)
@@ -336,7 +336,7 @@ interpretLeaf :: TreePlus -> WithEnv (Meta, Ident)
 interpretLeaf (m, TreeLeaf "_") = do
   h <- newNameWith'' "H"
   return (m, h)
-interpretLeaf (m, TreeLeaf x) = do
+interpretLeaf (m, TreeLeaf x) =
   return (m, asIdent x)
 interpretLeaf t = raiseSyntaxError (fst t) "LEAF"
 
@@ -355,12 +355,12 @@ interpretLeafText :: TreePlus -> WithEnv (Meta, T.Text)
 interpretLeafText (m, TreeLeaf "_") = do
   h <- newTextWith "_"
   return (m, h)
-interpretLeafText (m, TreeLeaf x) = do
+interpretLeafText (m, TreeLeaf x) =
   return (m, x)
 interpretLeafText t = raiseSyntaxError (fst t) "LEAF"
 
 interpretEnumValueMaybe :: TreePlus -> WithEnv (Maybe EnumValue)
-interpretEnumValueMaybe t = do
+interpretEnumValueMaybe t =
   catch
     (interpretEnumValue t >>= \x -> return (Just x))
     (\(_ :: Error) -> return Nothing)
@@ -495,10 +495,10 @@ cocaseAsSigmaIntro m name codType cocaseClauseList = do
       let isLinear = linearCheck $ map fst iesjes
       let isExhaustive = length iesjes == length labelList
       case (isLinear, isExhaustive) of
-        (False, _) -> raiseError m $ "found a non-linear copattern"
-        (_, False) -> raiseError m $ "found a non-exhaustive copattern"
+        (False, _) -> raiseError m "found a non-linear copattern"
+        (_, False) -> raiseError m "found a non-exhaustive copattern"
         (True, True) ->
-          return $ (map snd $ sortOn fst iesjes) ++ [cocaseBaseValue m codType]
+          return $ map snd (sortOn fst iesjes) ++ [cocaseBaseValue m codType]
 
 labelToIndex :: Meta -> [T.Text] -> [(Ident, a)] -> WithEnv [(Int, a)]
 labelToIndex _ _ [] = return []
@@ -511,7 +511,7 @@ labelToIndex m lenv ((x, e) : xes) =
 
 asLamClauseList ::
   Meta -> [CocaseClause] -> WithEnv [(Ident, WeakTermPlus)]
-asLamClauseList m cocaseClauseList = do
+asLamClauseList m cocaseClauseList =
   fmap concat
     $ forM cocaseClauseList
     $ \((a', args), clauseList) -> do
@@ -538,7 +538,7 @@ cocaseBaseValue m codType =
       (m, WeakTermUpsilon $ asIdent "unsafe:cast")
       [ (m, weakTermPi [] (m, WeakTermEnum (EnumTypeIntS 64))),
         codType,
-        (m, (weakTermPiIntro [] (m, WeakTermEnumIntro (EnumValueIntS 64 0))))
+        (m, weakTermPiIntro [] (m, WeakTermEnumIntro (EnumValueIntS 64 0)))
       ]
   )
 
@@ -569,19 +569,19 @@ headDiscriminantOf :: [(T.Text, Int)] -> Int
 headDiscriminantOf [] = 0
 headDiscriminantOf ((_, i) : _) = i
 
-readEnumType :: Char -> T.Text -> Int -> (Maybe Int)
+readEnumType :: Char -> T.Text -> Int -> Maybe Int
 readEnumType c str k -- n1, n2, ..., n{i}, ..., n{2^64}
   | T.length str >= 2,
     T.head str == c,
-    Just i <- (readMaybe $ T.unpack $ T.tail str :: Maybe Int),
+    Just i <- readMaybe $ T.unpack $ T.tail str :: Maybe Int,
     1 <= toInteger i && toInteger i <= 2 ^ k =
     Just i
 readEnumType _ _ _ = Nothing
 
-readEnumTypeIntS :: T.Text -> (Maybe Int)
+readEnumTypeIntS :: T.Text -> Maybe Int
 readEnumTypeIntS str = readEnumType 'i' str 23
 
-readEnumTypeIntU :: T.Text -> (Maybe Int)
+readEnumTypeIntU :: T.Text -> Maybe Int
 readEnumTypeIntU str = readEnumType 'u' str 23
 
 readEnumValueIntS :: T.Text -> T.Text -> Maybe EnumValue
@@ -643,7 +643,7 @@ interpretWith (m, TreeNode (with@(_, TreeLeaf "with") : bind : (_, TreeNode ((_,
       rest' <- interpretWith (m, TreeNode (with : bind : rest))
       let lam = (m, weakTermPiIntro [xt'] rest')
       return (m, WeakTermPiElim bind' [h1, h2, e', lam])
-interpretWith (m, TreeNode (with@(_, TreeLeaf "with") : bind : (_, TreeNode ((_, TreeLeaf "erase") : xs)) : rest)) = do
+interpretWith (m, TreeNode (with@(_, TreeLeaf "with") : bind : (_, TreeNode ((_, TreeLeaf "erase") : xs)) : rest)) =
   case mapM asLeaf xs of
     Nothing -> raiseSyntaxError m "(with TREE (erase LEAF ... LEAF) TREE*)"
     Just xs' -> do
