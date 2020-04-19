@@ -66,9 +66,10 @@ clarify' tenv (m, TermArrayIntro k es) = do
   let ts = map Left $ replicate (length es) retImmType
   arrayType <- cartesianSigma Nothing m k ts
   (zs, es', xs) <- unzip3 <$> mapM (clarifyPlus tenv) es
-  return
-    $ bindLet (zip zs es')
-    $ (m, CodeUpIntro $ (m, sigmaIntro [arrayType, (m, DataSigmaIntro k xs)]))
+  return $
+    bindLet
+      (zip zs es')
+      (m, CodeUpIntro (m, sigmaIntro [arrayType, (m, DataSigmaIntro k xs)]))
 clarify' tenv (m, TermArrayElim k mxts e1 e2) = do
   e1' <- clarify' tenv e1
   (arr, arrVar) <- newDataUpsilonWith m "arr"
@@ -76,9 +77,10 @@ clarify' tenv (m, TermArrayElim k mxts e1 e2) = do
   (content, contentVar) <- newDataUpsilonWith m "arr-content"
   e2' <- clarify' (insTypeEnv1 mxts tenv) e2
   let (_, xs, _) = unzip3 mxts
-  return
-    $ bindLet [(arr, e1')]
-    $ ( m,
+  return $
+    bindLet
+      [(arr, e1')]
+      ( m,
         sigmaElim [arrType, content] arrVar (m, CodeSigmaElim k xs contentVar e2')
       )
 clarify' _ (m, TermStruct ks) = do
@@ -87,9 +89,10 @@ clarify' _ (m, TermStruct ks) = do
 clarify' tenv (m, TermStructIntro eks) = do
   let (es, ks) = unzip eks
   (xs, es', vs) <- unzip3 <$> mapM (clarifyPlus tenv) es
-  return
-    $ bindLet (zip xs es')
-    $ (m, CodeUpIntro (m, DataStructIntro (zip vs ks)))
+  return $
+    bindLet
+      (zip xs es')
+      (m, CodeUpIntro (m, DataStructIntro (zip vs ks)))
 clarify' tenv (m, TermStructElim xks e1 e2) = do
   e1' <- clarify' tenv e1
   let (ms, xs, ks) = unzip3 xks
@@ -136,7 +139,7 @@ clarifyCase tenv m cxtes typeVarName envVarName lamVarName = do
   let sub =
         IntMap.fromList $
           map (\(mx, x, _) -> (asInt x, (mx, DataUpsilon x))) fvs
-  let cs = map (\cxte -> fst $ fst cxte) cxtes
+  let cs = map (fst . fst) cxtes
   return $ bindLet [(y, e')] (m, CodeCase sub yVar (zip cs es))
 
 constructCaseFVS ::
@@ -159,7 +162,7 @@ chainCaseClause tenv (((m, _), xts), body) =
   chainTermPlus tenv (m, termPiIntro xts body)
 
 nubFVS :: [IdentPlus] -> [IdentPlus]
-nubFVS fvs = nubBy (\(_, x, _) (_, y, _) -> x == y) fvs
+nubFVS = nubBy (\(_, x, _) (_, y, _) -> x == y)
 
 clarifyCase' :: TypeEnv -> Meta -> Ident -> Clause -> WithEnv CodePlus
 clarifyCase' tenv m envVarName ((_, xts), e) = do
@@ -250,8 +253,8 @@ clarifyArrayAccess tenv m name lowType = do
             callThenReturn <- toArrayAccessTail tenv m lowType cod arr index xs
             let body = iterativeApp headerList callThenReturn
             retClosure tenv Nothing [] m xts body
-          _ -> raiseCritical m $ "the type of array-access is wrong"
-    _ -> raiseCritical m $ "the type of array-access is wrong"
+          _ -> raiseCritical m "the type of array-access is wrong"
+    _ -> raiseCritical m "the type of array-access is wrong"
 
 -- ここでclsをつくる計算は省略できる (tryCache的に)
 clarifySysCall ::
@@ -297,7 +300,7 @@ knot m z cls = do
       modify (\env -> env {codeEnv = Map.insert (asText'' z) def' cenv})
 
 asSysCallMaybe :: OS -> T.Text -> Maybe (Syscall, [Arg])
-asSysCallMaybe OSLinux name = do
+asSysCallMaybe OSLinux name =
   case name of
     "os:read" ->
       return (Right ("read", 0), [ArgUnused, ArgImm, ArgArray, ArgImm])
@@ -466,7 +469,7 @@ rightmostOf (_, TermPi _ xts _)
 rightmostOf (m, _) = raiseCritical m "rightmost"
 
 sigToPi :: Meta -> TermPlus -> WithEnv (IdentPlus, IdentPlus)
-sigToPi m tPi = do
+sigToPi m tPi =
   case tPi of
     (_, TermPi _ [zu, kp] _) -> return (zu, kp)
     _ -> raiseCritical m "the type of sigma-intro is wrong"
@@ -602,7 +605,7 @@ chainTermPlus tenv (_, TermEnumElim (e, t) les) = do
   xs2 <- concat <$> mapM (chainTermPlus tenv) es
   return $ xs0 ++ xs1 ++ xs2
 chainTermPlus tenv (_, TermArray dom _) = chainTermPlus tenv dom
-chainTermPlus tenv (_, TermArrayIntro _ es) = do
+chainTermPlus tenv (_, TermArrayIntro _ es) =
   concat <$> mapM (chainTermPlus tenv) es
 chainTermPlus tenv (_, TermArrayElim _ xts e1 e2) = do
   xs1 <- chainTermPlus tenv e1
