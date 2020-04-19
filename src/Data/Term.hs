@@ -80,7 +80,7 @@ varTermPlus (_, TermEnumElim (e, t) les) = do
   let xs2 = concatMap varTermPlus es
   xs0 ++ xs1 ++ xs2
 varTermPlus (_, TermArray dom _) = varTermPlus dom
-varTermPlus (_, TermArrayIntro _ es) = do
+varTermPlus (_, TermArrayIntro _ es) =
   concatMap varTermPlus es
 varTermPlus (_, TermArrayElim _ xts d e) = varTermPlus d ++ varTermPlus' xts [e]
 varTermPlus (_, TermStruct {}) = []
@@ -98,7 +98,7 @@ varTermPlus' [] es = concatMap varTermPlus es
 varTermPlus' ((_, x, t) : xts) es = do
   let xs1 = varTermPlus t
   let xs2 = varTermPlus' xts es
-  xs1 ++ filter (\y -> y /= x) xs2
+  xs1 ++ filter (/= x) xs2
 
 substTermPlus :: SubstTerm -> TermPlus -> TermPlus
 substTermPlus _ (m, TermTau) = (m, TermTau)
@@ -140,7 +140,7 @@ substTermPlus sub (m, TermArrayElim mk xts v e) = do
   let v' = substTermPlus sub v
   let (xts', e') = substTermPlus'' sub xts e
   (m, TermArrayElim mk xts' v' e')
-substTermPlus _ (m, TermStruct ts) = do
+substTermPlus _ (m, TermStruct ts) =
   (m, TermStruct ts)
 substTermPlus sub (m, TermStructIntro ets) = do
   let (es, ts) = unzip ets
@@ -183,7 +183,7 @@ weaken (m, TermPi mName xts t) =
   (m, WeakTermPi mName (weakenArgs xts) (weaken t))
 weaken (m, TermPiIntro info xts body) = do
   let info' = fmap2 weakenArgs info
-  let xts' = (weakenArgs xts)
+  let xts' = weakenArgs xts
   (m, WeakTermPiIntro info' xts' (weaken body))
 weaken (m, TermPiElim e es) = do
   let e' = weaken e
@@ -217,7 +217,7 @@ weaken (m, TermArrayElim mk xts v e) = do
   let xts' = weakenArgs xts
   let e' = weaken e
   (m, WeakTermArrayElim mk xts' v' e')
-weaken (m, TermStruct ts) = do
+weaken (m, TermStruct ts) =
   (m, WeakTermStruct ts)
 weaken (m, TermStructIntro ets) = do
   let (es, ts) = unzip ets

@@ -112,7 +112,7 @@ supLocation m1 m2 =
     _ -> metaLocation m2
 
 newMeta :: Int -> Int -> Path Abs File -> Meta
-newMeta l c path = do
+newMeta l c path =
   Meta {metaFileName = path, metaLocation = (0, l, c), metaIsReducible = True}
 
 type PosInfo = (Path Abs File, Loc)
@@ -380,9 +380,9 @@ showArch Arch64 = "x64"
 type Syscall = Either T.Text (T.Text, Integer)
 
 linearCheck :: (Eq a, Ord a) => [a] -> Bool
-linearCheck xs = linearCheck' S.empty xs
+linearCheck = linearCheck' S.empty
 
-linearCheck' :: (Eq a, Ord a) => (S.Set a) -> [a] -> Bool
+linearCheck' :: (Eq a, Ord a) => S.Set a -> [a] -> Bool
 linearCheck' _ [] = True
 linearCheck' found (x : _)
   | x `S.member` found = False
@@ -400,8 +400,7 @@ breakOnMaybe needle text =
         else return (h, T.tail t)
 
 deleteKeys :: IntMap.IntMap a -> [Int] -> IntMap.IntMap a
-deleteKeys sub [] = sub
-deleteKeys sub (i : is) = IntMap.delete i $ deleteKeys sub is
+deleteKeys = foldr IntMap.delete
 
 showInHex :: T.Text -> T.Text
 showInHex x = "x" <> foldr (<>) "" (map showInHex' (encode $ T.unpack x))
@@ -431,7 +430,7 @@ hex 15 = "f"
 hex _ = " "
 
 fmap2 :: (Functor f, Functor g) => (a -> b) -> f (g a) -> f (g b)
-fmap2 f m = fmap (fmap f) m
+fmap2 f = fmap (fmap f)
 
 fmap2M :: (Monad m) => (b -> m c) -> Maybe (a, b) -> m (Maybe (a, c))
 fmap2M _ Nothing = return Nothing

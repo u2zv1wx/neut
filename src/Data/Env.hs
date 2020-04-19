@@ -237,14 +237,14 @@ getTarget = do
       return (currentOS, currentArch)
 
 getOS :: WithEnv OS
-getOS = do
+getOS =
   case os of
     "linux" -> return OSLinux
     "darwin" -> return OSDarwin
     s -> raiseCritical' $ "unsupported target os: " <> T.pack (show s)
 
 getArch :: WithEnv Arch
-getArch = do
+getArch =
   case arch of
     "x86_64" -> return Arch64
     s -> raiseCritical' $ "unsupported target arch: " <> T.pack (show s)
@@ -259,7 +259,7 @@ insTypeEnv :: TypeEnvKey -> TermPlus -> WithEnv ()
 insTypeEnv x t = modify (\e -> e {typeEnv = Map.insert x t (typeEnv e)})
 
 insTypeEnv' :: TypeEnvKey -> TermPlus -> TypeEnv -> TypeEnv
-insTypeEnv' x t tenv = Map.insert x t tenv
+insTypeEnv' = Map.insert
 
 lookupTypeEnv :: Meta -> TypeEnvKey -> T.Text -> WithEnv TermPlus
 lookupTypeEnv m x name = do
@@ -276,7 +276,7 @@ lookupTypeEnv' m (Right s) _ _
   | Just op <- asUnaryOpMaybe s = unaryOpToType m op
   | Just op <- asBinaryOpMaybe s = binaryOpToType m op
   | Just lowType <- asArrayAccessMaybe s = arrayAccessToType m lowType
-lookupTypeEnv' m key tenv name = do
+lookupTypeEnv' m key tenv name =
   case Map.lookup key tenv of
     Just t -> return t
     Nothing ->
@@ -286,7 +286,7 @@ lookupTypeEnv' m key tenv name = do
 lowTypeToType :: Meta -> LowType -> WithEnv TermPlus
 lowTypeToType m (LowTypeIntS s) = return (m, TermEnum (EnumTypeIntS s))
 lowTypeToType m (LowTypeIntU s) = return (m, TermEnum (EnumTypeIntU s))
-lowTypeToType m (LowTypeFloat s) = do
+lowTypeToType m (LowTypeFloat s) =
   return (m, TermConst $ "f" <> T.pack (show (sizeAsInt s)))
 lowTypeToType m _ = raiseCritical m "invalid argument passed to lowTypeToType"
 
@@ -355,7 +355,7 @@ insEnumEnv m name xis = do
         ( \e ->
             e
               { enumEnv = Map.insert name xis (enumEnv e),
-                revEnumEnv = rev `Map.union` (revEnumEnv e)
+                revEnumEnv = rev `Map.union` revEnumEnv e
               }
         )
 

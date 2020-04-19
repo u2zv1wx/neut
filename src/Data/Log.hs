@@ -68,13 +68,13 @@ outputFooter "" = return ()
 outputFooter eoe = putStrLn eoe
 
 outputPosInfo :: Bool -> PosInfo -> IO ()
-outputPosInfo b (path, loc) = do
+outputPosInfo b (path, loc) =
   withSGR b [SetConsoleIntensity BoldIntensity] $ do
     TIO.putStr $ T.pack (showPosInfo path loc)
     TIO.putStrLn ":"
 
 outputLogLevel :: Bool -> LogLevel -> IO ()
-outputLogLevel b l = do
+outputLogLevel b l =
   withSGR b (logLevelToSGR l) $ do
     TIO.putStr $ logLevelToText l
     TIO.putStr ": "
