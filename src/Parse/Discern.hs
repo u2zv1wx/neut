@@ -41,10 +41,10 @@ discern' nenv =
       mc <- lookupConstantMaybe m penv s
       case (mx, b1, b2, mc) of
         (Just x', _, _, _) -> return (m, WeakTermUpsilon x')
-        (_, _, _, Just c) -> return (m, WeakTermConst c)
         (_, Just s', _, _) -> return (m, WeakTermEnumIntro (EnumValueLabel s'))
         (_, _, Just s', _) -> return (m, WeakTermEnum (EnumTypeLabel s'))
-        _ -> raiseError m $ "(*) undefined variable:  " <> asText x
+        (_, _, _, Just c) -> return (m, WeakTermConst c)
+        _ -> raiseError m $ "undefined variable:  " <> asText x
     (m, WeakTermPi mName xts t) -> do
       (xts', t') <- discernBinder nenv xts t
       return (m, WeakTermPi mName xts' t')
@@ -153,9 +153,7 @@ discernIdent m x = do
 discernIdentPlus :: WeakIdentPlus -> WithEnv WeakIdentPlus
 discernIdentPlus (m, x, t) = do
   nenv <- gets topNameEnv
-  t' <- discern' nenv t
-  penv <- gets prefixEnv
-  x' <- lookupName'' m penv nenv x
+  (_, x', t') <- discernWeakIdentPlus nenv (m, x, t)
   modify (\env -> env {topNameEnv = Map.insert (asText x) x' (topNameEnv env)})
   return (m, x', t')
 
