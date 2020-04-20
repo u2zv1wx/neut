@@ -20,7 +20,7 @@ import Data.WeakTerm
 import Parse.Discern
 import Parse.Interpret
 
-parseInductive :: Meta -> [TreePlus] -> WithEnv [QuasiStmt]
+parseInductive :: Meta -> [TreePlus] -> WithEnv [WeakStmt]
 parseInductive m ts = do
   ts' <- mapM setupIndPrefix ts
   parseConnective m ts' toInductive toInductiveIntroList
@@ -44,9 +44,9 @@ setupIndPrefix' _ t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) TREE)"
 parseConnective ::
   Meta ->
   [TreePlus] ->
-  ([WeakTextPlus] -> [WeakTextPlus] -> Connective -> WithEnv [QuasiStmt]) ->
-  ([WeakTextPlus] -> Connective -> WithEnv [QuasiStmt]) ->
-  WithEnv [QuasiStmt]
+  ([WeakTextPlus] -> [WeakTextPlus] -> Connective -> WithEnv [WeakStmt]) ->
+  ([WeakTextPlus] -> Connective -> WithEnv [WeakStmt]) ->
+  WithEnv [WeakStmt]
 parseConnective m ts f g = do
   connectiveList <- mapM parseConnective' ts
   fs <- mapM formationRuleOf' connectiveList
@@ -79,7 +79,7 @@ registerLabelInfo ts = do
     let asbs = map (\(_, x, _) -> x) $ ats ++ bts
     modify (\env -> env {labelEnv = Map.insert a asbs (labelEnv env)})
 
-generateProjections :: [TreePlus] -> WithEnv [QuasiStmt]
+generateProjections :: [TreePlus] -> WithEnv [WeakStmt]
 generateProjections ts = do
   (ats, bts) <- toIndInfo ts
   let bts' = map textPlusToWeakIdentPlus bts
@@ -110,7 +110,7 @@ generateProjections ts = do
                 )
             )
         bt <- discernTopLevelIdentPlus (mb, asIdent b', (mb, weakTermPi (xts ++ [dom]) cod))
-        return [QuasiStmtLetWT mb bt e]
+        return [WeakStmtLetWT mb bt e]
   return $ concat $ concat stmtListList
 
 separate :: WeakTermPlus -> WithEnv (WeakIdentPlus, WeakTermPlus)
@@ -137,7 +137,7 @@ checkNameSanity m atsbts = do
       "the names of the rules of inductive/coinductive type must be distinct"
 
 toInductive ::
-  [WeakTextPlus] -> [WeakTextPlus] -> Connective -> WithEnv [QuasiStmt]
+  [WeakTextPlus] -> [WeakTextPlus] -> Connective -> WithEnv [WeakStmt]
 toInductive ats bts connective@(m, ai, xts, _) = do
   at <- formationRuleOf connective >>= ruleAsWeakIdentPlus
   let cod = (m, WeakTermPiElim (m, WeakTermUpsilon $ asIdent ai) (map toVar' xts))
@@ -159,11 +159,11 @@ toInductive ats bts connective@(m, ai, xts, _) = do
     discernTopLevelIdentPlus
       (m, asIdent $ ai <> ":induction", (m, weakTermPi indArgs cod))
   return
-    [ QuasiStmtLetWT m at' indType,
-      QuasiStmtLetWT m indIdent inductionPrinciple
+    [ WeakStmtLetWT m at' indType,
+      WeakStmtLetWT m indIdent inductionPrinciple
     ]
 
-toInductiveIntroList :: [WeakTextPlus] -> Connective -> WithEnv [QuasiStmt]
+toInductiveIntroList :: [WeakTextPlus] -> Connective -> WithEnv [WeakStmt]
 toInductiveIntroList ats (_, a, xts, rules) = do
   let ats' = map textPlusToWeakIdentPlus ats
   bts <- mapM ruleAsWeakIdentPlus rules -- fixme: このbtsはmutualな別の部分からもとってくる必要があるはず
@@ -176,7 +176,7 @@ toInductiveIntro ::
   [WeakIdentPlus] ->
   T.Text ->
   Rule ->
-  WithEnv [QuasiStmt]
+  WithEnv [WeakStmt]
 toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
   | (_, WeakTermPiElim (_, WeakTermUpsilon a') es) <- cod,
     ai == asText a',
@@ -205,7 +205,7 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
         let as = map (\(_, x, _) -> asText x) ats
         yts' <- mapM (internalize as atsbts) $ drop (length is) xtsyts
         return
-          [ QuasiStmtLetWT
+          [ WeakStmtLetWT
               m
               constructorIdent
               ( m {metaIsReducible = False},

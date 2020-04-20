@@ -1,6 +1,6 @@
 module Parse.Discern
-  ( discern,
-    discernLet,
+  ( -- discern,
+    -- discernLet,
     discernLet',
     discern'',
     discernWithCurrentNameEnv,
@@ -20,28 +20,28 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.WeakTerm
 
-discern :: [QuasiStmt] -> WithEnv [QuasiStmt]
-discern = discern' Map.empty
+-- discern :: [QuasiStmt] -> WithEnv [QuasiStmt]
+-- discern = discern' Map.empty
 
 type NameEnv = Map.HashMap T.Text Ident
 
-discern' :: NameEnv -> [QuasiStmt] -> WithEnv [QuasiStmt]
-discern' _ [] = return []
-discern' nenv (QuasiStmtLet m xt e : ss) = do
-  (xt', e', ss') <- discernLet nenv xt e ss
-  return $ QuasiStmtLet m xt' e' : ss'
-discern' nenv (QuasiStmtLetWT m xt e : ss) = do
-  (xt', e', ss') <- discernLet nenv xt e ss
-  return $ QuasiStmtLetWT m xt' e' : ss'
--- discern' nenv (QuasiStmtConstDecl m (mx, x, t) : ss) = do
---   insertConstant mx x
---   t' <- discern'' nenv t
+-- discern' :: NameEnv -> [QuasiStmt] -> WithEnv [QuasiStmt]
+-- discern' _ [] = return []
+-- discern' nenv (QuasiStmtLet m xt e : ss) = do
+--   (xt', e', ss') <- discernLet nenv xt e ss
+--   return $ QuasiStmtLet m xt' e' : ss'
+-- discern' nenv (QuasiStmtLetWT m xt e : ss) = do
+--   (xt', e', ss') <- discernLet nenv xt e ss
+--   return $ QuasiStmtLetWT m xt' e' : ss'
+-- -- discern' nenv (QuasiStmtConstDecl m (mx, x, t) : ss) = do
+-- --   insertConstant mx x
+-- --   t' <- discern'' nenv t
+-- --   ss' <- discern' nenv ss
+-- --   return $ QuasiStmtConstDecl m (mx, x, t') : ss'
+-- discern' nenv (QuasiStmtVerify m e : ss) = do
+--   e' <- discern'' nenv e
 --   ss' <- discern' nenv ss
---   return $ QuasiStmtConstDecl m (mx, x, t') : ss'
-discern' nenv (QuasiStmtVerify m e : ss) = do
-  e' <- discern'' nenv e
-  ss' <- discern' nenv ss
-  return $ QuasiStmtVerify m e' : ss'
+--   return $ QuasiStmtVerify m e' : ss'
 
 -- discern' nenv (QuasiStmtEnum m name xis : ss) = do
 --   insEnumEnv m name xis
@@ -63,18 +63,18 @@ discern' nenv (QuasiStmtVerify m e : ss) = do
 --   ss' <- discern' nenv ss
 --   return $ QuasiStmtUnuse prefix : ss'
 
-discernLet ::
-  NameEnv ->
-  WeakIdentPlus ->
-  WeakTermPlus ->
-  [QuasiStmt] ->
-  WithEnv (WeakIdentPlus, WeakTermPlus, [QuasiStmt])
-discernLet nenv (mx, x, t) e ss = do
-  t' <- discern'' nenv t
-  e' <- discern'' nenv e
-  x' <- newDefinedNameWith mx x
-  ss' <- discern' (insertName x x' nenv) ss
-  return ((mx, x', t'), e', ss')
+-- discernLet ::
+--   NameEnv ->
+--   WeakIdentPlus ->
+--   WeakTermPlus ->
+--   [QuasiStmt] ->
+--   WithEnv (WeakIdentPlus, WeakTermPlus, [QuasiStmt])
+-- discernLet nenv (mx, x, t) e ss = do
+--   t' <- discern'' nenv t
+--   e' <- discern'' nenv e
+--   x' <- newDefinedNameWith mx x
+--   ss' <- discern' (insertName x x' nenv) ss
+--   return ((mx, x', t'), e', ss')
 
 discernLet' ::
   WeakIdentPlus ->

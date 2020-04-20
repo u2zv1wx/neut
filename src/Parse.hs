@@ -31,15 +31,17 @@ import Path.IO
 import qualified System.IO.Streams as Streams
 import Text.Read (readMaybe)
 
-parse :: Path Abs File -> WithEnv WeakStmt
+parse :: Path Abs File -> WithEnv [WeakStmt]
 parse inputPath = do
   stmtList <- visit inputPath
-  stmtList' <- discern stmtList
+  -- stmtList' <- discern stmtList
   warnUnusedVar
-  pushTrace inputPath
-  concatQuasiStmtList stmtList'
+  -- pushTrace inputPath
+  return stmtList
 
-visit :: Path Abs File -> WithEnv [QuasiStmt]
+-- concatWeakStmtList stmtList
+
+visit :: Path Abs File -> WithEnv [WeakStmt]
 visit path = do
   insDepGraph path
   pushTrace path
@@ -49,7 +51,7 @@ visit path = do
   treeList <- tokenize content
   parse' $ includeCore (newMeta 1 1 path) treeList
 
-leave :: WithEnv [QuasiStmt]
+leave :: WithEnv [WeakStmt]
 leave = do
   path <- getCurrentFilePath
   popTrace
@@ -73,7 +75,7 @@ pushTrace path = modify (\env -> env {traceEnv = path : traceEnv env})
 popTrace :: WithEnv ()
 popTrace = modify (\env -> env {traceEnv = tail (traceEnv env)})
 
-parse' :: [TreePlus] -> WithEnv [QuasiStmt]
+parse' :: [TreePlus] -> WithEnv [WeakStmt]
 parse' =
   \case
     [] -> leave
@@ -164,7 +166,7 @@ parse' =
             name' <- withSectionPrefix name
             insertConstant m' name'
             h <- newNameWith'' "_"
-            let constDecl = QuasiStmtLet m' (m', h, t') (m', WeakTermConst name')
+            let constDecl = WeakStmtLet m' (m', h, t') (m', WeakTermConst name')
             defList <- parse' cont
             return $ constDecl : defList
           | otherwise -> raiseSyntaxError m "(constant LEAF TREE)"
@@ -206,14 +208,14 @@ parse' =
             e' <- adjustPhase e >>= macroExpand >>= interpret >>= discernWithCurrentNameEnv
             xt' <- adjustPhase xt >>= macroExpand >>= prefixTextPlus >>= interpretIdentPlus >>= discernTopLevelIdentPlus
             defList <- parse' cont
-            return $ QuasiStmtLet m' xt' e' : defList
+            return $ WeakStmtLet m' xt' e' : defList
           | otherwise -> raiseSyntaxError m "(let LEAF TREE TREE) | (let TREE TREE)"
         (m, TreeNode ((_, TreeLeaf "verify") : rest))
           | [e] <- rest -> do
             e' <- adjustPhase e >>= macroExpand >>= interpret >>= discernWithCurrentNameEnv
             m' <- adjustPhase' m
             defList <- parse' cont
-            return $ QuasiStmtVerify m' e' : defList
+            return $ WeakStmtVerify m' e' : defList
           | otherwise -> raiseSyntaxError m "(verify LEAF) | (verify library LEAF)"
         _ -> do
           e <- adjustPhase stmt >>= macroExpand
@@ -225,7 +227,7 @@ parse' =
               m' <- adjustPhase' $ metaOf e'
               t <- newHole m'
               defList <- parse' cont
-              return $ QuasiStmtLet m' (m', h, t) e' : defList
+              return $ WeakStmtLet m' (m', h, t) e' : defList
 
 use :: T.Text -> WithEnv ()
 use s =
@@ -343,7 +345,7 @@ includeFile ::
   T.Text ->
   WithEnv (Path Abs Dir) ->
   [TreePlus] ->
-  WithEnv [QuasiStmt]
+  WithEnv [WeakStmt]
 includeFile m mPath pathString computeDirPath as = do
   m' <- adjustPhase' m
   mPath' <- adjustPhase' mPath
@@ -360,9 +362,9 @@ includeFile m mPath pathString computeDirPath as = do
       raiseError m' $ "found cyclic inclusion:\n" <> showCyclicPath cyclicPath
     Just VisitInfoFinish -> parse' as
     Nothing -> do
-      includedQuasiStmtList <- visit newPath
+      includedWeakStmtList <- visit newPath
       defList <- parse' as
-      return $ includedQuasiStmtList ++ defList
+      return $ includedWeakStmtList ++ defList
 
 ensureEnvSanity :: Meta -> WithEnv ()
 ensureEnvSanity m = do
@@ -374,7 +376,7 @@ ensureEnvSanity m = do
       raiseError m "`include` can only be used with no prefix assumption"
     _ -> return ()
 
-parseDef :: [TreePlus] -> WithEnv [QuasiStmt]
+parseDef :: [TreePlus] -> WithEnv [WeakStmt]
 parseDef xds = do
   defList <- mapM (adjustPhase >=> prefixFunName >=> macroExpand) xds
   -- {f1 := def-1, ..., fn := def-n}から{f1, ..., fn}を取り出してトップレベルでdiscernする
@@ -422,11 +424,11 @@ extractFunName =
     t ->
       raiseSyntaxError (fst t) "(LEAF ...) | ((LEAF TREE) ...)"
 
-toLetList :: [(Ident, (Meta, WeakTermPlus), WeakTermPlus)] -> [QuasiStmt]
+toLetList :: [(Ident, (Meta, WeakTermPlus), WeakTermPlus)] -> [WeakStmt]
 toLetList =
   \case
     [] -> []
-    ((x, (m, t), e) : rest) -> QuasiStmtLet m (m, x, t) e : toLetList rest
+    ((x, (m, t), e) : rest) -> WeakStmtLet m (m, x, t) e : toLetList rest
 
 defToSub :: (Ident, Def) -> (Key, WeakTermPlus)
 defToSub (dom, (m, xt, xts, e)) = (Left $ asInt dom, (m, WeakTermIter xt xts e))
@@ -480,35 +482,35 @@ keywordSet =
       "coinductive"
     ]
 
-concatQuasiStmtList :: [QuasiStmt] -> WithEnv WeakStmt
-concatQuasiStmtList =
-  \case
-    [] -> do
-      path <- getCurrentFilePath
-      content <- liftIO $ TIO.readFile $ toFilePath path
-      let m = newMeta (length $ T.lines content) 1 path
-      return $ WeakStmtReturn (m, WeakTermEnumIntro $ EnumValueIntS 64 0)
-    QuasiStmtLet m xt e : es -> do
-      cont <- concatQuasiStmtList es
-      return $ WeakStmtLet m xt e cont
-    QuasiStmtLetWT m xt e : es -> do
-      cont <- concatQuasiStmtList es
-      return $ WeakStmtLetWT m xt e cont
-    QuasiStmtVerify m e : es -> do
-      cont <- concatQuasiStmtList es
-      return $ WeakStmtVerify m e cont
+-- concatWeakStmtList :: [WeakStmt] -> WithEnv WeakStmt
+-- concatWeakStmtList =
+--   \case
+--     [] -> do
+--       path <- getCurrentFilePath
+--       content <- liftIO $ TIO.readFile $ toFilePath path
+--       let m = newMeta (length $ T.lines content) 1 path
+--       return $ WeakStmtReturn (m, WeakTermEnumIntro $ EnumValueIntS 64 0)
+--     WeakStmtLet m xt e : es -> do
+--       cont <- concatWeakStmtList es
+--       return $ WeakStmtLet m xt e cont
+--     WeakStmtLetWT m xt e : es -> do
+--       cont <- concatWeakStmtList es
+--       return $ WeakStmtLetWT m xt e cont
+--     WeakStmtVerify m e : es -> do
+--       cont <- concatWeakStmtList es
+--       return $ WeakStmtVerify m e cont
 
--- QuasiStmtLetInductive n m at e : es -> do
+-- WeakStmtLetInductive n m at e : es -> do
 --   insForm n at e
---   cont <- concatQuasiStmtList es
+--   cont <- concatWeakStmtList es
 --   return $ WeakStmtLetWT m at e cont
--- QuasiStmtLetInductiveIntro m bt e as : ss ->
+-- WeakStmtLetInductiveIntro m bt e as : ss ->
 --   case e of
 --     (mLam, WeakTermPiIntro Nothing xtsyts (_, WeakTermPiIntro (Just (bi, _)) atsbts (_, WeakTermPiElim b _))) -> do
 --       (_, is) <- lookupRevIndEnv m bi
 --       yts' <- mapM (internalize as atsbts) $ drop (length (is :: [Int])) xtsyts
 --       insInductive as bt -- register the constructor (if necessary)
---       cont <- concatQuasiStmtList ss
+--       cont <- concatWeakStmtList ss
 --       return $
 --         WeakStmtLetWT
 --           m
