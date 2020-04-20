@@ -226,8 +226,7 @@ removeFromIntactSet :: Meta -> T.Text -> WithEnv ()
 removeFromIntactSet m x =
   whenCheck $ modify (\env -> env {intactSet = S.delete (m, x) (intactSet env)})
 
-lookupName ::
-  Meta -> [T.Text] -> NameEnv -> Ident -> WithEnv (Maybe Ident)
+lookupName :: Meta -> [T.Text] -> NameEnv -> Ident -> WithEnv (Maybe Ident)
 lookupName m penv nenv x =
   case Map.lookup (asText x) nenv of
     Just x' -> do
@@ -235,8 +234,7 @@ lookupName m penv nenv x =
       return $ Just x'
     Nothing -> lookupName' m penv nenv x
 
-lookupName' ::
-  Meta -> [T.Text] -> NameEnv -> Ident -> WithEnv (Maybe Ident)
+lookupName' :: Meta -> [T.Text] -> NameEnv -> Ident -> WithEnv (Maybe Ident)
 lookupName' m penv nenv x =
   case penv of
     [] -> return Nothing
