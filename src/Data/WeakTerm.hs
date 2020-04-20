@@ -93,7 +93,7 @@ data QuasiStmt
     --   QuasiStmtDef [(T.Text, Def)]
     QuasiStmtVerify Meta WeakTermPlus
   -- | QuasiStmtEnum Meta T.Text [(T.Text, Int)]
-  | QuasiStmtConstDecl Meta WeakTextPlus
+  -- | QuasiStmtConstDecl Meta WeakTextPlus
   | QuasiStmtLetInductive Int Meta WeakIdentPlus WeakTermPlus
   | QuasiStmtLetInductiveIntro Meta WeakIdentPlus WeakTermPlus [T.Text]
   -- | QuasiStmtUse T.Text
@@ -106,7 +106,7 @@ data WeakStmt
   | WeakStmtLet Meta WeakIdentPlus WeakTermPlus WeakStmt
   | WeakStmtLetWT Meta WeakIdentPlus WeakTermPlus WeakStmt
   | WeakStmtVerify Meta WeakTermPlus WeakStmt
-  | WeakStmtConstDecl Meta WeakTextPlus WeakStmt
+  -- | WeakStmtConstDecl Meta WeakTextPlus WeakStmt
   -- | WeakStmtVisit (Path Abs File) WeakStmt WeakStmt
   deriving (Show)
 

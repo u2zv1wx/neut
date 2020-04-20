@@ -155,7 +155,7 @@ parse' stmtList =
               install item path
             parse' cont
           | otherwise -> raiseSyntaxError m "(ensure LEAF LEAF)"
-        (_, TreeNode ((_, TreeLeaf "statement") : as1)) -> parse' $ as1 ++ cont
+        (_, TreeNode ((_, TreeLeaf "statement") : innerCont)) -> parse' $ innerCont ++ cont
         (m, TreeNode ((_, TreeLeaf "introspect") : rest))
           | ((mx, TreeLeaf x) : stmtClauseList) <- rest -> do
             val <- retrieveCompileTimeVarValue mx x
@@ -165,13 +165,16 @@ parse' stmtList =
               Just as1 -> parse' $ as1 ++ cont
           | otherwise -> raiseSyntaxError m "(introspect LEAF TREE*)"
         (m, TreeNode ((_, TreeLeaf "constant") : rest))
-          | [(mn, TreeLeaf name), t] <- rest -> do
+          | [(_, TreeLeaf name), t] <- rest -> do
             t' <- adjustPhase t >>= macroExpand >>= interpret -- たとえばここでdiscernも行う
             name' <- withSectionPrefix name
-            defList <- parse' cont
+            h <- asIdent <$> newTextWith "_"
             m' <- adjustPhase' m
-            mn' <- adjustPhase' mn
-            return $ QuasiStmtConstDecl m' (mn', name', t') : defList
+            -- mn' <- adjustPhase' mn
+            let constDecl = QuasiStmtLet m' (m', h, t') (m', WeakTermConst name')
+            defList <- parse' cont
+            return $ constDecl : defList
+          -- return $ QuasiStmtConstDecl m' (mn', name', t') : defList
           | otherwise -> raiseSyntaxError m "(constant LEAF TREE)"
         (m, TreeNode (def@(mDef, TreeLeaf "definition") : rest))
           | [name@(_, TreeLeaf _), body] <- rest ->
@@ -470,9 +473,9 @@ concatQuasiStmtList [] = do
   content <- liftIO $ TIO.readFile $ toFilePath path
   let m = newMeta (length $ T.lines content) 1 path
   return $ WeakStmtReturn (m, WeakTermEnumIntro $ EnumValueIntS 64 0)
-concatQuasiStmtList (QuasiStmtConstDecl m xt : es) = do
-  cont <- concatQuasiStmtList es
-  return $ WeakStmtConstDecl m xt cont
+-- concatQuasiStmtList (QuasiStmtConstDecl m xt : es) = do
+--   cont <- concatQuasiStmtList es
+--   return $ WeakStmtConstDecl m xt cont
 concatQuasiStmtList (QuasiStmtLet m xt e : es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtLet m xt e cont

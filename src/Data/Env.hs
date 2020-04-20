@@ -78,6 +78,7 @@ data Env
         -- "list:cons" ~> ("list", [0])
         revIndEnv :: Map.HashMap T.Text (T.Text, [Int]),
         intactSet :: S.Set (Meta, T.Text),
+        topNameEnv :: Map.HashMap T.Text Ident,
         --
         -- elaborate
         --
@@ -132,6 +133,7 @@ initialEnv =
       revNameEnv = IntMap.empty,
       revIndEnv = Map.empty,
       intactSet = S.empty,
+      topNameEnv = Map.empty,
       prefixEnv = [],
       sectionEnv = [],
       formationEnv = Map.empty,

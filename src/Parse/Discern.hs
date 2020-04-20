@@ -27,11 +27,11 @@ discern' nenv (QuasiStmtLet m xt e : ss) = do
 discern' nenv (QuasiStmtLetWT m xt e : ss) = do
   (xt', e', ss') <- discernLet nenv xt e ss
   return $ QuasiStmtLetWT m xt' e' : ss'
-discern' nenv (QuasiStmtConstDecl m (mx, x, t) : ss) = do
-  insertConstant mx x
-  t' <- discern'' nenv t
-  ss' <- discern' nenv ss
-  return $ QuasiStmtConstDecl m (mx, x, t') : ss'
+-- discern' nenv (QuasiStmtConstDecl m (mx, x, t) : ss) = do
+--   insertConstant mx x
+--   t' <- discern'' nenv t
+--   ss' <- discern' nenv ss
+--   return $ QuasiStmtConstDecl m (mx, x, t') : ss'
 discern' nenv (QuasiStmtVerify m e : ss) = do
   e' <- discern'' nenv e
   ss' <- discern' nenv ss
