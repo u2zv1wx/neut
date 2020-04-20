@@ -23,8 +23,8 @@ import Data.WeakTerm
 import Text.Read (readMaybe)
 
 interpret :: TreePlus -> WithEnv WeakTermPlus
-interpret =
-  \case
+interpret inputTree =
+  case inputTree of
     (m, TreeLeaf "tau") -> return (m, WeakTermTau)
     (m, TreeNode ((_, TreeLeaf "upsilon") : rest))
       | [(_, TreeLeaf x)] <- rest -> return (m, WeakTermUpsilon $ asIdent x)
