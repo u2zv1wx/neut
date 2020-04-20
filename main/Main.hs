@@ -1,7 +1,4 @@
-module Main
-  ( main,
-  )
-where
+module Main where
 
 import Clarify
 import qualified Codec.Archive.Tar as Tar
