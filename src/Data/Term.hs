@@ -48,6 +48,11 @@ type SubstTerm = IntMap.IntMap TermPlus
 
 type IdentPlus = (Meta, Ident, TermPlus)
 
+data Stmt
+  = StmtReturn Meta
+  | StmtLet Meta IdentPlus TermPlus Stmt
+  deriving (Show)
+
 termPi :: [IdentPlus] -> TermPlus -> Term
 termPi = TermPi Nothing
 

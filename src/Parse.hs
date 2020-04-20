@@ -35,6 +35,7 @@ parse :: Path Abs File -> WithEnv [WeakStmt]
 parse inputPath = do
   stmtList <- visit inputPath
   warnUnusedVar
+  pushTrace inputPath
   return stmtList
 
 -- should create "initial meta"

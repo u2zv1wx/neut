@@ -266,8 +266,7 @@ inferType' ctx t = do
 inferKind :: Meta -> ArrayKind -> WithEnv WeakTermPlus
 inferKind m (ArrayKindIntS i) = return (m, WeakTermEnum (EnumTypeIntS i))
 inferKind m (ArrayKindIntU i) = return (m, WeakTermEnum (EnumTypeIntU i))
-inferKind m (ArrayKindFloat size) =
-  return (m, WeakTermConst ("f" <> T.pack (show (sizeAsInt size))))
+inferKind m (ArrayKindFloat size) = return (m, WeakTermConst ("f" <> T.pack (show (sizeAsInt size))))
 inferKind m _ = raiseCritical m "inferKind for void-pointer"
 
 inferPi ::

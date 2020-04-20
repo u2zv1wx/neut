@@ -21,6 +21,8 @@
 
 (use free-internal)
 
+?free-internal:induction
+
 (definition free ((g (hom tau tau)))
   (witness (hom tau tau)
     (lambda (a)

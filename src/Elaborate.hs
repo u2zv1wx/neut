@@ -20,15 +20,16 @@ import Numeric
 import Reduce.Term
 import Reduce.WeakTerm
 
-elaborate :: [WeakStmt] -> WithEnv TermPlus
+elaborate :: [WeakStmt] -> WithEnv Stmt
 elaborate = elaborateStmt
 
-elaborateStmt :: [WeakStmt] -> WithEnv TermPlus
+elaborateStmt :: [WeakStmt] -> WithEnv Stmt
 elaborateStmt =
   \case
     [] -> do
-      let m = undefined
-      return (m, TermEnumIntro (EnumValueIntS 64 0))
+      path <- getCurrentFilePath
+      let m = newMeta 1 1 path
+      return $ StmtReturn m
     WeakStmtLet m (mx, x, t) e : cont -> do
       (e', te) <- infer e
       t' <- inferType t
@@ -39,7 +40,7 @@ elaborateStmt =
       insWeakTypeEnv x $ weaken t''
       modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e'') (substEnv env)})
       cont' <- elaborateStmt cont
-      return (m, TermPiElim (m, termPiIntro [(mx, x, t'')] cont') [e''])
+      return $ StmtLet m (mx, x, t'') e'' cont'
     WeakStmtLetWT m (mx, x, t) e : cont -> do
       t' <- inferType t
       analyze >> synthesize >> refine >> cleanup
@@ -48,7 +49,7 @@ elaborateStmt =
       insWeakTypeEnv x $ weaken t''
       modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e') (substEnv env)})
       cont' <- elaborateStmt cont
-      return (m, TermPiElim (m, termPiIntro [(mx, x, t'')] cont') [e'])
+      return $ StmtLet m (mx, x, t'') e' cont'
     WeakStmtConstDecl (_, c, t) : cont -> do
       t' <- reduceTermPlus <$> elaborate' t
       insTypeEnv (Right c) t'

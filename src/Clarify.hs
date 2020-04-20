@@ -20,14 +20,28 @@ import Data.Term
 import qualified Data.Text as T
 import Reduce.Term
 
-clarify :: TermPlus -> WithEnv CodePlus
-clarify e = do
+clarify :: Stmt -> WithEnv CodePlus
+clarify = clarifyStmt
+
+clarifyStmt :: Stmt -> WithEnv CodePlus
+clarifyStmt (StmtReturn m) =
+  return (m, CodeUpIntro (m, DataEnumIntro (EnumValueIntS 64 0)))
+clarifyStmt (StmtLet m (_, x, _) e cont) = do
   tenv <- gets typeEnv
-  clarify' tenv e
+  e' <- clarify' tenv e
+  insCodeEnv (asText'' x) [] e' -- S4-box-introduction
+  h <- newNameWith'' "_"
+  cont' <- clarifyStmt cont
+  return (m, CodeUpElim h e' cont')
 
 clarify' :: TypeEnv -> TermPlus -> WithEnv CodePlus
 clarify' _ (m, TermTau) = returnCartesianImmediate m
-clarify' _ (m, TermUpsilon x) = return (m, CodeUpIntro (m, DataUpsilon x))
+clarify' _ (m, TermUpsilon x) = do
+  cenv <- gets codeEnv
+  let x' = asText'' x
+  if x' `Map.member` cenv
+    then return (m, CodePiElimDownElim (m, DataConst x') []) -- S4-box-elimination
+    else return (m, CodeUpIntro (m, DataUpsilon x))
 clarify' _ (m, TermPi {}) = returnClosureType m
 clarify' tenv lam@(m, TermPiIntro Nothing mxts e) = do
   fvs <- nubFVS <$> chainTermPlus tenv lam
@@ -136,9 +150,7 @@ clarifyCase tenv m cxtes typeVarName envVarName lamVarName = do
   fvs <- constructCaseFVS tenv cxtes m typeVarName envVarName
   es <- (mapM (clarifyCase' tenv m envVarName) >=> alignFVS tenv m fvs) cxtes
   (y, e', yVar) <- clarifyPlus tenv (m, TermUpsilon lamVarName)
-  let sub =
-        IntMap.fromList $
-          map (\(mx, x, _) -> (asInt x, (mx, DataUpsilon x))) fvs
+  let sub = IntMap.fromList $ map (\(mx, x, _) -> (asInt x, (mx, DataUpsilon x))) fvs
   let cs = map (fst . fst) cxtes
   return $ bindLet [(y, e')] (m, CodeCase sub yVar (zip cs es))
 
@@ -184,13 +196,19 @@ clarifyConst tenv m x
   | x == "unsafe:cast" = clarifyCast tenv m
   | otherwise = do
     os <- getOS
-    cenv <- gets cacheEnv
-    -- showInHexはLLVMのときまで遅延させたほうがいいかも（型情報の取得が絡むので）
-    let x' = showInHex x
-    case (asSysCallMaybe os x, Map.lookup x cenv) of
-      (Just (syscall, argInfo), _) -> clarifySysCall tenv x syscall argInfo m
-      (_, Nothing) -> return (m, CodeUpIntro (m, DataConst x)) -- external
-      (_, Just _) -> return (m, CodePiElimDownElim (m, DataConst x') []) -- box-elim
+    case asSysCallMaybe os x of
+      Just (syscall, argInfo) -> clarifySysCall tenv x syscall argInfo m
+      _ -> return (m, CodeUpIntro (m, DataConst x))
+
+--   (_, Nothing) -> return (m, CodeUpIntro (m, DataConst x)) -- external
+--   (_, Just _) -> return (m, CodePiElimDownElim (m, DataConst x') []) -- box-elim
+-- cenv <- gets cacheEnv
+-- -- showInHexはLLVMのときまで遅延させたほうがいいかも（型情報の取得が絡むので）
+-- let x' = showInHex x
+-- case (asSysCallMaybe os x, Map.lookup x cenv) of
+--   (Just (syscall, argInfo), _) -> clarifySysCall tenv x syscall argInfo m
+--   (_, Nothing) -> return (m, CodeUpIntro (m, DataConst x)) -- external
+--   (_, Just _) -> return (m, CodePiElimDownElim (m, DataConst x') []) -- box-elim
 
 immType :: Meta -> TermPlus
 immType m = (m, TermEnum (EnumTypeIntS 64))
