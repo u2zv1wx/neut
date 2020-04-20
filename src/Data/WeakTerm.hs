@@ -85,41 +85,12 @@ type Connective =
     [Rule] -- list of introduction rule when inductive / list of elimination rule when coinductive
   )
 
--- data QuasiStmt
---   = QuasiStmtLet Meta WeakIdentPlus WeakTermPlus
---   | -- special case of `let` in which the `e` in `let x := e` is known to be well-typed
---     QuasiStmtLetWT Meta WeakIdentPlus WeakTermPlus
---   | -- | -- mutually recursive definition (n >= 0)
---     --   --   (definition
---     --   --     ((f1 A1) (ARGS-1) e1)
---     --   --     ...
---     --   --     ((fn An) (ARGS-n) en))
---     --   QuasiStmtDef [(T.Text, Def)]
---     QuasiStmtVerify Meta WeakTermPlus
---   -- | QuasiStmtEnum Meta T.Text [(T.Text, Int)]
---   -- | QuasiStmtConstDecl Meta WeakTextPlus
---   -- | QuasiStmtLetInductive Int Meta WeakIdentPlus WeakTermPlus
---   -- | QuasiStmtLetInductiveIntro Meta WeakIdentPlus WeakTermPlus [T.Text]
---   -- | QuasiStmtUse T.Text
---   -- | QuasiStmtUnuse T.Text
---   -- | QuasiStmtVisit (Path Abs File) [QuasiStmt]
---   deriving (Show)
-
 data WeakStmt
   = WeakStmtLet Meta WeakIdentPlus WeakTermPlus
   | WeakStmtLetWT Meta WeakIdentPlus WeakTermPlus
   | WeakStmtConstDecl WeakTextPlus
   | WeakStmtVerify Meta WeakTermPlus
   deriving (Show)
-
--- data WeakStmt
---   = WeakStmtReturn WeakTermPlus
---   | WeakStmtLet Meta WeakIdentPlus WeakTermPlus WeakStmt
---   | WeakStmtLetWT Meta WeakIdentPlus WeakTermPlus WeakStmt
---   | WeakStmtVerify Meta WeakTermPlus WeakStmt
---   -- | WeakStmtConstDecl Meta WeakTextPlus WeakStmt
---   -- | WeakStmtVisit (Path Abs File) WeakStmt WeakStmt
---   deriving (Show)
 
 weakTermPi :: [WeakIdentPlus] -> WeakTermPlus -> WeakTerm
 weakTermPi = WeakTermPi Nothing
