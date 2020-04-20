@@ -10,7 +10,6 @@ import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
 import Control.Monad.State.Lazy hiding (get)
 import Data.Basic
-import qualified Data.ByteString as B
 import Data.ByteString.Builder
 import qualified Data.ByteString.Lazy as L
 import Data.Env
@@ -29,7 +28,6 @@ import Parse.Rule
 import Parse.Tokenize
 import Path
 import Path.IO
-import System.IO.Streams (InputStream)
 import qualified System.IO.Streams as Streams
 import Text.Read (readMaybe)
 
@@ -148,7 +146,9 @@ parse' =
             when (not isAlreadyInstalled) $ do
               urlStr' <- readStrOrThrow mUrl urlStr
               note' $ "downloading " <> pkg <> " from " <> TE.decodeUtf8 urlStr'
-              item <- liftIO $ get urlStr' lazyConcatHandler
+              item <- liftIO $ get urlStr' $ \_ i1 -> do
+                i2 <- Streams.map byteString i1
+                toLazyByteString <$> Streams.fold mappend mempty i2
               note' $ "installing " <> pkg <> " into " <> T.pack (toFilePath path)
               install item path
             parse' cont
@@ -231,12 +231,6 @@ parse' =
               t <- newHole m'
               defList <- parse' cont
               return $ QuasiStmtLet m' (m', name, t) e' : defList
-
-lazyConcatHandler :: Response -> InputStream B.ByteString -> IO L.ByteString
-lazyConcatHandler _ i1 = do
-  i2 <- Streams.map byteString i1
-  x <- Streams.fold mappend mempty i2
-  return $ toLazyByteString x
 
 withSectionPrefix :: T.Text -> WithEnv T.Text
 withSectionPrefix x = do
