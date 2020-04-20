@@ -666,63 +666,88 @@ raiseSyntaxError m form =
   raiseError m $ "couldn't match the input with the expected form: " <> form
 
 interpretWith :: TreePlus -> WithEnv WeakTermPlus
-interpretWith (m, TreeNode (with@(_, TreeLeaf "with") : bind : (_, TreeNode ((_, TreeLeaf "let") : xt : es)) : rest)) = do
-  (borrowVarList, es') <- interpretBorrow m es
-  if not (null borrowVarList)
-    then do
-      sig <- newTextWith "borrow"
-      interpretWith
-        ( m,
-          TreeNode
-            [ with,
-              bind,
-              (m, TreeNode ((m, TreeLeaf "let") : (m, TreeLeaf sig) : es')),
-              ( m,
-                TreeNode
-                  [ (m, TreeLeaf "sigma-elimination"),
-                    (m, TreeNode (borrowVarList ++ [xt])),
-                    (m, TreeLeaf sig),
-                    (m, TreeNode (with : bind : rest))
-                  ]
-              )
-            ]
-        )
-    else do
-      bind' <- interpret bind
-      h1 <- newHole m
-      h2 <- newHole m
-      e' <- interpretWith (m, TreeNode (with : bind : es'))
-      xt' <- interpretWeakIdentPlus xt
-      rest' <- interpretWith (m, TreeNode (with : bind : rest))
-      let lam = (m, weakTermPiIntro [xt'] rest')
-      return (m, WeakTermPiElim bind' [h1, h2, e', lam])
-interpretWith (m, TreeNode (with@(_, TreeLeaf "with") : bind : (_, TreeNode ((_, TreeLeaf "erase") : xs)) : rest)) =
-  case mapM asLeaf xs of
-    Nothing -> raiseSyntaxError m "(with TREE (erase LEAF ... LEAF) TREE*)"
-    Just xs' -> do
-      rest' <- interpretWith (m, TreeNode (with : bind : rest))
-      return (m, WeakTermErase xs' rest')
-interpretWith (_, TreeNode [(_, TreeLeaf "with"), _, e]) = interpret e
-interpretWith (m, TreeNode (with@(_, TreeLeaf "with") : bind : e : rest)) = do
-  let e' = (m, TreeNode [(m, TreeLeaf "let"), (m, TreeLeaf "_"), e])
-  interpretWith (m, TreeNode (with : bind : e' : rest))
-interpretWith t = raiseSyntaxError (fst t) "(with TREE TREE+)"
+interpretWith =
+  \case
+    (m, TreeNode (with@(_, TreeLeaf "with") : bind : (_, TreeNode ((_, TreeLeaf "let") : xt : es)) : rest)) -> do
+      (borrowVarList, es') <- interpretBorrow m es
+      if not (null borrowVarList)
+        then do
+          sig <- newTextWith "borrow"
+          interpretWith
+            ( m,
+              TreeNode
+                [ with,
+                  bind,
+                  (m, TreeNode ((m, TreeLeaf "let") : (m, TreeLeaf sig) : es')),
+                  ( m,
+                    TreeNode
+                      [ (m, TreeLeaf "sigma-elimination"),
+                        (m, TreeNode (borrowVarList ++ [xt])),
+                        (m, TreeLeaf sig),
+                        (m, TreeNode (with : bind : rest))
+                      ]
+                  )
+                ]
+            )
+        else do
+          bind' <- interpret bind
+          h1 <- newHole m
+          h2 <- newHole m
+          e' <- interpretWith (m, TreeNode (with : bind : es'))
+          xt' <- interpretWeakIdentPlus xt
+          rest' <- interpretWith (m, TreeNode (with : bind : rest))
+          let lam = (m, weakTermPiIntro [xt'] rest')
+          return (m, WeakTermPiElim bind' [h1, h2, e', lam])
+    (m, TreeNode (with@(_, TreeLeaf "with") : bind : (_, TreeNode ((_, TreeLeaf "erase") : xs)) : rest)) ->
+      case mapM asLeaf xs of
+        Nothing -> raiseSyntaxError m "(with TREE (erase LEAF ... LEAF) TREE*)"
+        Just xs' -> do
+          rest' <- interpretWith (m, TreeNode (with : bind : rest))
+          return (m, WeakTermErase xs' rest')
+    (_, TreeNode [(_, TreeLeaf "with"), _, e]) ->
+      interpret e
+    (m, TreeNode (with@(_, TreeLeaf "with") : bind : e : rest)) -> do
+      let e' = (m, TreeNode [(m, TreeLeaf "let"), (m, TreeLeaf "_"), e])
+      interpretWith (m, TreeNode (with : bind : e' : rest))
+    t ->
+      raiseSyntaxError (fst t) "(with TREE TREE+)"
 
 interpretBorrow :: Meta -> [TreePlus] -> WithEnv ([TreePlus], [TreePlus])
-interpretBorrow m [] = raiseSyntaxError m "(TREE TREE*)"
-interpretBorrow _ es = do
-  let (borrowVarList, e') = interpretBorrow' $ last es
-  return (borrowVarList, init es ++ [e'])
+interpretBorrow m =
+  \case
+    [] -> raiseSyntaxError m "(TREE TREE*)"
+    es -> do
+      let (borrowVarList, e') = interpretBorrow' $ last es
+      return (borrowVarList, init es ++ [e'])
+
+-- interpretBorrow m [] = raiseSyntaxError m "(TREE TREE*)"
+-- interpretBorrow _ es = do
+--   let (borrowVarList, e') = interpretBorrow' $ last es
+--   return (borrowVarList, init es ++ [e'])
 
 interpretBorrow' :: TreePlus -> ([TreePlus], TreePlus)
-interpretBorrow' t@(_, TreeLeaf _) = ([], t)
-interpretBorrow' (m, TreeNode ts) = do
-  let (mmxs, ts') = unzip $ map interpretBorrow'' ts
-  (catMaybes mmxs, (m, TreeNode ts'))
+interpretBorrow' =
+  \case
+    t@(_, TreeLeaf _) -> ([], t)
+    (m, TreeNode ts) -> do
+      let (mmxs, ts') = unzip $ map interpretBorrow'' ts
+      (catMaybes mmxs, (m, TreeNode ts'))
+
+-- interpretBorrow' t@(_, TreeLeaf _) = ([], t)
+-- interpretBorrow' (m, TreeNode ts) = do
+--   let (mmxs, ts') = unzip $ map interpretBorrow'' ts
+--   (catMaybes mmxs, (m, TreeNode ts'))
 
 interpretBorrow'' :: TreePlus -> (Maybe TreePlus, TreePlus)
-interpretBorrow'' (m, TreeLeaf s)
-  | T.length s > 1,
-    T.head s == '&' =
-    (Just (m, TreeLeaf $ T.tail s), (m, TreeLeaf $ T.tail s))
-interpretBorrow'' t = (Nothing, t)
+interpretBorrow'' =
+  \case
+    (m, TreeLeaf s)
+      | T.length s > 1,
+        T.head s == '&' ->
+        (Just (m, TreeLeaf $ T.tail s), (m, TreeLeaf $ T.tail s))
+    t -> (Nothing, t)
+-- interpretBorrow'' (m, TreeLeaf s)
+--   | T.length s > 1,
+--     T.head s == '&' =
+--     (Just (m, TreeLeaf $ T.tail s), (m, TreeLeaf $ T.tail s))
+-- interpretBorrow'' t = (Nothing, t)
