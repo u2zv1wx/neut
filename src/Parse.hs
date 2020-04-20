@@ -76,156 +76,159 @@ popTrace :: WithEnv ()
 popTrace = modify (\env -> env {traceEnv = tail (traceEnv env)})
 
 parse' :: [TreePlus] -> WithEnv [QuasiStmt]
-parse' [] = leave
-parse' ((m, TreeNode ((_, TreeLeaf "notation") : es)) : as)
-  | [from, to] <- es = do
-    checkNotationSanity from
-    modify (\e -> e {notationEnv = (from, to) : notationEnv e})
-    parse' as
-  | otherwise = raiseSyntaxError m "(notation TREE TREE)"
-parse' ((m, TreeNode ((_, TreeLeaf "keyword") : es)) : as)
-  | [(_, TreeLeaf s)] <- es = do
-    checkKeywordSanity m s
-    modify (\e -> e {keywordEnv = S.insert s (keywordEnv e)})
-    parse' as
-  | otherwise = raiseSyntaxError m "(keyword LEAF)"
-parse' ((m, TreeNode ((_, TreeLeaf "use") : es)) : as)
-  | [(_, TreeLeaf s)] <- es = do
-    modify (\e -> e {prefixEnv = s : prefixEnv e}) -- required to check sanity of `include`
-    parse' as
-  | otherwise = raiseSyntaxError m "(use LEAF)"
-parse' ((m, TreeNode ((_, TreeLeaf "unuse") : es)) : as)
-  | [(_, TreeLeaf s)] <- es = do
-    modify (\e -> e {prefixEnv = filter (/= s) (prefixEnv e)}) -- required to check sanity of `include`
-    parse' as
-  | otherwise = raiseSyntaxError m "(unuse LEAF)"
-parse' ((m, TreeNode ((_, TreeLeaf "section") : es)) : as)
-  | [(_, TreeLeaf s)] <- es = do
-    modify (\e -> e {sectionEnv = s : sectionEnv e})
-    n <- getCurrentSection
-    modify (\e -> e {prefixEnv = n : n <> ":" <> "private" : prefixEnv e})
-    parse' as
-  | otherwise = raiseSyntaxError m "(section LEAF)"
-parse' ((m, TreeNode ((_, TreeLeaf "end") : es)) : as)
-  | [(_, TreeLeaf s)] <- es = do
-    ns <- gets sectionEnv
-    case ns of
-      [] -> raiseError m "there is no section to end"
-      (s' : ns')
-        | s == s' -> do
-          n <- getCurrentSection
-          modify (\e -> e {sectionEnv = ns'})
-          penv <- gets prefixEnv
-          modify (\env -> env {prefixEnv = filter (`notElem` [n, n <> ":" <> "private"]) penv})
-          parse' as
-        | otherwise ->
-          raiseError m $
-            "the innermost section is not `" <> s <> "`, but is `" <> s' <> "`"
-  | otherwise = raiseSyntaxError m "(end LEAF)"
-parse' ((m, TreeNode ((_, TreeLeaf "enum") : rest)) : as)
-  | (_, TreeLeaf name) : ts <- rest = do
-    xis <- interpretEnumItem m name ts
-    m' <- adjustPhase' m
-    ss <- parse' as
-    return $ QuasiStmtEnum m' name xis : ss
-  | otherwise = raiseSyntaxError m "(enum LEAF TREE ... TREE)"
-parse' ((m, TreeNode ((_, TreeLeaf "include") : rest)) : as)
-  | [(mPath, TreeLeaf pathString)] <- rest =
-    includeFile m mPath pathString getCurrentDirPath as
-  | [(_, TreeLeaf "library"), (mPath, TreeLeaf pathString)] <- rest =
-    includeFile m mPath pathString getLibraryDirPath as
-  | otherwise = raiseSyntaxError m "(include LEAF) | (include library LEAF)"
-parse' ((m, TreeNode ((_, TreeLeaf "ensure") : rest)) : as)
-  | [(_, TreeLeaf pkg), (mUrl, TreeLeaf urlStr)] <- rest = do
-    libDir <- getLibraryDirPath
-    pkg' <- parseRelDir $ T.unpack pkg
-    let path = libDir </> pkg'
-    isAlreadyInstalled <- doesDirExist path
-    when (not isAlreadyInstalled) $ do
-      urlStr' <- parseByteString mUrl urlStr
-      note' $ "downloading " <> pkg <> " from " <> TE.decodeUtf8 urlStr'
-      item <- liftIO $ get urlStr' lazyConcatHandler
-      note' $ "installing " <> pkg <> " into " <> T.pack (toFilePath path)
-      install item path
-    parse' as
-  | otherwise = raiseSyntaxError m "(ensure LEAF LEAF)"
-parse' ((_, TreeNode ((_, TreeLeaf "statement") : as1)) : as2) = parse' $ as1 ++ as2
-parse' ((m, TreeNode ((_, TreeLeaf "introspect") : rest)) : as2)
-  | ((mx, TreeLeaf x) : stmtClauseList) <- rest = do
-    val <- retrieveCompileTimeVarValue mx x
-    stmtClauseList' <- mapM parseStmtClause stmtClauseList
-    case lookup val stmtClauseList' of
-      Nothing -> parse' as2
-      Just as1 -> parse' $ as1 ++ as2
-  | otherwise = raiseSyntaxError m "(introspect LEAF TREE*)"
-parse' ((m, TreeNode ((_, TreeLeaf "constant") : rest)) : as)
-  | [(mn, TreeLeaf name), t] <- rest = do
-    t' <- adjustPhase t >>= macroExpand >>= interpret -- たとえばここでdiscernも行う
-    name' <- withSectionPrefix name
-    defList <- parse' as
-    m' <- adjustPhase' m
-    mn' <- adjustPhase' mn
-    return $ QuasiStmtConstDecl m' (mn', name', t') : defList
-  | otherwise = raiseSyntaxError m "(constant LEAF TREE)"
-parse' ((m, TreeNode (def@(mDef, TreeLeaf "definition") : rest)) : as)
-  | [name@(_, TreeLeaf _), body] <- rest =
-    parse' $ (m, TreeNode [(mDef, TreeLeaf "let"), name, body]) : as
-  | name@(mFun, TreeLeaf _) : xts@(_, TreeNode _) : body : rest' <- rest =
-    parse' $
-      (m, TreeNode [def, (mFun, TreeNode (name : xts : body : rest'))]) : as
-  | otherwise = do
-    ss1 <- parseDef rest
-    ss2 <- parse' as
-    return $ ss1 ++ ss2
-parse' ((m, TreeNode (ind@(_, TreeLeaf "inductive") : rest)) : as)
-  | name@(mFun, TreeLeaf _) : xts@(_, TreeNode _) : rest' <- rest =
-    parse' $ (m, TreeNode [ind, (mFun, TreeNode (name : xts : rest'))]) : as
-  | otherwise = do
-    rest' <- mapM (adjustPhase >=> macroExpand) rest
-    m' <- adjustPhase' m
-    stmtList1 <- parseInductive m' rest'
-    stmtList2 <- parse' as
-    return $ stmtList1 ++ stmtList2
-parse' ((m, TreeNode (coind@(_, TreeLeaf "coinductive") : rest)) : as)
-  | name@(mFun, TreeLeaf _) : xts@(_, TreeNode _) : rest' <- rest =
-    parse' $ (m, TreeNode [coind, (mFun, TreeNode (name : xts : rest'))]) : as
-  | otherwise = do
-    rest' <- mapM (adjustPhase >=> macroExpand) rest
-    registerLabelInfo rest'
-    rest'' <- asInductive rest'
-    stmtList1 <- parseInductive m rest''
-    stmtList2 <- generateProjections rest'
-    stmtList3 <- parse' as
-    return $ stmtList1 ++ stmtList2 ++ stmtList3
-parse' ((m, TreeNode ((mLet, TreeLeaf "let") : rest)) : as)
-  | [(mx, TreeLeaf x), t, e] <- rest = do
-    let xt = (mx, TreeNode [(mx, TreeLeaf x), t])
-    parse' ((m, TreeNode [(mLet, TreeLeaf "let"), xt, e]) : as)
-  | [xt, e] <- rest = do
-    m' <- adjustPhase' m
-    e' <- adjustPhase e >>= macroExpand >>= interpret
-    xt' <- adjustPhase xt >>= macroExpand >>= prefixTextPlus >>= interpretIdentPlus
-    defList <- parse' as
-    return $ QuasiStmtLet m' xt' e' : defList
-  | otherwise = raiseSyntaxError m "(let LEAF TREE TREE) | (let TREE TREE)"
-parse' ((m, TreeNode ((_, TreeLeaf "verify") : rest)) : as)
-  | [e] <- rest = do
-    e' <- adjustPhase e >>= macroExpand >>= interpret
-    m' <- adjustPhase' m
-    defList <- parse' as
-    return $ QuasiStmtVerify m' e' : defList
-  | otherwise = raiseSyntaxError m "(include LEAF) | (include library LEAF)"
-parse' (a : as) = do
-  e <- adjustPhase a >>= macroExpand
-  if isSpecialForm e
-    then parse' $ e : as
-    else do
-      e' <- interpret e
-      name <- asIdent <$> newTextWith "_"
-      m' <- adjustPhase' $ metaOf e'
-      t <- newHole m'
-      defList <- parse' as
-      return $ QuasiStmtLet m' (m', name, t) e' : defList
+parse' stmtList =
+  case stmtList of
+    [] -> leave
+    (stmt : cont) ->
+      case stmt of
+        (m, TreeNode ((_, TreeLeaf "notation") : es))
+          | [from, to] <- es -> do
+            checkNotationSanity from
+            modify (\e -> e {notationEnv = (from, to) : notationEnv e})
+            parse' cont
+          | otherwise -> raiseSyntaxError m "(notation TREE TREE)"
+        (m, TreeNode ((_, TreeLeaf "keyword") : es))
+          | [(_, TreeLeaf s)] <- es -> do
+            checkKeywordSanity m s
+            modify (\e -> e {keywordEnv = S.insert s (keywordEnv e)})
+            parse' cont
+          | otherwise -> raiseSyntaxError m "(keyword LEAF)"
+        (m, TreeNode ((_, TreeLeaf "use") : es))
+          | [(_, TreeLeaf s)] <- es -> do
+            modify (\e -> e {prefixEnv = s : prefixEnv e}) -- required to check sanity of `include`
+            parse' cont
+          | otherwise -> raiseSyntaxError m "(use LEAF)"
+        (m, TreeNode ((_, TreeLeaf "unuse") : es))
+          | [(_, TreeLeaf s)] <- es -> do
+            modify (\e -> e {prefixEnv = filter (/= s) (prefixEnv e)}) -- required to check sanity of `include`
+            parse' cont
+          | otherwise -> raiseSyntaxError m "(unuse LEAF)"
+        (m, TreeNode ((_, TreeLeaf "section") : es))
+          | [(_, TreeLeaf s)] <- es -> do
+            modify (\e -> e {sectionEnv = s : sectionEnv e})
+            n <- getCurrentSection
+            modify (\e -> e {prefixEnv = n : n <> ":" <> "private" : prefixEnv e})
+            parse' cont
+          | otherwise -> raiseSyntaxError m "(section LEAF)"
+        (m, TreeNode ((_, TreeLeaf "end") : es))
+          | [(_, TreeLeaf s)] <- es -> do
+            ns <- gets sectionEnv
+            case ns of
+              [] -> raiseError m "there is no section to end"
+              (s' : ns')
+                | s == s' -> do
+                  n <- getCurrentSection
+                  modify (\e -> e {sectionEnv = ns'})
+                  penv <- gets prefixEnv
+                  modify (\env -> env {prefixEnv = filter (`notElem` [n, n <> ":" <> "private"]) penv})
+                  parse' cont
+                | otherwise ->
+                  raiseError m $
+                    "the innermost section is not `" <> s <> "`, but is `" <> s' <> "`"
+          | otherwise -> raiseSyntaxError m "(end LEAF)"
+        (m, TreeNode ((_, TreeLeaf "enum") : rest))
+          | (_, TreeLeaf name) : ts <- rest -> do
+            xis <- interpretEnumItem m name ts
+            m' <- adjustPhase' m
+            ss <- parse' cont
+            return $ QuasiStmtEnum m' name xis : ss
+          | otherwise -> raiseSyntaxError m "(enum LEAF TREE ... TREE)"
+        (m, TreeNode ((_, TreeLeaf "include") : rest))
+          | [(mPath, TreeLeaf pathString)] <- rest ->
+            includeFile m mPath pathString getCurrentDirPath cont
+          | [(_, TreeLeaf "library"), (mPath, TreeLeaf pathString)] <- rest ->
+            includeFile m mPath pathString getLibraryDirPath cont
+          | otherwise -> raiseSyntaxError m "(include LEAF) | (include library LEAF)"
+        (m, TreeNode ((_, TreeLeaf "ensure") : rest))
+          | [(_, TreeLeaf pkg), (mUrl, TreeLeaf urlStr)] <- rest -> do
+            libDir <- getLibraryDirPath
+            pkg' <- parseRelDir $ T.unpack pkg
+            let path = libDir </> pkg'
+            isAlreadyInstalled <- doesDirExist path
+            when (not isAlreadyInstalled) $ do
+              urlStr' <- parseByteString mUrl urlStr
+              note' $ "downloading " <> pkg <> " from " <> TE.decodeUtf8 urlStr'
+              item <- liftIO $ get urlStr' lazyConcatHandler
+              note' $ "installing " <> pkg <> " into " <> T.pack (toFilePath path)
+              install item path
+            parse' cont
+          | otherwise -> raiseSyntaxError m "(ensure LEAF LEAF)"
+        (_, TreeNode ((_, TreeLeaf "statement") : as1)) -> parse' $ as1 ++ cont
+        (m, TreeNode ((_, TreeLeaf "introspect") : rest))
+          | ((mx, TreeLeaf x) : stmtClauseList) <- rest -> do
+            val <- retrieveCompileTimeVarValue mx x
+            stmtClauseList' <- mapM parseStmtClause stmtClauseList
+            case lookup val stmtClauseList' of
+              Nothing -> parse' cont
+              Just as1 -> parse' $ as1 ++ cont
+          | otherwise -> raiseSyntaxError m "(introspect LEAF TREE*)"
+        (m, TreeNode ((_, TreeLeaf "constant") : rest))
+          | [(mn, TreeLeaf name), t] <- rest -> do
+            t' <- adjustPhase t >>= macroExpand >>= interpret -- たとえばここでdiscernも行う
+            name' <- withSectionPrefix name
+            defList <- parse' cont
+            m' <- adjustPhase' m
+            mn' <- adjustPhase' mn
+            return $ QuasiStmtConstDecl m' (mn', name', t') : defList
+          | otherwise -> raiseSyntaxError m "(constant LEAF TREE)"
+        (m, TreeNode (def@(mDef, TreeLeaf "definition") : rest))
+          | [name@(_, TreeLeaf _), body] <- rest ->
+            parse' $ (m, TreeNode [(mDef, TreeLeaf "let"), name, body]) : cont
+          | name@(mFun, TreeLeaf _) : xts@(_, TreeNode _) : body : rest' <- rest ->
+            parse' $ (m, TreeNode [def, (mFun, TreeNode (name : xts : body : rest'))]) : cont
+          | otherwise -> do
+            ss1 <- parseDef rest
+            ss2 <- parse' cont
+            return $ ss1 ++ ss2
+        (m, TreeNode (ind@(_, TreeLeaf "inductive") : rest))
+          | name@(mFun, TreeLeaf _) : xts@(_, TreeNode _) : rest' <- rest ->
+            parse' $ (m, TreeNode [ind, (mFun, TreeNode (name : xts : rest'))]) : cont
+          | otherwise -> do
+            rest' <- mapM (adjustPhase >=> macroExpand) rest
+            m' <- adjustPhase' m
+            stmtList1 <- parseInductive m' rest'
+            stmtList2 <- parse' cont
+            return $ stmtList1 ++ stmtList2
+        (m, TreeNode (coind@(_, TreeLeaf "coinductive") : rest))
+          | name@(mFun, TreeLeaf _) : xts@(_, TreeNode _) : rest' <- rest ->
+            parse' $ (m, TreeNode [coind, (mFun, TreeNode (name : xts : rest'))]) : cont
+          | otherwise -> do
+            rest' <- mapM (adjustPhase >=> macroExpand) rest
+            registerLabelInfo rest'
+            rest'' <- asInductive rest'
+            stmtList1 <- parseInductive m rest''
+            stmtList2 <- generateProjections rest'
+            stmtList3 <- parse' cont
+            return $ stmtList1 ++ stmtList2 ++ stmtList3
+        (m, TreeNode ((mLet, TreeLeaf "let") : rest))
+          | [(mx, TreeLeaf x), t, e] <- rest -> do
+            let xt = (mx, TreeNode [(mx, TreeLeaf x), t])
+            parse' ((m, TreeNode [(mLet, TreeLeaf "let"), xt, e]) : cont)
+          | [xt, e] <- rest -> do
+            m' <- adjustPhase' m
+            e' <- adjustPhase e >>= macroExpand >>= interpret
+            xt' <- adjustPhase xt >>= macroExpand >>= prefixTextPlus >>= interpretIdentPlus
+            defList <- parse' cont
+            return $ QuasiStmtLet m' xt' e' : defList
+          | otherwise -> raiseSyntaxError m "(let LEAF TREE TREE) | (let TREE TREE)"
+        (m, TreeNode ((_, TreeLeaf "verify") : rest))
+          | [e] <- rest -> do
+            e' <- adjustPhase e >>= macroExpand >>= interpret
+            m' <- adjustPhase' m
+            defList <- parse' cont
+            return $ QuasiStmtVerify m' e' : defList
+          | otherwise -> raiseSyntaxError m "(include LEAF) | (include library LEAF)"
+        _ -> do
+          e <- adjustPhase stmt >>= macroExpand
+          if isSpecialForm e
+            then parse' $ e : cont
+            else do
+              e' <- interpret e
+              name <- asIdent <$> newTextWith "_"
+              m' <- adjustPhase' $ metaOf e'
+              t <- newHole m'
+              defList <- parse' cont
+              return $ QuasiStmtLet m' (m', name, t) e' : defList
 
 lazyConcatHandler :: Response -> InputStream B.ByteString -> IO L.ByteString
 lazyConcatHandler _ i1 = do
