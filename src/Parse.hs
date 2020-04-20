@@ -76,8 +76,8 @@ popTrace :: WithEnv ()
 popTrace = modify (\env -> env {traceEnv = tail (traceEnv env)})
 
 parse' :: [TreePlus] -> WithEnv [QuasiStmt]
-parse' stmtList =
-  case stmtList of
+parse' =
+  \case
     [] -> leave
     (stmt : cont) ->
       case stmt of
@@ -252,16 +252,20 @@ getCurrentSection = do
   return $ getCurrentSection' ns
 
 getCurrentSection' :: [T.Text] -> T.Text
-getCurrentSection' [] = ""
-getCurrentSection' [n] = n
-getCurrentSection' (n : ns) = getCurrentSection' ns <> ":" <> n
+getCurrentSection' =
+  \case
+    [] -> ""
+    [n] -> n
+    (n : ns) -> getCurrentSection' ns <> ":" <> n
 
 asInductive :: [TreePlus] -> WithEnv [TreePlus]
-asInductive [] = return []
-asInductive (t : ts) = do
-  (sub, t') <- asInductive' t
-  ts' <- asInductive $ map (substTree sub) ts
-  return $ t' : ts'
+asInductive =
+  \case
+    [] -> return []
+    (t : ts) -> do
+      (sub, t') <- asInductive' t
+      ts' <- asInductive $ map (substTree sub) ts
+      return $ t' : ts'
 
 asInductive' :: TreePlus -> WithEnv ((T.Text, T.Text), TreePlus)
 asInductive' (m, TreeNode ((_, TreeLeaf a) : (_, TreeNode xts) : rules)) = do
@@ -314,20 +318,24 @@ asInductive' (m, TreeNode ((_, TreeLeaf a) : (_, TreeNode xts) : rules)) = do
 asInductive' t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) ...)"
 
 extractArg :: TreePlus -> WithEnv TreePlus
-extractArg (m, TreeLeaf x) = return (m, TreeLeaf x)
-extractArg (_, TreeNode [(m, TreeLeaf x), _]) = return (m, TreeLeaf x)
-extractArg t = raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
+extractArg =
+  \case
+    (m, TreeLeaf x) -> return (m, TreeLeaf x)
+    (_, TreeNode [(m, TreeLeaf x), _]) -> return (m, TreeLeaf x)
+    t -> raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
 
 styleRule :: TreePlus -> WithEnv TreePlus
-styleRule (m, TreeNode [(mName, TreeLeaf name), (_, TreeNode xts), t]) =
-  return
-    ( m,
-      TreeNode
-        [ (mName, TreeLeaf name),
-          (m, TreeNode [(m, TreeLeaf "pi"), (m, TreeNode xts), t])
-        ]
-    )
-styleRule t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) TREE)"
+styleRule =
+  \case
+    (m, TreeNode [(mName, TreeLeaf name), (_, TreeNode xts), t]) ->
+      return
+        ( m,
+          TreeNode
+            [ (mName, TreeLeaf name),
+              (m, TreeNode [(m, TreeLeaf "pi"), (m, TreeNode xts), t])
+            ]
+        )
+    t -> raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) TREE)"
 
 parseByteString :: Meta -> T.Text -> WithEnv B.ByteString
 parseByteString m quotedStr =
@@ -392,59 +400,72 @@ parseDef xds = do
   return (toLetList $ zip (zip xs xds'') iterList)
 
 prefixFunName :: TreePlus -> WithEnv TreePlus
-prefixFunName (m, TreeNode [xt, xts, body]) = do
-  xt' <- prefixTextPlus xt
-  return (m, TreeNode [xt', xts, body])
-prefixFunName t = raiseSyntaxError (fst t) "(TREE TREE TREE)"
+prefixFunName =
+  \case
+    (m, TreeNode [xt, xts, body]) -> do
+      xt' <- prefixTextPlus xt
+      return (m, TreeNode [xt', xts, body])
+    t -> raiseSyntaxError (fst t) "(TREE TREE TREE)"
 
 prefixTextPlus :: TreePlus -> WithEnv TreePlus
-prefixTextPlus (m, TreeLeaf "_") = return (m, TreeLeaf "_")
-prefixTextPlus (m, TreeLeaf x) = do
-  x' <- withSectionPrefix x
-  return (m, TreeLeaf x')
-prefixTextPlus (m, TreeNode [(mx, TreeLeaf "_"), t]) =
-  return (m, TreeNode [(mx, TreeLeaf "_"), t])
-prefixTextPlus (m, TreeNode [(mx, TreeLeaf x), t]) = do
-  x' <- withSectionPrefix x
-  return (m, TreeNode [(mx, TreeLeaf x'), t])
-prefixTextPlus t = raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
+prefixTextPlus =
+  \case
+    (m, TreeLeaf "_") -> return (m, TreeLeaf "_")
+    (m, TreeLeaf x) -> do
+      x' <- withSectionPrefix x
+      return (m, TreeLeaf x')
+    (m, TreeNode [(mx, TreeLeaf "_"), t]) ->
+      return (m, TreeNode [(mx, TreeLeaf "_"), t])
+    (m, TreeNode [(mx, TreeLeaf x), t]) -> do
+      x' <- withSectionPrefix x
+      return (m, TreeNode [(mx, TreeLeaf x'), t])
+    t -> raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
 
 extractFunName :: TreePlus -> WithEnv Ident
-extractFunName (_, TreeNode ((_, TreeLeaf x) : _)) = return $ asIdent x
-extractFunName (_, TreeNode ((_, TreeNode [(_, TreeLeaf x), _]) : _)) = return $ asIdent x
-extractFunName t = raiseSyntaxError (fst t) "(LEAF ...) | ((LEAF TREE) ...)"
+extractFunName =
+  \case
+    (_, TreeNode ((_, TreeLeaf x) : _)) -> return $ asIdent x
+    (_, TreeNode ((_, TreeNode [(_, TreeLeaf x), _]) : _)) -> return $ asIdent x
+    t -> raiseSyntaxError (fst t) "(LEAF ...) | ((LEAF TREE) ...)"
 
 toLetList :: [(IdentDef, WeakTermPlus)] -> [QuasiStmt]
-toLetList [] = []
-toLetList (((x, (m, (mx, _, t), _, _)), iter) : rest) =
-  QuasiStmtLet m (mx, x, t) iter : toLetList rest
+toLetList =
+  \case
+    [] -> []
+    (((x, (m, (mx, _, t), _, _)), iter) : rest) -> QuasiStmtLet m (mx, x, t) iter : toLetList rest
 
 defToSub :: Def -> (Key, WeakTermPlus)
 defToSub (m, (mx, x, t), xts, e) =
   (Left $ asInt x, (m, WeakTermIter (mx, x, t) xts e))
 
 selfCompose :: Int -> SubstWeakTerm -> SubstWeakTerm
-selfCompose 0 sub = sub
-selfCompose n sub = compose sub $ selfCompose (n - 1) sub
+selfCompose i sub =
+  if i == 0
+    then sub
+    else compose sub $ selfCompose (i - 1) sub
 
 -- fixme: ここではintじゃなくてフルで比較するタイプのsubstを行う必要がある (discern以前にsubstをするので)
 compose :: SubstWeakTerm -> SubstWeakTerm -> SubstWeakTerm
-compose s1 s2 =
-  Map.union (Map.map (substWeakTermPlus s1) s2) s1
+compose s1 s2 = Map.union (Map.map (substWeakTermPlus s1) s2) s1
 
 parseStmtClause :: TreePlus -> WithEnv (T.Text, [TreePlus])
-parseStmtClause (_, TreeNode ((_, TreeLeaf x) : stmtList)) = return (x, stmtList)
-parseStmtClause (m, _) = raiseSyntaxError m "(LEAF TREE*)"
+parseStmtClause =
+  \case
+    (_, TreeNode ((_, TreeLeaf x) : stmtList)) -> return (x, stmtList)
+    (m, _) -> raiseSyntaxError m "(LEAF TREE*)"
 
 retrieveCompileTimeVarValue :: Meta -> T.Text -> WithEnv T.Text
-retrieveCompileTimeVarValue _ "OS" = showOS <$> getOS
-retrieveCompileTimeVarValue _ "architecture" = showArch <$> getArch
 retrieveCompileTimeVarValue m var =
-  raiseError m $ "no such compile-time variable defined: " <> var
+  case var of
+    "OS" -> showOS <$> getOS
+    "architecture" -> showArch <$> getArch
+    _ -> raiseError m $ "no such compile-time variable defined: " <> var
 
 isSpecialForm :: TreePlus -> Bool
-isSpecialForm (_, TreeNode ((_, TreeLeaf x) : _)) = S.member x keywordSet
-isSpecialForm _ = False
+isSpecialForm =
+  \case
+    (_, TreeNode ((_, TreeLeaf x) : _)) -> S.member x keywordSet
+    _ -> False
 
 keywordSet :: S.Set T.Text
 keywordSet =
@@ -468,65 +489,69 @@ keywordSet =
     ]
 
 concatQuasiStmtList :: [QuasiStmt] -> WithEnv WeakStmt
-concatQuasiStmtList [] = do
-  path <- getCurrentFilePath
-  content <- liftIO $ TIO.readFile $ toFilePath path
-  let m = newMeta (length $ T.lines content) 1 path
-  return $ WeakStmtReturn (m, WeakTermEnumIntro $ EnumValueIntS 64 0)
-concatQuasiStmtList (QuasiStmtLet m xt e : es) = do
-  cont <- concatQuasiStmtList es
-  return $ WeakStmtLet m xt e cont
-concatQuasiStmtList (QuasiStmtLetWT m xt e : es) = do
-  cont <- concatQuasiStmtList es
-  return $ WeakStmtLetWT m xt e cont
-concatQuasiStmtList (QuasiStmtVerify m e : es) = do
-  cont <- concatQuasiStmtList es
-  return $ WeakStmtVerify m e cont
-concatQuasiStmtList (QuasiStmtLetInductive n m at e : es) = do
-  insForm n at e
-  cont <- concatQuasiStmtList es
-  return $ WeakStmtLetWT m at e cont
-concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt e as : ss) =
-  case e of
-    (mLam, WeakTermPiIntro Nothing xtsyts (_, WeakTermPiIntro (Just (bi, _)) atsbts (_, WeakTermPiElim b _))) -> do
-      (_, is) <- lookupRevIndEnv m bi
-      yts' <- mapM (internalize as atsbts) $ drop (length (is :: [Int])) xtsyts
-      insInductive as bt -- register the constructor (if necessary)
-      cont <- concatQuasiStmtList ss
-      return $
-        WeakStmtLetWT
-          m
-          bt
-          ( mLam, -- metaIsReducible mLam == False
-            weakTermPiIntro
-              xtsyts
-              ( m,
-                WeakTermPiIntro
-                  (Just (bi, xtsyts))
-                  atsbts
-                  (m, WeakTermPiElim b yts')
+concatQuasiStmtList =
+  \case
+    [] -> do
+      path <- getCurrentFilePath
+      content <- liftIO $ TIO.readFile $ toFilePath path
+      let m = newMeta (length $ T.lines content) 1 path
+      return $ WeakStmtReturn (m, WeakTermEnumIntro $ EnumValueIntS 64 0)
+    QuasiStmtLet m xt e : es -> do
+      cont <- concatQuasiStmtList es
+      return $ WeakStmtLet m xt e cont
+    QuasiStmtLetWT m xt e : es -> do
+      cont <- concatQuasiStmtList es
+      return $ WeakStmtLetWT m xt e cont
+    QuasiStmtVerify m e : es -> do
+      cont <- concatQuasiStmtList es
+      return $ WeakStmtVerify m e cont
+    QuasiStmtLetInductive n m at e : es -> do
+      insForm n at e
+      cont <- concatQuasiStmtList es
+      return $ WeakStmtLetWT m at e cont
+    QuasiStmtLetInductiveIntro m bt e as : ss ->
+      case e of
+        (mLam, WeakTermPiIntro Nothing xtsyts (_, WeakTermPiIntro (Just (bi, _)) atsbts (_, WeakTermPiElim b _))) -> do
+          (_, is) <- lookupRevIndEnv m bi
+          yts' <- mapM (internalize as atsbts) $ drop (length (is :: [Int])) xtsyts
+          insInductive as bt -- register the constructor (if necessary)
+          cont <- concatQuasiStmtList ss
+          return $
+            WeakStmtLetWT
+              m
+              bt
+              ( mLam, -- metaIsReducible mLam == False
+                weakTermPiIntro
+                  xtsyts
+                  ( m,
+                    WeakTermPiIntro
+                      (Just (bi, xtsyts))
+                      atsbts
+                      (m, WeakTermPiElim b yts')
+                  )
               )
-          )
-          cont
-    _ -> raiseCritical m "inductive-intro"
+              cont
+        _ -> raiseCritical m "inductive-intro"
 
 checkKeywordSanity :: Meta -> T.Text -> WithEnv ()
-checkKeywordSanity m "" = raiseError m "empty string for a keyword"
 checkKeywordSanity m x
+  | x == "" = raiseError m "empty string for a keyword"
   | T.last x == '+' = raiseError m "A +-suffixed name cannot be a keyword"
-checkKeywordSanity _ _ = return ()
+  | otherwise = return ()
 
 showCyclicPath :: [Path Abs File] -> T.Text
-showCyclicPath [] = ""
-showCyclicPath [path] = T.pack (toFilePath path)
-showCyclicPath (path : ps) =
-  "     " <> T.pack (toFilePath path) <> showCyclicPath' ps
+showCyclicPath =
+  \case
+    [] -> ""
+    [path] -> T.pack (toFilePath path)
+    (path : ps) -> "     " <> T.pack (toFilePath path) <> showCyclicPath' ps
 
 showCyclicPath' :: [Path Abs File] -> T.Text
-showCyclicPath' [] = ""
-showCyclicPath' [path] = "\n  ~> " <> T.pack (toFilePath path)
-showCyclicPath' (path : ps) =
-  "\n  ~> " <> T.pack (toFilePath path) <> showCyclicPath' ps
+showCyclicPath' =
+  \case
+    [] -> ""
+    [path] -> "\n  ~> " <> T.pack (toFilePath path)
+    (path : ps) -> "\n  ~> " <> T.pack (toFilePath path) <> showCyclicPath' ps
 
 reportCyclicPath :: Meta -> Path Abs File -> WithEnv a
 reportCyclicPath m newPath = do
@@ -546,8 +571,10 @@ install bytestr pkgPath =
   liftIO $ Tar.unpack (toFilePath pkgPath) $ Tar.read $ GZip.decompress bytestr
 
 includeCore :: Meta -> [TreePlus] -> [TreePlus]
-includeCore _ ((_, TreeNode [(_, TreeLeaf "no-implicit-core")]) : rest) = rest
-includeCore m treeList = includeCore' m : treeList
+includeCore m treeList =
+  case treeList of
+    ((_, TreeNode [(_, TreeLeaf "no-implicit-core")]) : rest) -> rest
+    _ -> includeCore' m : treeList
 
 includeCore' :: Meta -> TreePlus
 includeCore' m =
@@ -560,13 +587,15 @@ includeCore' m =
   )
 
 adjustPhase :: TreePlus -> WithEnv TreePlus
-adjustPhase (m, TreeLeaf x) = do
-  m' <- adjustPhase' m
-  return (m', TreeLeaf x)
-adjustPhase (m, TreeNode ts) = do
-  m' <- adjustPhase' m
-  ts' <- mapM adjustPhase ts
-  return (m', TreeNode ts')
+adjustPhase =
+  \case
+    (m, TreeLeaf x) -> do
+      m' <- adjustPhase' m
+      return (m', TreeLeaf x)
+    (m, TreeNode ts) -> do
+      m' <- adjustPhase' m
+      ts' <- mapM adjustPhase ts
+      return (m', TreeNode ts')
 
 adjustPhase' :: Meta -> WithEnv Meta
 adjustPhase' m = do
@@ -582,9 +611,11 @@ warnUnusedVar =
     warnUnusedVar' $ S.toList set'
 
 warnUnusedVar' :: [(PosInfo, T.Text)] -> WithEnv ()
-warnUnusedVar' [] = return ()
-warnUnusedVar' ((pos, x) : pxs)
-  | T.all (`S.notMember` S.fromList "()") x = do
-    warn pos $ "defined but not used: `" <> x <> "`"
-    warnUnusedVar' pxs
-  | otherwise = warnUnusedVar' pxs
+warnUnusedVar' =
+  \case
+    [] -> return ()
+    ((pos, x) : pxs)
+      | T.all (`S.notMember` S.fromList "()") x -> do
+        warn pos $ "defined but not used: `" <> x <> "`"
+        warnUnusedVar' pxs
+      | otherwise -> warnUnusedVar' pxs
