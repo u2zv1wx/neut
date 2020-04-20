@@ -25,9 +25,6 @@ import Text.Read (readMaybe)
 interpret :: TreePlus -> WithEnv WeakTermPlus
 interpret =
   \case
-    --
-    -- foundational interpretations
-    --
     (m, TreeLeaf "tau") -> return (m, WeakTermTau)
     (m, TreeNode ((_, TreeLeaf "upsilon") : rest))
       | [(_, TreeLeaf x)] <- rest -> return (m, WeakTermUpsilon $ asIdent x)
@@ -186,9 +183,6 @@ interpret =
         hs <- mapM (const $ newHole m) args
         return (m, WeakTermPiElim f $ hs ++ es)
       | otherwise -> raiseSyntaxError m "(cocase TREE TREE*)"
-    --
-    -- auxiliary interpretations
-    --
     (m, TreeNode ((_, TreeLeaf "product") : ts)) -> do
       ts' <- mapM interpret ts
       let ms = map fst ts'
@@ -369,12 +363,15 @@ interpretIdentPlus =
     t -> raiseSyntaxError (fst t) "(LEAF TREE)"
 
 interpretLeafText :: TreePlus -> WithEnv (Meta, T.Text)
-interpretLeafText (m, TreeLeaf "_") = do
-  h <- newTextWith "_"
-  return (m, h)
-interpretLeafText (m, TreeLeaf x) =
-  return (m, x)
-interpretLeafText t = raiseSyntaxError (fst t) "LEAF"
+interpretLeafText =
+  \case
+    (m, TreeLeaf "_") -> do
+      h <- newTextWith "_"
+      return (m, h)
+    (m, TreeLeaf x) ->
+      return (m, x)
+    t ->
+      raiseSyntaxError (fst t) "LEAF"
 
 interpretEnumValueMaybe :: TreePlus -> WithEnv (Maybe EnumValue)
 interpretEnumValueMaybe t =
@@ -383,35 +380,36 @@ interpretEnumValueMaybe t =
     (\(_ :: Error) -> return Nothing)
 
 interpretEnumValue :: TreePlus -> WithEnv EnumValue
-interpretEnumValue (_, TreeLeaf x) = return $ EnumValueLabel x
-interpretEnumValue e@(m, TreeNode [(_, TreeLeaf t), (_, TreeLeaf x)]) = do
-  let mv1 = readEnumValueIntS t x
-  let mv2 = readEnumValueIntU t x
-  case (mv1, mv2) of
-    (Just v@(EnumValueIntS size x'), _) ->
-      if (-1) * (2 ^ (size - 1)) <= x' && x' < 2 ^ size
-        then return v
-        else
-          raiseError m $
-            "the signed integer "
-              <> T.pack (show x')
-              <> " is supposed to be of type i"
-              <> T.pack (show size)
-              <> ", but is out of range of i"
-              <> T.pack (show size)
-    (_, Just v@(EnumValueIntU size x')) ->
-      if 0 <= x' && x' < 2 ^ size
-        then return v
-        else
-          raiseError m $
-            "the unsigned integer "
-              <> T.pack (show x')
-              <> " is supposed to be of type u"
-              <> T.pack (show size)
-              <> ", but is out of range of u"
-              <> T.pack (show size)
-    _ -> raiseSyntaxError (fst e) "(SINT-TYPE INT) | (UINT-TYPE INT)"
-interpretEnumValue t = raiseSyntaxError (fst t) "LEAF | (LEAF LEAF)"
+interpretEnumValue =
+  \case
+    (_, TreeLeaf x) ->
+      return $ EnumValueLabel x
+    e@(m, TreeNode [(_, TreeLeaf t), (_, TreeLeaf x)]) ->
+      case (readEnumValueIntS t x, readEnumValueIntU t x) of
+        (Just v@(EnumValueIntS size x'), _) ->
+          if (-1) * (2 ^ (size - 1)) <= x' && x' < 2 ^ size
+            then return v
+            else
+              raiseError m $
+                "the signed integer "
+                  <> T.pack (show x')
+                  <> " is supposed to be of type i"
+                  <> T.pack (show size)
+                  <> ", but is out of range of i"
+                  <> T.pack (show size)
+        (_, Just v@(EnumValueIntU size x')) ->
+          if 0 <= x' && x' < 2 ^ size
+            then return v
+            else
+              raiseError m $
+                "the unsigned integer "
+                  <> T.pack (show x')
+                  <> " is supposed to be of type u"
+                  <> T.pack (show size)
+                  <> ", but is out of range of u"
+                  <> T.pack (show size)
+        _ -> raiseSyntaxError (fst e) "(SINT-TYPE INT) | (UINT-TYPE INT)"
+    t -> raiseSyntaxError (fst t) "LEAF | (LEAF LEAF)"
 
 interpretBinder ::
   [TreePlus] -> TreePlus -> WithEnv ([WeakIdentPlus], WeakTermPlus)
@@ -421,24 +419,19 @@ interpretBinder xts t = do
   return (xts', t')
 
 interpretWeakCase :: TreePlus -> WithEnv WeakCasePlus
---
--- foundational
---
-interpretWeakCase (m, TreeNode [(_, TreeLeaf "enum-introduction"), l]) = do
-  v <- weakenEnumValue <$> interpretEnumValue l
-  return (m, v)
-interpretWeakCase (m, TreeLeaf "default") = return (m, WeakCaseDefault)
---
--- auxiliary
---
-interpretWeakCase c
-  | (m, TreeLeaf i) <- c,
-    Just i' <- readMaybe $ T.unpack i = do
-    h <- newHole m
-    return (m, WeakCaseInt h i')
-  | otherwise = do
-    v <- weakenEnumValue <$> interpretEnumValue c
-    return (fst c, v)
+interpretWeakCase =
+  \case
+    (m, TreeNode [(_, TreeLeaf "enum-introduction"), l]) -> do
+      v <- weakenEnumValue <$> interpretEnumValue l
+      return (m, v)
+    (m, TreeLeaf "default") -> return (m, WeakCaseDefault)
+    (m, TreeLeaf i)
+      | Just i' <- readMaybe $ T.unpack i -> do
+        h <- newHole m
+        return (m, WeakCaseInt h i')
+    c -> do
+      v <- weakenEnumValue <$> interpretEnumValue c
+      return (fst c, v)
 
 interpretClause :: TreePlus -> WithEnv (WeakCasePlus, WeakTermPlus)
 interpretClause (_, TreeNode [c, e]) = do
