@@ -33,16 +33,7 @@ showCompInfo ((x, m) : xms) = do
   let (path, (_, l, c)) = getPosInfo m
   let pathStr = "\"" <> toFilePath path <> "\""
   let x' = T.unpack $ asText x
-  let str =
-        "(\""
-          ++ x'
-          ++ "\" ("
-          ++ pathStr
-          ++ " "
-          ++ show l
-          ++ " "
-          ++ show c
-          ++ "))"
+  let str = "(\"" ++ x' ++ "\" (" ++ pathStr ++ " " ++ show l ++ " " ++ show c ++ "))"
   str : showCompInfo xms
 
 parseForCompletion :: Path Abs File -> Line -> Column -> WithEnv CompInfo

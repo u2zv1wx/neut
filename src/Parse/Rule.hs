@@ -90,34 +90,55 @@ generateProjections ts = do
         (dom@(my, y, ty), cod) <- separate tb
         v <- newNameWith'' "base"
         let b' = a <> ":" <> b
-        return
-          [ QuasiStmtLetWT
-              mb
-              (mb, asIdent b', (mb, weakTermPi (xts ++ [dom]) cod))
-              ( mb,
-                weakTermPiIntro
-                  (xts ++ [dom])
-                  ( mb,
-                    WeakTermCase
-                      a
-                      (my, WeakTermUpsilon y)
-                      [ ( ( (mb, a <> ":unfold"),
-                            -- `xts ++` is required since LetWT bypasses `infer`
-                            xts
-                              ++ [(ma, asIdent a, ta)]
-                              ++ bts'
-                              ++ [(mb, v, ty)]
-                          ),
-                          ( mb,
-                            WeakTermPiElim
-                              (mb, WeakTermUpsilon $ asIdent b)
-                              [(mb, WeakTermUpsilon v)]
-                          )
+        e <-
+          discernWithCurrentNameEnv
+            ( mb,
+              weakTermPiIntro
+                (xts ++ [dom])
+                ( mb,
+                  WeakTermCase
+                    a
+                    (my, WeakTermUpsilon y)
+                    [ ( ( (mb, a <> ":unfold"),
+                          xts ++ [(ma, asIdent a, ta)] ++ bts' ++ [(mb, v, ty)] -- `xts ++` is required since LetWT bypasses `infer`
+                        ),
+                        ( mb,
+                          WeakTermPiElim (mb, WeakTermUpsilon $ asIdent b) [(mb, WeakTermUpsilon v)]
                         )
-                      ]
-                  )
-              )
-          ]
+                      )
+                    ]
+                )
+            )
+        bt <- discernTopLevelIdentPlus (mb, asIdent b', (mb, weakTermPi (xts ++ [dom]) cod))
+        return [QuasiStmtLetWT mb bt e]
+  -- return
+  --   [ QuasiStmtLetWT
+  --       mb
+  --       (mb, asIdent b', (mb, weakTermPi (xts ++ [dom]) cod))
+  --       ( mb,
+  --         weakTermPiIntro
+  --           (xts ++ [dom])
+  --           ( mb,
+  --             WeakTermCase
+  --               a
+  --               (my, WeakTermUpsilon y)
+  --               [ ( ( (mb, a <> ":unfold"),
+  --                     -- `xts ++` is required since LetWT bypasses `infer`
+  --                     xts
+  --                       ++ [(ma, asIdent a, ta)]
+  --                       ++ bts'
+  --                       ++ [(mb, v, ty)]
+  --                   ),
+  --                   ( mb,
+  --                     WeakTermPiElim
+  --                       (mb, WeakTermUpsilon $ asIdent b)
+  --                       [(mb, WeakTermUpsilon v)]
+  --                   )
+  --                 )
+  --               ]
+  --           )
+  --       )
+  --   ]
   return $ concat $ concat stmtListList
 
 separate :: WeakTermPlus -> WithEnv (WeakIdentPlus, WeakTermPlus)
