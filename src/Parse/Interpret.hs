@@ -626,7 +626,7 @@ readEnumType c str k -- n1, n2, ..., n{i}, ..., n{2^64}
     Just i <- readMaybe $ T.unpack $ T.tail str :: Maybe Int,
     1 <= toInteger i && toInteger i <= 2 ^ k =
     Just i
-readEnumType _ _ _ = Nothing
+  | otherwise = Nothing
 
 readEnumTypeIntS :: T.Text -> Maybe Int
 readEnumTypeIntS str = readEnumType 'i' str 23
@@ -649,11 +649,14 @@ readEnumValueIntU t x
   | otherwise = Nothing
 
 asArrayKind :: TreePlus -> WithEnv ArrayKind
-asArrayKind e@(_, TreeLeaf x) =
-  case asArrayKindMaybe x of
-    Nothing -> raiseSyntaxError (fst e) "SINT-TYPE | UINT-TYPE | FLOAT-TYPE"
-    Just t -> return t
-asArrayKind t = raiseSyntaxError (fst t) "LEAF"
+asArrayKind =
+  \case
+    e@(_, TreeLeaf x) ->
+      case asArrayKindMaybe x of
+        Nothing -> raiseSyntaxError (fst e) "SINT-TYPE | UINT-TYPE | FLOAT-TYPE"
+        Just t -> return t
+    t ->
+      raiseSyntaxError (fst t) "LEAF"
 
 toValueIntU :: IntSize -> Integer -> WeakTerm
 toValueIntU size i = WeakTermEnumIntro $ EnumValueIntU size i
