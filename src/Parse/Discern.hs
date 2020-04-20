@@ -6,6 +6,9 @@ module Parse.Discern
     discernWithCurrentNameEnv,
     insertConstant,
     discernTopLevelIdentPlus,
+    newDefinedNameWith,
+    discernIdent,
+    discernDef,
   )
 where
 
@@ -82,6 +85,12 @@ discernLet' (mx, x, t) e = do
   e' <- discern'' nenv e
   x' <- newDefinedNameWith mx x
   return ((mx, x', t'), e')
+
+discernDef :: Def -> WithEnv Def
+discernDef (m, xt, xts, e) = do
+  nenv <- gets topNameEnv
+  (xt', xts', e') <- discernIter nenv xt xts e
+  return (m, xt', xts', e')
 
 discernWithCurrentNameEnv :: WeakTermPlus -> WithEnv WeakTermPlus
 discernWithCurrentNameEnv e = do
@@ -254,6 +263,12 @@ newDefinedNameWith m (I (s, _)) = do
   let x = I (s, j)
   insertIntoIntactSet m s
   return x
+
+discernIdent :: Meta -> Ident -> WithEnv (Meta, Ident)
+discernIdent m x = do
+  x' <- newDefinedNameWith m x
+  modify (\env -> env {topNameEnv = Map.insert (asText x) x' (topNameEnv env)})
+  return (m, x')
 
 insertConstant :: Meta -> T.Text -> WithEnv ()
 insertConstant m x = do

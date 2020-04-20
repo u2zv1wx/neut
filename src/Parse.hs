@@ -376,15 +376,19 @@ ensureEnvSanity m = do
 
 parseDef :: [TreePlus] -> WithEnv [QuasiStmt]
 parseDef xds = do
-  xds' <- mapM (adjustPhase >=> prefixFunName >=> macroExpand) xds
-  -- ここでいい感じにdiscernを行う必要がある
-  xds'' <- mapM interpretIter xds'
-  let baseSub = Map.fromList $ map defToSub xds''
+  defList <- mapM (adjustPhase >=> prefixFunName >=> macroExpand) xds
+  -- {f1 := def-1, ..., fn := def-n}から{f1, ..., fn}を取り出してトップレベルでdiscernする
+  metaNameList <- mapM (extractFunName >=> uncurry discernIdent) defList
+  let nameList = map snd metaNameList
+  -- xiの名前をtopNameEnvに追加した状態でそれぞれの定義をdiscernする
+  defList' <- mapM (interpretIter >=> discernDef) defList
+  -- sub^nを計算する
+  let baseSub = Map.fromList $ map defToSub $ zip nameList defList'
   let sub = selfCompose (length baseSub) baseSub
-  let varList = map (\(_, (m, x, _), _, _) -> (m, WeakTermUpsilon x)) xds''
-  let iterList = map (substWeakTermPlus sub) varList -- fixme: ここのsubstはintじゃなく名前に沿ったものにしないとだめ
-  xs <- mapM extractFunName xds'
-  return (toLetList $ zip (zip xs xds'') iterList)
+  -- sub^nをf1, ..., fnに適用する
+  let typeList = map (\(m, (_, _, t), _, _) -> (m, t)) defList'
+  let bodyList = map (substWeakTermPlus sub . uncurry toVar) metaNameList
+  return (toLetList $ zip3 nameList typeList bodyList)
 
 prefixFunName :: TreePlus -> WithEnv TreePlus
 prefixFunName =
@@ -408,22 +412,33 @@ prefixTextPlus =
       return (m, TreeNode [(mx, TreeLeaf x'), t])
     t -> raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
 
-extractFunName :: TreePlus -> WithEnv Ident
+extractFunName :: TreePlus -> WithEnv (Meta, Ident)
 extractFunName =
   \case
-    (_, TreeNode ((_, TreeLeaf x) : _)) -> return $ asIdent x
-    (_, TreeNode ((_, TreeNode [(_, TreeLeaf x), _]) : _)) -> return $ asIdent x
-    t -> raiseSyntaxError (fst t) "(LEAF ...) | ((LEAF TREE) ...)"
+    (_, TreeNode ((m, TreeLeaf x) : _)) ->
+      return (m, asIdent x)
+    (_, TreeNode ((_, TreeNode [(m, TreeLeaf x), _]) : _)) ->
+      return (m, asIdent x)
+    t ->
+      raiseSyntaxError (fst t) "(LEAF ...) | ((LEAF TREE) ...)"
 
-toLetList :: [(IdentDef, WeakTermPlus)] -> [QuasiStmt]
+toLetList :: [(Ident, (Meta, WeakTermPlus), WeakTermPlus)] -> [QuasiStmt]
 toLetList =
   \case
     [] -> []
-    (((x, (m, (mx, _, t), _, _)), iter) : rest) -> QuasiStmtLet m (mx, x, t) iter : toLetList rest
+    ((x, (m, t), e) : rest) -> QuasiStmtLet m (m, x, t) e : toLetList rest
 
-defToSub :: Def -> (Key, WeakTermPlus)
-defToSub (m, (mx, x, t), xts, e) =
-  (Left $ asInt x, (m, WeakTermIter (mx, x, t) xts e))
+-- toLetList :: [(IdentDef, WeakTermPlus)] -> [QuasiStmt]
+-- toLetList =
+--   \case
+--     [] -> []
+--     (((x, (m, (mx, _, t), _, _)), iter) : rest) -> QuasiStmtLet m (mx, x, t) iter : toLetList rest
+defToSub :: (Ident, Def) -> (Key, WeakTermPlus)
+defToSub (dom, (m, xt, xts, e)) = (Left $ asInt dom, (m, WeakTermIter xt xts e))
+
+-- defToSub :: Def -> (Key, WeakTermPlus)
+-- defToSub (m, (mx, x, t), xts, e) =
+--   (Left $ asInt x, (m, WeakTermIter (mx, x, t) xts e))
 
 selfCompose :: Int -> SubstWeakTerm -> SubstWeakTerm
 selfCompose i sub =
@@ -431,8 +446,6 @@ selfCompose i sub =
     then sub
     else compose sub $ selfCompose (i - 1) sub
 
--- fixme: ここではintじゃなくてフルで比較するタイプのsubstを行う必要がある (discern以前にsubstをするので)
--- (またはdiscernをparseと同時に行うようにする)
 compose :: SubstWeakTerm -> SubstWeakTerm -> SubstWeakTerm
 compose s1 s2 = Map.union (Map.map (substWeakTermPlus s1) s2) s1
 

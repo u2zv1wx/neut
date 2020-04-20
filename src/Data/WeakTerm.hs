@@ -66,6 +66,9 @@ type IdentDef = (Ident, Def)
 weakTermPiIntro :: [WeakIdentPlus] -> WeakTermPlus -> WeakTerm
 weakTermPiIntro = WeakTermPiIntro Nothing
 
+toVar :: Meta -> Ident -> WeakTermPlus
+toVar m x = (m, WeakTermUpsilon x)
+
 type Rule = -- inference rule
   ( Meta, -- location of the name
     T.Text, -- the name of the rule
