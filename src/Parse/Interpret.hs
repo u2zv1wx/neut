@@ -434,32 +434,42 @@ interpretWeakCase =
       return (fst c, v)
 
 interpretClause :: TreePlus -> WithEnv (WeakCasePlus, WeakTermPlus)
-interpretClause (_, TreeNode [c, e]) = do
-  c' <- interpretWeakCase c
-  e' <- interpret e
-  return (c', e')
-interpretClause e = raiseSyntaxError (fst e) "(TREE TREE)"
+interpretClause =
+  \case
+    (_, TreeNode [c, e]) -> do
+      c' <- interpretWeakCase c
+      e' <- interpret e
+      return (c', e')
+    e ->
+      raiseSyntaxError (fst e) "(TREE TREE)"
 
 interpretStructIntro :: TreePlus -> WithEnv (WeakTermPlus, ArrayKind)
-interpretStructIntro (_, TreeNode [e, k]) = do
-  e' <- interpret e
-  k' <- asArrayKind k
-  return (e', k')
-interpretStructIntro e = raiseSyntaxError (fst e) "(TREE TREE)"
+interpretStructIntro =
+  \case
+    (_, TreeNode [e, k]) -> do
+      e' <- interpret e
+      k' <- asArrayKind k
+      return (e', k')
+    e ->
+      raiseSyntaxError (fst e) "(TREE TREE)"
 
 interpretStructElim :: TreePlus -> WithEnv (Meta, Ident, ArrayKind)
-interpretStructElim (_, TreeNode [(m, TreeLeaf x), k]) = do
-  k' <- asArrayKind k
-  return (m, asIdent x, k')
-interpretStructElim e = raiseSyntaxError (fst e) "(LEAF TREE)"
+interpretStructElim =
+  \case
+    (_, TreeNode [(m, TreeLeaf x), k]) -> do
+      k' <- asArrayKind k
+      return (m, asIdent x, k')
+    e ->
+      raiseSyntaxError (fst e) "(LEAF TREE)"
 
-interpretCaseClause ::
-  TreePlus -> WithEnv (((Meta, T.Text), [WeakIdentPlus]), WeakTermPlus)
-interpretCaseClause (_, TreeNode [(_, TreeNode ((m, TreeLeaf c) : xts)), e]) = do
-  xts' <- mapM interpretWeakIdentPlus xts
-  e' <- interpret e
-  return (((m, c), xts'), e')
-interpretCaseClause t = raiseSyntaxError (fst t) "((LEAF TREE ... TREE) TREE)"
+interpretCaseClause :: TreePlus -> WithEnv (((Meta, T.Text), [WeakIdentPlus]), WeakTermPlus)
+interpretCaseClause =
+  \case
+    (_, TreeNode [(_, TreeNode ((m, TreeLeaf c) : xts)), e]) -> do
+      xts' <- mapM interpretWeakIdentPlus xts
+      e' <- interpret e
+      return (((m, c), xts'), e')
+    t -> raiseSyntaxError (fst t) "((LEAF TREE ... TREE) TREE)"
 
 type CocaseClause = ((Ident, [WeakTermPlus]), [(Ident, WeakTermPlus)])
 
@@ -473,27 +483,50 @@ type CocaseClause = ((Ident, [WeakTermPlus]), [(Ident, WeakTermPlus)])
 --    ...
 --    (b e)))
 interpretCoinductive :: TreePlus -> WithEnv (T.Text, [WeakTermPlus])
-interpretCoinductive (_, TreeNode ((_, TreeLeaf c) : args)) = do
-  args' <- mapM interpret args
-  return (c, args')
-interpretCoinductive t = raiseSyntaxError (fst t) "(LEAF TREE ... TREE)"
+interpretCoinductive =
+  \case
+    (_, TreeNode ((_, TreeLeaf c) : args)) -> do
+      args' <- mapM interpret args
+      return (c, args')
+    t ->
+      raiseSyntaxError (fst t) "(LEAF TREE ... TREE)"
+
+-- interpretCoinductive (_, TreeNode ((_, TreeLeaf c) : args)) = do
+--   args' <- mapM interpret args
+--   return (c, args')
+-- interpretCoinductive t = raiseSyntaxError (fst t) "(LEAF TREE ... TREE)"
 
 interpretCocaseClause :: TreePlus -> WithEnv CocaseClause
-interpretCocaseClause (_, TreeNode (coind : clauseList)) = do
-  (c, args) <- interpretCoinductive coind
-  clauseList' <- mapM interpretCocaseClause' clauseList
-  return ((asIdent c, args), clauseList')
-interpretCocaseClause t =
-  raiseSyntaxError (fst t) "((LEAF TREE ... TREE) (LEAF TREE) ... (LEAF TREE))"
+interpretCocaseClause =
+  \case
+    (_, TreeNode (coind : clauseList)) -> do
+      (c, args) <- interpretCoinductive coind
+      clauseList' <- mapM interpretCocaseClause' clauseList
+      return ((asIdent c, args), clauseList')
+    t ->
+      raiseSyntaxError (fst t) "((LEAF TREE ... TREE) (LEAF TREE) ... (LEAF TREE))"
+
+-- interpretCocaseClause (_, TreeNode (coind : clauseList)) = do
+--   (c, args) <- interpretCoinductive coind
+--   clauseList' <- mapM interpretCocaseClause' clauseList
+--   return ((asIdent c, args), clauseList')
+-- interpretCocaseClause t =
+--   raiseSyntaxError (fst t) "((LEAF TREE ... TREE) (LEAF TREE) ... (LEAF TREE))"
 
 interpretCocaseClause' :: TreePlus -> WithEnv (Ident, WeakTermPlus)
-interpretCocaseClause' (_, TreeNode [(_, TreeLeaf label), body]) = do
-  body' <- interpret body
-  return (asIdent label, body')
-interpretCocaseClause' t = raiseSyntaxError (fst t) "(LEAF TREE)"
+interpretCocaseClause' =
+  \case
+    (_, TreeNode [(_, TreeLeaf label), body]) -> do
+      body' <- interpret body
+      return (asIdent label, body')
+    t -> raiseSyntaxError (fst t) "(LEAF TREE)"
 
-cocaseAsSigmaIntro ::
-  Meta -> T.Text -> WeakTermPlus -> [CocaseClause] -> WithEnv [WeakTermPlus]
+-- interpretCocaseClause' (_, TreeNode [(_, TreeLeaf label), body]) = do
+--   body' <- interpret body
+--   return (asIdent label, body')
+-- interpretCocaseClause' t = raiseSyntaxError (fst t) "(LEAF TREE)"
+
+cocaseAsSigmaIntro :: Meta -> T.Text -> WeakTermPlus -> [CocaseClause] -> WithEnv [WeakTermPlus]
 cocaseAsSigmaIntro m name codType cocaseClauseList = do
   let aes = map (headNameOf m) cocaseClauseList
   bes <- asLamClauseList m cocaseClauseList
@@ -511,16 +544,17 @@ cocaseAsSigmaIntro m name codType cocaseClauseList = do
           return $ map snd (sortOn fst iesjes) ++ [cocaseBaseValue m codType]
 
 labelToIndex :: Meta -> [T.Text] -> [(Ident, a)] -> WithEnv [(Int, a)]
-labelToIndex _ _ [] = return []
-labelToIndex m lenv ((x, e) : xes) =
-  case elemIndex (asText x) lenv of
-    Nothing -> raiseError m $ "no such destructor defined: " <> asText x
-    Just i -> do
-      ies <- labelToIndex m lenv xes
-      return $ (i, e) : ies
+labelToIndex m lenv =
+  \case
+    [] -> return []
+    ((x, e) : xes) ->
+      case elemIndex (asText x) lenv of
+        Nothing -> raiseError m $ "no such destructor defined: " <> asText x
+        Just i -> do
+          ies <- labelToIndex m lenv xes
+          return $ (i, e) : ies
 
-asLamClauseList ::
-  Meta -> [CocaseClause] -> WithEnv [(Ident, WeakTermPlus)]
+asLamClauseList :: Meta -> [CocaseClause] -> WithEnv [(Ident, WeakTermPlus)]
 asLamClauseList m cocaseClauseList =
   fmap concat
     $ forM cocaseClauseList
@@ -560,24 +594,30 @@ interpretEnumItem m name ts = do
     else raiseError m "found a collision of discriminant"
 
 interpretEnumItem' :: T.Text -> [TreePlus] -> WithEnv [(T.Text, Int)]
-interpretEnumItem' _ [] = return []
-interpretEnumItem' name [t] = do
-  (s, mj) <- interpretEnumItem'' t
-  return [(name <> ":" <> s, fromMaybe 0 mj)]
-interpretEnumItem' name (t : ts) = do
-  ts' <- interpretEnumItem' name ts
-  (s, mj) <- interpretEnumItem'' t
-  return $ (name <> ":" <> s, fromMaybe (1 + headDiscriminantOf ts') mj) : ts'
+interpretEnumItem' name =
+  \case
+    [] -> return []
+    [t] -> do
+      (s, mj) <- interpretEnumItem'' t
+      return [(name <> ":" <> s, fromMaybe 0 mj)]
+    (t : ts) -> do
+      ts' <- interpretEnumItem' name ts
+      (s, mj) <- interpretEnumItem'' t
+      return $ (name <> ":" <> s, fromMaybe (1 + headDiscriminantOf ts') mj) : ts'
 
 interpretEnumItem'' :: TreePlus -> WithEnv (T.Text, Maybe Int)
-interpretEnumItem'' (_, TreeLeaf s) = return (s, Nothing)
-interpretEnumItem'' (_, TreeNode [(_, TreeLeaf s), (_, TreeLeaf i)])
-  | Just i' <- readMaybe $ T.unpack i = return (s, Just i')
-interpretEnumItem'' t = raiseSyntaxError (fst t) "LEAF | (LEAF LEAF)"
+interpretEnumItem'' =
+  \case
+    (_, TreeLeaf s) -> return (s, Nothing)
+    (_, TreeNode [(_, TreeLeaf s), (_, TreeLeaf i)])
+      | Just i' <- readMaybe $ T.unpack i -> return (s, Just i')
+    t -> raiseSyntaxError (fst t) "LEAF | (LEAF LEAF)"
 
 headDiscriminantOf :: [(T.Text, Int)] -> Int
-headDiscriminantOf [] = 0
-headDiscriminantOf ((_, i) : _) = i
+headDiscriminantOf =
+  \case
+    [] -> 0
+    ((_, i) : _) -> i
 
 readEnumType :: Char -> T.Text -> Int -> Maybe Int
 readEnumType c str k -- n1, n2, ..., n{i}, ..., n{2^64}
