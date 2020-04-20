@@ -148,8 +148,6 @@ toInductive ::
 toInductive ats bts connective@(m, ai, xts, _) = do
   at <- formationRuleOf connective >>= ruleAsWeakIdentPlus
   let cod = (m, WeakTermPiElim (m, WeakTermUpsilon $ asIdent ai) (map toVar' xts))
-  z <- newNameWith'' "_"
-  let zt = (m, z, cod)
   let atsbts = map textPlusToWeakIdentPlus $ ats ++ bts
   -- definition of inductive type
   indType <-
@@ -158,6 +156,8 @@ toInductive ats bts connective@(m, ai, xts, _) = do
   at' <- discernTopLevelIdentPlus at
   insForm (length ats) at' indType
   -- definition of induction principle (fold)
+  z <- newNameWith'' "_"
+  let zt = (m, z, cod)
   let indArgs = xts ++ [zt] ++ atsbts
   inductionPrinciple <-
     discernWithCurrentNameEnv
