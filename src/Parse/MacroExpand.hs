@@ -24,11 +24,6 @@ recurM f =
       ts' <- mapM (recurM f) ts
       f (m, TreeNode ts')
 
--- recurM f (m, TreeLeaf s) = f (m, TreeLeaf s)
--- recurM f (m, TreeNode ts) = do
---   ts' <- mapM (recurM f) ts
---   f (m, TreeNode ts')
-
 macroExpand1 :: TreePlus -> WithEnv TreePlus
 macroExpand1 t@(i, _) = do
   nenv <- gets notationEnv
@@ -92,12 +87,6 @@ applySubst sub =
     (i, TreeNode ts) ->
       (i, TreeNode $ map (applySubst sub) ts)
 
--- applySubst sub (i, TreeLeaf s) =
---   case lookup s sub of
---     Nothing -> (i, TreeLeaf s)
---     Just t -> replaceMeta i t
--- applySubst sub (i, TreeNode ts) = (i, TreeNode $ map (applySubst sub) ts)
-
 toSpliceTree :: Meta -> [TreePlus] -> TreePlus
 toSpliceTree m ts = (m, TreeNode [(m, TreeLeaf "splice"), (m, TreeNode ts)])
 
@@ -142,11 +131,6 @@ splice' =
       let ts' = map splice' ts
       (m, TreeNode $ expandSplice $ map findSplice ts')
 
--- splice' t@(_, TreeLeaf _) = t
--- splice' (m, TreeNode ts) = do
---   let ts' = map splice' ts
---   (m, TreeNode $ expandSplice $ map findSplice ts')
-
 findSplice :: TreePlus -> Either TreePlus [TreePlus]
 findSplice =
   \case
@@ -155,20 +139,12 @@ findSplice =
     t ->
       Left t
 
--- findSplice (_, TreeNode [(_, TreeLeaf "splice"), (_, TreeNode ts)]) =
---   Right ts
--- findSplice t = Left t
-
 expandSplice :: [Either TreePlus [TreePlus]] -> [TreePlus]
 expandSplice =
   \case
     [] -> []
     (Left t : rest) -> t : expandSplice rest
     (Right ts : rest) -> ts ++ expandSplice rest
-
--- expandSplice [] = []
--- expandSplice (Left t : rest) = t : expandSplice rest
--- expandSplice (Right ts : rest) = ts ++ expandSplice rest
 
 -- returns the first "Just"
 try :: (Monad m) => (a -> m (Maybe b)) -> [(a, c)] -> m (Maybe (b, c))
@@ -180,9 +156,3 @@ try f =
       case mx of
         Nothing -> try f as
         Just x -> return $ Just (x, t)
--- try _ [] = return Nothing
--- try f ((s, t) : as) = do
---   mx <- f s
---   case mx of
---     Nothing -> try f as
---     Just x -> return $ Just (x, t)
