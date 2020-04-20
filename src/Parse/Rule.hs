@@ -192,26 +192,72 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
     let ixts = filter (\(_, (_, x, _)) -> x `S.member` vs) $ zip [0 ..] xts
     let (is, xts') = unzip ixts
     modify (\env -> env {revIndEnv = Map.insert bi (ai, is) (revIndEnv env)})
-    return
-      [ QuasiStmtLetInductiveIntro
-          m
-          (mb, asIdent bi, (m, weakTermPi (xts' ++ yts) cod))
-          ( m {metaIsReducible = False},
-            weakTermPiIntro
-              (xts' ++ yts)
+    constructor <-
+      discernWithCurrentNameEnv
+        ( m {metaIsReducible = False},
+          weakTermPiIntro
+            (xts' ++ yts)
+            ( m,
+              WeakTermPiIntro
+                (Just (bi, xts' ++ yts))
+                (ats ++ bts)
+                ( m,
+                  WeakTermPiElim
+                    (mb, WeakTermUpsilon (asIdent bi))
+                    (map toVar' yts)
+                )
+            )
+        )
+    constructorIdent <-
+      discernTopLevelIdentPlus
+        (mb, asIdent bi, (m, weakTermPi (xts' ++ yts) cod))
+    case constructor of
+      (_, WeakTermPiIntro _ xtsyts (_, WeakTermPiIntro _ atsbts (_, WeakTermPiElim b _))) -> do
+        let as = map (\(_, x, _) -> asText x) ats
+        yts' <- mapM (internalize as atsbts) $ drop (length (is :: [Int])) xtsyts
+        return
+          [ QuasiStmtLetWT
+              m
+              constructorIdent
               ( m,
-                WeakTermPiIntro
-                  (Just (bi, xts' ++ yts))
-                  (ats ++ bts)
+                weakTermPiIntro
+                  xtsyts
                   ( m,
-                    WeakTermPiElim
-                      (mb, WeakTermUpsilon (asIdent bi))
-                      (map toVar' yts)
+                    WeakTermPiIntro
+                      (Just (bi, xtsyts))
+                      atsbts
+                      (m, WeakTermPiElim b yts')
                   )
               )
-          )
-          (map (\(_, x, _) -> asText x) ats)
-      ]
+          ]
+      _ -> raiseCritical m "inductive-intro"
+  -- asとatsbtsとxtsytsを現在のnameEnvでrenameする必要がある？
+  -- というか、caseで変換結果を引き抜けばオーケー。
+  --       (_, is) <- lookupRevIndEnv m bi
+  --       yts' <- mapM (internalize as atsbts) $ drop (length (is :: [Int])) xtsyts
+  --       insInductive as bt -- register the constructor (if necessary)
+  -- return
+  --   [QuasiStmtLetWT m constructorIdent constructor]
+  -- return
+  --   [ QuasiStmtLetInductiveIntro
+  --       m
+  --       (mb, asIdent bi, (m, weakTermPi (xts' ++ yts) cod))
+  --       ( m {metaIsReducible = False},
+  --         weakTermPiIntro
+  --           (xts' ++ yts)
+  --           ( m,
+  --             WeakTermPiIntro
+  --               (Just (bi, xts' ++ yts))
+  --               (ats ++ bts)
+  --               ( m,
+  --                 WeakTermPiElim
+  --                   (mb, WeakTermUpsilon (asIdent bi))
+  --                   (map toVar' yts)
+  --               )
+  --           )
+  --       )
+  --       (map (\(_, x, _) -> asText x) ats)
+  --   ]
   | otherwise =
     raiseError m $
       "the succedent of an introduction rule of `"

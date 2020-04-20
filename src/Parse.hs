@@ -501,28 +501,28 @@ concatQuasiStmtList =
     --   insForm n at e
     --   cont <- concatQuasiStmtList es
     --   return $ WeakStmtLetWT m at e cont
-    QuasiStmtLetInductiveIntro m bt e as : ss ->
-      case e of
-        (mLam, WeakTermPiIntro Nothing xtsyts (_, WeakTermPiIntro (Just (bi, _)) atsbts (_, WeakTermPiElim b _))) -> do
-          (_, is) <- lookupRevIndEnv m bi
-          yts' <- mapM (internalize as atsbts) $ drop (length (is :: [Int])) xtsyts
-          insInductive as bt -- register the constructor (if necessary)
-          cont <- concatQuasiStmtList ss
-          return $
-            WeakStmtLetWT
-              m
-              bt
-              ( mLam, -- metaIsReducible mLam == False
-                weakTermPiIntro
-                  xtsyts
-                  ( m,
-                    WeakTermPiIntro
-                      (Just (bi, xtsyts))
-                      atsbts
-                      (m, WeakTermPiElim b yts')
-                  )
-              )
-              cont
+    -- QuasiStmtLetInductiveIntro m bt e as : ss ->
+    --   case e of
+    --     (mLam, WeakTermPiIntro Nothing xtsyts (_, WeakTermPiIntro (Just (bi, _)) atsbts (_, WeakTermPiElim b _))) -> do
+    --       (_, is) <- lookupRevIndEnv m bi
+    --       yts' <- mapM (internalize as atsbts) $ drop (length (is :: [Int])) xtsyts
+    --       insInductive as bt -- register the constructor (if necessary)
+    --       cont <- concatQuasiStmtList ss
+    --       return $
+    --         WeakStmtLetWT
+    --           m
+    --           bt
+    --           ( mLam, -- metaIsReducible mLam == False
+    --             weakTermPiIntro
+    --               xtsyts
+    --               ( m,
+    --                 WeakTermPiIntro
+    --                   (Just (bi, xtsyts))
+    --                   atsbts
+    --                   (m, WeakTermPiElim b yts')
+    --               )
+    --           )
+    --           cont
         _ -> raiseCritical m "inductive-intro"
 
 checkKeywordSanity :: Meta -> T.Text -> WithEnv ()
