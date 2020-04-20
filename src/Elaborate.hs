@@ -28,8 +28,7 @@ elaborateStmt =
   \case
     [] -> do
       path <- getCurrentFilePath
-      let m = newMeta 1 1 path
-      return $ StmtReturn m
+      return $ StmtReturn $ newMeta 1 1 path
     WeakStmtLet m (mx, x, t) e : cont -> do
       (e', te) <- infer e
       t' <- inferType t
@@ -114,7 +113,6 @@ elaborate' =
       xts' <- mapM elaboratePlus xts
       e' <- elaborate' e
       return (m, TermIter (mx, x, t') xts' e')
-    -- elaborate'
     (m, WeakTermZeta _) ->
       raiseCritical
         m
