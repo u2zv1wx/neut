@@ -30,91 +30,97 @@ discernDef (m, xt, xts, e) = do
 
 -- Alpha-convert all the variables so that different variables have different names.
 discern' :: NameEnv -> WeakTermPlus -> WithEnv WeakTermPlus
-discern' _ (m, WeakTermTau) = return (m, WeakTermTau)
-discern' nenv (m, WeakTermUpsilon x@(I (s, _))) = do
-  penv <- gets prefixEnv
-  mx <- lookupName m penv nenv x
-  b1 <- lookupEnumValueNameWithPrefix s
-  b2 <- lookupEnumTypeNameWithPrefix s
-  mc <- lookupConstantMaybe m penv s
-  case (mx, b1, b2, mc) of
-    (Just x', _, _, _) -> return (m, WeakTermUpsilon x')
-    (_, _, _, Just c) -> return (m, WeakTermConst c)
-    (_, Just s', _, _) -> return (m, WeakTermEnumIntro (EnumValueLabel s'))
-    (_, _, Just s', _) -> return (m, WeakTermEnum (EnumTypeLabel s'))
-    _ -> raiseError m $ "(*) undefined variable:  " <> asText x
-discern' nenv (m, WeakTermPi mName xts t) = do
-  (xts', t') <- discernBinder nenv xts t
-  return (m, WeakTermPi mName xts' t')
-discern' nenv (m, WeakTermPiIntro info xts e) = do
-  info' <- fmap2M (mapM (discernWeakIdentPlus nenv)) info
-  (xts', e') <- discernBinder nenv xts e
-  return (m, WeakTermPiIntro info' xts' e')
-discern' nenv (m, WeakTermPiElim e es) = do
-  es' <- mapM (discern' nenv) es
-  e' <- discern' nenv e
-  return (m, WeakTermPiElim e' es')
-discern' nenv (m, WeakTermIter (mx, x, t) xts e) = do
-  t' <- discern' nenv t
-  (xt', xts', e') <- discernIter nenv (mx, x, t') xts e
-  return (m, WeakTermIter xt' xts' e')
-discern' _ (m, WeakTermConst x) = return (m, WeakTermConst x)
-discern' _ (m, WeakTermZeta h) = return (m, WeakTermZeta h)
-discern' nenv (m, WeakTermInt t x) = do
-  t' <- discern' nenv t
-  return (m, WeakTermInt t' x)
-discern' nenv (m, WeakTermFloat t x) = do
-  t' <- discern' nenv t
-  return (m, WeakTermFloat t' x)
-discern' _ (m, WeakTermEnum s) = return (m, WeakTermEnum s)
-discern' _ (m, WeakTermEnumIntro x) = return (m, WeakTermEnumIntro x)
-discern' nenv (m, WeakTermEnumElim (e, t) caseList) = do
-  e' <- discern' nenv e
-  t' <- discern' nenv t
-  caseList' <-
-    forM caseList $ \((mCase, l), body) -> do
-      l' <- discernWeakCase mCase nenv l
-      body' <- discern' nenv body
-      return ((mCase, l'), body')
-  return (m, WeakTermEnumElim (e', t') caseList')
-discern' nenv (m, WeakTermArray dom kind) = do
-  dom' <- discern' nenv dom
-  return (m, WeakTermArray dom' kind)
-discern' nenv (m, WeakTermArrayIntro kind es) = do
-  es' <- mapM (discern' nenv) es
-  return (m, WeakTermArrayIntro kind es')
-discern' nenv (m, WeakTermArrayElim kind xts e1 e2) = do
-  e1' <- discern' nenv e1
-  (xts', e2') <- discernBinder nenv xts e2
-  return (m, WeakTermArrayElim kind xts' e1' e2')
-discern' _ (m, WeakTermStruct ts) = return (m, WeakTermStruct ts)
-discern' nenv (m, WeakTermStructIntro ets) = do
-  let (es, ts) = unzip ets
-  es' <- mapM (discern' nenv) es
-  return (m, WeakTermStructIntro $ zip es' ts)
-discern' nenv (m, WeakTermStructElim xts e1 e2) = do
-  e1' <- discern' nenv e1
-  (xts', e2') <- discernStruct nenv xts e2
-  return (m, WeakTermStructElim xts' e1' e2')
-discern' nenv (m, WeakTermCase indName e cxtes) = do
-  e' <- discern' nenv e
-  penv <- gets prefixEnv
-  cxtes' <-
-    flip mapM cxtes $ \(((mc, c), xts), body) -> do
-      c' <- lookupConstant mc penv c
-      (xts', body') <- discernBinder nenv xts body
-      return (((mc, c'), xts'), body')
-  return (m, WeakTermCase indName e' cxtes')
-discern' nenv (m, WeakTermQuestion e t) = do
-  e' <- discern' nenv e
-  t' <- discern' nenv t
-  return (m, WeakTermQuestion e' t')
-discern' nenv (_, WeakTermErase mxs e) = do
-  penv <- gets prefixEnv
-  forM_ mxs $ \(mx, x) -> lookupName'' mx penv nenv (asIdent x)
-  let xs = map snd mxs
-  let nenv' = Map.filterWithKey (\k _ -> k `notElem` xs) nenv
-  discern' nenv' e
+discern' nenv =
+  \case
+    (m, WeakTermTau) -> return (m, WeakTermTau)
+    (m, WeakTermUpsilon x@(I (s, _))) -> do
+      penv <- gets prefixEnv
+      mx <- lookupName m penv nenv x
+      b1 <- lookupEnumValueNameWithPrefix s
+      b2 <- lookupEnumTypeNameWithPrefix s
+      mc <- lookupConstantMaybe m penv s
+      case (mx, b1, b2, mc) of
+        (Just x', _, _, _) -> return (m, WeakTermUpsilon x')
+        (_, _, _, Just c) -> return (m, WeakTermConst c)
+        (_, Just s', _, _) -> return (m, WeakTermEnumIntro (EnumValueLabel s'))
+        (_, _, Just s', _) -> return (m, WeakTermEnum (EnumTypeLabel s'))
+        _ -> raiseError m $ "(*) undefined variable:  " <> asText x
+    (m, WeakTermPi mName xts t) -> do
+      (xts', t') <- discernBinder nenv xts t
+      return (m, WeakTermPi mName xts' t')
+    (m, WeakTermPiIntro info xts e) -> do
+      info' <- fmap2M (mapM (discernWeakIdentPlus nenv)) info
+      (xts', e') <- discernBinder nenv xts e
+      return (m, WeakTermPiIntro info' xts' e')
+    (m, WeakTermPiElim e es) -> do
+      es' <- mapM (discern' nenv) es
+      e' <- discern' nenv e
+      return (m, WeakTermPiElim e' es')
+    (m, WeakTermIter (mx, x, t) xts e) -> do
+      t' <- discern' nenv t
+      (xt', xts', e') <- discernIter nenv (mx, x, t') xts e
+      return (m, WeakTermIter xt' xts' e')
+    (m, WeakTermConst x) ->
+      return (m, WeakTermConst x)
+    (m, WeakTermZeta h) ->
+      return (m, WeakTermZeta h)
+    (m, WeakTermInt t x) -> do
+      t' <- discern' nenv t
+      return (m, WeakTermInt t' x)
+    (m, WeakTermFloat t x) -> do
+      t' <- discern' nenv t
+      return (m, WeakTermFloat t' x)
+    (m, WeakTermEnum s) ->
+      return (m, WeakTermEnum s)
+    (m, WeakTermEnumIntro x) ->
+      return (m, WeakTermEnumIntro x)
+    (m, WeakTermEnumElim (e, t) caseList) -> do
+      e' <- discern' nenv e
+      t' <- discern' nenv t
+      caseList' <-
+        forM caseList $ \((mCase, l), body) -> do
+          l' <- discernWeakCase mCase nenv l
+          body' <- discern' nenv body
+          return ((mCase, l'), body')
+      return (m, WeakTermEnumElim (e', t') caseList')
+    (m, WeakTermArray dom kind) -> do
+      dom' <- discern' nenv dom
+      return (m, WeakTermArray dom' kind)
+    (m, WeakTermArrayIntro kind es) -> do
+      es' <- mapM (discern' nenv) es
+      return (m, WeakTermArrayIntro kind es')
+    (m, WeakTermArrayElim kind xts e1 e2) -> do
+      e1' <- discern' nenv e1
+      (xts', e2') <- discernBinder nenv xts e2
+      return (m, WeakTermArrayElim kind xts' e1' e2')
+    (m, WeakTermStruct ts) -> return (m, WeakTermStruct ts)
+    (m, WeakTermStructIntro ets) -> do
+      let (es, ts) = unzip ets
+      es' <- mapM (discern' nenv) es
+      return (m, WeakTermStructIntro $ zip es' ts)
+    (m, WeakTermStructElim xts e1 e2) -> do
+      e1' <- discern' nenv e1
+      (xts', e2') <- discernStruct nenv xts e2
+      return (m, WeakTermStructElim xts' e1' e2')
+    (m, WeakTermCase indName e cxtes) -> do
+      e' <- discern' nenv e
+      penv <- gets prefixEnv
+      cxtes' <-
+        flip mapM cxtes $ \(((mc, c), xts), body) -> do
+          c' <- lookupConstant mc penv c
+          (xts', body') <- discernBinder nenv xts body
+          return (((mc, c'), xts'), body')
+      return (m, WeakTermCase indName e' cxtes')
+    (m, WeakTermQuestion e t) -> do
+      e' <- discern' nenv e
+      t' <- discern' nenv t
+      return (m, WeakTermQuestion e' t')
+    (_, WeakTermErase mxs e) -> do
+      penv <- gets prefixEnv
+      forM_ mxs $ \(mx, x) -> lookupName'' mx penv nenv (asIdent x)
+      let xs = map snd mxs
+      let nenv' = Map.filterWithKey (\k _ -> k `notElem` xs) nenv
+      discern' nenv' e
 
 discernBinder ::
   NameEnv ->
