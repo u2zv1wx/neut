@@ -93,29 +93,7 @@ compInfoWeakStmtList c info (WeakStmtLet _ (mx, x, t) e : ss) = do
   let info' = (x, mx) : info
   compInfoWeakTermPlus c info' e
   compInfoWeakStmtList c info' ss
--- compInfoWeakStmtList c info (WeakStmtLetWT m (mx, x, t) e : ss) = do
---   compInfoWeakStmtList c info $ WeakStmtLet m (mx, x, t) e : ss
--- compInfoWeakTermPlus c info t
--- let info' = (x, mx) : info
--- compInfoWeakTermPlus c info' e
--- compInfoWeakStmtList c info' ss
--- compInfoWeakStmtList c info ((WeakStmtDef xds) : ss) = do
---   xms <- mapM (compInfoDef c info . snd) xds
---   let info' = xms ++ info
---   compInfoWeakStmtList c info' ss
--- compInfoWeakStmtList c info ((WeakStmtConstDecl _ (mx, x, t)) : ss) = do
---   compInfoWeakTermPlus c info t
---   let info' = (asIdent x, mx) : info
---   compInfoWeakStmtList c info' ss
 compInfoWeakStmtList c info (_ : ss) = compInfoWeakStmtList c info ss
-
--- compInfoDef ::
---   CursorName -> CompInfo -> Def -> Either CompInfo (Ident, Meta)
--- compInfoDef c info (_, (mx, x, t), xts, e) = do
---   compInfoWeakTermPlus c info t
---   let info' = (x, mx) : info
---   compInfoBinder c info' xts e
---   return (x, mx)
 
 compInfoWeakTermPlus ::
   CursorName -> CompInfo -> WeakTermPlus -> Either CompInfo ()
@@ -136,6 +114,7 @@ compInfoWeakTermPlus c info (_, WeakTermIter (mx, x, t) xts e) = do
   compInfoBinder c info' xts e
 compInfoWeakTermPlus _ _ (_, WeakTermZeta _) = return ()
 compInfoWeakTermPlus _ _ (_, WeakTermConst _) = return ()
+compInfoWeakTermPlus _ _ (_, WeakTermBoxElim _) = return ()
 compInfoWeakTermPlus c info (_, WeakTermInt t _) = compInfoWeakTermPlus c info t
 compInfoWeakTermPlus c info (_, WeakTermFloat t _) =
   compInfoWeakTermPlus c info t

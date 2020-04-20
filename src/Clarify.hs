@@ -26,6 +26,10 @@ clarify = clarifyStmt IntMap.empty
 clarifyStmt :: SubstTerm -> Stmt -> WithEnv CodePlus
 clarifyStmt _ (StmtReturn m) =
   return (m, CodeUpIntro (m, DataEnumIntro (EnumValueIntS 64 0)))
+-- let x := e1 in e2
+--   ~>
+-- let x := box-intro CONST e1 in
+-- e2{x := box-elim CONST}
 clarifyStmt sub (StmtLet m (_, x, _) e cont) = do
   tenv <- gets typeEnv
   e' <- clarify' tenv $ substTermPlus sub e

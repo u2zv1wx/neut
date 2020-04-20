@@ -174,6 +174,7 @@ normalize (m, TermConst x) = do
   case Map.lookup x cenv of
     Just (Left e) -> normalize e
     _ -> return (m, TermConst x)
+normalize (m, TermBoxElim x) = return (m, TermBoxElim x)
 normalize (m, TermFloat size x) = return (m, TermFloat size x)
 normalize (m, TermEnum enumType) = return (m, TermEnum enumType)
 normalize (m, TermEnumIntro enumValue) = return (m, TermEnumIntro enumValue)
