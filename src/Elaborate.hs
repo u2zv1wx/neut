@@ -26,9 +26,8 @@ elaborate = elaborateStmt
 elaborateStmt :: [WeakStmt] -> WithEnv Stmt
 elaborateStmt =
   \case
-    [] -> do
-      path <- getCurrentFilePath
-      return $ StmtReturn $ newMeta 1 1 path
+    [] ->
+      StmtReturn . newMeta 1 1 <$> getCurrentFilePath
     WeakStmtLet m (mx, x, t) e : cont -> do
       (e', te) <- infer e
       t' <- inferType t
@@ -56,7 +55,7 @@ elaborateStmt =
     WeakStmtVerify m e : cont -> do
       whenCheck $ do
         (e', _) <- infer e
-        e'' <- elaborate' e'
+        _ <- elaborate' e'
         start <- liftIO getCurrentTime
         -- _ <- normalize e''
         stop <- liftIO getCurrentTime
