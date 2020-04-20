@@ -92,20 +92,17 @@ parse' =
             parse' cont
           | otherwise -> raiseSyntaxError m "(keyword LEAF)"
         (m, TreeNode ((_, TreeLeaf "use") : es))
-          | [(_, TreeLeaf s)] <- es -> do
-            modify (\e -> e {prefixEnv = s : prefixEnv e})
-            parse' cont
+          | [(_, TreeLeaf s)] <- es ->
+            use s >> parse' cont
           | otherwise -> raiseSyntaxError m "(use LEAF)"
         (m, TreeNode ((_, TreeLeaf "unuse") : es))
-          | [(_, TreeLeaf s)] <- es -> do
-            modify (\e -> e {prefixEnv = filter (/= s) (prefixEnv e)})
-            parse' cont
+          | [(_, TreeLeaf s)] <- es ->
+            unuse s >> parse' cont
           | otherwise -> raiseSyntaxError m "(unuse LEAF)"
         (m, TreeNode ((_, TreeLeaf "section") : es))
           | [(_, TreeLeaf s)] <- es -> do
             modify (\e -> e {sectionEnv = s : sectionEnv e})
-            n <- getCurrentSection
-            modify (\e -> e {prefixEnv = n : n <> ":" <> "private" : prefixEnv e})
+            getCurrentSection >>= use
             parse' cont
           | otherwise -> raiseSyntaxError m "(section LEAF)"
         (m, TreeNode ((_, TreeLeaf "end") : es))
@@ -115,10 +112,8 @@ parse' =
               [] -> raiseError m "there is no section to end"
               (s' : ns')
                 | s == s' -> do
-                  n <- getCurrentSection
+                  getCurrentSection >>= unuse
                   modify (\e -> e {sectionEnv = ns'})
-                  penv <- gets prefixEnv
-                  modify (\env -> env {prefixEnv = filter (`notElem` [n, n <> ":" <> "private"]) penv})
                   parse' cont
                 | otherwise ->
                   raiseError m $
@@ -149,8 +144,8 @@ parse' =
               item <- liftIO $ get urlStr' $ \_ i1 -> do
                 i2 <- Streams.map byteString i1
                 toLazyByteString <$> Streams.fold mappend mempty i2
-              note' $ "installing " <> pkg <> " into " <> T.pack (toFilePath path)
-              install item path
+              note' $ "extracting " <> pkg <> " into " <> T.pack (toFilePath path)
+              extract item path
             parse' cont
           | otherwise -> raiseSyntaxError m "(ensure LEAF LEAF)"
         (_, TreeNode ((_, TreeLeaf "statement") : innerCont)) -> parse' $ innerCont ++ cont
@@ -219,7 +214,7 @@ parse' =
             m' <- adjustPhase' m
             defList <- parse' cont
             return $ QuasiStmtVerify m' e' : defList
-          | otherwise -> raiseSyntaxError m "(include LEAF) | (include library LEAF)"
+          | otherwise -> raiseSyntaxError m "(verify LEAF) | (verify library LEAF)"
         _ -> do
           e <- adjustPhase stmt >>= macroExpand
           if isSpecialForm e
@@ -231,6 +226,14 @@ parse' =
               t <- newHole m'
               defList <- parse' cont
               return $ QuasiStmtLet m' (m', name, t) e' : defList
+
+use :: T.Text -> WithEnv ()
+use s =
+  modify (\e -> e {prefixEnv = s : prefixEnv e})
+
+unuse :: T.Text -> WithEnv ()
+unuse s =
+  modify (\e -> e {prefixEnv = filter (/= s) (prefixEnv e)})
 
 withSectionPrefix :: T.Text -> WithEnv T.Text
 withSectionPrefix x = do
@@ -544,8 +547,8 @@ ensureFileExistence m path = do
     then return ()
     else raiseError m $ "no such file: " <> T.pack (toFilePath path)
 
-install :: L.ByteString -> Path Abs Dir -> WithEnv ()
-install bytestr pkgPath =
+extract :: L.ByteString -> Path Abs Dir -> WithEnv ()
+extract bytestr pkgPath =
   liftIO $ Tar.unpack (toFilePath pkgPath) $ Tar.read $ GZip.decompress bytestr
 
 includeCore :: Meta -> [TreePlus] -> [TreePlus]
