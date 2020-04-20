@@ -146,8 +146,7 @@ checkNameSanity m atsbts = do
 toInductive ::
   [WeakTextPlus] -> [WeakTextPlus] -> Connective -> WithEnv [QuasiStmt]
 toInductive ats bts connective@(m, ai, xts, _) = do
-  -- let a = asIdent ai
-  formationRule <- formationRuleOf connective >>= ruleAsWeakIdentPlus
+  at <- formationRuleOf connective >>= ruleAsWeakIdentPlus
   let cod = (m, WeakTermPiElim (m, WeakTermUpsilon $ asIdent ai) (map toVar' xts))
   z <- newNameWith'' "_"
   let zt = (m, z, cod)
@@ -156,9 +155,9 @@ toInductive ats bts connective@(m, ai, xts, _) = do
   indType <-
     discernWithCurrentNameEnv
       (m, weakTermPiIntro xts (m, WeakTermPi (Just ai) atsbts cod))
-  formationRule' <- discernTopLevelIdentPlus formationRule
-  insForm (length ats) formationRule' indType
-  -- definition of induction principle
+  at' <- discernTopLevelIdentPlus at
+  insForm (length ats) at' indType
+  -- definition of induction principle (fold)
   let indArgs = xts ++ [zt] ++ atsbts
   inductionPrinciple <-
     discernWithCurrentNameEnv
@@ -167,30 +166,9 @@ toInductive ats bts connective@(m, ai, xts, _) = do
     discernTopLevelIdentPlus
       (m, asIdent $ ai <> ":induction", (m, weakTermPi indArgs cod))
   return
-    [ QuasiStmtLetWT m formationRule' indType,
+    [ QuasiStmtLetWT m at' indType,
       QuasiStmtLetWT m indIdent inductionPrinciple
     ]
-
--- return
---   [ QuasiStmtLetInductive
---       (length ats)
---       m
---       formationRule
---       -- nat := lam (...). Pi{nat} (...)
---       (m, weakTermPiIntro xts (m, WeakTermPi (Just ai) atsbts cod)),
---     -- induction principle
---     QuasiStmtLetWT
---       m
---       ( m,
---         asIdent $ ai <> ":induction",
---         (m, WeakTermPi Nothing (xts ++ [zt] ++ atsbts) cod)
---       )
---       ( m,
---         weakTermPiIntro
---           (xts ++ [zt] ++ atsbts)
---           (m, WeakTermPiElim (toVar' zt) (map toVar' atsbts))
---       )
---   ]
 
 toInductiveIntroList :: [WeakTextPlus] -> Connective -> WithEnv [QuasiStmt]
 toInductiveIntroList ats (_, a, xts, rules) = do
