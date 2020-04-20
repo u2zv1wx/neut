@@ -130,8 +130,10 @@ parse' stmtList =
           | (_, TreeLeaf name) : ts <- rest -> do
             xis <- interpretEnumItem m name ts
             m' <- adjustPhase' m
-            ss <- parse' cont
-            return $ QuasiStmtEnum m' name xis : ss
+            insEnumEnv m' name xis
+            parse' cont
+          -- ss <- parse' cont
+          -- return $ QuasiStmtEnum m' name xis : ss
           | otherwise -> raiseSyntaxError m "(enum LEAF TREE ... TREE)"
         (m, TreeNode ((_, TreeLeaf "include") : rest))
           | [(mPath, TreeLeaf pathString)] <- rest ->
@@ -480,7 +482,7 @@ concatQuasiStmtList (QuasiStmtLetWT m xt e : es) = do
 concatQuasiStmtList (QuasiStmtVerify m e : es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtVerify m e cont
-concatQuasiStmtList (QuasiStmtEnum {} : ss) = concatQuasiStmtList ss
+-- concatQuasiStmtList (QuasiStmtEnum {} : ss) = concatQuasiStmtList ss
 concatQuasiStmtList (QuasiStmtLetInductive n m at e : es) = do
   insForm n at e
   cont <- concatQuasiStmtList es

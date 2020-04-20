@@ -1,6 +1,7 @@
 module Parse.Discern
   ( discern,
     discernLet,
+    discernLet',
     discern'',
   )
 where
@@ -35,10 +36,10 @@ discern' nenv (QuasiStmtVerify m e : ss) = do
   e' <- discern'' nenv e
   ss' <- discern' nenv ss
   return $ QuasiStmtVerify m e' : ss'
-discern' nenv (QuasiStmtEnum m name xis : ss) = do
-  insEnumEnv m name xis
-  ss' <- discern' nenv ss
-  return $ QuasiStmtEnum m name xis : ss'
+-- discern' nenv (QuasiStmtEnum m name xis : ss) = do
+--   insEnumEnv m name xis
+--   ss' <- discern' nenv ss
+--   return $ QuasiStmtEnum m name xis : ss'
 discern' nenv (QuasiStmtLetInductive n m xt e : ss) = do
   (xt', e', ss') <- discernLet nenv xt e ss
   return $ QuasiStmtLetInductive n m xt' e' : ss'
@@ -67,6 +68,17 @@ discernLet nenv (mx, x, t) e ss = do
   x' <- newDefinedNameWith mx x
   ss' <- discern' (insertName x x' nenv) ss
   return ((mx, x', t'), e', ss')
+
+discernLet' ::
+  WeakIdentPlus ->
+  WeakTermPlus ->
+  WithEnv (WeakIdentPlus, WeakTermPlus)
+discernLet' (mx, x, t) e = do
+  nenv <- gets topNameEnv
+  t' <- discern'' nenv t
+  e' <- discern'' nenv e
+  x' <- newDefinedNameWith mx x
+  return ((mx, x', t'), e')
 
 -- Alpha-convert all the variables so that different variables have different names.
 discern'' :: NameEnv -> WeakTermPlus -> WithEnv WeakTermPlus

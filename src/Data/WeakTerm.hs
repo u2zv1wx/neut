@@ -92,7 +92,7 @@ data QuasiStmt
     --   --     ((fn An) (ARGS-n) en))
     --   QuasiStmtDef [(T.Text, Def)]
     QuasiStmtVerify Meta WeakTermPlus
-  | QuasiStmtEnum Meta T.Text [(T.Text, Int)]
+  -- | QuasiStmtEnum Meta T.Text [(T.Text, Int)]
   | QuasiStmtConstDecl Meta WeakTextPlus
   | QuasiStmtLetInductive Int Meta WeakIdentPlus WeakTermPlus
   | QuasiStmtLetInductiveIntro Meta WeakIdentPlus WeakTermPlus [T.Text]
