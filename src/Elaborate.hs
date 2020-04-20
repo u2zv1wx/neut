@@ -29,7 +29,7 @@ elaborateStmt =
     [] -> do
       let m = undefined
       return (m, TermEnumIntro (EnumValueIntS 64 0))
-    (WeakStmtLet m (mx, x, t) e : cont) -> do
+    WeakStmtLet m (mx, x, t) e : cont -> do
       (e', te) <- infer e
       t' <- inferType t
       insConstraintEnv te t'
@@ -43,7 +43,7 @@ elaborateStmt =
       cont' <- elaborateStmt cont
       x' <- newNameWith'' "_"
       return (m, TermPiElim (m, termPiIntro [(mx, x', t'')] cont') [e''])
-    (WeakStmtLetWT m (mx, x, t) e : cont) -> do
+    WeakStmtLetWT m (mx, x, t) e : cont -> do
       t' <- inferType t
       analyze >> synthesize >> refine >> cleanup
       e' <- reduceTermPlus <$> elaborate' e -- `e` is supposed to be well-typed
@@ -55,7 +55,11 @@ elaborateStmt =
       cont' <- elaborateStmt cont
       x' <- newNameWith'' "_"
       return (m, TermPiElim (m, termPiIntro [(mx, x', t'')] cont') [e'])
-    (WeakStmtVerify m e : cont) -> do
+    WeakStmtConstDecl (_, c, t) : cont -> do
+      t' <- reduceTermPlus <$> elaborate' t
+      insTypeEnv (Right c) t'
+      elaborateStmt cont
+    WeakStmtVerify m e : cont -> do
       whenCheck $ do
         (e', _) <- infer e
         e'' <- elaborate' e'

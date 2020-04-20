@@ -167,10 +167,8 @@ parse' =
             m' <- adjustPhase' m
             name' <- withSectionPrefix name
             insertConstant m' name'
-            h <- newNameWith'' "_"
-            let constDecl = WeakStmtLet m' (m', h, t') (m', WeakTermConst name')
             defList <- parse' cont
-            return $ constDecl : defList
+            return $ WeakStmtConstDecl (m', name', t') : defList
           | otherwise -> raiseSyntaxError m "(constant LEAF TREE)"
         (m, TreeNode (def@(mDef, TreeLeaf "definition") : rest))
           | [name@(_, TreeLeaf _), body] <- rest ->
