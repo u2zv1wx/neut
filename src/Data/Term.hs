@@ -16,6 +16,7 @@ data Term
   | TermPiElim TermPlus [TermPlus]
   | TermIter IdentPlus [IdentPlus] TermPlus
   | TermConst T.Text
+  | TermBoxElim Ident -- S4 necessity
   | TermFloat FloatSize Double
   | TermEnum EnumType
   | TermEnumIntro EnumValue
@@ -75,6 +76,7 @@ varTermPlus (_, TermPiElim e es) = do
 varTermPlus (_, TermIter (_, x, t) xts e) =
   varTermPlus t ++ filter (/= x) (varTermPlus' xts [e])
 varTermPlus (_, TermConst _) = []
+varTermPlus (_, TermBoxElim _) = []
 varTermPlus (_, TermFloat _ _) = []
 varTermPlus (_, TermEnum _) = []
 varTermPlus (_, TermEnumIntro _) = []
@@ -126,6 +128,7 @@ substTermPlus sub (m, TermIter (mx, x, t) xts e) = do
   let (xts', e') = substTermPlus'' sub' xts e
   (m, TermIter (mx, x, t') xts' e')
 substTermPlus _ e@(_, TermConst _) = e
+substTermPlus _ e@(_, TermBoxElim _) = e
 substTermPlus _ e@(_, TermFloat _ _) = e
 substTermPlus _ (m, TermEnum x) = (m, TermEnum x)
 substTermPlus _ (m, TermEnumIntro l) = (m, TermEnumIntro l)
@@ -200,6 +203,7 @@ weaken (m, TermIter (mx, x, t) xts e) = do
   let e' = weaken e
   (m, WeakTermIter (mx, x, t') xts' e')
 weaken (m, TermConst x) = (m, WeakTermConst x)
+weaken (m, TermBoxElim x) = (m, WeakTermBoxElim x)
 weaken (m, TermFloat size x) =
   (m, WeakTermFloat (m, WeakTermConst ("f" <> showFloatSize size)) x)
 weaken (m, TermEnum x) = (m, WeakTermEnum x)

@@ -9,6 +9,7 @@ import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import qualified Data.IntMap as IntMap
 import Data.List (nub)
+import qualified Data.Set as S
 import Data.Term
 import qualified Data.Text as T
 import Data.Time
@@ -82,8 +83,12 @@ elaborate' =
   \case
     (m, WeakTermTau) ->
       return (m, TermTau)
-    (m, WeakTermUpsilon x) ->
-      return (m, TermUpsilon x)
+    (m, WeakTermUpsilon x) -> do
+      cset <- gets constantSet
+      let x' = asText x
+      if S.member x' cset
+        then return (m, TermConst x')
+        else return (m, TermUpsilon x)
     (m, WeakTermPi mName xts t) -> do
       xts' <- mapM elaboratePlus xts
       t' <- elaborate' t
@@ -118,6 +123,8 @@ elaborate' =
         "every meta-variable must be of the form (?M e1 ... en) where n >= 0, but found the meta-variable here that doesn't fit this pattern"
     (m, WeakTermConst x) ->
       return (m, TermConst x)
+    (m, WeakTermBoxElim x) ->
+      return (m, TermBoxElim x)
     (m, WeakTermInt t x) -> do
       t' <- reduceTermPlus <$> elaborate' t
       case t' of

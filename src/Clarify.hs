@@ -21,17 +21,19 @@ import qualified Data.Text as T
 import Reduce.Term
 
 clarify :: Stmt -> WithEnv CodePlus
-clarify = clarifyStmt
+clarify = clarifyStmt IntMap.empty
 
-clarifyStmt :: Stmt -> WithEnv CodePlus
-clarifyStmt (StmtReturn m) =
+clarifyStmt :: SubstTerm -> Stmt -> WithEnv CodePlus
+clarifyStmt _ (StmtReturn m) =
   return (m, CodeUpIntro (m, DataEnumIntro (EnumValueIntS 64 0)))
-clarifyStmt (StmtLet m (_, x, _) e cont) = do
+clarifyStmt sub (StmtLet m (_, x, _) e cont) = do
   tenv <- gets typeEnv
-  e' <- clarify' tenv e
-  insCodeEnv (asText'' x) [] e' -- S4-box-introduction
+  e' <- clarify' tenv $ substTermPlus sub e
+  constName <- newNameWith x
+  insCodeEnv (asText'' constName) [] e' -- box-introduction
+  let sub' = IntMap.insert (asInt x) (m, TermBoxElim constName) sub
+  cont' <- clarifyStmt sub' cont
   h <- newNameWith'' "_"
-  cont' <- clarifyStmt cont
   return (m, CodeUpElim h e' cont')
 
 clarify' :: TypeEnv -> TermPlus -> WithEnv CodePlus
@@ -56,6 +58,8 @@ clarify' tenv iter@(m, TermIter (_, x, t) mxts e) = do
   fvs <- nubFVS <$> chainTermPlus tenv iter
   retClosureFix tenv x fvs m mxts e'
 clarify' tenv (m, TermConst x) = clarifyConst tenv m x
+clarify' _ (m, TermBoxElim x) =
+  return (m, CodePiElimDownElim (m, DataConst $ asText'' x) []) -- box-elimination
 clarify' _ (m, TermFloat size l) = return (m, CodeUpIntro (m, DataFloat size l))
 clarify' _ (m, TermEnum _) = returnCartesianImmediate m
 clarify' _ (m, TermEnumIntro l) = return (m, CodeUpIntro (m, DataEnumIntro l))
@@ -193,17 +197,7 @@ clarifyConst tenv m x
     os <- getOS
     case asSysCallMaybe os x of
       Just (syscall, argInfo) -> clarifySysCall tenv x syscall argInfo m
-      _ -> return (m, CodeUpIntro (m, DataConst x))
-
---   (_, Nothing) -> return (m, CodeUpIntro (m, DataConst x)) -- external
---   (_, Just _) -> return (m, CodePiElimDownElim (m, DataConst x') []) -- box-elim
--- cenv <- gets cacheEnv
--- -- showInHexはLLVMのときまで遅延させたほうがいいかも（型情報の取得が絡むので）
--- let x' = showInHex x
--- case (asSysCallMaybe os x, Map.lookup x cenv) of
---   (Just (syscall, argInfo), _) -> clarifySysCall tenv x syscall argInfo m
---   (_, Nothing) -> return (m, CodeUpIntro (m, DataConst x)) -- external
---   (_, Just _) -> return (m, CodePiElimDownElim (m, DataConst x') []) -- box-elim
+      _ -> return (m, CodeUpIntro (m, DataConst x)) -- external constant
 
 immType :: Meta -> TermPlus
 immType m = (m, TermEnum (EnumTypeIntS 64))
@@ -608,6 +602,7 @@ chainTermPlus tenv (_, TermIter (_, x, t) xts e) = do
   xs2 <- chainTermPlus' (insTypeEnv' (Left (asInt x)) t tenv) xts [e]
   return $ xs1 ++ filter (\(_, y, _) -> y /= x) xs2
 chainTermPlus _ (_, TermConst _) = return []
+chainTermPlus _ (_, TermBoxElim _) = return []
 chainTermPlus _ (_, TermFloat _ _) = return []
 chainTermPlus _ (_, TermEnum _) = return []
 chainTermPlus _ (_, TermEnumIntro _) = return []

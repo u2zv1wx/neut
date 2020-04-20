@@ -3,7 +3,6 @@ module Parse.Discern
     discernIdent,
     discernIdentPlus,
     discernDef,
-    insertConstant,
   )
 where
 
@@ -61,6 +60,8 @@ discern' nenv =
       return (m, WeakTermIter xt' xts' e')
     (m, WeakTermConst x) ->
       return (m, WeakTermConst x)
+    (m, WeakTermBoxElim x) ->
+      return (m, WeakTermBoxElim x)
     (m, WeakTermZeta h) ->
       return (m, WeakTermZeta h)
     (m, WeakTermInt t x) -> do
@@ -205,15 +206,6 @@ newDefinedNameWith m (I (s, _)) = do
   let x = I (s, j)
   insertIntoIntactSet m s
   return x
-
-insertConstant :: Meta -> T.Text -> WithEnv ()
-insertConstant m x = do
-  cset <- gets constantSet
-  if S.member x cset
-    then raiseError m $ "the constant `" <> x <> "` is already defined"
-    else do
-      modify (\env -> env {constantSet = S.insert x (constantSet env)})
-      insertIntoIntactSet m x
 
 insertName :: Ident -> Ident -> NameEnv -> NameEnv
 insertName (I (s, _)) = Map.insert s

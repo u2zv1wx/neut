@@ -480,3 +480,10 @@ lookupRevIndEnv m bi = do
   case Map.lookup bi rienv of
     Nothing -> raiseCritical m $ "no such constructor defined: `" <> bi <> "`"
     Just val -> return val
+
+insertConstant :: Meta -> T.Text -> WithEnv ()
+insertConstant m x = do
+  cset <- gets constantSet
+  if S.member x cset
+    then raiseError m $ "the constant `" <> x <> "` is already defined"
+    else modify (\env -> env {constantSet = S.insert x (constantSet env)})

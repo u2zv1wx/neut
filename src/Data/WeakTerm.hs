@@ -5,8 +5,6 @@ import qualified Data.HashMap.Lazy as Map
 import qualified Data.Set as S
 import qualified Data.Text as T
 
--- import Path
-
 data WeakTerm
   = WeakTermTau
   | WeakTermUpsilon Ident
@@ -19,6 +17,7 @@ data WeakTerm
   | WeakTermIter WeakIdentPlus [WeakIdentPlus] WeakTermPlus
   | WeakTermZeta Ident
   | WeakTermConst T.Text
+  | WeakTermBoxElim Ident
   | WeakTermInt WeakTermPlus Integer
   | WeakTermFloat WeakTermPlus Double
   | WeakTermEnum EnumType
@@ -109,6 +108,7 @@ varWeakTermPlus (_, WeakTermIter (_, x, t) xts e) = do
   let set2 = S.filter (/= x) (varWeakTermPlus' xts [e])
   S.union set1 set2
 varWeakTermPlus (_, WeakTermConst _) = S.empty
+varWeakTermPlus (_, WeakTermBoxElim _) = S.empty
 varWeakTermPlus (_, WeakTermZeta _) = S.empty
 varWeakTermPlus (_, WeakTermInt t _) = varWeakTermPlus t
 varWeakTermPlus (_, WeakTermFloat t _) = varWeakTermPlus t
@@ -164,6 +164,7 @@ holeWeakTermPlus (_, WeakTermIter (_, _, t) xts e) = do
   S.union set1 set2
 holeWeakTermPlus (_, WeakTermZeta h) = S.singleton h
 holeWeakTermPlus (_, WeakTermConst _) = S.empty
+holeWeakTermPlus (_, WeakTermBoxElim _) = S.empty
 holeWeakTermPlus (_, WeakTermInt t _) = holeWeakTermPlus t
 holeWeakTermPlus (_, WeakTermFloat t _) = holeWeakTermPlus t
 holeWeakTermPlus (_, WeakTermEnum _) = S.empty
@@ -205,6 +206,7 @@ holeWeakTermPlus' ((_, _, t) : xts) es = do
   let set2 = holeWeakTermPlus' xts es
   S.union set1 set2
 
+-- fixme: const substは不要
 substWeakTermPlus :: SubstWeakTerm -> WeakTermPlus -> WeakTermPlus
 substWeakTermPlus _ tau@(_, WeakTermTau) = tau
 substWeakTermPlus sub e1@(_, WeakTermUpsilon x) =
@@ -231,6 +233,7 @@ substWeakTermPlus sub e@(_, WeakTermConst x) =
   case Map.lookup (Right x) sub of
     Nothing -> e
     Just e2 -> (supMeta (metaOf e) (metaOf e2), snd e2)
+substWeakTermPlus _ e@(_, WeakTermBoxElim _) = e
 substWeakTermPlus sub e1@(_, WeakTermZeta x) =
   case Map.lookup (Left $ asInt x) sub of
     Nothing -> e1
@@ -348,6 +351,7 @@ toText (_, WeakTermIter (_, x, _) xts e) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["μ", asText x, argStr, toText e]
 toText (_, WeakTermConst x) = x
+toText (_, WeakTermBoxElim x) = asText x
 toText (_, WeakTermZeta (I (_, i))) = "?M" <> T.pack (show i)
 toText (_, WeakTermInt _ a) = T.pack $ show a
 toText (_, WeakTermFloat _ a) = T.pack $ show a

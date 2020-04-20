@@ -76,6 +76,8 @@ infer' _ (m, WeakTermConst x)
   | otherwise = do
     t <- lookupTypeEnv m (Right x) x
     return ((m, WeakTermConst x), (m, snd $ weaken t))
+infer' _ (m, WeakTermBoxElim _) =
+  raiseCritical m "`infer'` for box modality"
 infer' _ (m, WeakTermInt t i) = do
   t' <- inferType' [] t -- ctx == [] since t' should be i64, i8, etc. (i.e. t must be closed)
   return ((m, WeakTermInt t' i), t')
