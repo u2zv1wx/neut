@@ -20,55 +20,123 @@ import Numeric
 import Reduce.Term
 import Reduce.WeakTerm
 
-elaborate :: WeakStmt -> WithEnv TermPlus
+elaborate :: [WeakStmt] -> WithEnv TermPlus
 elaborate = elaborateStmt
 
-elaborateStmt :: WeakStmt -> WithEnv TermPlus
-elaborateStmt (WeakStmtReturn e) = do
-  (e', _) <- infer e
-  analyze >> synthesize >> refine
-  elaborate' e'
-elaborateStmt (WeakStmtLet m (mx, x, t) e cont) = do
-  (e', te) <- infer e
-  t' <- inferType t
-  insConstraintEnv te t'
-  analyze >> synthesize >> refine >> cleanup
-  e'' <- reduceTermPlus <$> elaborate' e'
-  t'' <- reduceTermPlus <$> elaborate' t'
-  insTypeEnv (Left $ asInt x) t''
-  -- insTypeEnv (Right x) t''
-  modify (\env -> env {cacheEnv = Map.insert x (Left e'') (cacheEnv env)})
-  cont' <- elaborateStmt cont
-  x' <- newNameWith'' "_"
-  return (m, TermPiElim (m, termPiIntro [(mx, x', t'')] cont') [e''])
-elaborateStmt (WeakStmtLetWT m (mx, x, t) e cont) = do
-  t' <- inferType t
-  analyze >> synthesize >> refine >> cleanup
-  e' <- reduceTermPlus <$> elaborate' e -- `e` is supposed to be well-typed
-  t'' <- reduceTermPlus <$> elaborate' t'
-  -- insTypeEnv (Right x) t''
-  insTypeEnv (Left $ asInt x) t''
-  modify (\env -> env {cacheEnv = Map.insert x (Left e') (cacheEnv env)})
-  cont' <- elaborateStmt cont
-  x' <- newNameWith'' "_"
-  return (m, TermPiElim (m, termPiIntro [(mx, x', t'')] cont') [e'])
-elaborateStmt (WeakStmtVerify m e cont) = do
-  whenCheck $ do
-    (e', _) <- infer e
-    e'' <- elaborate' e'
-    start <- liftIO $ getCurrentTime
-    _ <- normalize e''
-    stop <- liftIO $ getCurrentTime
-    let sec = realToFrac $ diffUTCTime stop start :: Float
-    note m $
-      "verification succeeded (" <> T.pack (showFloat' sec) <> " seconds)"
-  elaborateStmt cont
-elaborateStmt (WeakStmtConstDecl _ (_, x, t) cont) = do
-  t' <- inferType t
-  analyze >> synthesize >> refine >> cleanup
-  t'' <- reduceTermPlus <$> elaborate' t'
-  insTypeEnv (Right x) t''
-  elaborateStmt cont
+elaborateStmt :: [WeakStmt] -> WithEnv TermPlus
+elaborateStmt =
+  \case
+    [] -> do
+      let m = undefined
+      return (m, TermEnumIntro (EnumValueIntS 64 0))
+    (WeakStmtLet m (mx, x, t) e : cont) -> do
+      (e', te) <- infer e
+      t' <- inferType t
+      insConstraintEnv te t'
+      analyze >> synthesize >> refine >> cleanup
+      e'' <- reduceTermPlus <$> elaborate' e'
+      t'' <- reduceTermPlus <$> elaborate' t'
+      insTypeEnv (Left $ asInt x) t''
+      -- insTypeEnv (Right x) t''
+      modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e'') (substEnv env)})
+      -- modify (\env -> env {cacheEnv = Map.insert x (Left e'') (cacheEnv env)})
+      cont' <- elaborateStmt cont
+      x' <- newNameWith'' "_"
+      return (m, TermPiElim (m, termPiIntro [(mx, x', t'')] cont') [e''])
+    (WeakStmtLetWT m (mx, x, t) e : cont) -> do
+      t' <- inferType t
+      analyze >> synthesize >> refine >> cleanup
+      e' <- reduceTermPlus <$> elaborate' e -- `e` is supposed to be well-typed
+      t'' <- reduceTermPlus <$> elaborate' t'
+      -- insTypeEnv (Right x) t''
+      insTypeEnv (Left $ asInt x) t''
+      modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e') (substEnv env)})
+      -- modify (\env -> env {cacheEnv = Map.insert x (Left e') (cacheEnv env)})
+      cont' <- elaborateStmt cont
+      x' <- newNameWith'' "_"
+      return (m, TermPiElim (m, termPiIntro [(mx, x', t'')] cont') [e'])
+    (WeakStmtVerify m e : cont) -> do
+      whenCheck $ do
+        (e', _) <- infer e
+        e'' <- elaborate' e'
+        start <- liftIO getCurrentTime
+        _ <- normalize e''
+        stop <- liftIO getCurrentTime
+        let sec = realToFrac $ diffUTCTime stop start :: Float
+        note m $
+          "verification succeeded (" <> T.pack (showFloat' sec) <> " seconds)"
+      elaborateStmt cont
+
+-- elaborateStmt (WeakStmtLetWT m (mx, x, t) e cont) = do
+--   t' <- inferType t
+--   analyze >> synthesize >> refine >> cleanup
+--   e' <- reduceTermPlus <$> elaborate' e -- `e` is supposed to be well-typed
+--   t'' <- reduceTermPlus <$> elaborate' t'
+--   -- insTypeEnv (Right x) t''
+--   insTypeEnv (Left $ asInt x) t''
+--   modify (\env -> env {cacheEnv = Map.insert x (Left e') (cacheEnv env)})
+--   cont' <- elaborateStmt cont
+--   x' <- newNameWith'' "_"
+--   return (m, TermPiElim (m, termPiIntro [(mx, x', t'')] cont') [e'])
+-- elaborateStmt (WeakStmtVerify m e cont) = do
+--   whenCheck $ do
+--     (e', _) <- infer e
+--     e'' <- elaborate' e'
+--     start <- liftIO $ getCurrentTime
+--     _ <- normalize e''
+--     stop <- liftIO $ getCurrentTime
+--     let sec = realToFrac $ diffUTCTime stop start :: Float
+--     note m $
+--       "verification succeeded (" <> T.pack (showFloat' sec) <> " seconds)"
+--   elaborateStmt cont
+-- elaborateStmt (WeakStmtConstDecl _ (_, x, t) cont) = do
+--   t' <- inferType t
+--   analyze >> synthesize >> refine >> cleanup
+--   t'' <- reduceTermPlus <$> elaborate' t'
+--   insTypeEnv (Right x) t''
+--   elaborateStmt cont
+
+-- elaborateStmt (WeakStmtLet m (mx, x, t) e cont) = do
+--   (e', te) <- infer e
+--   t' <- inferType t
+--   insConstraintEnv te t'
+--   analyze >> synthesize >> refine >> cleanup
+--   e'' <- reduceTermPlus <$> elaborate' e'
+--   t'' <- reduceTermPlus <$> elaborate' t'
+--   insTypeEnv (Left $ asInt x) t''
+--   -- insTypeEnv (Right x) t''
+--   modify (\env -> env {cacheEnv = Map.insert x (Left e'') (cacheEnv env)})
+--   cont' <- elaborateStmt cont
+--   x' <- newNameWith'' "_"
+--   return (m, TermPiElim (m, termPiIntro [(mx, x', t'')] cont') [e''])
+-- elaborateStmt (WeakStmtLetWT m (mx, x, t) e cont) = do
+--   t' <- inferType t
+--   analyze >> synthesize >> refine >> cleanup
+--   e' <- reduceTermPlus <$> elaborate' e -- `e` is supposed to be well-typed
+--   t'' <- reduceTermPlus <$> elaborate' t'
+--   -- insTypeEnv (Right x) t''
+--   insTypeEnv (Left $ asInt x) t''
+--   modify (\env -> env {cacheEnv = Map.insert x (Left e') (cacheEnv env)})
+--   cont' <- elaborateStmt cont
+--   x' <- newNameWith'' "_"
+--   return (m, TermPiElim (m, termPiIntro [(mx, x', t'')] cont') [e'])
+-- elaborateStmt (WeakStmtVerify m e cont) = do
+--   whenCheck $ do
+--     (e', _) <- infer e
+--     e'' <- elaborate' e'
+--     start <- liftIO $ getCurrentTime
+--     _ <- normalize e''
+--     stop <- liftIO $ getCurrentTime
+--     let sec = realToFrac $ diffUTCTime stop start :: Float
+--     note m $
+--       "verification succeeded (" <> T.pack (showFloat' sec) <> " seconds)"
+--   elaborateStmt cont
+-- elaborateStmt (WeakStmtConstDecl _ (_, x, t) cont) = do
+--   t' <- inferType t
+--   analyze >> synthesize >> refine >> cleanup
+--   t'' <- reduceTermPlus <$> elaborate' t'
+--   insTypeEnv (Right x) t''
+--   elaborateStmt cont
 
 -- elaborateStmt (WeakStmtVisit _ ss1 ss2) = do
 --   e1 <- elaborateStmt ss1
@@ -110,7 +178,7 @@ elaborate' (m, WeakTermPiIntro info xts e) = do
 elaborate' (m, WeakTermPiElim (mh, WeakTermZeta (I (_, x))) es) = do
   sub <- gets substEnv
   case IntMap.lookup x sub of
-    Nothing -> raiseError mh $ "couldn't instantiate the hole here"
+    Nothing -> raiseError mh "couldn't instantiate the hole here"
     Just (_, WeakTermPiIntro _ xts e)
       | length xts == length es -> do
         let xs = map (\(_, y, _) -> Left $ asInt y) xts
@@ -168,7 +236,7 @@ elaborate' (m, WeakTermFloat t x) = do
   t' <- reduceTermPlus <$> elaborate' t
   case t' of
     (_, TermConst floatType)
-      | Just (LowTypeFloat size) <- asLowTypeMaybe floatType -> do
+      | Just (LowTypeFloat size) <- asLowTypeMaybe floatType ->
         return (m, TermFloat size x)
     _ ->
       raiseError m $
@@ -223,14 +291,14 @@ elaborate' (m, WeakTermCase indName e cxtes) = do
       return ((c, xts'), body')
   eenv <- gets enumEnv
   case cxtes' of
-    [] -> do
+    [] ->
       case Map.lookup indName eenv of
         Nothing -> raiseError m $ "no such inductive type defined: " <> indName
         Just [] -> return (m, TermCase indName e' cxtes')
         Just _ ->
           raiseError m $
             "the inductive type `" <> indName <> "` is not a bottom-type"
-    _ -> do
+    _ ->
       case Map.lookup indName eenv of
         Nothing -> raiseError m $ "no such inductive type defined: " <> indName
         Just bis -> do
@@ -238,8 +306,8 @@ elaborate' (m, WeakTermCase indName e cxtes) = do
           let isLinear = linearCheck bs'
           let isExhaustive = length bis == length bs'
           case (isLinear, isExhaustive) of
-            (False, _) -> raiseError m $ "found a non-linear pattern"
-            (_, False) -> raiseError m $ "found a non-exhaustive pattern"
+            (False, _) -> raiseError m "found a non-linear pattern"
+            (_, False) -> raiseError m "found a non-exhaustive pattern"
             (True, True) -> return (m, TermCase indName e' cxtes')
 elaborate' (m, WeakTermQuestion e t) = do
   e' <- elaborate' e
@@ -250,8 +318,7 @@ elaborate' (m, WeakTermQuestion e t) = do
         let form = toText (weaken e') : showFormArgs 0 [0 .. len - 1]
         let formStr = inParen $ showItems form
         note m $ toText (weaken t') <> "\n-\n" <> formStr
-      _ -> do
-        note m $ toText (weaken t')
+      _ -> note m $ toText (weaken t')
   return e'
 elaborate' (_, WeakTermErase _ e) = elaborate' e
 
@@ -266,10 +333,8 @@ getArgLen _ = Nothing
 
 showFormArgs :: Int -> [Int] -> [T.Text]
 showFormArgs _ [] = []
-showFormArgs k [_]
-  | otherwise = ["#" <> T.pack (show k)]
-showFormArgs k (_ : is)
-  | otherwise = "#" <> T.pack (show k) : showFormArgs (k + 1) is
+showFormArgs k [_] = ["#" <> T.pack (show k)]
+showFormArgs k (_ : is) = "#" <> T.pack (show k) : showFormArgs (k + 1) is
 
 elaborateWeakCase :: WeakCasePlus -> WithEnv CasePlus
 elaborateWeakCase (m, WeakCaseInt t x) = do
@@ -281,7 +346,7 @@ elaborateWeakCase (m, WeakCaseInt t x) = do
       return (m, CaseValue (EnumValueIntU size x))
     (_, TermEnum (EnumTypeLabel "bool")) ->
       return (m, CaseValue (EnumValueIntS 1 x))
-    _ -> do
+    _ ->
       raiseError m $
         "the type of `"
           <> T.pack (show x)

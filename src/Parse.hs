@@ -34,12 +34,14 @@ import Text.Read (readMaybe)
 parse :: Path Abs File -> WithEnv [WeakStmt]
 parse inputPath = do
   stmtList <- visit inputPath
-  -- stmtList' <- discern stmtList
   warnUnusedVar
-  -- pushTrace inputPath
   return stmtList
 
--- concatWeakStmtList stmtList
+-- should create "initial meta"
+-- path <- getCurrentFilePath
+-- content <- liftIO $ TIO.readFile $ toFilePath path
+-- let m = newMeta (length $ T.lines content) 1 path
+-- return $ WeakStmtReturn (m, WeakTermEnumIntro $ EnumValueIntS 64 0)
 
 visit :: Path Abs File -> WithEnv [WeakStmt]
 visit path = do
@@ -161,7 +163,7 @@ parse' =
           | otherwise -> raiseSyntaxError m "(introspect LEAF TREE*)"
         (m, TreeNode ((_, TreeLeaf "constant") : rest))
           | [(_, TreeLeaf name), t] <- rest -> do
-            t' <- adjustPhase t >>= macroExpand >>= interpret >>= discernWithCurrentNameEnv
+            t' <- adjustPhase t >>= macroExpand >>= interpret >>= discern
             m' <- adjustPhase' m
             name' <- withSectionPrefix name
             insertConstant m' name'
@@ -205,14 +207,14 @@ parse' =
             parse' ((m, TreeNode [(mLet, TreeLeaf "let"), xt, e]) : cont)
           | [xt, e] <- rest -> do
             m' <- adjustPhase' m
-            e' <- adjustPhase e >>= macroExpand >>= interpret >>= discernWithCurrentNameEnv
-            xt' <- adjustPhase xt >>= macroExpand >>= prefixTextPlus >>= interpretIdentPlus >>= discernTopLevelIdentPlus
+            e' <- adjustPhase e >>= macroExpand >>= interpret >>= discern
+            xt' <- adjustPhase xt >>= macroExpand >>= prefixTextPlus >>= interpretIdentPlus >>= discernIdentPlus
             defList <- parse' cont
             return $ WeakStmtLet m' xt' e' : defList
           | otherwise -> raiseSyntaxError m "(let LEAF TREE TREE) | (let TREE TREE)"
         (m, TreeNode ((_, TreeLeaf "verify") : rest))
           | [e] <- rest -> do
-            e' <- adjustPhase e >>= macroExpand >>= interpret >>= discernWithCurrentNameEnv
+            e' <- adjustPhase e >>= macroExpand >>= interpret >>= discern
             m' <- adjustPhase' m
             defList <- parse' cont
             return $ WeakStmtVerify m' e' : defList
@@ -222,7 +224,7 @@ parse' =
           if isSpecialForm e
             then parse' $ e : cont
             else do
-              e' <- interpret e >>= discernWithCurrentNameEnv
+              e' <- interpret e >>= discern
               h <- newNameWith'' "_"
               m' <- adjustPhase' $ metaOf e'
               t <- newHole m'
@@ -481,52 +483,6 @@ keywordSet =
       "inductive",
       "coinductive"
     ]
-
--- concatWeakStmtList :: [WeakStmt] -> WithEnv WeakStmt
--- concatWeakStmtList =
---   \case
---     [] -> do
---       path <- getCurrentFilePath
---       content <- liftIO $ TIO.readFile $ toFilePath path
---       let m = newMeta (length $ T.lines content) 1 path
---       return $ WeakStmtReturn (m, WeakTermEnumIntro $ EnumValueIntS 64 0)
---     WeakStmtLet m xt e : es -> do
---       cont <- concatWeakStmtList es
---       return $ WeakStmtLet m xt e cont
---     WeakStmtLetWT m xt e : es -> do
---       cont <- concatWeakStmtList es
---       return $ WeakStmtLetWT m xt e cont
---     WeakStmtVerify m e : es -> do
---       cont <- concatWeakStmtList es
---       return $ WeakStmtVerify m e cont
-
--- WeakStmtLetInductive n m at e : es -> do
---   insForm n at e
---   cont <- concatWeakStmtList es
---   return $ WeakStmtLetWT m at e cont
--- WeakStmtLetInductiveIntro m bt e as : ss ->
---   case e of
---     (mLam, WeakTermPiIntro Nothing xtsyts (_, WeakTermPiIntro (Just (bi, _)) atsbts (_, WeakTermPiElim b _))) -> do
---       (_, is) <- lookupRevIndEnv m bi
---       yts' <- mapM (internalize as atsbts) $ drop (length (is :: [Int])) xtsyts
---       insInductive as bt -- register the constructor (if necessary)
---       cont <- concatWeakStmtList ss
---       return $
---         WeakStmtLetWT
---           m
---           bt
---           ( mLam, -- metaIsReducible mLam == False
---             weakTermPiIntro
---               xtsyts
---               ( m,
---                 WeakTermPiIntro
---                   (Just (bi, xtsyts))
---                   atsbts
---                   (m, WeakTermPiElim b yts')
---               )
---           )
---           cont
--- _ -> raiseCritical m "inductive-intro"
 
 checkKeywordSanity :: Meta -> T.Text -> WithEnv ()
 checkKeywordSanity m x

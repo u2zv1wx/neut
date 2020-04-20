@@ -62,7 +62,7 @@ main = execParser (info (helper <*> parseOpt) fullDesc) >>= run
 
 parseOpt :: Parser Command
 parseOpt =
-  subparser $
+  subparser
     ( command
         "build"
         (info (helper <*> parseBuildOpt) (progDesc "build given file"))
@@ -259,8 +259,7 @@ runCheck :: Path Abs File -> WithEnv ()
 runCheck = parse >=> elaborate >=> \_ -> return ()
 
 seqIO :: [IO ()] -> IO ()
-seqIO [] = return ()
-seqIO (a : as) = a >> seqIO as
+seqIO = foldr (>>) (return ())
 
 archive :: FilePath -> FilePath -> [FilePath] -> IO ()
 archive tarPath base dir = do

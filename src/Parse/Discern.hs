@@ -1,14 +1,9 @@
 module Parse.Discern
-  ( -- discern,
-    -- discernLet,
-    discernLet',
-    discern'',
-    discernWithCurrentNameEnv,
-    insertConstant,
-    discernTopLevelIdentPlus,
-    newDefinedNameWith,
+  ( discern,
     discernIdent,
+    discernIdentPlus,
     discernDef,
+    insertConstant,
   )
 where
 
@@ -20,72 +15,12 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.WeakTerm
 
--- discern :: [QuasiStmt] -> WithEnv [QuasiStmt]
--- discern = discern' Map.empty
-
 type NameEnv = Map.HashMap T.Text Ident
 
--- discern' :: NameEnv -> [QuasiStmt] -> WithEnv [QuasiStmt]
--- discern' _ [] = return []
--- discern' nenv (QuasiStmtLet m xt e : ss) = do
---   (xt', e', ss') <- discernLet nenv xt e ss
---   return $ QuasiStmtLet m xt' e' : ss'
--- discern' nenv (QuasiStmtLetWT m xt e : ss) = do
---   (xt', e', ss') <- discernLet nenv xt e ss
---   return $ QuasiStmtLetWT m xt' e' : ss'
--- -- discern' nenv (QuasiStmtConstDecl m (mx, x, t) : ss) = do
--- --   insertConstant mx x
--- --   t' <- discern'' nenv t
--- --   ss' <- discern' nenv ss
--- --   return $ QuasiStmtConstDecl m (mx, x, t') : ss'
--- discern' nenv (QuasiStmtVerify m e : ss) = do
---   e' <- discern'' nenv e
---   ss' <- discern' nenv ss
---   return $ QuasiStmtVerify m e' : ss'
-
--- discern' nenv (QuasiStmtEnum m name xis : ss) = do
---   insEnumEnv m name xis
---   ss' <- discern' nenv ss
---   return $ QuasiStmtEnum m name xis : ss'
--- discern' nenv (QuasiStmtLetInductive n m xt e : ss) = do
---   (xt', e', ss') <- discernLet nenv xt e ss
---   return $ QuasiStmtLetInductive n m xt' e' : ss'
--- discern' nenv (QuasiStmtLetInductiveIntro m xt e as : ss) = do
---   (xt', e', ss') <- discernLet nenv xt e ss
---   return $ QuasiStmtLetInductiveIntro m xt' e' as : ss'
-
--- discern' nenv (QuasiStmtUse prefix : ss) = do
---   modify (\e -> e {prefixEnv = prefix : prefixEnv e})
---   ss' <- discern' nenv ss
---   return $ QuasiStmtUse prefix : ss'
--- discern' nenv (QuasiStmtUnuse prefix : ss) = do
---   modify (\e -> e {prefixEnv = filter (/= prefix) (prefixEnv e)})
---   ss' <- discern' nenv ss
---   return $ QuasiStmtUnuse prefix : ss'
-
--- discernLet ::
---   NameEnv ->
---   WeakIdentPlus ->
---   WeakTermPlus ->
---   [QuasiStmt] ->
---   WithEnv (WeakIdentPlus, WeakTermPlus, [QuasiStmt])
--- discernLet nenv (mx, x, t) e ss = do
---   t' <- discern'' nenv t
---   e' <- discern'' nenv e
---   x' <- newDefinedNameWith mx x
---   ss' <- discern' (insertName x x' nenv) ss
---   return ((mx, x', t'), e', ss')
-
-discernLet' ::
-  WeakIdentPlus ->
-  WeakTermPlus ->
-  WithEnv (WeakIdentPlus, WeakTermPlus)
-discernLet' (mx, x, t) e = do
+discern :: WeakTermPlus -> WithEnv WeakTermPlus
+discern e = do
   nenv <- gets topNameEnv
-  t' <- discern'' nenv t
-  e' <- discern'' nenv e
-  x' <- newDefinedNameWith mx x
-  return ((mx, x', t'), e')
+  discern' nenv e
 
 discernDef :: Def -> WithEnv Def
 discernDef (m, xt, xts, e) = do
@@ -93,15 +28,10 @@ discernDef (m, xt, xts, e) = do
   (xt', xts', e') <- discernIter nenv xt xts e
   return (m, xt', xts', e')
 
-discernWithCurrentNameEnv :: WeakTermPlus -> WithEnv WeakTermPlus
-discernWithCurrentNameEnv e = do
-  nenv <- gets topNameEnv
-  discern'' nenv e
-
 -- Alpha-convert all the variables so that different variables have different names.
-discern'' :: NameEnv -> WeakTermPlus -> WithEnv WeakTermPlus
-discern'' _ (m, WeakTermTau) = return (m, WeakTermTau)
-discern'' nenv (m, WeakTermUpsilon x@(I (s, _))) = do
+discern' :: NameEnv -> WeakTermPlus -> WithEnv WeakTermPlus
+discern' _ (m, WeakTermTau) = return (m, WeakTermTau)
+discern' nenv (m, WeakTermUpsilon x@(I (s, _))) = do
   penv <- gets prefixEnv
   mx <- lookupName m penv nenv x
   b1 <- lookupEnumValueNameWithPrefix s
@@ -113,61 +43,61 @@ discern'' nenv (m, WeakTermUpsilon x@(I (s, _))) = do
     (_, Just s', _, _) -> return (m, WeakTermEnumIntro (EnumValueLabel s'))
     (_, _, Just s', _) -> return (m, WeakTermEnum (EnumTypeLabel s'))
     _ -> raiseError m $ "(*) undefined variable:  " <> asText x
-discern'' nenv (m, WeakTermPi mName xts t) = do
+discern' nenv (m, WeakTermPi mName xts t) = do
   (xts', t') <- discernBinder nenv xts t
   return (m, WeakTermPi mName xts' t')
-discern'' nenv (m, WeakTermPiIntro info xts e) = do
+discern' nenv (m, WeakTermPiIntro info xts e) = do
   info' <- fmap2M (mapM (discernWeakIdentPlus nenv)) info
   (xts', e') <- discernBinder nenv xts e
   return (m, WeakTermPiIntro info' xts' e')
-discern'' nenv (m, WeakTermPiElim e es) = do
-  es' <- mapM (discern'' nenv) es
-  e' <- discern'' nenv e
+discern' nenv (m, WeakTermPiElim e es) = do
+  es' <- mapM (discern' nenv) es
+  e' <- discern' nenv e
   return (m, WeakTermPiElim e' es')
-discern'' nenv (m, WeakTermIter (mx, x, t) xts e) = do
-  t' <- discern'' nenv t
+discern' nenv (m, WeakTermIter (mx, x, t) xts e) = do
+  t' <- discern' nenv t
   (xt', xts', e') <- discernIter nenv (mx, x, t') xts e
   return (m, WeakTermIter xt' xts' e')
-discern'' _ (m, WeakTermConst x) = return (m, WeakTermConst x)
-discern'' _ (m, WeakTermZeta h) = return (m, WeakTermZeta h)
-discern'' nenv (m, WeakTermInt t x) = do
-  t' <- discern'' nenv t
+discern' _ (m, WeakTermConst x) = return (m, WeakTermConst x)
+discern' _ (m, WeakTermZeta h) = return (m, WeakTermZeta h)
+discern' nenv (m, WeakTermInt t x) = do
+  t' <- discern' nenv t
   return (m, WeakTermInt t' x)
-discern'' nenv (m, WeakTermFloat t x) = do
-  t' <- discern'' nenv t
+discern' nenv (m, WeakTermFloat t x) = do
+  t' <- discern' nenv t
   return (m, WeakTermFloat t' x)
-discern'' _ (m, WeakTermEnum s) = return (m, WeakTermEnum s)
-discern'' _ (m, WeakTermEnumIntro x) = return (m, WeakTermEnumIntro x)
-discern'' nenv (m, WeakTermEnumElim (e, t) caseList) = do
-  e' <- discern'' nenv e
-  t' <- discern'' nenv t
+discern' _ (m, WeakTermEnum s) = return (m, WeakTermEnum s)
+discern' _ (m, WeakTermEnumIntro x) = return (m, WeakTermEnumIntro x)
+discern' nenv (m, WeakTermEnumElim (e, t) caseList) = do
+  e' <- discern' nenv e
+  t' <- discern' nenv t
   caseList' <-
     forM caseList $ \((mCase, l), body) -> do
       l' <- discernWeakCase mCase nenv l
-      body' <- discern'' nenv body
+      body' <- discern' nenv body
       return ((mCase, l'), body')
   return (m, WeakTermEnumElim (e', t') caseList')
-discern'' nenv (m, WeakTermArray dom kind) = do
-  dom' <- discern'' nenv dom
+discern' nenv (m, WeakTermArray dom kind) = do
+  dom' <- discern' nenv dom
   return (m, WeakTermArray dom' kind)
-discern'' nenv (m, WeakTermArrayIntro kind es) = do
-  es' <- mapM (discern'' nenv) es
+discern' nenv (m, WeakTermArrayIntro kind es) = do
+  es' <- mapM (discern' nenv) es
   return (m, WeakTermArrayIntro kind es')
-discern'' nenv (m, WeakTermArrayElim kind xts e1 e2) = do
-  e1' <- discern'' nenv e1
+discern' nenv (m, WeakTermArrayElim kind xts e1 e2) = do
+  e1' <- discern' nenv e1
   (xts', e2') <- discernBinder nenv xts e2
   return (m, WeakTermArrayElim kind xts' e1' e2')
-discern'' _ (m, WeakTermStruct ts) = return (m, WeakTermStruct ts)
-discern'' nenv (m, WeakTermStructIntro ets) = do
+discern' _ (m, WeakTermStruct ts) = return (m, WeakTermStruct ts)
+discern' nenv (m, WeakTermStructIntro ets) = do
   let (es, ts) = unzip ets
-  es' <- mapM (discern'' nenv) es
+  es' <- mapM (discern' nenv) es
   return (m, WeakTermStructIntro $ zip es' ts)
-discern'' nenv (m, WeakTermStructElim xts e1 e2) = do
-  e1' <- discern'' nenv e1
+discern' nenv (m, WeakTermStructElim xts e1 e2) = do
+  e1' <- discern' nenv e1
   (xts', e2') <- discernStruct nenv xts e2
   return (m, WeakTermStructElim xts' e1' e2')
-discern'' nenv (m, WeakTermCase indName e cxtes) = do
-  e' <- discern'' nenv e
+discern' nenv (m, WeakTermCase indName e cxtes) = do
+  e' <- discern' nenv e
   penv <- gets prefixEnv
   cxtes' <-
     flip mapM cxtes $ \(((mc, c), xts), body) -> do
@@ -175,16 +105,16 @@ discern'' nenv (m, WeakTermCase indName e cxtes) = do
       (xts', body') <- discernBinder nenv xts body
       return (((mc, c'), xts'), body')
   return (m, WeakTermCase indName e' cxtes')
-discern'' nenv (m, WeakTermQuestion e t) = do
-  e' <- discern'' nenv e
-  t' <- discern'' nenv t
+discern' nenv (m, WeakTermQuestion e t) = do
+  e' <- discern' nenv e
+  t' <- discern' nenv t
   return (m, WeakTermQuestion e' t')
-discern'' nenv (_, WeakTermErase mxs e) = do
+discern' nenv (_, WeakTermErase mxs e) = do
   penv <- gets prefixEnv
   forM_ mxs $ \(mx, x) -> lookupName'' mx penv nenv (asIdent x)
   let xs = map snd mxs
   let nenv' = Map.filterWithKey (\k _ -> k `notElem` xs) nenv
-  discern'' nenv' e
+  discern' nenv' e
 
 discernBinder ::
   NameEnv ->
@@ -192,25 +122,31 @@ discernBinder ::
   WeakTermPlus ->
   WithEnv ([WeakIdentPlus], WeakTermPlus)
 discernBinder nenv [] e = do
-  e' <- discern'' nenv e
+  e' <- discern' nenv e
   return ([], e')
 discernBinder nenv ((mx, x, t) : xts) e = do
-  t' <- discern'' nenv t
+  t' <- discern' nenv t
   x' <- newDefinedNameWith mx x
   (xts', e') <- discernBinder (insertName x x' nenv) xts e
   return ((mx, x', t') : xts', e')
 
 discernWeakIdentPlus :: NameEnv -> WeakIdentPlus -> WithEnv WeakIdentPlus
 discernWeakIdentPlus nenv (m, x, t) = do
-  t' <- discern'' nenv t
+  t' <- discern' nenv t
   penv <- gets prefixEnv
   x' <- lookupName'' m penv nenv x
   return (m, x', t')
 
-discernTopLevelIdentPlus :: WeakIdentPlus -> WithEnv WeakIdentPlus
-discernTopLevelIdentPlus (m, x, t) = do
+discernIdent :: Meta -> Ident -> WithEnv (Meta, Ident)
+discernIdent m x = do
+  x' <- newDefinedNameWith m x
+  modify (\env -> env {topNameEnv = Map.insert (asText x) x' (topNameEnv env)})
+  return (m, x')
+
+discernIdentPlus :: WeakIdentPlus -> WithEnv WeakIdentPlus
+discernIdentPlus (m, x, t) = do
   nenv <- gets topNameEnv
-  t' <- discern'' nenv t
+  t' <- discern' nenv t
   penv <- gets prefixEnv
   x' <- lookupName'' m penv nenv x
   modify (\env -> env {topNameEnv = Map.insert (asText x) x' (topNameEnv env)})
@@ -225,17 +161,17 @@ discernIter ::
 discernIter nenv (mx, x, t') [] e = do
   x' <- newDefinedNameWith mx x
   removeFromIntactSet mx $ asText x'
-  e' <- discern'' (insertName x x' nenv) e
+  e' <- discern' (insertName x x' nenv) e
   return ((mx, x', t'), [], e')
 discernIter nenv xt ((mx, x, t) : xts) e = do
-  t' <- discern'' nenv t
+  t' <- discern' nenv t
   x' <- newDefinedNameWith mx x
   (xt', xts', e') <- discernIter (insertName x x' nenv) xt xts e
   return (xt', (mx, x', t') : xts', e')
 
 discernWeakCase :: Meta -> NameEnv -> WeakCase -> WithEnv WeakCase
 discernWeakCase _ nenv (WeakCaseInt t a) = do
-  t' <- discern'' nenv t
+  t' <- discern' nenv t
   return (WeakCaseInt t' a)
 discernWeakCase m _ (WeakCaseLabel l) = do
   ml <- lookupEnumValueNameWithPrefix l
@@ -250,7 +186,7 @@ discernStruct ::
   WeakTermPlus ->
   WithEnv ([(Meta, Ident, ArrayKind)], WeakTermPlus)
 discernStruct nenv [] e = do
-  e' <- discern'' nenv e
+  e' <- discern' nenv e
   return ([], e')
 discernStruct nenv ((mx, x, t) : xts) e = do
   x' <- newDefinedNameWith mx x
@@ -264,12 +200,6 @@ newDefinedNameWith m (I (s, _)) = do
   let x = I (s, j)
   insertIntoIntactSet m s
   return x
-
-discernIdent :: Meta -> Ident -> WithEnv (Meta, Ident)
-discernIdent m x = do
-  x' <- newDefinedNameWith m x
-  modify (\env -> env {topNameEnv = Map.insert (asText x) x' (topNameEnv env)})
-  return (m, x')
 
 insertConstant :: Meta -> T.Text -> WithEnv ()
 insertConstant m x = do

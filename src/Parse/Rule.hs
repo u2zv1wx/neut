@@ -91,7 +91,7 @@ generateProjections ts = do
         v <- newNameWith'' "base"
         let b' = a <> ":" <> b
         e <-
-          discernWithCurrentNameEnv
+          discern
             ( mb,
               weakTermPiIntro
                 (xts ++ [dom])
@@ -109,7 +109,7 @@ generateProjections ts = do
                     ]
                 )
             )
-        bt <- discernTopLevelIdentPlus (mb, asIdent b', (mb, weakTermPi (xts ++ [dom]) cod))
+        bt <- discernIdentPlus (mb, asIdent b', (mb, weakTermPi (xts ++ [dom]) cod))
         return [WeakStmtLetWT mb bt e]
   return $ concat $ concat stmtListList
 
@@ -144,19 +144,19 @@ toInductive ats bts connective@(m, ai, xts, _) = do
   let atsbts = map textPlusToWeakIdentPlus $ ats ++ bts
   -- definition of inductive type
   indType <-
-    discernWithCurrentNameEnv
+    discern
       (m, weakTermPiIntro xts (m, WeakTermPi (Just ai) atsbts cod))
-  at' <- discernTopLevelIdentPlus at
+  at' <- discernIdentPlus at
   insForm (length ats) at' indType
   -- definition of induction principle (fold)
   z <- newNameWith'' "_"
   let zt = (m, z, cod)
   let indArgs = xts ++ [zt] ++ atsbts
   inductionPrinciple <-
-    discernWithCurrentNameEnv
+    discern
       (m, weakTermPiIntro indArgs (m, WeakTermPiElim (toVar' zt) (map toVar' atsbts)))
   indIdent <-
-    discernTopLevelIdentPlus
+    discernIdentPlus
       (m, asIdent $ ai <> ":induction", (m, weakTermPi indArgs cod))
   return
     [ WeakStmtLetWT m at' indType,
@@ -186,7 +186,7 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
     let (is, xts') = unzip ixts
     modify (\env -> env {revIndEnv = Map.insert bi (ai, is) (revIndEnv env)})
     constructor <-
-      discernWithCurrentNameEnv
+      discern
         ( m,
           weakTermPiIntro
             (xts' ++ yts)
@@ -198,7 +198,7 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
             )
         )
     constructorIdent <-
-      discernTopLevelIdentPlus
+      discernIdentPlus
         (mb, asIdent bi, (m, weakTermPi (xts' ++ yts) cod))
     case constructor of
       (_, WeakTermPiIntro _ xtsyts (_, WeakTermPiIntro _ atsbts (_, WeakTermPiElim b _))) -> do

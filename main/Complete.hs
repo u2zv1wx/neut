@@ -44,8 +44,7 @@ parseForCompletion path l c = do
   content <- liftIO $ TIO.readFile $ toFilePath path
   let s = I ("*cursor*", 0)
   case modifyFileForCompletion s content l c of
-    Nothing -> do
-      return []
+    Nothing -> return []
     Just (prefix, content') -> do
       treeList <- tokenize content'
       stmtList <- parse' $ includeCore (newMeta 1 1 path) treeList
@@ -83,34 +82,40 @@ modifyFileForCompletion (I (s, _)) content l c = do
       let targetLine' = s1' <> s <> s2''
       return (prefix, T.unlines $ ys ++ [targetLine'] ++ zs)
 
-compInfo :: CursorName -> [QuasiStmt] -> Either CompInfo ()
-compInfo c ss = compInfoQuasiStmtList c [] ss
+compInfo :: CursorName -> [WeakStmt] -> Either CompInfo ()
+compInfo c = compInfoWeakStmtList c []
 
-compInfoQuasiStmtList ::
-  CursorName -> CompInfo -> [QuasiStmt] -> Either CompInfo ()
-compInfoQuasiStmtList _ _ [] = return ()
-compInfoQuasiStmtList c info ((QuasiStmtLet _ (mx, x, t) e) : ss) = do
-  compInfoWeakTermPlus c info t
-  let info' = (asIdent x, mx) : info
-  compInfoWeakTermPlus c info' e
-  compInfoQuasiStmtList c info' ss
-compInfoQuasiStmtList c info ((QuasiStmtDef xds) : ss) = do
-  xms <- mapM (compInfoDef c info . snd) xds
-  let info' = xms ++ info
-  compInfoQuasiStmtList c info' ss
-compInfoQuasiStmtList c info ((QuasiStmtConstDecl _ (mx, x, t)) : ss) = do
-  compInfoWeakTermPlus c info t
-  let info' = (asIdent x, mx) : info
-  compInfoQuasiStmtList c info' ss
-compInfoQuasiStmtList c info (_ : ss) = compInfoQuasiStmtList c info ss
-
-compInfoDef ::
-  CursorName -> CompInfo -> Def -> Either CompInfo (Ident, Meta)
-compInfoDef c info (_, (mx, x, t), xts, e) = do
+compInfoWeakStmtList ::
+  CursorName -> CompInfo -> [WeakStmt] -> Either CompInfo ()
+compInfoWeakStmtList _ _ [] = return ()
+compInfoWeakStmtList c info (WeakStmtLet _ (mx, x, t) e : ss) = do
   compInfoWeakTermPlus c info t
   let info' = (x, mx) : info
-  compInfoBinder c info' xts e
-  return (x, mx)
+  compInfoWeakTermPlus c info' e
+  compInfoWeakStmtList c info' ss
+-- compInfoWeakStmtList c info (WeakStmtLetWT m (mx, x, t) e : ss) = do
+--   compInfoWeakStmtList c info $ WeakStmtLet m (mx, x, t) e : ss
+-- compInfoWeakTermPlus c info t
+-- let info' = (x, mx) : info
+-- compInfoWeakTermPlus c info' e
+-- compInfoWeakStmtList c info' ss
+-- compInfoWeakStmtList c info ((WeakStmtDef xds) : ss) = do
+--   xms <- mapM (compInfoDef c info . snd) xds
+--   let info' = xms ++ info
+--   compInfoWeakStmtList c info' ss
+-- compInfoWeakStmtList c info ((WeakStmtConstDecl _ (mx, x, t)) : ss) = do
+--   compInfoWeakTermPlus c info t
+--   let info' = (asIdent x, mx) : info
+--   compInfoWeakStmtList c info' ss
+compInfoWeakStmtList c info (_ : ss) = compInfoWeakStmtList c info ss
+
+-- compInfoDef ::
+--   CursorName -> CompInfo -> Def -> Either CompInfo (Ident, Meta)
+-- compInfoDef c info (_, (mx, x, t), xts, e) = do
+--   compInfoWeakTermPlus c info t
+--   let info' = (x, mx) : info
+--   compInfoBinder c info' xts e
+--   return (x, mx)
 
 compInfoWeakTermPlus ::
   CursorName -> CompInfo -> WeakTermPlus -> Either CompInfo ()
@@ -215,7 +220,7 @@ headTailMaybeText s
   | otherwise = return (T.head s, T.tail s)
 
 splitAtMaybe :: Int -> T.Text -> Maybe (T.Text, T.Text)
-splitAtMaybe i xs = do
+splitAtMaybe i xs =
   if 0 <= i && toEnum i < T.length xs
     then return $ T.splitAt (toEnum i) xs
     else Nothing
