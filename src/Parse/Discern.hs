@@ -46,9 +46,9 @@ discern' nenv (QuasiStmtVerify m e : ss) = do
 --   insEnumEnv m name xis
 --   ss' <- discern' nenv ss
 --   return $ QuasiStmtEnum m name xis : ss'
-discern' nenv (QuasiStmtLetInductive n m xt e : ss) = do
-  (xt', e', ss') <- discernLet nenv xt e ss
-  return $ QuasiStmtLetInductive n m xt' e' : ss'
+-- discern' nenv (QuasiStmtLetInductive n m xt e : ss) = do
+--   (xt', e', ss') <- discernLet nenv xt e ss
+--   return $ QuasiStmtLetInductive n m xt' e' : ss'
 discern' nenv (QuasiStmtLetInductiveIntro m xt e as : ss) = do
   (xt', e', ss') <- discernLet nenv xt e ss
   return $ QuasiStmtLetInductiveIntro m xt' e' as : ss'

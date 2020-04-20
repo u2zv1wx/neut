@@ -428,17 +428,8 @@ toLetList =
     [] -> []
     ((x, (m, t), e) : rest) -> QuasiStmtLet m (m, x, t) e : toLetList rest
 
--- toLetList :: [(IdentDef, WeakTermPlus)] -> [QuasiStmt]
--- toLetList =
---   \case
---     [] -> []
---     (((x, (m, (mx, _, t), _, _)), iter) : rest) -> QuasiStmtLet m (mx, x, t) iter : toLetList rest
 defToSub :: (Ident, Def) -> (Key, WeakTermPlus)
 defToSub (dom, (m, xt, xts, e)) = (Left $ asInt dom, (m, WeakTermIter xt xts e))
-
--- defToSub :: Def -> (Key, WeakTermPlus)
--- defToSub (m, (mx, x, t), xts, e) =
---   (Left $ asInt x, (m, WeakTermIter (mx, x, t) xts e))
 
 selfCompose :: Int -> SubstWeakTerm -> SubstWeakTerm
 selfCompose i sub =
@@ -506,10 +497,10 @@ concatQuasiStmtList =
     QuasiStmtVerify m e : es -> do
       cont <- concatQuasiStmtList es
       return $ WeakStmtVerify m e cont
-    QuasiStmtLetInductive n m at e : es -> do
-      insForm n at e
-      cont <- concatQuasiStmtList es
-      return $ WeakStmtLetWT m at e cont
+    -- QuasiStmtLetInductive n m at e : es -> do
+    --   insForm n at e
+    --   cont <- concatQuasiStmtList es
+    --   return $ WeakStmtLetWT m at e cont
     QuasiStmtLetInductiveIntro m bt e as : ss ->
       case e of
         (mLam, WeakTermPiIntro Nothing xtsyts (_, WeakTermPiIntro (Just (bi, _)) atsbts (_, WeakTermPiElim b _))) -> do

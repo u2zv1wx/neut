@@ -17,6 +17,7 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Tree
 import Data.WeakTerm
+import Parse.Discern
 import Parse.Interpret
 
 parseInductive :: Meta -> [TreePlus] -> WithEnv [QuasiStmt]
@@ -92,7 +93,7 @@ generateProjections ts = do
         return
           [ QuasiStmtLetWT
               mb
-              (mb, asIdent b', (mb, WeakTermPi Nothing (xts ++ [dom]) cod))
+              (mb, asIdent b', (mb, weakTermPi (xts ++ [dom]) cod))
               ( mb,
                 weakTermPiIntro
                   (xts ++ [dom])
@@ -145,32 +146,51 @@ checkNameSanity m atsbts = do
 toInductive ::
   [WeakTextPlus] -> [WeakTextPlus] -> Connective -> WithEnv [QuasiStmt]
 toInductive ats bts connective@(m, ai, xts, _) = do
-  let a = asIdent ai
+  -- let a = asIdent ai
   formationRule <- formationRuleOf connective >>= ruleAsWeakIdentPlus
-  let cod = (m, WeakTermPiElim (m, WeakTermUpsilon a) (map toVar' xts))
+  let cod = (m, WeakTermPiElim (m, WeakTermUpsilon $ asIdent ai) (map toVar' xts))
   z <- newNameWith'' "_"
   let zt = (m, z, cod)
   let atsbts = map textPlusToWeakIdentPlus $ ats ++ bts
+  -- definition of inductive type
+  indType <-
+    discernWithCurrentNameEnv
+      (m, weakTermPiIntro xts (m, WeakTermPi (Just ai) atsbts cod))
+  formationRule' <- discernTopLevelIdentPlus formationRule
+  insForm (length ats) formationRule' indType
+  -- definition of induction principle
+  let indArgs = xts ++ [zt] ++ atsbts
+  inductionPrinciple <-
+    discernWithCurrentNameEnv
+      (m, weakTermPiIntro indArgs (m, WeakTermPiElim (toVar' zt) (map toVar' atsbts)))
+  indIdent <-
+    discernTopLevelIdentPlus
+      (m, asIdent $ ai <> ":induction", (m, weakTermPi indArgs cod))
   return
-    [ QuasiStmtLetInductive
-        (length ats)
-        m
-        formationRule
-        -- nat := lam (...). Pi{nat} (...)
-        (m, weakTermPiIntro xts (m, WeakTermPi (Just ai) atsbts cod)),
-      -- induction principle
-      QuasiStmtLetWT
-        m
-        ( m,
-          asIdent $ ai <> ":induction",
-          (m, WeakTermPi Nothing (xts ++ [zt] ++ atsbts) cod)
-        )
-        ( m,
-          weakTermPiIntro
-            (xts ++ [zt] ++ atsbts)
-            (m, WeakTermPiElim (toVar' zt) (map toVar' atsbts))
-        )
+    [ QuasiStmtLetWT m formationRule' indType,
+      QuasiStmtLetWT m indIdent inductionPrinciple
     ]
+
+-- return
+--   [ QuasiStmtLetInductive
+--       (length ats)
+--       m
+--       formationRule
+--       -- nat := lam (...). Pi{nat} (...)
+--       (m, weakTermPiIntro xts (m, WeakTermPi (Just ai) atsbts cod)),
+--     -- induction principle
+--     QuasiStmtLetWT
+--       m
+--       ( m,
+--         asIdent $ ai <> ":induction",
+--         (m, WeakTermPi Nothing (xts ++ [zt] ++ atsbts) cod)
+--       )
+--       ( m,
+--         weakTermPiIntro
+--           (xts ++ [zt] ++ atsbts)
+--           (m, WeakTermPiElim (toVar' zt) (map toVar' atsbts))
+--       )
+--   ]
 
 toInductiveIntroList :: [WeakTextPlus] -> Connective -> WithEnv [QuasiStmt]
 toInductiveIntroList ats (_, a, xts, rules) = do

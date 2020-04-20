@@ -97,7 +97,7 @@ data QuasiStmt
     QuasiStmtVerify Meta WeakTermPlus
   -- | QuasiStmtEnum Meta T.Text [(T.Text, Int)]
   -- | QuasiStmtConstDecl Meta WeakTextPlus
-  | QuasiStmtLetInductive Int Meta WeakIdentPlus WeakTermPlus
+  -- | QuasiStmtLetInductive Int Meta WeakIdentPlus WeakTermPlus
   | QuasiStmtLetInductiveIntro Meta WeakIdentPlus WeakTermPlus [T.Text]
   -- | QuasiStmtUse T.Text
   -- | QuasiStmtUnuse T.Text
