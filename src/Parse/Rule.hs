@@ -1,5 +1,6 @@
 module Parse.Rule
   ( parseInductive,
+    asInductive,
     insForm,
     insInductive,
     internalize,
@@ -273,6 +274,85 @@ optConcat mNew mOld = do
   mOld' <- mOld
   -- insert mNew at the end of the list (to respect the structure of ind/coind represented as pi/sigma)
   return $ mOld' ++ mNew'
+
+asInductive :: [TreePlus] -> WithEnv [TreePlus]
+asInductive =
+  \case
+    [] -> return []
+    (t : ts) -> do
+      (sub, t') <- asInductive' t
+      ts' <- asInductive $ map (substTree sub) ts
+      return $ t' : ts'
+
+asInductive' :: TreePlus -> WithEnv ((T.Text, T.Text), TreePlus)
+asInductive' (m, TreeNode ((_, TreeLeaf a) : (_, TreeNode xts) : rules)) = do
+  let a' = "(" <> a <> ")"
+  let sub = (a, a')
+  let xts' = map (substTree sub) xts
+  rules'' <- mapM styleRule $ map (substTree sub) rules
+  let hole = "(_)"
+  argList <- mapM extractArg xts
+  return
+    ( (a, a'),
+      ( m,
+        TreeNode
+          [ (m, TreeLeaf a),
+            (m, TreeNode xts'),
+            ( m,
+              TreeNode
+                [ (m, TreeLeaf "unfold"),
+                  ( m,
+                    TreeNode
+                      ( [ ( m,
+                            TreeNode
+                              [ (m, TreeLeaf a'),
+                                ( m,
+                                  TreeNode
+                                    [ (m, TreeLeaf "pi"),
+                                      (m, TreeNode xts'),
+                                      (m, TreeLeaf "tau")
+                                    ]
+                                )
+                              ]
+                          )
+                        ]
+                          ++ rules''
+                          ++ [ ( m,
+                                 TreeNode
+                                   [ (m, TreeLeaf hole),
+                                     (m, TreeNode ((m, TreeLeaf a') : argList))
+                                   ]
+                               )
+                             ]
+                      )
+                  ),
+                  (m, TreeNode ((m, TreeLeaf a) : argList))
+                ]
+            )
+          ]
+      )
+    )
+asInductive' t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) ...)"
+
+extractArg :: TreePlus -> WithEnv TreePlus
+extractArg =
+  \case
+    (m, TreeLeaf x) -> return (m, TreeLeaf x)
+    (_, TreeNode [(m, TreeLeaf x), _]) -> return (m, TreeLeaf x)
+    t -> raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
+
+styleRule :: TreePlus -> WithEnv TreePlus
+styleRule =
+  \case
+    (m, TreeNode [(mName, TreeLeaf name), (_, TreeNode xts), t]) ->
+      return
+        ( m,
+          TreeNode
+            [ (mName, TreeLeaf name),
+              (m, TreeNode [(m, TreeLeaf "pi"), (m, TreeNode xts), t])
+            ]
+        )
+    t -> raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) TREE)"
 
 data Mode
   = ModeForward

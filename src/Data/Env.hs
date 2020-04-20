@@ -111,16 +111,6 @@ data Env
         depGraph :: Map.HashMap (Path Abs File) [Path Abs File]
       }
 
-data Nat a
-  = Leaf a
-  | Node (Nat a)
-
-foo :: Nat Int
-foo = Leaf 30
-
-bar :: Nat String
-bar = Node (Node (Leaf "Str"))
-
 initialEnv :: Env
 initialEnv =
   Env

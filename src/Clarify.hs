@@ -36,12 +36,7 @@ clarifyStmt (StmtLet m (_, x, _) e cont) = do
 
 clarify' :: TypeEnv -> TermPlus -> WithEnv CodePlus
 clarify' _ (m, TermTau) = returnCartesianImmediate m
-clarify' _ (m, TermUpsilon x) = do
-  cenv <- gets codeEnv
-  let x' = asText'' x
-  if x' `Map.member` cenv
-    then return (m, CodePiElimDownElim (m, DataConst x') []) -- S4-box-elimination
-    else return (m, CodeUpIntro (m, DataUpsilon x))
+clarify' _ (m, TermUpsilon x) = return (m, CodeUpIntro (m, DataUpsilon x))
 clarify' _ (m, TermPi {}) = returnClosureType m
 clarify' tenv lam@(m, TermPiIntro Nothing mxts e) = do
   fvs <- nubFVS <$> chainTermPlus tenv lam

@@ -49,14 +49,8 @@ llvmCode (_, CodeUpElim x e1 e2) = do
   e1' <- llvmCode e1
   e2' <- llvmCode e2
   commConv x e1' e2'
-llvmCode (_, CodeEnumElim sub v branchList) = do
-  let (ls, es) = unzip branchList
-  let es' = map (substCodePlus sub) es
-  ns <- gets nameSet
-  modify (\env -> env {nameSet = S.empty})
-  es'' <- mapM reduceCodePlus es'
-  modify (\env -> env {nameSet = ns})
-  llvmCodeEnumElim v $ zip ls es''
+llvmCode (_, CodeEnumElim sub v branchList) =
+  prepareBranch sub branchList >>= llvmCodeEnumElim v
 llvmCode (_, CodeStructElim xks v e) = do
   let (xs, ks) = unzip xks
   let ts = map arrayKindToLowType ks
@@ -65,14 +59,18 @@ llvmCode (_, CodeStructElim xks v e) = do
   let idxList = map (\i -> (LLVMDataInt i, i32)) [0 ..]
   ys <- mapM newNameWith xs
   loadContent v bt (zip idxList (zip ys xts)) e
-llvmCode (m, CodeCase sub v branchList) = do
+llvmCode (m, CodeCase sub v branchList) =
+  prepareBranch sub branchList >>= llvmCodeCase m v
+
+prepareBranch :: SubstDataPlus -> [(a, CodePlus)] -> WithEnv [(a, CodePlus)]
+prepareBranch sub branchList = do
   let (ls, es) = unzip branchList
   let es' = map (substCodePlus sub) es
   ns <- gets nameSet
   modify (\env -> env {nameSet = S.empty})
   es'' <- mapM reduceCodePlus es'
   modify (\env -> env {nameSet = ns})
-  llvmCodeCase m v $ zip ls es''
+  return $ zip ls es''
 
 uncastList :: [(Ident, (Ident, LowType))] -> CodePlus -> WithEnv LLVM
 uncastList [] e = llvmCode e
@@ -192,9 +190,8 @@ llvmCast mName v ptrType = do
   x <- newNameWith'' mName
   return
     ( LLVMDataLocal x,
-      \cont ->
-        llvmDataLet tmp v $
-          LLVMLet x (LLVMOpBitcast (LLVMDataLocal tmp) voidPtr ptrType) cont
+      llvmDataLet tmp v
+        . LLVMLet x (LLVMOpBitcast (LLVMDataLocal tmp) voidPtr ptrType)
     )
 
 llvmCastInt ::
@@ -207,12 +204,10 @@ llvmCastInt mName v lowType = do
   y <- newNameWith'' mName
   return
     ( LLVMDataLocal y,
-      \cont ->
-        llvmDataLet x v $
-          LLVMLet
-            y
-            (LLVMOpPointerToInt (LLVMDataLocal x) voidPtr lowType)
-            cont
+      llvmDataLet x v
+        . LLVMLet
+          y
+          (LLVMOpPointerToInt (LLVMDataLocal x) voidPtr lowType)
     )
 
 llvmCastFloat ::
@@ -228,10 +223,9 @@ llvmCastFloat mName v size = do
   z <- newNameWith'' mName
   return
     ( LLVMDataLocal z,
-      \cont ->
-        llvmDataLet xName v
-          $ LLVMLet yName (LLVMOpPointerToInt x voidPtr intType)
-          $ LLVMLet z (LLVMOpBitcast y intType floatType) cont
+      llvmDataLet xName v
+        . LLVMLet yName (LLVMOpPointerToInt x voidPtr intType)
+        . LLVMLet z (LLVMOpBitcast y intType floatType)
     )
 
 -- uncast: {some-concrete-type} -> voidPtr
@@ -296,11 +290,7 @@ llvmDataLet x (m, DataConst y) cont = do
     Just (Definition _ args e)
       | not (y `S.member` ns) -> do
         modify (\env -> env {nameSet = S.insert y ns})
-        ns' <- gets nameSet
-        modify (\env -> env {nameSet = S.empty})
-        e' <- reduceCodePlus e
-        modify (\env -> env {nameSet = ns'})
-        llvm <- llvmCode e'
+        llvm <- llvmCode e
         insLLVMEnv y args llvm
         llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
       | otherwise ->
