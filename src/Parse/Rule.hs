@@ -111,34 +111,6 @@ generateProjections ts = do
             )
         bt <- discernTopLevelIdentPlus (mb, asIdent b', (mb, weakTermPi (xts ++ [dom]) cod))
         return [QuasiStmtLetWT mb bt e]
-  -- return
-  --   [ QuasiStmtLetWT
-  --       mb
-  --       (mb, asIdent b', (mb, weakTermPi (xts ++ [dom]) cod))
-  --       ( mb,
-  --         weakTermPiIntro
-  --           (xts ++ [dom])
-  --           ( mb,
-  --             WeakTermCase
-  --               a
-  --               (my, WeakTermUpsilon y)
-  --               [ ( ( (mb, a <> ":unfold"),
-  --                     -- `xts ++` is required since LetWT bypasses `infer`
-  --                     xts
-  --                       ++ [(ma, asIdent a, ta)]
-  --                       ++ bts'
-  --                       ++ [(mb, v, ty)]
-  --                   ),
-  --                   ( mb,
-  --                     WeakTermPiElim
-  --                       (mb, WeakTermUpsilon $ asIdent b)
-  --                       [(mb, WeakTermUpsilon v)]
-  --                   )
-  --                 )
-  --               ]
-  --           )
-  --       )
-  --   ]
   return $ concat $ concat stmtListList
 
 separate :: WeakTermPlus -> WithEnv (WeakIdentPlus, WeakTermPlus)
@@ -215,18 +187,14 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
     modify (\env -> env {revIndEnv = Map.insert bi (ai, is) (revIndEnv env)})
     constructor <-
       discernWithCurrentNameEnv
-        ( m {metaIsReducible = False},
+        ( m,
           weakTermPiIntro
             (xts' ++ yts)
             ( m,
               WeakTermPiIntro
                 (Just (bi, xts' ++ yts))
                 (ats ++ bts)
-                ( m,
-                  WeakTermPiElim
-                    (mb, WeakTermUpsilon (asIdent bi))
-                    (map toVar' yts)
-                )
+                (m, WeakTermPiElim (mb, WeakTermUpsilon (asIdent bi)) (map toVar' yts))
             )
         )
     constructorIdent <-
@@ -235,50 +203,20 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
     case constructor of
       (_, WeakTermPiIntro _ xtsyts (_, WeakTermPiIntro _ atsbts (_, WeakTermPiElim b _))) -> do
         let as = map (\(_, x, _) -> asText x) ats
-        yts' <- mapM (internalize as atsbts) $ drop (length (is :: [Int])) xtsyts
+        yts' <- mapM (internalize as atsbts) $ drop (length is) xtsyts
         return
           [ QuasiStmtLetWT
               m
               constructorIdent
-              ( m,
+              ( m {metaIsReducible = False},
                 weakTermPiIntro
                   xtsyts
                   ( m,
-                    WeakTermPiIntro
-                      (Just (bi, xtsyts))
-                      atsbts
-                      (m, WeakTermPiElim b yts')
+                    WeakTermPiIntro (Just (bi, xtsyts)) atsbts (m, WeakTermPiElim b yts')
                   )
               )
           ]
       _ -> raiseCritical m "inductive-intro"
-  -- asとatsbtsとxtsytsを現在のnameEnvでrenameする必要がある？
-  -- というか、caseで変換結果を引き抜けばオーケー。
-  --       (_, is) <- lookupRevIndEnv m bi
-  --       yts' <- mapM (internalize as atsbts) $ drop (length (is :: [Int])) xtsyts
-  --       insInductive as bt -- register the constructor (if necessary)
-  -- return
-  --   [QuasiStmtLetWT m constructorIdent constructor]
-  -- return
-  --   [ QuasiStmtLetInductiveIntro
-  --       m
-  --       (mb, asIdent bi, (m, weakTermPi (xts' ++ yts) cod))
-  --       ( m {metaIsReducible = False},
-  --         weakTermPiIntro
-  --           (xts' ++ yts)
-  --           ( m,
-  --             WeakTermPiIntro
-  --               (Just (bi, xts' ++ yts))
-  --               (ats ++ bts)
-  --               ( m,
-  --                 WeakTermPiElim
-  --                   (mb, WeakTermUpsilon (asIdent bi))
-  --                   (map toVar' yts)
-  --               )
-  --           )
-  --       )
-  --       (map (\(_, x, _) -> asText x) ats)
-  --   ]
   | otherwise =
     raiseError m $
       "the succedent of an introduction rule of `"
