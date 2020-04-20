@@ -95,12 +95,12 @@ parse' stmtList =
           | otherwise -> raiseSyntaxError m "(keyword LEAF)"
         (m, TreeNode ((_, TreeLeaf "use") : es))
           | [(_, TreeLeaf s)] <- es -> do
-            modify (\e -> e {prefixEnv = s : prefixEnv e}) -- required to check sanity of `include`
+            modify (\e -> e {prefixEnv = s : prefixEnv e})
             parse' cont
           | otherwise -> raiseSyntaxError m "(use LEAF)"
         (m, TreeNode ((_, TreeLeaf "unuse") : es))
           | [(_, TreeLeaf s)] <- es -> do
-            modify (\e -> e {prefixEnv = filter (/= s) (prefixEnv e)}) -- required to check sanity of `include`
+            modify (\e -> e {prefixEnv = filter (/= s) (prefixEnv e)})
             parse' cont
           | otherwise -> raiseSyntaxError m "(unuse LEAF)"
         (m, TreeNode ((_, TreeLeaf "section") : es))
@@ -128,12 +128,10 @@ parse' stmtList =
           | otherwise -> raiseSyntaxError m "(end LEAF)"
         (m, TreeNode ((_, TreeLeaf "enum") : rest))
           | (_, TreeLeaf name) : ts <- rest -> do
-            xis <- interpretEnumItem m name ts
             m' <- adjustPhase' m
+            xis <- interpretEnumItem m' name ts
             insEnumEnv m' name xis
             parse' cont
-          -- ss <- parse' cont
-          -- return $ QuasiStmtEnum m' name xis : ss
           | otherwise -> raiseSyntaxError m "(enum LEAF TREE ... TREE)"
         (m, TreeNode ((_, TreeLeaf "include") : rest))
           | [(mPath, TreeLeaf pathString)] <- rest ->
@@ -166,15 +164,14 @@ parse' stmtList =
           | otherwise -> raiseSyntaxError m "(introspect LEAF TREE*)"
         (m, TreeNode ((_, TreeLeaf "constant") : rest))
           | [(_, TreeLeaf name), t] <- rest -> do
-            t' <- adjustPhase t >>= macroExpand >>= interpret -- たとえばここでdiscernも行う
-            name' <- withSectionPrefix name
-            h <- asIdent <$> newTextWith "_"
+            t' <- adjustPhase t >>= macroExpand >>= interpret >>= discernWithCurrentNameEnv
             m' <- adjustPhase' m
-            -- mn' <- adjustPhase' mn
+            name' <- withSectionPrefix name
+            insertConstant m' name'
+            h <- asIdent <$> newTextWith "_"
             let constDecl = QuasiStmtLet m' (m', h, t') (m', WeakTermConst name')
             defList <- parse' cont
             return $ constDecl : defList
-          -- return $ QuasiStmtConstDecl m' (mn', name', t') : defList
           | otherwise -> raiseSyntaxError m "(constant LEAF TREE)"
         (m, TreeNode (def@(mDef, TreeLeaf "definition") : rest))
           | [name@(_, TreeLeaf _), body] <- rest ->
@@ -352,11 +349,13 @@ includeFile ::
   [TreePlus] ->
   WithEnv [QuasiStmt]
 includeFile m mPath pathString computeDirPath as = do
-  ensureEnvSanity m
-  path <- parseString mPath pathString
+  m' <- adjustPhase' m
+  mPath' <- adjustPhase' mPath
+  ensureEnvSanity m'
+  path <- parseString mPath' pathString
   dirPath <- computeDirPath
   newPath <- resolveFile dirPath path
-  includeFile' m newPath as
+  includeFile' m' newPath as
 
 includeFile' :: Meta -> Path Abs File -> [TreePlus] -> WithEnv [QuasiStmt]
 includeFile' m path as = do
@@ -383,6 +382,7 @@ ensureEnvSanity m = do
 parseDef :: [TreePlus] -> WithEnv [QuasiStmt]
 parseDef xds = do
   xds' <- mapM (adjustPhase >=> prefixFunName >=> macroExpand) xds
+  -- ここでいい感じにdiscernを行う必要がある
   xds'' <- mapM interpretIter xds'
   let baseSub = Map.fromList $ map defToSub xds''
   let sub = selfCompose (length baseSub) baseSub
@@ -473,9 +473,6 @@ concatQuasiStmtList [] = do
   content <- liftIO $ TIO.readFile $ toFilePath path
   let m = newMeta (length $ T.lines content) 1 path
   return $ WeakStmtReturn (m, WeakTermEnumIntro $ EnumValueIntS 64 0)
--- concatQuasiStmtList (QuasiStmtConstDecl m xt : es) = do
---   cont <- concatQuasiStmtList es
---   return $ WeakStmtConstDecl m xt cont
 concatQuasiStmtList (QuasiStmtLet m xt e : es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtLet m xt e cont
@@ -485,7 +482,6 @@ concatQuasiStmtList (QuasiStmtLetWT m xt e : es) = do
 concatQuasiStmtList (QuasiStmtVerify m e : es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtVerify m e cont
--- concatQuasiStmtList (QuasiStmtEnum {} : ss) = concatQuasiStmtList ss
 concatQuasiStmtList (QuasiStmtLetInductive n m at e : es) = do
   insForm n at e
   cont <- concatQuasiStmtList es
@@ -513,9 +509,6 @@ concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt e as : ss) =
           )
           cont
     _ -> raiseCritical m "inductive-intro"
-
--- concatQuasiStmtList (QuasiStmtUse _ : ss) = concatQuasiStmtList ss
--- concatQuasiStmtList (QuasiStmtUnuse _ : ss) = concatQuasiStmtList ss
 
 checkKeywordSanity :: Meta -> T.Text -> WithEnv ()
 checkKeywordSanity m "" = raiseError m "empty string for a keyword"

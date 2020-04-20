@@ -3,6 +3,8 @@ module Parse.Discern
     discernLet,
     discernLet',
     discern'',
+    discernWithCurrentNameEnv,
+    insertConstant,
   )
 where
 
@@ -79,6 +81,11 @@ discernLet' (mx, x, t) e = do
   e' <- discern'' nenv e
   x' <- newDefinedNameWith mx x
   return ((mx, x', t'), e')
+
+discernWithCurrentNameEnv :: WeakTermPlus -> WithEnv WeakTermPlus
+discernWithCurrentNameEnv e = do
+  nenv <- gets topNameEnv
+  discern'' nenv e
 
 -- Alpha-convert all the variables so that different variables have different names.
 discern'' :: NameEnv -> WeakTermPlus -> WithEnv WeakTermPlus
