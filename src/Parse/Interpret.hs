@@ -332,12 +332,6 @@ interpretIter =
       return (m, xt', xts', e')
     t -> raiseSyntaxError (fst t) "(TREE (TREE ... TREE) TREE)"
 
--- interpretIter (m, TreeNode [xt, (_, TreeNode xts), e]) = do
---   xt' <- interpretWeakIdentPlus xt
---   (xts', e') <- interpretBinder xts e
---   return (m, xt', xts', e')
--- interpretIter t = raiseSyntaxError (fst t) "(TREE (TREE ... TREE) TREE)"
-
 interpretLeaf :: TreePlus -> WithEnv (Meta, Ident)
 interpretLeaf =
   \case
@@ -491,11 +485,6 @@ interpretCoinductive =
     t ->
       raiseSyntaxError (fst t) "(LEAF TREE ... TREE)"
 
--- interpretCoinductive (_, TreeNode ((_, TreeLeaf c) : args)) = do
---   args' <- mapM interpret args
---   return (c, args')
--- interpretCoinductive t = raiseSyntaxError (fst t) "(LEAF TREE ... TREE)"
-
 interpretCocaseClause :: TreePlus -> WithEnv CocaseClause
 interpretCocaseClause =
   \case
@@ -506,13 +495,6 @@ interpretCocaseClause =
     t ->
       raiseSyntaxError (fst t) "((LEAF TREE ... TREE) (LEAF TREE) ... (LEAF TREE))"
 
--- interpretCocaseClause (_, TreeNode (coind : clauseList)) = do
---   (c, args) <- interpretCoinductive coind
---   clauseList' <- mapM interpretCocaseClause' clauseList
---   return ((asIdent c, args), clauseList')
--- interpretCocaseClause t =
---   raiseSyntaxError (fst t) "((LEAF TREE ... TREE) (LEAF TREE) ... (LEAF TREE))"
-
 interpretCocaseClause' :: TreePlus -> WithEnv (Ident, WeakTermPlus)
 interpretCocaseClause' =
   \case
@@ -520,11 +502,6 @@ interpretCocaseClause' =
       body' <- interpret body
       return (asIdent label, body')
     t -> raiseSyntaxError (fst t) "(LEAF TREE)"
-
--- interpretCocaseClause' (_, TreeNode [(_, TreeLeaf label), body]) = do
---   body' <- interpret body
---   return (asIdent label, body')
--- interpretCocaseClause' t = raiseSyntaxError (fst t) "(LEAF TREE)"
 
 cocaseAsSigmaIntro :: Meta -> T.Text -> WeakTermPlus -> [CocaseClause] -> WithEnv [WeakTermPlus]
 cocaseAsSigmaIntro m name codType cocaseClauseList = do
@@ -720,11 +697,6 @@ interpretBorrow m =
       let (borrowVarList, e') = interpretBorrow' $ last es
       return (borrowVarList, init es ++ [e'])
 
--- interpretBorrow m [] = raiseSyntaxError m "(TREE TREE*)"
--- interpretBorrow _ es = do
---   let (borrowVarList, e') = interpretBorrow' $ last es
---   return (borrowVarList, init es ++ [e'])
-
 interpretBorrow' :: TreePlus -> ([TreePlus], TreePlus)
 interpretBorrow' =
   \case
@@ -732,11 +704,6 @@ interpretBorrow' =
     (m, TreeNode ts) -> do
       let (mmxs, ts') = unzip $ map interpretBorrow'' ts
       (catMaybes mmxs, (m, TreeNode ts'))
-
--- interpretBorrow' t@(_, TreeLeaf _) = ([], t)
--- interpretBorrow' (m, TreeNode ts) = do
---   let (mmxs, ts') = unzip $ map interpretBorrow'' ts
---   (catMaybes mmxs, (m, TreeNode ts'))
 
 interpretBorrow'' :: TreePlus -> (Maybe TreePlus, TreePlus)
 interpretBorrow'' =
@@ -746,8 +713,3 @@ interpretBorrow'' =
         T.head s == '&' ->
         (Just (m, TreeLeaf $ T.tail s), (m, TreeLeaf $ T.tail s))
     t -> (Nothing, t)
--- interpretBorrow'' (m, TreeLeaf s)
---   | T.length s > 1,
---     T.head s == '&' =
---     (Just (m, TreeLeaf $ T.tail s), (m, TreeLeaf $ T.tail s))
--- interpretBorrow'' t = (Nothing, t)
