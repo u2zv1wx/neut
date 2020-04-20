@@ -146,7 +146,7 @@ parse' =
             let path = libDir </> pkg'
             isAlreadyInstalled <- doesDirExist path
             when (not isAlreadyInstalled) $ do
-              urlStr' <- parseByteString mUrl urlStr
+              urlStr' <- readStrOrThrow mUrl urlStr
               note' $ "downloading " <> pkg <> " from " <> TE.decodeUtf8 urlStr'
               item <- liftIO $ get urlStr' lazyConcatHandler
               note' $ "installing " <> pkg <> " into " <> T.pack (toFilePath path)
@@ -241,10 +241,7 @@ lazyConcatHandler _ i1 = do
 withSectionPrefix :: T.Text -> WithEnv T.Text
 withSectionPrefix x = do
   ns <- gets sectionEnv
-  return $ withSectionPrefix' ns x
-
-withSectionPrefix' :: [T.Text] -> T.Text -> T.Text
-withSectionPrefix' ns x = foldl (\acc n -> n <> ":" <> acc) x ns
+  return $ foldl (\acc n -> n <> ":" <> acc) x ns
 
 getCurrentSection :: WithEnv T.Text
 getCurrentSection = do
@@ -337,16 +334,10 @@ styleRule =
         )
     t -> raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) TREE)"
 
-parseByteString :: Meta -> T.Text -> WithEnv B.ByteString
-parseByteString m quotedStr =
+readStrOrThrow :: (Read a) => Meta -> T.Text -> WithEnv a
+readStrOrThrow m quotedStr =
   case readMaybe (T.unpack quotedStr) of
-    Nothing -> raiseError m "the argument of `include` must be a string"
-    Just str -> return str
-
-parseString :: Meta -> T.Text -> WithEnv String
-parseString m quotedStr =
-  case readMaybe (T.unpack quotedStr) of
-    Nothing -> raiseError m "the argument of `include` must be a string"
+    Nothing -> raiseError m "the atom here must be a string"
     Just str -> return str
 
 includeFile ::
@@ -360,20 +351,19 @@ includeFile m mPath pathString computeDirPath as = do
   m' <- adjustPhase' m
   mPath' <- adjustPhase' mPath
   ensureEnvSanity m'
-  path <- parseString mPath' pathString
+  path <- readStrOrThrow mPath' pathString
   dirPath <- computeDirPath
   newPath <- resolveFile dirPath path
-  includeFile' m' newPath as
-
-includeFile' :: Meta -> Path Abs File -> [TreePlus] -> WithEnv [QuasiStmt]
-includeFile' m path as = do
-  ensureFileExistence m path
+  ensureFileExistence m' newPath
   denv <- gets fileEnv
-  case Map.lookup path denv of
-    Just VisitInfoActive -> reportCyclicPath m path
+  case Map.lookup newPath denv of
+    Just VisitInfoActive -> do
+      tenv <- gets traceEnv
+      let cyclicPath = dropWhile (/= newPath) (reverse tenv) ++ [newPath]
+      raiseError m' $ "found cyclic inclusion:\n" <> showCyclicPath cyclicPath
     Just VisitInfoFinish -> parse' as
     Nothing -> do
-      includedQuasiStmtList <- visit path
+      includedQuasiStmtList <- visit newPath
       defList <- parse' as
       return $ includedQuasiStmtList ++ defList
 
@@ -553,12 +543,6 @@ showCyclicPath' =
     [path] -> "\n  ~> " <> T.pack (toFilePath path)
     (path : ps) -> "\n  ~> " <> T.pack (toFilePath path) <> showCyclicPath' ps
 
-reportCyclicPath :: Meta -> Path Abs File -> WithEnv a
-reportCyclicPath m newPath = do
-  tenv <- gets traceEnv
-  let cyclicPath = dropWhile (/= newPath) (reverse tenv) ++ [newPath]
-  raiseError m $ "found cyclic inclusion:\n" <> showCyclicPath cyclicPath
-
 ensureFileExistence :: Meta -> Path Abs File -> WithEnv ()
 ensureFileExistence m path = do
   b <- doesFileExist path
@@ -574,17 +558,15 @@ includeCore :: Meta -> [TreePlus] -> [TreePlus]
 includeCore m treeList =
   case treeList of
     ((_, TreeNode [(_, TreeLeaf "no-implicit-core")]) : rest) -> rest
-    _ -> includeCore' m : treeList
-
-includeCore' :: Meta -> TreePlus
-includeCore' m =
-  ( m,
-    TreeNode
-      [ (m, TreeLeaf "include"),
-        (m, TreeLeaf "library"),
-        (m, TreeLeaf "\"core/core.neut\"")
-      ]
-  )
+    _ ->
+      ( m,
+        TreeNode
+          [ (m, TreeLeaf "include"),
+            (m, TreeLeaf "library"),
+            (m, TreeLeaf "\"core/core.neut\"")
+          ]
+      )
+        : treeList
 
 adjustPhase :: TreePlus -> WithEnv TreePlus
 adjustPhase =
