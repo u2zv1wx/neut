@@ -100,7 +100,7 @@ generateProjections ts = do
                     WeakTermCase
                       a
                       (my, WeakTermUpsilon y)
-                      [ ( ( (mb, a <> ":" <> "unfold"),
+                      [ ( ( (mb, a <> ":unfold"),
                             -- `xts ++` is required since LetWT bypasses `infer`
                             xts
                               ++ [(ma, asIdent a, ta)]
@@ -162,7 +162,7 @@ toInductive ats bts connective@(m, ai, xts, _) = do
       QuasiStmtLetWT
         m
         ( m,
-          asIdent $ ai <> ":" <> "induction",
+          asIdent $ ai <> ":induction",
           (m, WeakTermPi Nothing (xts ++ [zt] ++ atsbts) cod)
         )
         ( m,
@@ -292,7 +292,6 @@ isResolved sub e = do
   let freeVarSet = S.map asInt $ varWeakTermPlus e
   all (`S.notMember` freeVarSet) outerVarList
 
--- type SubstWeakTerm = Map.HashMap T.Text WeakTermPlus
 -- e : Aを受け取って、flipしていないときはIN(A) = BをみたすB型のtermを、
 -- また、flipしてるときはOUT(A) = BをみたすB型のtermを、
 -- それぞれ構成して返す。IN/OUTはSubstWeakTermによって定まるものとする。

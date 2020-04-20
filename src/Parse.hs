@@ -163,7 +163,7 @@ parse' =
             m' <- adjustPhase' m
             name' <- withSectionPrefix name
             insertConstant m' name'
-            h <- asIdent <$> newTextWith "_"
+            h <- newNameWith'' "_"
             let constDecl = QuasiStmtLet m' (m', h, t') (m', WeakTermConst name')
             defList <- parse' cont
             return $ constDecl : defList
@@ -203,14 +203,14 @@ parse' =
             parse' ((m, TreeNode [(mLet, TreeLeaf "let"), xt, e]) : cont)
           | [xt, e] <- rest -> do
             m' <- adjustPhase' m
-            e' <- adjustPhase e >>= macroExpand >>= interpret
-            xt' <- adjustPhase xt >>= macroExpand >>= prefixTextPlus >>= interpretIdentPlus
+            e' <- adjustPhase e >>= macroExpand >>= interpret >>= discernWithCurrentNameEnv
+            xt' <- adjustPhase xt >>= macroExpand >>= prefixTextPlus >>= interpretIdentPlus >>= discernTopLevelIdentPlus
             defList <- parse' cont
             return $ QuasiStmtLet m' xt' e' : defList
           | otherwise -> raiseSyntaxError m "(let LEAF TREE TREE) | (let TREE TREE)"
         (m, TreeNode ((_, TreeLeaf "verify") : rest))
           | [e] <- rest -> do
-            e' <- adjustPhase e >>= macroExpand >>= interpret
+            e' <- adjustPhase e >>= macroExpand >>= interpret >>= discernWithCurrentNameEnv
             m' <- adjustPhase' m
             defList <- parse' cont
             return $ QuasiStmtVerify m' e' : defList
@@ -220,12 +220,12 @@ parse' =
           if isSpecialForm e
             then parse' $ e : cont
             else do
-              e' <- interpret e
-              name <- asIdent <$> newTextWith "_"
+              e' <- interpret e >>= discernWithCurrentNameEnv
+              h <- newNameWith'' "_"
               m' <- adjustPhase' $ metaOf e'
               t <- newHole m'
               defList <- parse' cont
-              return $ QuasiStmtLet m' (m', name, t) e' : defList
+              return $ QuasiStmtLet m' (m', h, t) e' : defList
 
 use :: T.Text -> WithEnv ()
 use s =
@@ -432,6 +432,7 @@ selfCompose i sub =
     else compose sub $ selfCompose (i - 1) sub
 
 -- fixme: ここではintじゃなくてフルで比較するタイプのsubstを行う必要がある (discern以前にsubstをするので)
+-- (またはdiscernをparseと同時に行うようにする)
 compose :: SubstWeakTerm -> SubstWeakTerm -> SubstWeakTerm
 compose s1 s2 = Map.union (Map.map (substWeakTermPlus s1) s2) s1
 

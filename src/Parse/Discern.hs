@@ -5,6 +5,7 @@ module Parse.Discern
     discern'',
     discernWithCurrentNameEnv,
     insertConstant,
+    discernTopLevelIdentPlus,
   )
 where
 
@@ -194,6 +195,15 @@ discernWeakIdentPlus nenv (m, x, t) = do
   t' <- discern'' nenv t
   penv <- gets prefixEnv
   x' <- lookupName'' m penv nenv x
+  return (m, x', t')
+
+discernTopLevelIdentPlus :: WeakIdentPlus -> WithEnv WeakIdentPlus
+discernTopLevelIdentPlus (m, x, t) = do
+  nenv <- gets topNameEnv
+  t' <- discern'' nenv t
+  penv <- gets prefixEnv
+  x' <- lookupName'' m penv nenv x
+  modify (\env -> env {topNameEnv = Map.insert (asText x) x' (topNameEnv env)})
   return (m, x', t')
 
 discernIter ::
