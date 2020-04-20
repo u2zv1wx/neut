@@ -57,8 +57,7 @@ discern' nenv =
       e' <- discern' nenv e
       return (m, WeakTermPiElim e' es')
     (m, WeakTermIter (mx, x, t) xts e) -> do
-      t' <- discern' nenv t
-      (xt', xts', e') <- discernIter nenv (mx, x, t') xts e
+      (xt', xts', e') <- discernIter nenv (mx, x, t) xts e
       return (m, WeakTermIter xt' xts' e')
     (m, WeakTermConst x) ->
       return (m, WeakTermConst x)
@@ -127,14 +126,16 @@ discernBinder ::
   [WeakIdentPlus] ->
   WeakTermPlus ->
   WithEnv ([WeakIdentPlus], WeakTermPlus)
-discernBinder nenv [] e = do
-  e' <- discern' nenv e
-  return ([], e')
-discernBinder nenv ((mx, x, t) : xts) e = do
-  t' <- discern' nenv t
-  x' <- newDefinedNameWith mx x
-  (xts', e') <- discernBinder (insertName x x' nenv) xts e
-  return ((mx, x', t') : xts', e')
+discernBinder nenv binder e =
+  case binder of
+    [] -> do
+      e' <- discern' nenv e
+      return ([], e')
+    ((mx, x, t) : xts) -> do
+      t' <- discern' nenv t
+      x' <- newDefinedNameWith mx x
+      (xts', e') <- discernBinder (insertName x x' nenv) xts e
+      return ((mx, x', t') : xts', e')
 
 discernWeakIdentPlus :: NameEnv -> WeakIdentPlus -> WithEnv WeakIdentPlus
 discernWeakIdentPlus nenv (m, x, t) = do
@@ -164,40 +165,40 @@ discernIter ::
   [WeakIdentPlus] ->
   WeakTermPlus ->
   WithEnv (WeakIdentPlus, [WeakIdentPlus], WeakTermPlus)
-discernIter nenv (mx, x, t') [] e = do
-  x' <- newDefinedNameWith mx x
-  removeFromIntactSet mx $ asText x'
-  e' <- discern' (insertName x x' nenv) e
-  return ((mx, x', t'), [], e')
-discernIter nenv xt ((mx, x, t) : xts) e = do
-  t' <- discern' nenv t
-  x' <- newDefinedNameWith mx x
-  (xt', xts', e') <- discernIter (insertName x x' nenv) xt xts e
-  return (xt', (mx, x', t') : xts', e')
+discernIter nenv (mf, f, tf) binder e = do
+  tf' <- discern' nenv tf
+  f' <- newDefinedNameWith mf f
+  removeFromIntactSet mf $ asText f'
+  (binder', e') <- discernBinder (insertName f f' nenv) binder e
+  return ((mf, f', tf'), binder', e')
 
 discernWeakCase :: Meta -> NameEnv -> WeakCase -> WithEnv WeakCase
-discernWeakCase _ nenv (WeakCaseInt t a) = do
-  t' <- discern' nenv t
-  return (WeakCaseInt t' a)
-discernWeakCase m _ (WeakCaseLabel l) = do
-  ml <- lookupEnumValueNameWithPrefix l
-  case ml of
-    Just l' -> return (WeakCaseLabel l')
-    Nothing -> raiseError m $ "no such enum-value is defined: " <> l
-discernWeakCase _ _ l = return l
+discernWeakCase m nenv =
+  \case
+    WeakCaseInt t a -> do
+      t' <- discern' nenv t
+      return (WeakCaseInt t' a)
+    WeakCaseLabel l -> do
+      ml <- lookupEnumValueNameWithPrefix l
+      case ml of
+        Just l' -> return (WeakCaseLabel l')
+        Nothing -> raiseError m $ "no such enum-value is defined: " <> l
+    l -> return l
 
 discernStruct ::
   NameEnv ->
   [(Meta, Ident, ArrayKind)] ->
   WeakTermPlus ->
   WithEnv ([(Meta, Ident, ArrayKind)], WeakTermPlus)
-discernStruct nenv [] e = do
-  e' <- discern' nenv e
-  return ([], e')
-discernStruct nenv ((mx, x, t) : xts) e = do
-  x' <- newDefinedNameWith mx x
-  (xts', e') <- discernStruct (insertName x x' nenv) xts e
-  return ((mx, x', t) : xts', e')
+discernStruct nenv binder e =
+  case binder of
+    [] -> do
+      e' <- discern' nenv e
+      return ([], e')
+    ((mx, x, t) : xts) -> do
+      x' <- newDefinedNameWith mx x
+      (xts', e') <- discernStruct (insertName x x' nenv) xts e
+      return ((mx, x', t) : xts', e')
 
 newDefinedNameWith :: Meta -> Ident -> WithEnv Ident
 newDefinedNameWith m (I (s, _)) = do
@@ -238,14 +239,16 @@ lookupName m penv nenv x =
 
 lookupName' ::
   Meta -> [T.Text] -> NameEnv -> Ident -> WithEnv (Maybe Ident)
-lookupName' _ [] _ _ = return Nothing
-lookupName' m (prefix : prefixList) nenv x = do
-  let query = prefix <> ":" <> asText x
-  case Map.lookup query nenv of
-    Just x' -> do
-      removeFromIntactSet m query
-      return $ Just x'
-    Nothing -> lookupName' m prefixList nenv x
+lookupName' m penv nenv x =
+  case penv of
+    [] -> return Nothing
+    prefix : prefixList -> do
+      let query = prefix <> ":" <> asText x
+      case Map.lookup query nenv of
+        Nothing -> lookupName' m prefixList nenv x
+        Just x' -> do
+          removeFromIntactSet m query
+          return $ Just x'
 
 lookupName'' :: Meta -> [T.Text] -> NameEnv -> Ident -> WithEnv Ident
 lookupName'' m penv nenv x = do
@@ -264,15 +267,17 @@ lookupConstantMaybe m penv x = do
     else lookupConstantMaybe' m penv x
 
 lookupConstantMaybe' :: Meta -> [T.Text] -> T.Text -> WithEnv (Maybe T.Text)
-lookupConstantMaybe' _ [] _ = return Nothing
-lookupConstantMaybe' m (prefix : prefixList) x = do
-  let query = prefix <> ":" <> x
-  b <- isConstant query
-  if b
-    then do
-      removeFromIntactSet m query
-      return $ Just query
-    else lookupConstantMaybe' m prefixList x
+lookupConstantMaybe' m penv x =
+  case penv of
+    [] -> return Nothing
+    prefix : prefixList -> do
+      let query = prefix <> ":" <> x
+      b <- isConstant query
+      if b
+        then do
+          removeFromIntactSet m query
+          return $ Just query
+        else lookupConstantMaybe' m prefixList x
 
 lookupConstant :: Meta -> [T.Text] -> T.Text -> WithEnv T.Text
 lookupConstant m penv x = do
@@ -290,15 +295,16 @@ lookupEnum f name = do
       penv <- gets prefixEnv
       lookupEnum' f penv name
 
-lookupEnum' ::
-  (T.Text -> WithEnv Bool) -> [T.Text] -> T.Text -> WithEnv (Maybe T.Text)
-lookupEnum' _ [] _ = return Nothing
-lookupEnum' f (prefix : prefixList) name = do
-  let name' = prefix <> ":" <> name
-  b <- f name'
-  if b
-    then return $ Just name'
-    else lookupEnum' f prefixList name
+lookupEnum' :: (T.Text -> WithEnv Bool) -> [T.Text] -> T.Text -> WithEnv (Maybe T.Text)
+lookupEnum' f penv name =
+  case penv of
+    [] -> return Nothing
+    prefix : prefixList -> do
+      let name' = prefix <> ":" <> name
+      b <- f name'
+      if b
+        then return $ Just name'
+        else lookupEnum' f prefixList name
 
 lookupEnumValueNameWithPrefix :: T.Text -> WithEnv (Maybe T.Text)
 lookupEnumValueNameWithPrefix = lookupEnum isDefinedEnumValue
