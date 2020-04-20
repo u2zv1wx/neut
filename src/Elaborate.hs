@@ -36,25 +36,19 @@ elaborateStmt =
       analyze >> synthesize >> refine >> cleanup
       e'' <- reduceTermPlus <$> elaborate' e'
       t'' <- reduceTermPlus <$> elaborate' t'
-      insTypeEnv (Left $ asInt x) t''
-      -- insTypeEnv (Right x) t''
+      insWeakTypeEnv x $ weaken t''
       modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e'') (substEnv env)})
-      -- modify (\env -> env {cacheEnv = Map.insert x (Left e'') (cacheEnv env)})
       cont' <- elaborateStmt cont
-      x' <- newNameWith'' "_"
-      return (m, TermPiElim (m, termPiIntro [(mx, x', t'')] cont') [e''])
+      return (m, TermPiElim (m, termPiIntro [(mx, x, t'')] cont') [e''])
     WeakStmtLetWT m (mx, x, t) e : cont -> do
       t' <- inferType t
       analyze >> synthesize >> refine >> cleanup
       e' <- reduceTermPlus <$> elaborate' e -- `e` is supposed to be well-typed
       t'' <- reduceTermPlus <$> elaborate' t'
-      -- insTypeEnv (Right x) t''
-      insTypeEnv (Left $ asInt x) t''
+      insWeakTypeEnv x $ weaken t''
       modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e') (substEnv env)})
-      -- modify (\env -> env {cacheEnv = Map.insert x (Left e') (cacheEnv env)})
       cont' <- elaborateStmt cont
-      x' <- newNameWith'' "_"
-      return (m, TermPiElim (m, termPiIntro [(mx, x', t'')] cont') [e'])
+      return (m, TermPiElim (m, termPiIntro [(mx, x, t'')] cont') [e'])
     WeakStmtConstDecl (_, c, t) : cont -> do
       t' <- reduceTermPlus <$> elaborate' t
       insTypeEnv (Right c) t'
