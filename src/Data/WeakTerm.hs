@@ -8,9 +8,9 @@ import qualified Data.Text as T
 data WeakTerm
   = WeakTermTau
   | WeakTermUpsilon Ident
-  | WeakTermPi (Maybe T.Text) [WeakIdentPlus] WeakTermPlus
+  | WeakTermPi (Maybe Ident) [WeakIdentPlus] WeakTermPlus
   | WeakTermPiIntro
-      (Maybe (T.Text, [WeakIdentPlus]))
+      (Maybe (Ident, Ident, [WeakIdentPlus]))
       [WeakIdentPlus]
       WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
@@ -34,9 +34,9 @@ data WeakTerm
   | WeakTermStructIntro [(WeakTermPlus, ArrayKind)]
   | WeakTermStructElim [(Meta, Ident, ArrayKind)] WeakTermPlus WeakTermPlus
   | WeakTermCase
-      T.Text
+      (Maybe Ident)
       WeakTermPlus
-      [(((Meta, T.Text), [WeakIdentPlus]), WeakTermPlus)]
+      [(((Meta, Ident), [WeakIdentPlus]), WeakTermPlus)]
   | WeakTermQuestion WeakTermPlus WeakTermPlus -- e : t (output the type `t` as note)
   | WeakTermErase [(Meta, T.Text)] WeakTermPlus
   deriving (Show, Eq)
@@ -343,8 +343,8 @@ toText (_, WeakTermPi (Just _) _ cod) = toText cod
 toText (_, WeakTermPiIntro Nothing xts e) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["λ", argStr, toText e]
-toText (_, WeakTermPiIntro (Just (name, _)) _ _) =
-  "<#" <> name <> "-" <> "internal" <> "#>"
+toText (_, WeakTermPiIntro (Just (_, name, _)) _ _) =
+  "<#" <> asText name <> "-" <> "internal" <> "#>"
 toText (_, WeakTermPiElim e es) =
   showCons $ map toText $ e : es
 toText (_, WeakTermIter (_, x, _) xts e) = do
@@ -386,7 +386,7 @@ toText (_, WeakTermCase _ e cxtes) =
           cxtes
           ( \((c, xts), body) -> do
               let xs = map (\(_, x, _) -> asText x) xts
-              showCons [showCons (snd c : xs), toText body]
+              showCons [showCons (asText (snd c) : xs), toText body]
           )
     )
 toText (_, WeakTermQuestion e _) = toText e

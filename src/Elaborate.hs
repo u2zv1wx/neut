@@ -94,10 +94,14 @@ elaborate' =
       t' <- elaborate' t
       return (m, TermPi mName xts' t')
     (m, WeakTermPiIntro info xts e) -> do
-      info' <- fmap2M (mapM elaboratePlus) info
+      -- info' <- fmap2M (mapM elaboratePlus) info
       xts' <- mapM elaboratePlus xts
       e' <- elaborate' e
-      return (m, TermPiIntro info' xts' e')
+      case info of
+        Nothing -> return (m, TermPiIntro Nothing xts' e')
+        Just (indName, consName, args) -> do
+          args' <- mapM elaboratePlus args
+          return (m, TermPiIntro (Just (indName, consName, args')) xts' e')
     (m, WeakTermPiElim (mh, WeakTermZeta (I (_, x))) es) -> do
       sub <- gets substEnv
       case IntMap.lookup x sub of

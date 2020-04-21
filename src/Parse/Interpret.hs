@@ -26,6 +26,12 @@ interpret :: TreePlus -> WithEnv WeakTermPlus
 interpret inputTree =
   case inputTree of
     (m, TreeLeaf "tau") -> return (m, WeakTermTau)
+    -- -- こっちのほうがたぶん高速
+    -- (m, TreeNode ((_, TreeLeaf headAtom) : rest)) ->
+    --   case headAtom of
+    --     "upsilon"
+    --       | [(_, TreeLeaf x)] <- rest -> return (m, WeakTermUpsilon $ asIdent x)
+    --       | otherwise -> raiseSyntaxError m "(upsilon TREE)"
     (m, TreeNode ((_, TreeLeaf "upsilon") : rest))
       | [(_, TreeLeaf x)] <- rest -> return (m, WeakTermUpsilon $ asIdent x)
       | otherwise -> raiseSyntaxError m "(upsilon TREE)"
@@ -149,7 +155,7 @@ interpret inputTree =
       | e : cxtes <- rest -> do
         e' <- interpret e
         cxtes' <- mapM interpretCaseClause cxtes
-        return (m, WeakTermCase "UNKNOWN" e' cxtes')
+        return (m, WeakTermCase Nothing e' cxtes')
       | otherwise -> raiseSyntaxError m "(case TREE TREE*)"
     -- A -> FνF -> νF (i.e. copattern matching (although I think it's more correct to say "record" or something like that,
     -- considering that the constructed term using `FνF -> νF` is just a record after all))
@@ -456,13 +462,13 @@ interpretStructElim =
     e ->
       raiseSyntaxError (fst e) "(LEAF TREE)"
 
-interpretCaseClause :: TreePlus -> WithEnv (((Meta, T.Text), [WeakIdentPlus]), WeakTermPlus)
+interpretCaseClause :: TreePlus -> WithEnv (((Meta, Ident), [WeakIdentPlus]), WeakTermPlus)
 interpretCaseClause =
   \case
     (_, TreeNode [(_, TreeNode ((m, TreeLeaf c) : xts)), e]) -> do
       xts' <- mapM interpretWeakIdentPlus xts
       e' <- interpret e
-      return (((m, c), xts'), e')
+      return (((m, asIdent c), xts'), e')
     t -> raiseSyntaxError (fst t) "((LEAF TREE ... TREE) TREE)"
 
 type CocaseClause = ((Ident, [WeakTermPlus]), [(Ident, WeakTermPlus)])

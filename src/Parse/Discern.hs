@@ -62,11 +62,12 @@ discern' nenv =
       (xts', e') <- discernBinder nenv xts e
       case info of
         Nothing -> return (m, WeakTermPiIntro Nothing xts' e')
-        Just (name, args) -> do
+        Just (indName, consName, args) -> do
           penv <- gets prefixEnv
-          name' <- lookupName'' m penv nenv name
+          indName' <- lookupName'' m penv nenv indName
+          consName' <- lookupName'' m penv nenv consName
           args' <- mapM (discernFreeIdentPlus nenv) args
-          return (m, WeakTermPiIntro (Just (name', args')) xts' e')
+          return (m, WeakTermPiIntro (Just (indName', consName', args')) xts' e')
     (m, WeakTermPiElim e es) -> do
       es' <- mapM (discern' nenv) es
       e' <- discern' nenv e
@@ -118,7 +119,7 @@ discern' nenv =
       e1' <- discern' nenv e1
       (xts', e2') <- discernStruct nenv xts e2
       return (m, WeakTermStructElim xts' e1' e2')
-    (m, WeakTermCase indName e cxtes) -> do
+    (m, WeakTermCase mIndName e cxtes) -> do
       e' <- discern' nenv e
       penv <- gets prefixEnv
       cxtes' <-
@@ -126,7 +127,11 @@ discern' nenv =
           c' <- lookupName'' mc penv nenv c
           (xts', body') <- discernBinder nenv xts body
           return (((mc, c'), xts'), body')
-      return (m, WeakTermCase indName e' cxtes')
+      case mIndName of
+        Nothing -> return (m, WeakTermCase Nothing e' cxtes')
+        Just indName -> do
+          indName' <- lookupName'' m penv nenv indName
+          return (m, WeakTermCase (Just indName') e' cxtes')
     (m, WeakTermQuestion e t) -> do
       e' <- discern' nenv e
       t' <- discern' nenv t

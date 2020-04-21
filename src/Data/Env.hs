@@ -76,7 +76,7 @@ data Env
         -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
         indEnv :: RuleEnv,
         -- "list:cons" ~> ("list", [0])
-        revIndEnv :: Map.HashMap T.Text (T.Text, [Int]),
+        revIndEnv :: IntMap.IntMap (Ident, [Int]),
         intactSet :: S.Set (Meta, T.Text),
         topNameEnv :: Map.HashMap T.Text Ident,
         --
@@ -131,7 +131,7 @@ initialEnv =
       revEnumEnv = Map.empty,
       nameEnv = Map.empty,
       revNameEnv = IntMap.empty,
-      revIndEnv = Map.empty,
+      revIndEnv = IntMap.empty,
       intactSet = S.empty,
       topNameEnv = Map.empty,
       prefixEnv = [],
@@ -474,11 +474,11 @@ warn pos str = do
   eoe <- gets endOfEntry
   liftIO $ outputLog b eoe $ logWarning pos str
 
-lookupRevIndEnv :: Meta -> T.Text -> WithEnv (T.Text, [Int])
+lookupRevIndEnv :: Meta -> Ident -> WithEnv (Ident, [Int])
 lookupRevIndEnv m bi = do
   rienv <- gets revIndEnv
-  case Map.lookup bi rienv of
-    Nothing -> raiseCritical m $ "no such constructor defined: `" <> bi <> "`"
+  case IntMap.lookup (asInt bi) rienv of
+    Nothing -> raiseCritical m $ "no such constructor defined: `" <> asText bi <> "`"
     Just val -> return val
 
 insertConstant :: Meta -> T.Text -> WithEnv ()

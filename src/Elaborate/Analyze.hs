@@ -51,8 +51,9 @@ simp' (((m1, WeakTermPiIntro Nothing xts1 e1), (m2, WeakTermPiIntro Nothing xts2
     xt2 <- asWeakIdentPlus m2 e2
     simpBinder (xts1 ++ [xt1]) (xts2 ++ [xt2])
     simp cs
-simp' (((m1, WeakTermPiIntro (Just (name1, args1)) xts1 e1), (m2, WeakTermPiIntro (Just (name2, args2)) xts2 e2)) : cs)
-  | name1 == name2,
+simp' (((m1, WeakTermPiIntro (Just (indName1, consName1, args1)) xts1 e1), (m2, WeakTermPiIntro (Just (indName2, consName2, args2)) xts2 e2)) : cs)
+  | indName1 == indName2,
+    consName1 == consName2,
     length args1 == length args2 = do
     simpBinder args1 args2
     simp $ ((m1, weakTermPiIntro xts1 e1), (m2, weakTermPiIntro xts2 e2)) : cs

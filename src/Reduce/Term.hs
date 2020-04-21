@@ -145,11 +145,12 @@ normalize (m, TermPi mName xts cod) = do
   cod' <- normalize cod
   return (m, TermPi mName (zip3 ms xs ts') cod')
 normalize (m, TermPiIntro info xts e) = do
-  info' <- fmap2M (mapM normalizeIdentPlus) info
+  -- info' <- fmap2M (mapM normalizeIdentPlus) info
   let (ms, xs, ts) = unzip3 xts
   ts' <- mapM normalize ts
   e' <- normalize e
-  return (m, TermPiIntro info' (zip3 ms xs ts') e')
+  -- return (m, TermPiIntro info' (zip3 ms xs ts') e')
+  return (m, TermPiIntro info (zip3 ms xs ts') e')
 normalize (m, TermPiElim e es) = do
   e' <- normalize e
   es' <- mapM normalize es

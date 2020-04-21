@@ -14,6 +14,7 @@ import Data.Basic
 import Data.Either
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import qualified Data.IntMap as IntMap
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Tree
@@ -98,9 +99,9 @@ generateProjections ts = do
                 (xts ++ [dom])
                 ( mb,
                   WeakTermCase
-                    a
+                    (Just $ asIdent a)
                     (my, WeakTermUpsilon y)
-                    [ ( ( (mb, a <> ":unfold"),
+                    [ ( ( (mb, asIdent (a <> ":unfold")),
                           xts ++ [(ma, asIdent a, ta)] ++ bts' ++ [(mb, v, ty)] -- `xts ++` is required since LetWT bypasses `infer`
                         ),
                         ( mb,
@@ -146,7 +147,7 @@ toInductive ats bts connective@(m, ai, xts, _) = do
   -- definition of inductive type
   indType <-
     discern
-      (m, weakTermPiIntro xts (m, WeakTermPi (Just ai) atsbts cod))
+      (m, weakTermPiIntro xts (m, WeakTermPi (Just (asIdent ai)) atsbts cod))
   at' <- discernIdentPlus at
   insForm (length ats) at' indType
   -- definition of induction principle (fold)
@@ -185,7 +186,6 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
     let vs = varWeakTermPlus (m, weakTermPi yts cod)
     let ixts = filter (\(_, (_, x, _)) -> x `S.member` vs) $ zip [0 ..] xts
     let (is, xts') = unzip ixts
-    modify (\env -> env {revIndEnv = Map.insert bi (ai, is) (revIndEnv env)})
     constructor <-
       discern
         ( m,
@@ -193,7 +193,7 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
             (xts' ++ yts)
             ( m,
               WeakTermPiIntro
-                (Just (bi, xts' ++ yts))
+                (Just (asIdent ai, asIdent bi, xts' ++ yts))
                 (ats ++ bts)
                 (m, WeakTermPiElim (mb, WeakTermUpsilon (asIdent bi)) (map toVar' yts))
             )
@@ -202,8 +202,9 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
       discernIdentPlus
         (mb, asIdent bi, (m, weakTermPi (xts' ++ yts) cod))
     case constructor of
-      (_, WeakTermPiIntro _ xtsyts (_, WeakTermPiIntro _ atsbts (_, WeakTermPiElim b _))) -> do
+      (_, WeakTermPiIntro _ xtsyts (_, WeakTermPiIntro indInfo@(Just (ai', bi', _)) atsbts (_, WeakTermPiElim b _))) -> do
         let as = map (\(_, x, _) -> asText x) ats
+        modify (\env -> env {revIndEnv = IntMap.insert (asInt bi') (ai', is) (revIndEnv env)})
         yts' <- mapM (internalize as atsbts) $ drop (length is) xtsyts
         return
           [ WeakStmtLetWT
@@ -213,7 +214,7 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
                 weakTermPiIntro
                   xtsyts
                   ( m,
-                    WeakTermPiIntro (Just (bi, xtsyts)) atsbts (m, WeakTermPiElim b yts')
+                    WeakTermPiIntro indInfo atsbts (m, WeakTermPiElim b yts')
                   )
               )
           ]
@@ -578,9 +579,14 @@ substRuleType sub (m, WeakTermPi mName xts t) = do
   (xts', t') <- substRuleType'' sub xts t
   return (m, WeakTermPi mName xts' t')
 substRuleType sub (m, WeakTermPiIntro info xts body) = do
-  info' <- fmap2M (substRuleType' sub) info
   (xts', body') <- substRuleType'' sub xts body
-  return (m, WeakTermPiIntro info' xts' body')
+  case info of
+    Nothing -> return (m, WeakTermPiIntro Nothing xts' body')
+    Just (indName, consName, args) -> do
+      args' <- substRuleType' sub args
+      return (m, WeakTermPiIntro (Just (indName, consName, args')) xts' body')
+-- info' <- fmap2M (substRuleType' sub) info
+-- return (m, WeakTermPiIntro info' xts' body')
 substRuleType sub@((a1, es1), (a2, es2)) (m, WeakTermPiElim e es)
   | (mx, WeakTermUpsilon x) <- e,
     a1 == x =

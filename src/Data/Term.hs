@@ -11,8 +11,8 @@ import GHC.Generics (Generic)
 data Term
   = TermTau
   | TermUpsilon Ident
-  | TermPi (Maybe T.Text) [IdentPlus] TermPlus
-  | TermPiIntro (Maybe (T.Text, [IdentPlus])) [IdentPlus] TermPlus
+  | TermPi (Maybe Ident) [IdentPlus] TermPlus
+  | TermPiIntro (Maybe (Ident, Ident, [IdentPlus])) [IdentPlus] TermPlus
   | TermPiElim TermPlus [TermPlus]
   | TermIter IdentPlus [IdentPlus] TermPlus
   | TermConst T.Text
@@ -32,7 +32,7 @@ data Term
   | TermStructIntro [(TermPlus, ArrayKind)]
   | TermStructElim [(Meta, Ident, ArrayKind)] TermPlus TermPlus
   | TermCase
-      T.Text
+      (Maybe Ident)
       TermPlus -- (the `e` in `case e of (...)`, the type of `e`)
       [Clause] -- ((cons x xs) e), ((nil) e), ((succ n) e).  (not ((cons A x xs) e).)
   deriving (Show, Generic)
@@ -43,7 +43,7 @@ type TextPlus = (Meta, T.Text, TermPlus)
 
 type TermPlus = (Meta, Term)
 
-type Clause = (((Meta, T.Text), [IdentPlus]), TermPlus)
+type Clause = (((Meta, Ident), [IdentPlus]), TermPlus)
 
 type SubstTerm = IntMap.IntMap TermPlus
 
