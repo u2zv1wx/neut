@@ -12,6 +12,7 @@ import Data.Log
 import Data.Time.Clock.POSIX
 import Elaborate
 import Emit
+import GHC.IO.Handle
 import LLVM
 import Options.Applicative
 import Parse
@@ -25,8 +26,6 @@ import Text.Read (readMaybe)
 type InputPath = String
 
 type OutputPath = String
-
-type IsIncremental = Bool
 
 type CheckOptEndOfEntry = String
 
@@ -49,7 +48,7 @@ instance Read OutputKind where
   readsPrec _ _ = []
 
 data Command
-  = Build InputPath (Maybe OutputPath) OutputKind IsIncremental
+  = Build InputPath (Maybe OutputPath) OutputKind
   | Check InputPath ShouldColorize CheckOptEndOfEntry
   | Archive InputPath (Maybe OutputPath)
   | Complete InputPath Line Column
@@ -105,14 +104,6 @@ parseBuildOpt =
             help "The type of output file"
           ]
       )
-    <*> flag
-      False
-      True
-      ( mconcat
-          [ long "incremental",
-            help "Set this to enable incremental compilation"
-          ]
-      )
 
 kindReader :: ReadM OutputKind
 kindReader = do
@@ -122,54 +113,72 @@ kindReader = do
     Just m -> return m
 
 parseCheckOpt :: Parser Command
-parseCheckOpt = do
-  let inputPathOpt =
-        argument str $ mconcat [metavar "INPUT", help "The path of input file"]
-  let colorizeOpt =
-        flag True False $
-          mconcat
+parseCheckOpt =
+  Check
+    <$> argument
+      str
+      ( mconcat
+          [ metavar "INPUT",
+            help "The path of input file"
+          ]
+      )
+      <*> flag
+        True
+        False
+        ( mconcat
             [ long "no-color",
               help "Set this to disable colorization of the output"
             ]
-  let footerOpt =
-        strOption $
-          mconcat
+        )
+      <*> strOption
+        ( mconcat
             [ long "end-of-entry",
               value "",
               help "String printed after each entry",
               metavar "STRING"
             ]
-  Check <$> inputPathOpt <*> colorizeOpt <*> footerOpt
+        )
 
 parseArchiveOpt :: Parser Command
-parseArchiveOpt = do
-  let inputPathOpt =
-        argument str $
-          mconcat [metavar "INPUT", help "The path of input directory"]
-  let outputPathOpt =
-        optional
-          $ strOption
-          $ mconcat
+parseArchiveOpt =
+  Archive
+    <$> argument
+      str
+      ( mconcat [metavar "INPUT", help "The path of input directory"]
+      )
+    <*> optional
+      ( strOption $
+          mconcat
             [ long "output",
               short 'o',
               metavar "OUTPUT",
               help "The path of output"
             ]
-  Archive <$> inputPathOpt <*> outputPathOpt
+      )
 
 parseCompleteOpt :: Parser Command
-parseCompleteOpt = do
-  let inputPathOpt =
-        argument str $ mconcat [metavar "INPUT", help "The path of input file"]
-  let lineOpt = argument auto $ mconcat [help "Line number", metavar "LINE"]
-  let columnOpt =
-        argument auto $ mconcat [help "Column number", metavar "COLUMN"]
-  Complete <$> inputPathOpt <*> lineOpt <*> columnOpt
+parseCompleteOpt =
+  Complete
+    <$> argument
+      str
+      ( mconcat
+          [metavar "INPUT", help "The path of input file"]
+      )
+    <*> argument
+      auto
+      ( mconcat
+          [help "Line number", metavar "LINE"]
+      )
+    <*> argument
+      auto
+      ( mconcat
+          [help "Column number", metavar "COLUMN"]
+      )
 
 run :: Command -> IO ()
 run cmd =
   case cmd of
-    Build inputPathStr mOutputPathStr outputKind _ -> do
+    Build inputPathStr mOutputPathStr outputKind -> do
       inputPath <- resolveFile' inputPathStr
       time <- round <$> getPOSIXTime
       resultOrErr <-
@@ -181,33 +190,18 @@ run cmd =
       case resultOrErr of
         Left (Error err) ->
           seqIO (map (outputLog True "") err) >> exitWith (ExitFailure 1)
-        Right result -> do
-          let result' = toLazyByteString result
+        Right llvmIRBuilder -> do
+          let llvmIR = toLazyByteString llvmIRBuilder
           case outputKind of
-            OutputKindLLVM -> L.writeFile (toFilePath outputPath) result'
-            OutputKindObject -> do
-              tmpOutputPath <- liftIO $ addExtension ".ll" outputPath
-              let tmpOutputPathStr = toFilePath tmpOutputPath
-              L.writeFile tmpOutputPathStr result'
-              callProcess
-                "clang"
-                [ tmpOutputPathStr,
-                  "-Wno-override-module",
-                  "-o" ++ toFilePath outputPath
-                ]
-              removeFile tmpOutputPath
-            OutputKindAsm -> do
-              tmpOutputPath <- liftIO $ addExtension ".ll" outputPath
-              let tmpOutputPathStr = toFilePath tmpOutputPath
-              L.writeFile tmpOutputPathStr result'
-              callProcess
-                "clang"
-                [ "-S",
-                  tmpOutputPathStr,
-                  "-Wno-override-module",
-                  "-o" ++ toFilePath outputPath
-                ]
-              removeFile tmpOutputPath
+            OutputKindLLVM ->
+              L.writeFile (toFilePath outputPath) llvmIR
+            _ -> do
+              let clangCmd = proc "clang" $ clangOptWith outputKind outputPath
+              withCreateProcess clangCmd {std_in = CreatePipe} $ \(Just stdin) _ _ clangProcessHandler -> do
+                L.hPut stdin llvmIR
+                hClose stdin
+                exitCode <- waitForProcess clangProcessHandler
+                exitWith exitCode
     Check inputPathStr colorizeFlag eoe -> do
       inputPath <- resolveFile' inputPathStr
       time <- round <$> getPOSIXTime
@@ -220,7 +214,8 @@ run cmd =
               timestamp = time
             }
       case resultOrErr of
-        Right _ -> return ()
+        Right _ ->
+          return ()
         Left (Error err) ->
           seqIO (map (outputLog colorizeFlag eoe) err) >> exitWith (ExitFailure 1)
     Archive inputPathStr mOutputPathStr -> do
@@ -235,13 +230,16 @@ run cmd =
       resultOrErr <-
         evalWithEnv (complete inputPath l c) $ initialEnv {timestamp = time}
       case resultOrErr of
-        Left _ -> return ()
-        Right result -> mapM_ putStrLn result
+        Left _ ->
+          return ()
+        Right result ->
+          mapM_ putStrLn result
 
 constructOutputPath :: Path Rel File -> Maybe (Path Abs File) -> OutputKind -> IO (Path Abs File)
 constructOutputPath basename mPath kind =
   case mPath of
-    Just path -> return path
+    Just path ->
+      return path
     Nothing ->
       case kind of
         OutputKindLLVM -> do
@@ -257,7 +255,8 @@ constructOutputPath basename mPath kind =
 constructOutputArchivePath :: Path Abs Dir -> Maybe (Path Abs File) -> IO (Path Abs File)
 constructOutputArchivePath inputPath mPath =
   case mPath of
-    Just path -> return path
+    Just path ->
+      return path
     Nothing -> do
       let baseName = fromRelDir $ dirname inputPath
       outputPath <- resolveFile' baseName
@@ -271,6 +270,19 @@ runCheck = parse >=> elaborate >=> \_ -> return ()
 
 seqIO :: [IO ()] -> IO ()
 seqIO = foldr (>>) (return ())
+
+clangOptWith :: OutputKind -> Path Abs File -> [String]
+clangOptWith OutputKindAsm outputPath = "-S" : clangBaseOpt outputPath
+clangOptWith _ outputPath = clangBaseOpt outputPath
+
+clangBaseOpt :: Path Abs File -> [String]
+clangBaseOpt outputPath =
+  [ "-xir",
+    "-Wno-override-module",
+    "-",
+    "-o",
+    toFilePath outputPath
+  ]
 
 archive :: FilePath -> FilePath -> [FilePath] -> IO ()
 archive tarPath base dir = do
