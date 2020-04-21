@@ -167,95 +167,101 @@ parseCompleteOpt = do
   Complete <$> inputPathOpt <*> lineOpt <*> columnOpt
 
 run :: Command -> IO ()
-run (Build inputPathStr mOutputPathStr outputKind _) = do
-  inputPath <- resolveFile' inputPathStr
-  time <- round <$> getPOSIXTime
-  resultOrErr <-
-    evalWithEnv (runBuild inputPath) $
-      initialEnv {shouldColorize = True, endOfEntry = "", timestamp = time}
-  (basename, _) <- splitExtension $ filename inputPath
-  mOutputPath <- mapM resolveFile' mOutputPathStr
-  outputPath <- constructOutputPath basename mOutputPath outputKind
-  case resultOrErr of
-    Left (Error err) ->
-      seqIO (map (outputLog True "") err) >> exitWith (ExitFailure 1)
-    Right result -> do
-      let result' = toLazyByteString result
-      case outputKind of
-        OutputKindLLVM -> L.writeFile (toFilePath outputPath) result'
-        OutputKindObject -> do
-          tmpOutputPath <- liftIO $ addExtension ".ll" outputPath
-          let tmpOutputPathStr = toFilePath tmpOutputPath
-          L.writeFile tmpOutputPathStr result'
-          callProcess
-            "clang"
-            [ tmpOutputPathStr,
-              "-Wno-override-module",
-              "-o" ++ toFilePath outputPath
-            ]
-          removeFile tmpOutputPath
+run cmd =
+  case cmd of
+    Build inputPathStr mOutputPathStr outputKind _ -> do
+      inputPath <- resolveFile' inputPathStr
+      time <- round <$> getPOSIXTime
+      resultOrErr <-
+        evalWithEnv (runBuild inputPath) $
+          initialEnv {shouldColorize = True, endOfEntry = "", timestamp = time}
+      (basename, _) <- splitExtension $ filename inputPath
+      mOutputPath <- mapM resolveFile' mOutputPathStr
+      outputPath <- constructOutputPath basename mOutputPath outputKind
+      case resultOrErr of
+        Left (Error err) ->
+          seqIO (map (outputLog True "") err) >> exitWith (ExitFailure 1)
+        Right result -> do
+          let result' = toLazyByteString result
+          case outputKind of
+            OutputKindLLVM -> L.writeFile (toFilePath outputPath) result'
+            OutputKindObject -> do
+              tmpOutputPath <- liftIO $ addExtension ".ll" outputPath
+              let tmpOutputPathStr = toFilePath tmpOutputPath
+              L.writeFile tmpOutputPathStr result'
+              callProcess
+                "clang"
+                [ tmpOutputPathStr,
+                  "-Wno-override-module",
+                  "-o" ++ toFilePath outputPath
+                ]
+              removeFile tmpOutputPath
+            OutputKindAsm -> do
+              tmpOutputPath <- liftIO $ addExtension ".ll" outputPath
+              let tmpOutputPathStr = toFilePath tmpOutputPath
+              L.writeFile tmpOutputPathStr result'
+              callProcess
+                "clang"
+                [ "-S",
+                  tmpOutputPathStr,
+                  "-Wno-override-module",
+                  "-o" ++ toFilePath outputPath
+                ]
+              removeFile tmpOutputPath
+    Check inputPathStr colorizeFlag eoe -> do
+      inputPath <- resolveFile' inputPathStr
+      time <- round <$> getPOSIXTime
+      resultOrErr <-
+        evalWithEnv (runCheck inputPath) $
+          initialEnv
+            { shouldColorize = colorizeFlag,
+              endOfEntry = eoe,
+              isCheck = True,
+              timestamp = time
+            }
+      case resultOrErr of
+        Right _ -> return ()
+        Left (Error err) ->
+          seqIO (map (outputLog colorizeFlag eoe) err) >> exitWith (ExitFailure 1)
+    Archive inputPathStr mOutputPathStr -> do
+      inputPath <- resolveDir' inputPathStr
+      contents <- listDirectory $ toFilePath inputPath
+      mOutputPath <- mapM resolveFile' mOutputPathStr
+      outputPath <- toFilePath <$> constructOutputArchivePath inputPath mOutputPath
+      archive outputPath (toFilePath inputPath) contents
+    Complete inputPathStr l c -> do
+      inputPath <- resolveFile' inputPathStr
+      time <- round <$> getPOSIXTime
+      resultOrErr <-
+        evalWithEnv (complete inputPath l c) $ initialEnv {timestamp = time}
+      case resultOrErr of
+        Left _ -> return ()
+        Right result -> mapM_ putStrLn result
+
+constructOutputPath :: Path Rel File -> Maybe (Path Abs File) -> OutputKind -> IO (Path Abs File)
+constructOutputPath basename mPath kind =
+  case mPath of
+    Just path -> return path
+    Nothing ->
+      case kind of
+        OutputKindLLVM -> do
+          dir <- getCurrentDir
+          addExtension ".ll" (dir </> basename)
         OutputKindAsm -> do
-          tmpOutputPath <- liftIO $ addExtension ".ll" outputPath
-          let tmpOutputPathStr = toFilePath tmpOutputPath
-          L.writeFile tmpOutputPathStr result'
-          callProcess
-            "clang"
-            [ "-S",
-              tmpOutputPathStr,
-              "-Wno-override-module",
-              "-o" ++ toFilePath outputPath
-            ]
-          removeFile tmpOutputPath
-run (Check inputPathStr colorizeFlag eoe) = do
-  inputPath <- resolveFile' inputPathStr
-  time <- round <$> getPOSIXTime
-  resultOrErr <-
-    evalWithEnv (runCheck inputPath) $
-      initialEnv
-        { shouldColorize = colorizeFlag,
-          endOfEntry = eoe,
-          isCheck = True,
-          timestamp = time
-        }
-  case resultOrErr of
-    Right _ -> return ()
-    Left (Error err) ->
-      seqIO (map (outputLog colorizeFlag eoe) err) >> exitWith (ExitFailure 1)
-run (Archive inputPathStr mOutputPathStr) = do
-  inputPath <- resolveDir' inputPathStr
-  contents <- listDirectory $ toFilePath inputPath
-  mOutputPath <- mapM resolveFile' mOutputPathStr
-  outputPath <- toFilePath <$> constructOutputArchivePath inputPath mOutputPath
-  archive outputPath (toFilePath inputPath) contents
-run (Complete inputPathStr l c) = do
-  inputPath <- resolveFile' inputPathStr
-  time <- round <$> getPOSIXTime
-  resultOrErr <-
-    evalWithEnv (complete inputPath l c) $ initialEnv {timestamp = time}
-  case resultOrErr of
-    Left _ -> return ()
-    Right result -> mapM_ putStrLn result
+          dir <- getCurrentDir
+          addExtension ".s" (dir </> basename)
+        OutputKindObject -> do
+          dir <- getCurrentDir
+          return $ dir </> basename
 
-constructOutputPath ::
-  Path Rel File -> Maybe (Path Abs File) -> OutputKind -> IO (Path Abs File)
-constructOutputPath basename Nothing OutputKindLLVM = do
-  dir <- getCurrentDir
-  addExtension ".ll" (dir </> basename)
-constructOutputPath basename Nothing OutputKindAsm = do
-  dir <- getCurrentDir
-  addExtension ".s" (dir </> basename)
-constructOutputPath basename Nothing OutputKindObject = do
-  dir <- getCurrentDir
-  return $ dir </> basename
-constructOutputPath _ (Just path) _ = return path
-
-constructOutputArchivePath ::
-  Path Abs Dir -> Maybe (Path Abs File) -> IO (Path Abs File)
-constructOutputArchivePath inputPath Nothing = do
-  let baseName = fromRelDir $ dirname inputPath
-  outputPath <- resolveFile' baseName
-  addExtension ".tar.gz" outputPath
-constructOutputArchivePath _ (Just path) = return path
+constructOutputArchivePath :: Path Abs Dir -> Maybe (Path Abs File) -> IO (Path Abs File)
+constructOutputArchivePath inputPath mPath =
+  case mPath of
+    Just path -> return path
+    Nothing -> do
+      let baseName = fromRelDir $ dirname inputPath
+      outputPath <- resolveFile' baseName
+      addExtension ".tar.gz" outputPath
 
 runBuild :: Path Abs File -> WithEnv Builder
 runBuild = parse >=> elaborate >=> clarify >=> toLLVM >=> emit
