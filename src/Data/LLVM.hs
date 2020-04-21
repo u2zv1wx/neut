@@ -49,51 +49,55 @@ type SizeInfo = LowType
 type SubstLLVM = IntMap.IntMap LLVMData
 
 substLLVMData :: SubstLLVM -> LLVMData -> LLVMData
-substLLVMData sub (LLVMDataLocal x) =
-  case IntMap.lookup (asInt x) sub of
-    Just d -> d
-    Nothing -> LLVMDataLocal x
-substLLVMData _ d = d
+substLLVMData sub llvmData =
+  case llvmData of
+    LLVMDataLocal x ->
+      case IntMap.lookup (asInt x) sub of
+        Just d -> d
+        Nothing -> LLVMDataLocal x
+    _ -> llvmData
 
 substLLVMOp :: SubstLLVM -> LLVMOp -> LLVMOp
-substLLVMOp sub (LLVMOpCall d ds) = do
-  let d' = substLLVMData sub d
-  let ds' = map (substLLVMData sub) ds
-  LLVMOpCall d' ds'
-substLLVMOp sub (LLVMOpGetElementPtr (d, t) dts) = do
-  let d' = substLLVMData sub d
-  let (ds, ts) = unzip dts
-  let ds' = map (substLLVMData sub) ds
-  LLVMOpGetElementPtr (d', t) (zip ds' ts)
-substLLVMOp sub (LLVMOpBitcast d t1 t2) = do
-  let d' = substLLVMData sub d
-  LLVMOpBitcast d' t1 t2
-substLLVMOp sub (LLVMOpIntToPointer d t1 t2) = do
-  let d' = substLLVMData sub d
-  LLVMOpIntToPointer d' t1 t2
-substLLVMOp sub (LLVMOpPointerToInt d t1 t2) = do
-  let d' = substLLVMData sub d
-  LLVMOpPointerToInt d' t1 t2
-substLLVMOp sub (LLVMOpLoad d t) = do
-  let d' = substLLVMData sub d
-  LLVMOpLoad d' t
-substLLVMOp sub (LLVMOpStore t d1 d2) = do
-  let d1' = substLLVMData sub d1
-  let d2' = substLLVMData sub d2
-  LLVMOpStore t d1' d2'
-substLLVMOp sub (LLVMOpAlloc d sizeInfo) = do
-  let d' = substLLVMData sub d
-  LLVMOpAlloc d' sizeInfo
-substLLVMOp sub (LLVMOpFree d sizeInfo i) = do
-  let d' = substLLVMData sub d
-  LLVMOpFree d' sizeInfo i
-substLLVMOp sub (LLVMOpUnaryOp op d) = do
-  let d' = substLLVMData sub d
-  LLVMOpUnaryOp op d'
-substLLVMOp sub (LLVMOpBinaryOp op d1 d2) = do
-  let d1' = substLLVMData sub d1
-  let d2' = substLLVMData sub d2
-  LLVMOpBinaryOp op d1' d2'
-substLLVMOp sub (LLVMOpSysCall i ds) = do
-  let ds' = map (substLLVMData sub) ds
-  LLVMOpSysCall i ds'
+substLLVMOp sub llvmOp =
+  case llvmOp of
+    LLVMOpCall d ds -> do
+      let d' = substLLVMData sub d
+      let ds' = map (substLLVMData sub) ds
+      LLVMOpCall d' ds'
+    LLVMOpGetElementPtr (d, t) dts -> do
+      let d' = substLLVMData sub d
+      let (ds, ts) = unzip dts
+      let ds' = map (substLLVMData sub) ds
+      LLVMOpGetElementPtr (d', t) (zip ds' ts)
+    LLVMOpBitcast d t1 t2 -> do
+      let d' = substLLVMData sub d
+      LLVMOpBitcast d' t1 t2
+    LLVMOpIntToPointer d t1 t2 -> do
+      let d' = substLLVMData sub d
+      LLVMOpIntToPointer d' t1 t2
+    LLVMOpPointerToInt d t1 t2 -> do
+      let d' = substLLVMData sub d
+      LLVMOpPointerToInt d' t1 t2
+    LLVMOpLoad d t -> do
+      let d' = substLLVMData sub d
+      LLVMOpLoad d' t
+    LLVMOpStore t d1 d2 -> do
+      let d1' = substLLVMData sub d1
+      let d2' = substLLVMData sub d2
+      LLVMOpStore t d1' d2'
+    LLVMOpAlloc d sizeInfo -> do
+      let d' = substLLVMData sub d
+      LLVMOpAlloc d' sizeInfo
+    LLVMOpFree d sizeInfo i -> do
+      let d' = substLLVMData sub d
+      LLVMOpFree d' sizeInfo i
+    LLVMOpUnaryOp op d -> do
+      let d' = substLLVMData sub d
+      LLVMOpUnaryOp op d'
+    LLVMOpBinaryOp op d1 d2 -> do
+      let d1' = substLLVMData sub d1
+      let d2' = substLLVMData sub d2
+      LLVMOpBinaryOp op d1' d2'
+    LLVMOpSysCall i ds -> do
+      let ds' = map (substLLVMData sub) ds
+      LLVMOpSysCall i ds'
