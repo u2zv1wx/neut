@@ -77,35 +77,35 @@ parse' :: [TreePlus] -> WithEnv [WeakStmt]
 parse' stmtTreeList =
   case stmtTreeList of
     [] -> leave
-    (stmt : cont) ->
-      case stmt of
+    (headStmt : restStmtList) ->
+      case headStmt of
         (m, TreeNode (leaf@(_, TreeLeaf headAtom) : rest)) ->
           case headAtom of
             "notation"
               | [from, to] <- rest -> do
                 checkNotationSanity from
                 modify (\e -> e {notationEnv = (from, to) : notationEnv e})
-                parse' cont
+                parse' restStmtList
               | otherwise -> raiseSyntaxError m "(notation TREE TREE)"
             "keyword"
               | [(_, TreeLeaf s)] <- rest -> do
                 checkKeywordSanity m s
                 modify (\e -> e {keywordEnv = S.insert s (keywordEnv e)})
-                parse' cont
+                parse' restStmtList
               | otherwise -> raiseSyntaxError m "(keyword LEAF)"
             "use"
               | [(_, TreeLeaf s)] <- rest ->
-                use s >> parse' cont
+                use s >> parse' restStmtList
               | otherwise -> raiseSyntaxError m "(use LEAF)"
             "unuse"
               | [(_, TreeLeaf s)] <- rest ->
-                unuse s >> parse' cont
+                unuse s >> parse' restStmtList
               | otherwise -> raiseSyntaxError m "(unuse LEAF)"
             "section"
               | [(_, TreeLeaf s)] <- rest -> do
                 modify (\e -> e {sectionEnv = s : sectionEnv e})
                 getCurrentSection >>= use
-                parse' cont
+                parse' restStmtList
               | otherwise -> raiseSyntaxError m "(section LEAF)"
             "end"
               | [(_, TreeLeaf s)] <- rest -> do
@@ -116,7 +116,7 @@ parse' stmtTreeList =
                     | s == s' -> do
                       getCurrentSection >>= unuse
                       modify (\e -> e {sectionEnv = ns'})
-                      parse' cont
+                      parse' restStmtList
                     | otherwise ->
                       raiseError m $
                         "the innermost section is not `" <> s <> "`, but is `" <> s' <> "`"
@@ -126,13 +126,13 @@ parse' stmtTreeList =
                 m' <- adjustPhase' m
                 xis <- interpretEnumItem m' name ts
                 insEnumEnv m' name xis
-                parse' cont
+                parse' restStmtList
               | otherwise -> raiseSyntaxError m "(enum LEAF TREE ... TREE)"
             "include"
               | [(mPath, TreeLeaf pathString)] <- rest ->
-                includeFile m mPath pathString getCurrentDirPath cont
+                includeFile m mPath pathString getCurrentDirPath restStmtList
               | [(_, TreeLeaf "library"), (mPath, TreeLeaf pathString)] <- rest ->
-                includeFile m mPath pathString getLibraryDirPath cont
+                includeFile m mPath pathString getLibraryDirPath restStmtList
               | otherwise -> raiseSyntaxError m "(include LEAF) | (include library LEAF)"
             "ensure"
               | [(_, TreeLeaf pkg), (mUrl, TreeLeaf urlStr)] <- rest -> do
@@ -148,17 +148,17 @@ parse' stmtTreeList =
                     toLazyByteString <$> Streams.fold mappend mempty i2
                   note' $ "extracting " <> pkg <> " into " <> T.pack (toFilePath path)
                   extract item path
-                parse' cont
+                parse' restStmtList
               | otherwise -> raiseSyntaxError m "(ensure LEAF LEAF)"
             "statement" ->
-              parse' $ rest ++ cont
+              parse' $ rest ++ restStmtList
             "introspect"
               | ((mx, TreeLeaf x) : stmtClauseList) <- rest -> do
                 val <- retrieveCompileTimeVarValue mx x
                 stmtClauseList' <- mapM parseStmtClause stmtClauseList
                 case lookup val stmtClauseList' of
-                  Nothing -> parse' cont
-                  Just as1 -> parse' $ as1 ++ cont
+                  Nothing -> parse' restStmtList
+                  Just as1 -> parse' $ as1 ++ restStmtList
               | otherwise -> raiseSyntaxError m "(introspect LEAF TREE*)"
             "constant"
               | [(_, TreeLeaf name), t] <- rest -> do
@@ -166,71 +166,71 @@ parse' stmtTreeList =
                 m' <- adjustPhase' m
                 name' <- withSectionPrefix name
                 insertConstant m' name'
-                defList <- parse' cont
+                defList <- parse' restStmtList
                 return $ WeakStmtConstDecl (m', name', t') : defList
               | otherwise -> raiseSyntaxError m "(constant LEAF TREE)"
             "definition"
               | [name@(_, TreeLeaf _), body] <- rest ->
-                parse' $ (m, TreeNode [(m, TreeLeaf "let"), name, body]) : cont
+                parse' $ (m, TreeNode [(m, TreeLeaf "let"), name, body]) : restStmtList
               | name@(mFun, TreeLeaf _) : xts@(_, TreeNode _) : body : rest' <- rest ->
-                parse' $ (m, TreeNode [leaf, (mFun, TreeNode (name : xts : body : rest'))]) : cont
+                parse' $ (m, TreeNode [leaf, (mFun, TreeNode (name : xts : body : rest'))]) : restStmtList
               | otherwise -> do
                 ss1 <- parseDef rest
-                ss2 <- parse' cont
+                ss2 <- parse' restStmtList
                 return $ ss1 ++ ss2
             "inductive"
               | name@(mFun, TreeLeaf _) : xts@(_, TreeNode _) : es' <- rest ->
-                parse' $ (m, TreeNode [leaf, (mFun, TreeNode (name : xts : es'))]) : cont
+                parse' $ (m, TreeNode [leaf, (mFun, TreeNode (name : xts : es'))]) : restStmtList
               | otherwise -> do
                 rest' <- mapM (adjustPhase >=> macroExpand) rest
                 m' <- adjustPhase' m
                 stmtList1 <- parseInductive m' rest'
-                stmtList2 <- parse' cont
+                stmtList2 <- parse' restStmtList
                 return $ stmtList1 ++ stmtList2
             "coinductive"
               | name@(mFun, TreeLeaf _) : xts@(_, TreeNode _) : rest' <- rest ->
-                parse' $ (m, TreeNode [leaf, (mFun, TreeNode (name : xts : rest'))]) : cont
+                parse' $ (m, TreeNode [leaf, (mFun, TreeNode (name : xts : rest'))]) : restStmtList
               | otherwise -> do
                 rest' <- mapM (adjustPhase >=> macroExpand) rest
                 registerLabelInfo rest'
                 rest'' <- asInductive rest'
                 stmtList1 <- parseInductive m rest''
                 stmtList2 <- generateProjections rest'
-                stmtList3 <- parse' cont
+                stmtList3 <- parse' restStmtList
                 return $ stmtList1 ++ stmtList2 ++ stmtList3
             "let"
               | [(mx, TreeLeaf x), t, e] <- rest -> do
                 let xt = (mx, TreeNode [(mx, TreeLeaf x), t])
-                parse' ((m, TreeNode [(m, TreeLeaf "let"), xt, e]) : cont)
+                parse' ((m, TreeNode [(m, TreeLeaf "let"), xt, e]) : restStmtList)
               | [xt, e] <- rest -> do
                 m' <- adjustPhase' m
                 e' <- adjustPhase e >>= macroExpand >>= interpret >>= discern
                 xt' <- adjustPhase xt >>= macroExpand >>= prefixTextPlus >>= interpretIdentPlus >>= discernIdentPlus
-                defList <- parse' cont
+                defList <- parse' restStmtList
                 return $ WeakStmtLet m' xt' e' : defList
               | otherwise -> raiseSyntaxError m "(let LEAF TREE TREE) | (let TREE TREE)"
             "verify"
               | [e] <- rest -> do
                 e' <- adjustPhase e >>= macroExpand >>= interpret >>= discern
                 m' <- adjustPhase' m
-                defList <- parse' cont
+                defList <- parse' restStmtList
                 return $ WeakStmtVerify m' e' : defList
               | otherwise -> raiseSyntaxError m "(verify LEAF) | (verify library LEAF)"
-            _ -> interpretAux stmt cont
-        _ -> interpretAux stmt cont
+            _ -> interpretAux headStmt restStmtList
+        _ -> interpretAux headStmt restStmtList
 
 interpretAux :: TreePlus -> [TreePlus] -> WithEnv [WeakStmt]
-interpretAux stmt cont = do
-  e <- adjustPhase stmt >>= macroExpand
-  if isSpecialForm e
-    then parse' $ e : cont
+interpretAux headStmt restStmtList = do
+  headStmt' <- adjustPhase headStmt >>= macroExpand
+  if isSpecialForm headStmt'
+    then parse' $ headStmt' : restStmtList
     else do
-      e' <- interpret e >>= discern
+      e <- interpret headStmt' >>= discern
       h <- newNameWith'' "_"
-      m' <- adjustPhase' $ metaOf e'
+      m' <- adjustPhase' $ metaOf e
       t <- newHole m'
-      defList <- parse' cont
-      return $ WeakStmtLet m' (m', h, t) e' : defList
+      defList <- parse' restStmtList
+      return $ WeakStmtLet m' (m', h, t) e : defList
 
 use :: T.Text -> WithEnv ()
 use s =
