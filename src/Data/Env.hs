@@ -90,11 +90,11 @@ data Env
         constraintQueue :: ConstraintQueue,
         -- metavar ~> beta-equivalent weakterm
         substEnv :: IntMap.IntMap WeakTermPlus,
+        defEnv :: IntMap.IntMap TermPlus,
         zetaEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus),
         --
         -- clarify
         --
-        cacheEnv :: Map.HashMap T.Text (Either TermPlus CodePlus),
         -- f ~> thunk (lam (x1 ... xn) e)
         codeEnv :: Map.HashMap T.Text Definition,
         nameSet :: S.Set T.Text,
@@ -141,7 +141,6 @@ initialEnv =
       labelEnv = Map.empty,
       weakTypeEnv = IntMap.empty,
       typeEnv = Map.empty,
-      cacheEnv = Map.empty,
       codeEnv = Map.empty,
       chainEnv = IntMap.empty,
       llvmEnv = Map.empty,
@@ -154,6 +153,7 @@ initialEnv =
       constraintEnv = [],
       constraintQueue = Q.empty,
       substEnv = IntMap.empty,
+      defEnv = IntMap.empty,
       zetaEnv = IntMap.empty,
       nameSet = S.empty,
       nopFreeSet = S.empty,

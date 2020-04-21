@@ -4,10 +4,9 @@ module Reduce.Term
   )
 where
 
-import Control.Monad.State.Lazy
+import Control.Monad.State
 import Data.Basic
 import Data.Env
-import qualified Data.HashMap.Lazy as Map
 import qualified Data.IntMap as IntMap
 import Data.Term
 import qualified Data.Text as T
@@ -142,110 +141,112 @@ isValueConst x
   | otherwise = False
 
 normalize :: TermPlus -> WithEnv TermPlus
-normalize (m, TermTau) = return (m, TermTau)
-normalize (m, TermUpsilon x) = return (m, TermUpsilon x)
-normalize (m, TermPi mName xts cod) = do
-  let (ms, xs, ts) = unzip3 xts
-  ts' <- mapM normalize ts
-  cod' <- normalize cod
-  return (m, TermPi mName (zip3 ms xs ts') cod')
-normalize (m, TermPiIntro info xts e) = do
-  -- info' <- fmap2M (mapM normalizeIdentPlus) info
-  let (ms, xs, ts) = unzip3 xts
-  ts' <- mapM normalize ts
-  e' <- normalize e
-  -- return (m, TermPiIntro info' (zip3 ms xs ts') e')
-  return (m, TermPiIntro info (zip3 ms xs ts') e')
-normalize (m, TermPiElim e es) = do
-  e' <- normalize e
-  es' <- mapM normalize es
-  case e' of
-    (_, TermPiIntro _ xts body) -> do
-      let xs = map (\(_, x, _) -> asInt x) xts
-      let sub = IntMap.fromList $ zip xs es'
-      normalize $ substTermPlus sub body
-    iter@(_, TermIter (_, self, _) xts body) -> do
-      let xs = map (\(_, x, _) -> asInt x) xts
-      let sub = IntMap.fromList $ (asInt self, iter) : zip xs es'
-      normalize $ substTermPlus sub body
-    _ -> return (m, TermPiElim e' es')
-normalize (m, TermIter (mx, x, t) xts e) = do
-  t' <- normalize t
-  let (ms, xs, ts) = unzip3 xts
-  ts' <- mapM normalize ts
-  e' <- normalize e
-  return (m, TermIter (mx, x, t') (zip3 ms xs ts') e')
-normalize (m, TermConst x) = do
-  cenv <- gets cacheEnv
-  case Map.lookup x cenv of
-    Just (Left e) -> normalize e
-    _ -> return (m, TermConst x)
-normalize (m, TermBoxElim x) = return (m, TermBoxElim x)
-normalize (m, TermFloat size x) = return (m, TermFloat size x)
-normalize (m, TermEnum enumType) = return (m, TermEnum enumType)
-normalize (m, TermEnumIntro enumValue) = return (m, TermEnumIntro enumValue)
-normalize (m, TermEnumElim (e, t) les) = do
-  t' <- normalize t
-  e' <- normalize e
-  let (ls, es) = unzip les
-  let les'' = zip (map snd ls) es
-  case e' of
-    (_, TermEnumIntro l) ->
-      case lookup (CaseValue l) les'' of
-        Just body -> normalize body
-        Nothing ->
-          case lookup CaseDefault les'' of
-            Just body -> normalize body
-            Nothing -> do
-              es' <- mapM normalize es
-              let les' = zip ls es'
-              return (m, TermEnumElim (e', t') les')
-    _ -> do
-      es' <- mapM normalize es
-      let les' = zip ls es'
-      return (m, TermEnumElim (e', t') les')
-normalize (m, TermArray dom k) = do
-  dom' <- normalize dom
-  return (m, TermArray dom' k)
-normalize (m, TermArrayIntro k es) = do
-  es' <- mapM normalize es
-  return (m, TermArrayIntro k es')
-normalize (m, TermArrayElim k xts e1 e2) = do
-  e1' <- normalize e1
-  case e1 of
-    (_, TermArrayIntro k' es)
-      | length es == length xts,
-        k == k' -> do
-        let xs = map (\(_, x, _) -> asInt x) xts
-        let sub = IntMap.fromList $ zip xs es
-        normalize $ substTermPlus sub e2
-    _ -> return (m, TermArrayElim k xts e1' e2)
-normalize (m, TermStruct ks) = return (m, TermStruct ks)
-normalize (m, TermStructIntro eks) = do
-  let (es, ks) = unzip eks
-  es' <- mapM normalize es
-  return (m, TermStructIntro $ zip es' ks)
-normalize (m, TermStructElim xks e1 e2) = do
-  e1' <- normalize e1
-  case e1' of
-    (_, TermStructIntro eks)
-      | (_, xs, ks1) <- unzip3 xks,
-        (es, ks2) <- unzip eks,
-        ks1 == ks2 -> do
-        let sub = IntMap.fromList $ zip (map asInt xs) es
-        normalize $ substTermPlus sub e2
-    _ -> return (m, TermStructElim xks e1' e2)
-normalize (m, TermCase indName e cxtes) = do
-  e' <- normalize e
-  cxtes'' <-
-    flip mapM cxtes $ \((c, xts), body) -> do
+normalize term =
+  case term of
+    (m, TermTau) ->
+      return (m, TermTau)
+    (m, TermUpsilon x) -> do
+      denv <- gets defEnv
+      case IntMap.lookup (asInt x) denv of
+        Just e -> normalize e
+        Nothing -> return (m, TermUpsilon x)
+    (m, TermPi mName xts cod) -> do
       let (ms, xs, ts) = unzip3 xts
       ts' <- mapM normalize ts
-      body' <- normalize body
-      return ((c, zip3 ms xs ts'), body')
-  return (m, TermCase indName e' cxtes'')
-
-normalizeIdentPlus :: IdentPlus -> WithEnv IdentPlus
-normalizeIdentPlus (m, x, t) = do
-  t' <- normalize t
-  return (m, x, t')
+      cod' <- normalize cod
+      return (m, TermPi mName (zip3 ms xs ts') cod')
+    (m, TermPiIntro info xts e) -> do
+      let (ms, xs, ts) = unzip3 xts
+      ts' <- mapM normalize ts
+      e' <- normalize e
+      return (m, TermPiIntro info (zip3 ms xs ts') e')
+    (m, TermPiElim e es) -> do
+      e' <- normalize e
+      es' <- mapM normalize es
+      case e' of
+        (_, TermPiIntro _ xts body) -> do
+          let xs = map (\(_, x, _) -> asInt x) xts
+          let sub = IntMap.fromList $ zip xs es'
+          normalize $ substTermPlus sub body
+        iter@(_, TermIter (_, self, _) xts body) -> do
+          let xs = map (\(_, x, _) -> asInt x) xts
+          let sub = IntMap.fromList $ (asInt self, iter) : zip xs es'
+          normalize $ substTermPlus sub body
+        _ -> return (m, TermPiElim e' es')
+    (m, TermIter (mx, x, t) xts e) -> do
+      t' <- normalize t
+      let (ms, xs, ts) = unzip3 xts
+      ts' <- mapM normalize ts
+      e' <- normalize e
+      return (m, TermIter (mx, x, t') (zip3 ms xs ts') e')
+    (m, TermConst x) ->
+      return (m, TermConst x)
+    (m, TermBoxElim x) ->
+      return (m, TermBoxElim x)
+    (m, TermFloat size x) ->
+      return (m, TermFloat size x)
+    (m, TermEnum enumType) ->
+      return (m, TermEnum enumType)
+    (m, TermEnumIntro enumValue) ->
+      return (m, TermEnumIntro enumValue)
+    (m, TermEnumElim (e, t) les) -> do
+      t' <- normalize t
+      e' <- normalize e
+      let (ls, es) = unzip les
+      let les'' = zip (map snd ls) es
+      case e' of
+        (_, TermEnumIntro l) ->
+          case lookup (CaseValue l) les'' of
+            Just body -> normalize body
+            Nothing ->
+              case lookup CaseDefault les'' of
+                Just body -> normalize body
+                Nothing -> do
+                  es' <- mapM normalize es
+                  let les' = zip ls es'
+                  return (m, TermEnumElim (e', t') les')
+        _ -> do
+          es' <- mapM normalize es
+          let les' = zip ls es'
+          return (m, TermEnumElim (e', t') les')
+    (m, TermArray dom k) -> do
+      dom' <- normalize dom
+      return (m, TermArray dom' k)
+    (m, TermArrayIntro k es) -> do
+      es' <- mapM normalize es
+      return (m, TermArrayIntro k es')
+    (m, TermArrayElim k xts e1 e2) -> do
+      e1' <- normalize e1
+      case e1 of
+        (_, TermArrayIntro k' es)
+          | length es == length xts,
+            k == k' -> do
+            let xs = map (\(_, x, _) -> asInt x) xts
+            let sub = IntMap.fromList $ zip xs es
+            normalize $ substTermPlus sub e2
+        _ -> return (m, TermArrayElim k xts e1' e2)
+    (m, TermStruct ks) ->
+      return (m, TermStruct ks)
+    (m, TermStructIntro eks) -> do
+      let (es, ks) = unzip eks
+      es' <- mapM normalize es
+      return (m, TermStructIntro $ zip es' ks)
+    (m, TermStructElim xks e1 e2) -> do
+      e1' <- normalize e1
+      case e1' of
+        (_, TermStructIntro eks)
+          | (_, xs, ks1) <- unzip3 xks,
+            (es, ks2) <- unzip eks,
+            ks1 == ks2 -> do
+            let sub = IntMap.fromList $ zip (map asInt xs) es
+            normalize $ substTermPlus sub e2
+        _ -> return (m, TermStructElim xks e1' e2)
+    (m, TermCase indName e cxtes) -> do
+      e' <- normalize e
+      cxtes'' <-
+        flip mapM cxtes $ \((c, xts), body) -> do
+          let (ms, xs, ts) = unzip3 xts
+          ts' <- mapM normalize ts
+          body' <- normalize body
+          return ((c, zip3 ms xs ts'), body')
+      return (m, TermCase indName e' cxtes'')

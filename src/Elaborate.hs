@@ -38,6 +38,7 @@ elaborateStmt =
       t'' <- reduceTermPlus <$> elaborate' t'
       insWeakTypeEnv x $ weaken t''
       modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e'') (substEnv env)})
+      modify (\env -> env {defEnv = IntMap.insert (asInt x) e'' (defEnv env)})
       cont' <- elaborateStmt cont
       return $ StmtLet m (mx, x, t'') e'' cont'
     WeakStmtLetWT m (mx, x, t) e : cont -> do
@@ -46,6 +47,7 @@ elaborateStmt =
       e' <- reduceTermPlus <$> elaborate' e -- `e` is supposed to be well-typed
       t'' <- reduceTermPlus <$> elaborate' t'
       insWeakTypeEnv x $ weaken t''
+      modify (\env -> env {defEnv = IntMap.insert (asInt x) e' (defEnv env)})
       modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e') (substEnv env)})
       cont' <- elaborateStmt cont
       return $ StmtLet m (mx, x, t'') e' cont'
@@ -58,9 +60,9 @@ elaborateStmt =
     WeakStmtVerify m e : cont -> do
       whenCheck $ do
         (e', _) <- infer e
-        _ <- elaborate' e'
+        e'' <- elaborate' e'
         start <- liftIO getCurrentTime
-        -- _ <- normalize e''
+        _ <- normalize e''
         stop <- liftIO getCurrentTime
         let sec = realToFrac $ diffUTCTime stop start :: Float
         note m $
