@@ -134,15 +134,26 @@ data FloatSize
 instance Binary FloatSize
 
 asFloatSize :: Int -> Maybe FloatSize
-asFloatSize 16 = Just FloatSize16
-asFloatSize 32 = Just FloatSize32
-asFloatSize 64 = Just FloatSize64
-asFloatSize _ = Nothing
+asFloatSize size =
+  case size of
+    16 ->
+      Just FloatSize16
+    32 ->
+      Just FloatSize32
+    64 ->
+      Just FloatSize64
+    _ ->
+      Nothing
 
 showFloatSize :: FloatSize -> T.Text
-showFloatSize FloatSize16 = "f16"
-showFloatSize FloatSize32 = "f32"
-showFloatSize FloatSize64 = "f64"
+showFloatSize size =
+  case size of
+    FloatSize16 ->
+      "f16"
+    FloatSize32 ->
+      "f32"
+    FloatSize64 ->
+      "f64"
 
 data EnumType
   = EnumTypeLabel T.Text
@@ -182,26 +193,17 @@ data LowType
 
 -- これasArrayKindMaybeから実装したほうがよさそう？
 asLowTypeMaybe :: T.Text -> Maybe LowType
-asLowTypeMaybe s =
-  case T.uncons s of
-    Just ('i', rest)
-      | Just n <- readMaybe $ T.unpack rest,
-        0 < n && n <= 64 ->
-        Just $ LowTypeIntS n
-    Just ('u', rest)
-      | Just n <- readMaybe $ T.unpack rest,
-        0 < n && n <= 64 ->
-        Just $ LowTypeIntU n
-    Just ('f', rest)
-      | Just n <- readMaybe $ T.unpack rest,
-        Just size <- asFloatSize n ->
-        Just $ LowTypeFloat size
-    _ -> Nothing
+asLowTypeMaybe name = arrayKindToLowType <$> asArrayKindMaybe name
 
 sizeAsInt :: FloatSize -> Int
-sizeAsInt FloatSize16 = 16
-sizeAsInt FloatSize32 = 32
-sizeAsInt FloatSize64 = 64
+sizeAsInt size =
+  case size of
+    FloatSize16 ->
+      16
+    FloatSize32 ->
+      32
+    FloatSize64 ->
+      64
 
 data ArrayKind
   = ArrayKindIntS Int
@@ -225,29 +227,49 @@ asArrayAccessMaybe name
   | otherwise = Nothing
 
 lowTypeToArrayKindMaybe :: LowType -> Maybe ArrayKind
-lowTypeToArrayKindMaybe (LowTypeIntS i) = Just $ ArrayKindIntS i
-lowTypeToArrayKindMaybe (LowTypeIntU i) = Just $ ArrayKindIntU i
-lowTypeToArrayKindMaybe (LowTypeFloat size) = Just $ ArrayKindFloat size
-lowTypeToArrayKindMaybe _ = Nothing
+lowTypeToArrayKindMaybe lowType =
+  case lowType of
+    LowTypeIntS i ->
+      Just $ ArrayKindIntS i
+    LowTypeIntU i ->
+      Just $ ArrayKindIntU i
+    LowTypeFloat size ->
+      Just $ ArrayKindFloat size
+    _ ->
+      Nothing
+
+arrayKindToLowType :: ArrayKind -> LowType
+arrayKindToLowType arrayKind =
+  case arrayKind of
+    ArrayKindIntS i ->
+      LowTypeIntS i
+    ArrayKindIntU i ->
+      LowTypeIntU i
+    ArrayKindFloat size ->
+      LowTypeFloat size
+    ArrayKindVoidPtr ->
+      voidPtr
 
 asArrayKindMaybe :: T.Text -> Maybe ArrayKind
-asArrayKindMaybe "" = Nothing
-asArrayKindMaybe s
-  | 'i' <- T.head s,
-    Just n <- readMaybe $ T.unpack $ T.tail s,
-    0 < n && n <= 64 =
-    Just $ ArrayKindIntS n
-asArrayKindMaybe s
-  | 'u' <- T.head s,
-    Just n <- readMaybe $ T.unpack $ T.tail s,
-    0 < n && n <= 64 =
-    Just $ ArrayKindIntU n
-asArrayKindMaybe s
-  | 'f' <- T.head s,
-    Just n <- readMaybe $ T.unpack $ T.tail s,
-    Just size <- asFloatSize n =
-    Just $ ArrayKindFloat size
-asArrayKindMaybe _ = Nothing
+asArrayKindMaybe s =
+  case T.uncons s of
+    Nothing -> Nothing
+    Just (c, rest) ->
+      case c of
+        'i'
+          | Just n <- readMaybe $ T.unpack rest,
+            0 < n && n <= 64 ->
+            Just $ ArrayKindIntS n
+        'u'
+          | Just n <- readMaybe $ T.unpack rest,
+            0 < n && n <= 64 ->
+            Just $ ArrayKindIntU n
+        'f'
+          | Just n <- readMaybe $ T.unpack rest,
+            Just size <- asFloatSize n ->
+            Just $ ArrayKindFloat size
+        _ ->
+          Nothing
 
 data UnaryOp
   = UnaryOpNeg LowType -- fneg : X -> X
@@ -263,30 +285,45 @@ asUnaryOpMaybe name
   | Just (typeStr, "neg") <- breakOnMaybe ":" name,
     Just lowType <- asLowTypeMaybe typeStr =
     Just $ UnaryOpNeg lowType
-asUnaryOpMaybe name
   | Just (domTypeStr, rest) <- breakOnMaybe ":" name,
     Just (convOpStr, codTypeStr) <- breakOnMaybe ":" rest,
     Just domType <- asLowTypeMaybe domTypeStr,
     Just codType <- asLowTypeMaybe codTypeStr,
     Just op <- asConvOpMaybe domType codType convOpStr =
     Just op
-asUnaryOpMaybe _ = Nothing
+  | otherwise = Nothing
 
 unaryOpToDomCod :: UnaryOp -> (LowType, LowType)
-unaryOpToDomCod (UnaryOpNeg t) = (t, t)
-unaryOpToDomCod (UnaryOpTrunc dom cod) = (dom, cod)
-unaryOpToDomCod (UnaryOpZext dom cod) = (dom, cod)
-unaryOpToDomCod (UnaryOpSext dom cod) = (dom, cod)
-unaryOpToDomCod (UnaryOpFpExt dom cod) = (dom, cod)
-unaryOpToDomCod (UnaryOpTo dom cod) = (dom, cod)
+unaryOpToDomCod unaryOp =
+  case unaryOp of
+    UnaryOpNeg t ->
+      (t, t)
+    UnaryOpTrunc dom cod ->
+      (dom, cod)
+    UnaryOpZext dom cod ->
+      (dom, cod)
+    UnaryOpSext dom cod ->
+      (dom, cod)
+    UnaryOpFpExt dom cod ->
+      (dom, cod)
+    UnaryOpTo dom cod ->
+      (dom, cod)
 
 asConvOpMaybe :: LowType -> LowType -> T.Text -> Maybe UnaryOp
-asConvOpMaybe domType codType "trunc" = Just $ UnaryOpTrunc domType codType
-asConvOpMaybe domType codType "zext" = Just $ UnaryOpZext domType codType
-asConvOpMaybe domType codType "sext" = Just $ UnaryOpSext domType codType
-asConvOpMaybe domType codType "ext" = Just $ UnaryOpFpExt domType codType
-asConvOpMaybe domType codType "to" = Just $ UnaryOpTo domType codType
-asConvOpMaybe _ _ _ = Nothing
+asConvOpMaybe domType codType name =
+  case name of
+    "trunc" ->
+      Just $ UnaryOpTrunc domType codType
+    "zext" ->
+      Just $ UnaryOpZext domType codType
+    "sext" ->
+      Just $ UnaryOpSext domType codType
+    "ext" ->
+      Just $ UnaryOpFpExt domType codType
+    "to" ->
+      Just $ UnaryOpTo domType codType
+    _ ->
+      Nothing
 
 data BinaryOp
   = BinaryOpAdd LowType -- (X, X) -> X
@@ -314,47 +351,87 @@ asBinaryOpMaybe name
     Just lowType <- asLowTypeMaybe typeStr,
     Just f <- asBinaryOpMaybe' opStr =
     Just $ f lowType
-asBinaryOpMaybe _ = Nothing
+  | otherwise = Nothing
 
 binaryOpToDomCod :: BinaryOp -> (LowType, LowType)
-binaryOpToDomCod (BinaryOpAdd t) = (t, t)
-binaryOpToDomCod (BinaryOpSub t) = (t, t)
-binaryOpToDomCod (BinaryOpMul t) = (t, t)
-binaryOpToDomCod (BinaryOpDiv t) = (t, t)
-binaryOpToDomCod (BinaryOpRem t) = (t, t)
-binaryOpToDomCod (BinaryOpEQ t) = (t, LowTypeIntS 1)
-binaryOpToDomCod (BinaryOpNE t) = (t, LowTypeIntS 1)
-binaryOpToDomCod (BinaryOpGT t) = (t, LowTypeIntS 1)
-binaryOpToDomCod (BinaryOpGE t) = (t, LowTypeIntS 1)
-binaryOpToDomCod (BinaryOpLT t) = (t, LowTypeIntS 1)
-binaryOpToDomCod (BinaryOpLE t) = (t, LowTypeIntS 1)
-binaryOpToDomCod (BinaryOpShl t) = (t, t)
-binaryOpToDomCod (BinaryOpLshr t) = (t, t)
-binaryOpToDomCod (BinaryOpAshr t) = (t, t)
-binaryOpToDomCod (BinaryOpAnd t) = (t, t)
-binaryOpToDomCod (BinaryOpOr t) = (t, t)
-binaryOpToDomCod (BinaryOpXor t) = (t, t)
+binaryOpToDomCod binaryOp =
+  case binaryOp of
+    BinaryOpAdd t ->
+      (t, t)
+    BinaryOpSub t ->
+      (t, t)
+    BinaryOpMul t ->
+      (t, t)
+    BinaryOpDiv t ->
+      (t, t)
+    BinaryOpRem t ->
+      (t, t)
+    BinaryOpEQ t ->
+      (t, LowTypeIntS 1)
+    BinaryOpNE t ->
+      (t, LowTypeIntS 1)
+    BinaryOpGT t ->
+      (t, LowTypeIntS 1)
+    BinaryOpGE t ->
+      (t, LowTypeIntS 1)
+    BinaryOpLT t ->
+      (t, LowTypeIntS 1)
+    BinaryOpLE t ->
+      (t, LowTypeIntS 1)
+    BinaryOpShl t ->
+      (t, t)
+    BinaryOpLshr t ->
+      (t, t)
+    BinaryOpAshr t ->
+      (t, t)
+    BinaryOpAnd t ->
+      (t, t)
+    BinaryOpOr t ->
+      (t, t)
+    BinaryOpXor t ->
+      (t, t)
 
 asBinaryOpMaybe' :: T.Text -> Maybe (LowType -> BinaryOp)
-asBinaryOpMaybe' "add" = Just BinaryOpAdd
-asBinaryOpMaybe' "sub" = Just BinaryOpSub
-asBinaryOpMaybe' "mul" = Just BinaryOpMul
-asBinaryOpMaybe' "div" = Just BinaryOpDiv
-asBinaryOpMaybe' "rem" = Just BinaryOpRem
-asBinaryOpMaybe' "eq" = Just BinaryOpEQ
-asBinaryOpMaybe' "ne" = Just BinaryOpNE
-asBinaryOpMaybe' "gt" = Just BinaryOpGT
-asBinaryOpMaybe' "ge" = Just BinaryOpGE
-asBinaryOpMaybe' "lt" = Just BinaryOpLT
-asBinaryOpMaybe' "<" = Just BinaryOpLT
-asBinaryOpMaybe' "le" = Just BinaryOpLE
-asBinaryOpMaybe' "shl" = Just BinaryOpShl
-asBinaryOpMaybe' "lshr" = Just BinaryOpLshr
-asBinaryOpMaybe' "ashr" = Just BinaryOpAshr
-asBinaryOpMaybe' "and" = Just BinaryOpAnd
-asBinaryOpMaybe' "or" = Just BinaryOpOr
-asBinaryOpMaybe' "xor" = Just BinaryOpXor
-asBinaryOpMaybe' _ = Nothing
+asBinaryOpMaybe' name =
+  case name of
+    "add" ->
+      Just BinaryOpAdd
+    "sub" ->
+      Just BinaryOpSub
+    "mul" ->
+      Just BinaryOpMul
+    "div" ->
+      Just BinaryOpDiv
+    "rem" ->
+      Just BinaryOpRem
+    "eq" ->
+      Just BinaryOpEQ
+    "ne" ->
+      Just BinaryOpNE
+    "gt" ->
+      Just BinaryOpGT
+    "ge" ->
+      Just BinaryOpGE
+    "lt" ->
+      Just BinaryOpLT
+    "<" ->
+      Just BinaryOpLT
+    "le" ->
+      Just BinaryOpLE
+    "shl" ->
+      Just BinaryOpShl
+    "lshr" ->
+      Just BinaryOpLshr
+    "ashr" ->
+      Just BinaryOpAshr
+    "and" ->
+      Just BinaryOpAnd
+    "or" ->
+      Just BinaryOpOr
+    "xor" ->
+      Just BinaryOpXor
+    _ ->
+      Nothing
 
 type Target = (OS, Arch)
 
@@ -383,10 +460,15 @@ linearCheck :: (Eq a, Ord a) => [a] -> Bool
 linearCheck = linearCheck' S.empty
 
 linearCheck' :: (Eq a, Ord a) => S.Set a -> [a] -> Bool
-linearCheck' _ [] = True
-linearCheck' found (x : _)
-  | x `S.member` found = False
-linearCheck' found (x : xs) = linearCheck' (S.insert x found) xs
+linearCheck' found input =
+  case input of
+    [] ->
+      True
+    (x : xs)
+      | x `S.member` found ->
+        False
+      | otherwise ->
+        linearCheck' (S.insert x found) xs
 
 {-# INLINE breakOnMaybe #-}
 breakOnMaybe :: T.Text -> T.Text -> Maybe (T.Text, T.Text)
@@ -411,29 +493,50 @@ showInHex' w = do
   hex high <> hex low
 
 hex :: Int -> T.Text
-hex 0 = "0"
-hex 1 = "1"
-hex 2 = "2"
-hex 3 = "3"
-hex 4 = "4"
-hex 5 = "5"
-hex 6 = "6"
-hex 7 = "7"
-hex 8 = "8"
-hex 9 = "9"
-hex 10 = "a"
-hex 11 = "b"
-hex 12 = "c"
-hex 13 = "d"
-hex 14 = "e"
-hex 15 = "f"
-hex _ = " "
+hex i =
+  case i of
+    0 ->
+      "0"
+    1 ->
+      "1"
+    2 ->
+      "2"
+    3 ->
+      "3"
+    4 ->
+      "4"
+    5 ->
+      "5"
+    6 ->
+      "6"
+    7 ->
+      "7"
+    8 ->
+      "8"
+    9 ->
+      "9"
+    10 ->
+      "a"
+    11 ->
+      "b"
+    12 ->
+      "c"
+    13 ->
+      "d"
+    14 ->
+      "e"
+    15 ->
+      "f"
+    _ ->
+      " "
 
 fmap2 :: (Functor f, Functor g) => (a -> b) -> f (g a) -> f (g b)
 fmap2 f = fmap (fmap f)
 
 fmap2M :: (Monad m) => (b -> m c) -> Maybe (a, b) -> m (Maybe (a, c))
-fmap2M _ Nothing = return Nothing
-fmap2M f (Just (x, y)) = do
-  y' <- f y
-  return $ Just (x, y')
+fmap2M f m =
+  case m of
+    Nothing -> return Nothing
+    Just (x, y) -> do
+      y' <- f y
+      return $ Just (x, y')

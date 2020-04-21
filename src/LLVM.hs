@@ -452,11 +452,11 @@ indexTypeOf :: LowType -> LowType
 indexTypeOf (LowTypePtr (LowTypeStruct _)) = LowTypeIntS 32
 indexTypeOf _ = LowTypeIntS 64
 
-arrayKindToLowType :: ArrayKind -> LowType
-arrayKindToLowType (ArrayKindIntS i) = LowTypeIntS i
-arrayKindToLowType (ArrayKindIntU i) = LowTypeIntU i
-arrayKindToLowType (ArrayKindFloat size) = LowTypeFloat size
-arrayKindToLowType ArrayKindVoidPtr = voidPtr
+-- arrayKindToLowType :: ArrayKind -> LowType
+-- arrayKindToLowType (ArrayKindIntS i) = LowTypeIntS i
+-- arrayKindToLowType (ArrayKindIntU i) = LowTypeIntU i
+-- arrayKindToLowType (ArrayKindFloat size) = LowTypeFloat size
+-- arrayKindToLowType ArrayKindVoidPtr = voidPtr
 
 toFunPtrType :: [a] -> LowType
 toFunPtrType xs =
