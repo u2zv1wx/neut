@@ -51,8 +51,12 @@ toRelevantApp m x t = do
     )
 
 bindLet :: [(Ident, CodePlus)] -> CodePlus -> CodePlus
-bindLet [] cont = cont
-bindLet ((x, e) : xes) cont = (fst e, CodeUpElim x e $ bindLet xes cont)
+bindLet binder cont =
+  case binder of
+    [] ->
+      cont
+    (x, e) : xes ->
+      (fst e, CodeUpElim x e $ bindLet xes cont)
 
 returnCartesianImmediate :: Meta -> WithEnv CodePlus
 returnCartesianImmediate m = do

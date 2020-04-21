@@ -19,16 +19,18 @@ cartesianSigma ::
   ArrayKind ->
   [Either CodePlus (Ident, CodePlus)] ->
   WithEnv DataPlus
-cartesianSigma Nothing m k mxts = do
-  (args, e) <- makeSwitcher m (affineSigma m k mxts) (relevantSigma m k mxts)
-  i <- newCount
-  let h = "sigma-" <> T.pack (show i)
-  insCodeEnv h args e
-  return (m, DataConst h)
-cartesianSigma (Just name) m k mxts =
-  tryCache m name $ do
-    (args, e) <- makeSwitcher m (affineSigma m k mxts) (relevantSigma m k mxts)
-    insCodeEnv name args e
+cartesianSigma mName m k mxts =
+  case mName of
+    Nothing -> do
+      (args, e) <- makeSwitcher m (affineSigma m k mxts) (relevantSigma m k mxts)
+      i <- newCount
+      let h = "sigma-" <> T.pack (show i)
+      insCodeEnv h args e
+      return (m, DataConst h)
+    Just name ->
+      tryCache m name $ do
+        (args, e) <- makeSwitcher m (affineSigma m k mxts) (relevantSigma m k mxts)
+        insCodeEnv name args e
 
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
 -- affineSigma NAME LOC [(x1, t1), ..., (xn, tn)]   ~>
@@ -94,8 +96,7 @@ relevantSigma m k mxts argVar = do
   body' <- linearize xts body
   return (m, CodeSigmaElim k (map fst xts) argVar body')
 
-toPairInfo ::
-  (Ident, CodePlus) -> WithEnv (Ident, (DataPlus, CodePlus))
+toPairInfo :: (Ident, CodePlus) -> WithEnv (Ident, (DataPlus, CodePlus))
 toPairInfo (_, t@(m, _)) = do
   (name, var) <- newDataUpsilonWith m "pair"
   return (name, (var, t))
@@ -105,8 +106,7 @@ toPairInfo (_, t@(m, _)) = do
 --   ...
 --   let (xn, yn) := dn in
 --   return ((x1, ..., xn), (y1, ..., yn))
-transposeSigma ::
-  Meta -> ArrayKind -> [(DataPlus, CodePlus)] -> WithEnv CodePlus
+transposeSigma :: Meta -> ArrayKind -> [(DataPlus, CodePlus)] -> WithEnv CodePlus
 transposeSigma m k ds = do
   (xList, xVarList) <- unzip <$> mapM (const $ newDataUpsilonWith m "sig-x") ds
   (yList, yVarList) <- unzip <$> mapM (const $ newDataUpsilonWith m "sig-y") ds
@@ -121,17 +121,22 @@ transposeSigma m k ds = do
           )
       )
 
-bindSigmaElim ::
-  [((Ident, Ident), (DataPlus, CodePlus))] -> CodePlus -> CodePlus
-bindSigmaElim [] cont = cont
-bindSigmaElim (((x, y), (d, _)) : xyds) cont =
-  (fst cont, sigmaElim [x, y] d $ bindSigmaElim xyds cont)
+bindSigmaElim :: [((Ident, Ident), (DataPlus, CodePlus))] -> CodePlus -> CodePlus
+bindSigmaElim binder cont =
+  case binder of
+    [] ->
+      cont
+    ((x, y), (d, _)) : xyds ->
+      (fst cont, sigmaElim [x, y] d $ bindSigmaElim xyds cont)
 
 supplyName :: Either b (Ident, b) -> WithEnv (Ident, b)
-supplyName (Right (x, t)) = return (x, t)
-supplyName (Left t) = do
-  x <- newNameWith' "unused-sigarg"
-  return (x, t)
+supplyName mName =
+  case mName of
+    Right (x, t) ->
+      return (x, t)
+    Left t -> do
+      x <- newNameWith' "unused-sigarg"
+      return (x, t)
 
 cartArrayName :: T.Text
 cartArrayName = "cartesian-array"
