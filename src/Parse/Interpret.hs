@@ -45,40 +45,54 @@ interpret inputTree =
         case T.uncons atom of
           Nothing ->
             raiseCritical m "encountered a variable with empty identifier"
-          Just (c, rest2)
+          Just (c, rest)
+            | c == '@' ->
+              if T.length rest == 0
+                then raiseError m "found a explicit variable with empty identifier"
+                else do
+                  (m', e) <- interpret (m, TreeLeaf rest)
+                  return (m' {metaIsExplicit = True}, e)
             | c == '?' ->
-              if T.length rest2 == 0
+              if T.length rest == 0
                 then raiseError m "found a note-variable with empty identifier"
                 else do
-                  e <- interpret (m, TreeLeaf rest2)
+                  e <- interpret (m, TreeLeaf rest)
                   h <- newHole m
                   return (m, WeakTermQuestion e h)
-            | otherwise -> return (m, WeakTermUpsilon $ asIdent atom)
+            | otherwise ->
+              return (m, WeakTermUpsilon $ asIdent atom)
     (m, TreeNode (leaf@(_, TreeLeaf headAtom) : rest)) ->
       case headAtom of
         "upsilon"
-          | [(_, TreeLeaf x)] <- rest -> return (m, WeakTermUpsilon $ asIdent x)
-          | otherwise -> raiseSyntaxError m "(upsilon TREE)"
+          | [(_, TreeLeaf x)] <- rest ->
+            return (m, WeakTermUpsilon $ asIdent x)
+          | otherwise ->
+            raiseSyntaxError m "(upsilon TREE)"
         "pi"
           | [(_, TreeNode xts), t] <- rest -> do
             (xts', t') <- interpretBinder xts t
             return (m, weakTermPi xts' t')
-          | otherwise -> raiseSyntaxError m "(pi (TREE*) TREE)"
+          | otherwise ->
+            raiseSyntaxError m "(pi (TREE*) TREE)"
         "pi-introduction"
           | [(_, TreeNode xts), e] <- rest -> do
             (xts', e') <- interpretBinder xts e
             return (m, weakTermPiIntro xts' e')
-          | otherwise -> raiseSyntaxError m "(pi-introduction (TREE*) TREE)"
+          | otherwise ->
+            raiseSyntaxError m "(pi-introduction (TREE*) TREE)"
         "pi-elimination"
-          | e : es <- rest -> interpretPiElim m e es
-          | otherwise -> raiseSyntaxError m "(pi-elimination TREE TREE*)" -- e' <- interpret e
+          | e : es <- rest ->
+            interpretPiElim m e es
+          | otherwise ->
+            raiseSyntaxError m "(pi-elimination TREE TREE*)" -- e' <- interpret e
         "sigma"
           | [(_, TreeNode xts), t] <- rest -> do
             xts' <- mapM interpretWeakIdentPlus xts
             t' <- interpret t
             placeholder <- newNameWith'' "cod"
             weakTermSigma m $ xts' ++ [(fst t', placeholder, t')]
-          | otherwise -> raiseSyntaxError m "(sigma (TREE*) TREE)"
+          | otherwise ->
+            raiseSyntaxError m "(sigma (TREE*) TREE)"
         "sigma-introduction" -> do
           es' <- mapM interpret rest
           sigmaIntro m es'
@@ -89,79 +103,96 @@ interpret inputTree =
             e2' <- interpret e2
             h <- newHole m
             return $ sigmaElim m h xts' e1' e2'
-          | otherwise -> raiseSyntaxError m "(sigma-elimination (TREE*) TREE TREE)"
+          | otherwise ->
+            raiseSyntaxError m "(sigma-elimination (TREE*) TREE TREE)"
         "iterate"
           | [xt, xts@(_, TreeNode _), e] <- rest -> do
             (m', xt', xts', e') <- interpretIter (m, TreeNode [xt, xts, e])
             return (m', WeakTermIter xt' xts' e')
-          | otherwise -> raiseSyntaxError m "(iterate TREE (TREE*) TREE)"
+          | otherwise ->
+            raiseSyntaxError m "(iterate TREE (TREE*) TREE)"
         "zeta"
           | [x@(_, TreeLeaf _)] <- rest -> do
             (_, x') <- interpretLeaf x
             return (m, WeakTermZeta x')
-          | otherwise -> raiseSyntaxError m "(zeta LEAF)"
+          | otherwise ->
+            raiseSyntaxError m "(zeta LEAF)"
         "constant"
-          | [(_, TreeLeaf x)] <- rest -> return (m, WeakTermConst x)
-          | otherwise -> raiseSyntaxError m "(constant LEAF)"
+          | [(_, TreeLeaf x)] <- rest ->
+            return (m, WeakTermConst x)
+          | otherwise ->
+            raiseSyntaxError m "(constant LEAF)"
         "f16"
           | [(mx, TreeLeaf x)] <- rest ->
             case readMaybe $ T.unpack x of
-              Nothing -> raiseError mx "the argument of `f16` must be a float"
+              Nothing ->
+                raiseError mx "the argument of `f16` must be a float"
               Just x' ->
                 return (m, WeakTermFloat (m, WeakTermConst "f16") x')
-          | otherwise -> raiseSyntaxError m "(f16 LEAF)"
+          | otherwise ->
+            raiseSyntaxError m "(f16 LEAF)"
         "f32"
           | [(mx, TreeLeaf x)] <- rest ->
             case readMaybe $ T.unpack x of
-              Nothing -> raiseError mx "the argument of `f32` must be a float"
+              Nothing ->
+                raiseError mx "the argument of `f32` must be a float"
               Just x' ->
                 return (m, WeakTermFloat (m, WeakTermConst "f32") x')
-          | otherwise -> raiseSyntaxError m "(f32 LEAF)"
+          | otherwise ->
+            raiseSyntaxError m "(f32 LEAF)"
         "f64"
           | [(mx, TreeLeaf x)] <- rest ->
             case readMaybe $ T.unpack x of
-              Nothing -> raiseError mx "the argument of `f64` must be a float"
+              Nothing ->
+                raiseError mx "the argument of `f64` must be a float"
               Just x' ->
                 return (m, WeakTermFloat (m, WeakTermConst "f64") x')
-          | otherwise -> raiseSyntaxError m "(f64 LEAF)"
+          | otherwise ->
+            raiseSyntaxError m "(f64 LEAF)"
         "enum"
           | [(_, TreeLeaf x)] <- rest ->
             case (readEnumTypeIntS x, readEnumTypeIntU x) of
               (Just i, _) -> return (m, WeakTermEnum $ EnumTypeIntS i)
               (_, Just i) -> return (m, WeakTermEnum $ EnumTypeIntU i)
               _ -> return (m, WeakTermEnum $ EnumTypeLabel x)
-          | otherwise -> raiseSyntaxError m "(enum LEAF)"
+          | otherwise ->
+            raiseSyntaxError m "(enum LEAF)"
         "enum-introduction"
           | [l] <- rest -> do
             l' <- interpretEnumValue l
             return (m, WeakTermEnumIntro l')
-          | otherwise -> raiseSyntaxError m "(enum-introduction TREE)"
+          | otherwise ->
+            raiseSyntaxError m "(enum-introduction TREE)"
         "enum-elimination"
           | e : cs <- rest -> do
             e' <- interpret e
             cs' <- mapM interpretClause cs
             h <- newHole m
             return (m, WeakTermEnumElim (e', h) cs')
-          | otherwise -> raiseSyntaxError m "(enum-elimination TREE TREE*)"
+          | otherwise ->
+            raiseSyntaxError m "(enum-elimination TREE TREE*)"
         "array"
           | [dom, kind] <- rest -> do
             dom' <- interpret dom
             kind' <- asArrayKind kind
             return (m, WeakTermArray dom' kind')
-          | otherwise -> raiseSyntaxError m "(array TREE TREE)"
+          | otherwise ->
+            raiseSyntaxError m "(array TREE TREE)"
         "array-introduction"
           | kind : es <- rest -> do
             kind' <- asArrayKind kind
             es' <- mapM interpret es
             return (m, WeakTermArrayIntro kind' es')
-          | otherwise -> raiseSyntaxError m "(array-introduction TREE TREE*)"
+          | otherwise ->
+            raiseSyntaxError m "(array-introduction TREE TREE*)"
         "array-elimination"
           | [kind, (_, TreeNode xts), e1, e2] <- rest -> do
             kind' <- asArrayKind kind
             e1' <- interpret e1
             (xts', e2') <- interpretBinder xts e2
             return (m, WeakTermArrayElim kind' xts' e1' e2')
-          | otherwise -> raiseSyntaxError m "(array-elimination TREE (TREE*) TREE TREE)"
+          | otherwise ->
+            raiseSyntaxError m "(array-elimination TREE (TREE*) TREE TREE)"
         "struct" -> do
           ks' <- mapM asArrayKind rest
           return (m, WeakTermStruct ks')
@@ -174,21 +205,22 @@ interpret inputTree =
             xts' <- mapM interpretStructElim xts
             e2' <- interpret e2
             return (m, WeakTermStructElim xts' e1' e2')
-          | otherwise -> raiseSyntaxError m "(struct-elimination (TREE*) TREE TREE)"
+          | otherwise ->
+            raiseSyntaxError m "(struct-elimination (TREE*) TREE TREE)"
         "case"
           | e : cxtes <- rest -> do
             e' <- interpret e
             cxtes' <- mapM interpretCaseClause cxtes
             return (m, WeakTermCase Nothing e' cxtes')
-          | otherwise -> raiseSyntaxError m "(case TREE TREE*)"
-        -- A -> FνF -> νF (i.e. copattern matching (although I think it's more correct to say "record" or something like that,
-        -- considering that the constructed term using `FνF -> νF` is just a record after all))
+          | otherwise ->
+            raiseSyntaxError m "(case TREE TREE*)"
         "question"
           | [e] <- rest -> do
             e' <- interpret e
             h <- newHole m
             return (m, WeakTermQuestion e' h)
-          | otherwise -> raiseSyntaxError m "(question TREE)"
+          | otherwise ->
+            raiseSyntaxError m "(question TREE)"
         "erase"
           | [(_, TreeNode mxs), body] <- rest,
             Just mxs' <- mapM asLeaf mxs -> do
@@ -200,7 +232,8 @@ interpret inputTree =
           | [e] <- rest -> do
             e' <- interpret e
             return ((fst e') {metaIsReducible = False}, snd e')
-          | otherwise -> raiseSyntaxError m "(irreducible TREE)"
+          | otherwise ->
+            raiseSyntaxError m "(irreducible TREE)"
         "cocase"
           | codType : cocaseClauseList <- rest -> do
             (a, args) <- interpretCoinductive codType
@@ -208,37 +241,60 @@ interpret inputTree =
             cocaseClauseList' <- mapM interpretCocaseClause cocaseClauseList
             let codType' = (m, WeakTermPiElim (m, WeakTermUpsilon ai) args)
             es <- cocaseAsSigmaIntro m a codType' cocaseClauseList'
-            let f = (m, WeakTermUpsilon $ asIdent $ a <> ":unfold")
+            let m' = m {metaIsExplicit = True}
+            let f = (m', WeakTermUpsilon $ asIdent $ a <> ":unfold")
             hs <- mapM (const $ newHole m) args
             return (m, WeakTermPiElim f $ hs ++ es)
-          | otherwise -> raiseSyntaxError m "(cocase TREE TREE*)"
+          | otherwise ->
+            raiseSyntaxError m "(cocase TREE TREE*)"
         "product" -> do
           ts' <- mapM interpret rest
           let ms = map fst ts'
           xs <- mapM (const $ newNameWith'' "sig") ts'
           weakTermSigma m (zip3 ms xs ts')
         "record"
-          | codType : clauseList <- rest -> do
-            (a, args) <- interpretCoinductive codType
-            let ai = asIdent a
-            clauseList' <- mapM interpretCocaseClause' clauseList
-            let codType' = (m, WeakTermPiElim (m, WeakTermUpsilon ai) args)
-            es <- cocaseAsSigmaIntro m a codType' [((ai, args), clauseList')]
-            let f = (m, WeakTermUpsilon $ asIdent $ a <> ":unfold")
-            hs <- mapM (const $ newHole m) args
-            return (m, WeakTermPiElim f $ hs ++ es)
-          | otherwise -> raiseSyntaxError m "(record TREE TREE*)"
-        "with" -> interpretWith inputTree
-        _ -> interpretAux m $ leaf : rest
-    (m, TreeNode es) -> interpretAux m es
+          | codType : clauseList <- rest ->
+            interpret
+              ( m,
+                TreeNode
+                  [ (m, TreeLeaf "cocase"),
+                    codType,
+                    (m, TreeNode (codType : clauseList))
+                  ]
+              )
+          | otherwise ->
+            raiseSyntaxError m "(record TREE TREE*)"
+        "with" ->
+          interpretWith inputTree
+        _ ->
+          interpretAux m $ leaf : rest
+    (m, TreeNode es) ->
+      interpretAux m es
+
+-- (cocase (a e ... e)
+--   ((a e ... e)
+--    (b e)
+--    ...
+--    (b e))
+--   ((a e ... e)
+--    (b e)
+--    ...
+--    (b e)))
+-- (record (a e ... e)
+--    (b e)
+--    ...
+--    (b e))
 
 interpretAux :: Meta -> [TreePlus] -> WithEnv WeakTermPlus
 interpretAux m es = do
   ml <- interpretEnumValueMaybe (m, TreeNode es)
   case (ml, es) of
-    (Just l, _) -> return (m, WeakTermEnumIntro l)
-    (_, []) -> raiseSyntaxError m "(TREE TREE*)"
-    (_, f : args) -> interpretPiElim m f args
+    (Just l, _) ->
+      return (m, WeakTermEnumIntro l)
+    (_, []) ->
+      raiseSyntaxError m "(TREE TREE*)"
+    (_, f : args) ->
+      interpretPiElim m f args
 
 interpretPiElim :: Meta -> TreePlus -> [TreePlus] -> WithEnv WeakTermPlus
 interpretPiElim m f args = do
@@ -249,16 +305,16 @@ interpretPiElim m f args = do
 sigmaIntro :: Meta -> [WeakTermPlus] -> WithEnv WeakTermPlus
 sigmaIntro m es = do
   z <- newNameWith'' "sigma"
-  let zv = (m, WeakTermUpsilon z)
   k <- newNameWith'' "sigma"
   ts <- mapM (const (newHole m)) es
   xs <- mapM (const (newNameWith'' "hole")) es
   let xts = zipWith (\x t -> (m, x, t)) xs ts
-  let piType = (m, weakTermPi xts zv)
   return
     ( m,
       weakTermPiIntro
-        [(m, z, (m, WeakTermTau)), (m, k, piType)]
+        [ (m, z, (m, WeakTermTau)),
+          (m, k, (m, weakTermPi xts (m, WeakTermUpsilon z)))
+        ]
         (m, WeakTermPiElim (m, WeakTermUpsilon k) es)
     )
 
@@ -269,7 +325,6 @@ sigmaIntro m es = do
 sigmaIntroString :: Meta -> [WeakTermPlus] -> WithEnv WeakTermPlus
 sigmaIntroString m u8s = do
   z <- newNameWith'' "sigma"
-  let zv = (m, WeakTermUpsilon z)
   k <- newNameWith'' "sigma"
   lenVar <- newNameWith'' "len"
   arrVar <- newNameWith'' "array"
@@ -291,7 +346,7 @@ sigmaIntroString m u8s = do
                     )
                   )
                 ]
-                zv
+                (m, WeakTermUpsilon z)
             )
           )
         ]

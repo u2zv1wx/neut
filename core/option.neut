@@ -19,23 +19,23 @@
     (lambda (_ _ f m)
       (case m
         ((none)
-          (none *))
+          (none))
         ((some x)
-          (some * (f x)))))))
+          (some (f x)))))))
 
 ;; (satisfies-functor option), (satisfies-return option)みたいに書いてもいいかも。
 
 (definition return
   (witness (return-type option)
     (lambda (_ x)
-      (some * x))))
+      (some x))))
 
 (definition bind
   (witness (bind-type option)
     (lambda (_ _ m k)
       (case m
         ((none)
-          (none *))
+          (none))
         ((some x)
           (k x))))))
 
@@ -50,7 +50,7 @@
       ((some y)
         y))))
 
-;; (attribute from-option (implicit 0))
+(attribute from-option (implicit 0))
 
 ?functor:unfold
 

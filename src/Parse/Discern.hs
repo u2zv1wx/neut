@@ -3,6 +3,7 @@ module Parse.Discern
     discernIdent,
     discernIdentPlus,
     discernDef,
+    discernText,
   )
 where
 
@@ -26,6 +27,12 @@ discernDef (m, xt, xts, e) = do
   nenv <- gets topNameEnv
   (xt', xts', e') <- discernIter nenv xt xts e
   return (m, xt', xts', e')
+
+discernText :: Meta -> T.Text -> WithEnv Ident
+discernText m x = do
+  nenv <- gets topNameEnv
+  penv <- gets prefixEnv
+  lookupName'' m penv nenv $ asIdent x
 
 -- Alpha-convert all the variables so that different variables have different names.
 discern' :: NameEnv -> WeakTermPlus -> WithEnv WeakTermPlus

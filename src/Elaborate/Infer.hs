@@ -48,7 +48,8 @@ infer' ctx term =
               (m, WeakTermPi (Just $ asText indName) xts' t')
             )
     (m, WeakTermPiElim e es) -> do
-      etls <- mapM (infer' ctx) es
+      es' <- insertHoleIfNecessary e es
+      etls <- mapM (infer' ctx) es'
       etl <- infer' ctx e
       inferPiElim ctx m etl etls
     (m, WeakTermIter (mx, x, t) xts e) -> do
@@ -193,6 +194,50 @@ toWeakIdentPlus :: Meta -> (WeakTermPlus, WeakTermPlus) -> WithEnv WeakIdentPlus
 toWeakIdentPlus m (_, t) = do
   x <- newNameWith' "pat"
   return (m, x, t)
+
+insertHoleIfNecessary :: WeakTermPlus -> [WeakTermPlus] -> WithEnv [WeakTermPlus]
+insertHoleIfNecessary e es =
+  case e of
+    (m, WeakTermUpsilon x)
+      | not (metaIsExplicit m) ->
+        insertHoleIfNecessary' m x es
+    _ ->
+      return es
+
+insertHoleIfNecessary' :: Meta -> Ident -> [WeakTermPlus] -> WithEnv [WeakTermPlus]
+insertHoleIfNecessary' m x es = do
+  ienv <- gets impEnv
+  case IntMap.lookup (asInt x) ienv of
+    Nothing ->
+      return es
+    Just is -> do
+      t <- lookupWeakTypeEnv m x
+      -- tl <- lookupTypeEnv m (Right x) x
+      case t of
+        (_, WeakTermPi _ xts _) ->
+          supplyHole' m 0 (length xts) is es
+        _ ->
+          raiseCritical m $
+            "the type of `"
+              <> asText x
+              <> "` must be a Pi-type, but is:\n"
+              <> toText t
+
+supplyHole' :: Meta -> Int -> Int -> [Int] -> [WeakTermPlus] -> WithEnv [WeakTermPlus]
+supplyHole' m idx len is es
+  | idx < len =
+    if idx `elem` is
+      then do
+        xts' <- supplyHole' m (idx + 1) len is es
+        h <- newHole m
+        return $ h : xts'
+      else supplyHole' m (idx + 1) len is es
+  | otherwise =
+    return es
+
+-- insertHoleIfNecessary (m, WeakTermConst x) es
+--   | not (metaIsExplicit m) = insertHoleIfNecessary' m x es
+-- insertHoleIfNecessary _ es = return es
 
 inferArgs ::
   Meta ->

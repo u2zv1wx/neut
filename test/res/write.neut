@@ -221,7 +221,12 @@
 
 ;; (id* (i64 3)) ;; こうできるわけでさ。
 
-(let p (equal:refl i64 3))
+
+(let p
+  (equal:refl (i64 3)))
+
+(let p
+  (@equal:refl i64 3))
 
 ;; (i64:add top tau)
 
@@ -275,7 +280,7 @@
 
 ;; (i64:print (fact 10))
 
-(i64:print (fact (unsafe:cast u64 i64 (list:length * xs))))
+(i64:print (fact (unsafe:cast u64 i64 (list:length xs))))
 
 
 
@@ -292,6 +297,7 @@
 
 ;; (provide unused-function)
 (?string:print "\n")
+
 
 (string:print "hello, world!\n")
 

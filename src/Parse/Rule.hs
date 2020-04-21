@@ -6,6 +6,7 @@ module Parse.Rule
     internalize,
     registerLabelInfo,
     generateProjections,
+    updateImplicit,
   )
 where
 
@@ -117,8 +118,16 @@ generateProjections ts = do
                 )
             )
         bt <- discernIdentPlus (mb, asIdent b', (mb, weakTermPi (xts ++ [dom]) cod))
+        updateImplicit mb b' [0 .. length xts - 1]
+        updateImplicit mb (a <> ":unfold") [0 .. length xts - 1]
         return [WeakStmtLetWT mb bt e]
   return $ concat $ concat stmtListList
+
+updateImplicit :: Meta -> T.Text -> [Int] -> WithEnv ()
+updateImplicit mx x is = do
+  ienv <- gets impEnv
+  x' <- discernText mx x
+  modify (\env -> env {impEnv = IntMap.insertWith (++) (asInt x') is ienv})
 
 separate :: WeakTermPlus -> WithEnv (WeakIdentPlus, WeakTermPlus)
 separate e =
@@ -176,6 +185,7 @@ toInductive ats bts connective@(m, ai, xts, _) = do
   indIdent <-
     discernIdentPlus
       (m, asIdent $ ai <> ":induction", (m, weakTermPi indArgs cod))
+  updateImplicit m (ai <> ":induction") [0 .. length xts - 1] -- inductionというかfoldですが
   return
     [ WeakStmtLetWT m at' indType,
       WeakStmtLetWT m indIdent inductionPrinciple
@@ -217,6 +227,7 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
     constructorIdent <-
       discernIdentPlus
         (mb, asIdent bi, (m, weakTermPi (xts' ++ yts) cod))
+    updateImplicit m bi [0 .. length xts' - 1]
     case constructor of
       (_, WeakTermPiIntro _ xtsyts (_, WeakTermPiIntro indInfo@(Just (ai', _, _)) atsbts (_, WeakTermPiElim b _))) -> do
         let as = take (length ats) $ map (\(_, x, _) -> asInt x) atsbts

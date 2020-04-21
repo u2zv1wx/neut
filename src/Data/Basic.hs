@@ -49,7 +49,8 @@ data Meta
   = Meta
       { metaFileName :: Path Abs File,
         metaLocation :: Loc,
-        metaIsReducible :: Bool
+        metaIsReducible :: Bool,
+        metaIsExplicit :: Bool
       }
   deriving (Generic)
 
@@ -58,15 +59,18 @@ instance Binary Meta where
     put $ unwrapPath $ metaFileName m
     put $ metaLocation m
     put $ metaIsReducible m
+    put $ metaIsExplicit m
   get = do
     path <- get
     loc <- get
     isReducible <- get
+    isExplicit <- get
     return $
       Meta
         { metaFileName = Path path,
           metaLocation = loc,
-          metaIsReducible = isReducible
+          metaIsReducible = isReducible,
+          metaIsExplicit = isExplicit
         }
 
 -- required to derive the eqality on WeakTerm
@@ -96,7 +100,8 @@ supMeta m1 m2 =
   Meta
     { metaFileName = supFileName m1 m2,
       metaLocation = supLocation m1 m2,
-      metaIsReducible = metaIsReducible m1 && metaIsReducible m2
+      metaIsReducible = metaIsReducible m1 && metaIsReducible m2,
+      metaIsExplicit = metaIsExplicit m1 || metaIsExplicit m2
     }
 
 supFileName :: Meta -> Meta -> Path Abs File
@@ -113,7 +118,12 @@ supLocation m1 m2 =
 
 newMeta :: Int -> Int -> Path Abs File -> Meta
 newMeta l c path =
-  Meta {metaFileName = path, metaLocation = (0, l, c), metaIsReducible = True}
+  Meta
+    { metaFileName = path,
+      metaLocation = (0, l, c),
+      metaIsReducible = True,
+      metaIsExplicit = False
+    }
 
 type PosInfo = (Path Abs File, Loc)
 

@@ -9,7 +9,6 @@ import Data.ByteString.Builder
 import qualified Data.ByteString.Lazy as L
 import Data.Env
 import Data.Log
-import Data.Time.Clock.POSIX
 import Elaborate
 import Emit
 import GHC.IO.Handle
@@ -180,10 +179,9 @@ run cmd =
   case cmd of
     Build inputPathStr mOutputPathStr outputKind -> do
       inputPath <- resolveFile' inputPathStr
-      time <- round <$> getPOSIXTime
       resultOrErr <-
         evalWithEnv (runBuild inputPath) $
-          initialEnv {shouldColorize = True, endOfEntry = "", timestamp = time}
+          initialEnv {shouldColorize = True, endOfEntry = ""}
       (basename, _) <- splitExtension $ filename inputPath
       mOutputPath <- mapM resolveFile' mOutputPathStr
       outputPath <- constructOutputPath basename mOutputPath outputKind
@@ -204,14 +202,12 @@ run cmd =
                 exitWith exitCode
     Check inputPathStr colorizeFlag eoe -> do
       inputPath <- resolveFile' inputPathStr
-      time <- round <$> getPOSIXTime
       resultOrErr <-
         evalWithEnv (runCheck inputPath) $
           initialEnv
             { shouldColorize = colorizeFlag,
               endOfEntry = eoe,
-              isCheck = True,
-              timestamp = time
+              isCheck = True
             }
       case resultOrErr of
         Right _ ->
@@ -226,9 +222,8 @@ run cmd =
       archive outputPath (toFilePath inputPath) contents
     Complete inputPathStr l c -> do
       inputPath <- resolveFile' inputPathStr
-      time <- round <$> getPOSIXTime
       resultOrErr <-
-        evalWithEnv (complete inputPath l c) $ initialEnv {timestamp = time}
+        evalWithEnv (complete inputPath l c) initialEnv
       case resultOrErr of
         Left _ ->
           return ()

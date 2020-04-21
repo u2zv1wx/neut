@@ -250,7 +250,9 @@ elaborate' term =
         t' <- elaborate' t
         case (getArgLen t', isUpsilonOrConst e') of
           (Just len, True) -> do
-            let form = toText (weaken e') : showFormArgs 0 [0 .. len - 1]
+            (is, e'') <- getImpInfo e'
+            let form = toText (weaken e'') : showFormArgs 0 is [0 .. len - 1]
+            -- let form = toText (weaken e') : showFormArgs 0 [0 .. len - 1]
             let formStr = inParen $ showItems form
             note m $ toText (weaken t') <> "\n-\n" <> formStr
           _ -> note m $ toText (weaken t')
@@ -261,22 +263,52 @@ elaborate' term =
 isUpsilonOrConst :: TermPlus -> Bool
 isUpsilonOrConst term =
   case term of
-    (_, TermUpsilon _) -> True
-    (_, TermConst _) -> True
-    _ -> False
+    (_, TermUpsilon _) ->
+      True
+    (_, TermConst _) ->
+      True
+    _ ->
+      False
+
+getImpInfo :: TermPlus -> WithEnv ([Int], TermPlus)
+getImpInfo term =
+  case term of
+    (m, TermUpsilon x)
+      | not (metaIsExplicit m) -> do
+        ienv <- gets impEnv
+        case IntMap.lookup (asInt x) ienv of
+          Just is ->
+            return (is, term)
+          Nothing ->
+            return ([], term)
+      | otherwise ->
+        return ([], (m, TermUpsilon (I ("@" <> asText x, asInt x))))
+    _ ->
+      return ([], term)
 
 getArgLen :: TermPlus -> Maybe Int
 getArgLen term =
   case term of
-    (_, TermPi _ xts _) -> return $ length xts
-    _ -> Nothing
+    (_, TermPi _ xts _) ->
+      return $ length xts
+    _ ->
+      Nothing
 
-showFormArgs :: Int -> [Int] -> [T.Text]
-showFormArgs k idxList =
+showFormArgs :: Int -> [Int] -> [Int] -> [T.Text]
+showFormArgs k impList idxList =
   case idxList of
-    [] -> []
-    [_] -> ["#" <> T.pack (show k)]
-    (_ : is) -> "#" <> T.pack (show k) : showFormArgs (k + 1) is
+    [] ->
+      []
+    [i]
+      | i `elem` impList ->
+        ["*"]
+      | otherwise ->
+        ["#" <> T.pack (show k)]
+    (i : is)
+      | i `elem` impList ->
+        "*" : showFormArgs k impList is
+      | otherwise ->
+        "#" <> T.pack (show k) : showFormArgs (k + 1) impList is
 
 elaborateWeakCase :: WeakCasePlus -> WithEnv CasePlus
 elaborateWeakCase weakCase =
@@ -316,8 +348,10 @@ caseCheckEnumIdent m enumtype ls =
     EnumTypeLabel x -> do
       es <- lookupEnumSet m x
       caseCheckEnumIdent' m (length es) ls
-    EnumTypeIntS _ -> throwIfFalse m $ CaseDefault `elem` ls
-    EnumTypeIntU _ -> throwIfFalse m $ CaseDefault `elem` ls
+    EnumTypeIntS _ ->
+      throwIfFalse m $ CaseDefault `elem` ls
+    EnumTypeIntU _ ->
+      throwIfFalse m $ CaseDefault `elem` ls
 
 caseCheckEnumIdent' :: Meta -> Int -> [Case] -> WithEnv ()
 caseCheckEnumIdent' m i labelList = do

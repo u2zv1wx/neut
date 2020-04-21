@@ -47,7 +47,6 @@ data Env
         shouldColorize :: Bool,
         endOfEntry :: String,
         isCheck :: Bool,
-        timestamp :: Integer,
         --
         -- parse
         --
@@ -83,7 +82,7 @@ data Env
         -- elaborate
         --
         -- const ~> (index of implicit arguments of the const)
-        -- , impEnv :: Map.HashMap T.Text [Int]
+        impEnv :: IntMap.IntMap [Int],
         weakTypeEnv :: IntMap.IntMap WeakTermPlus,
         typeEnv :: TypeEnv,
         constraintEnv :: [PreConstraint],
@@ -117,7 +116,6 @@ initialEnv =
     { count = 0,
       ppCount = 0,
       shouldColorize = False,
-      timestamp = 0,
       isCheck = False,
       endOfEntry = "",
       phase = 0,
@@ -141,6 +139,7 @@ initialEnv =
       labelEnv = Map.empty,
       weakTypeEnv = IntMap.empty,
       typeEnv = Map.empty,
+      impEnv = IntMap.empty,
       codeEnv = Map.empty,
       chainEnv = IntMap.empty,
       llvmEnv = Map.empty,
