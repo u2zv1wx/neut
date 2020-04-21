@@ -165,7 +165,7 @@
 
 ?equal
 
-?equal:induction
+?equal:fold
 
 ;; ?@@@equal:refl
 
@@ -240,8 +240,8 @@
 (definition hoge-func ((x i64)) x)
 
 
-?choice:induction
-;; (choice:induction (choice:item-1) (lambda () i64) ?admit ?admit)
+?choice:fold
+;; (choice:fold (choice:item-1) (lambda () i64) ?admit ?admit)
 
 
 (definition flip ((c (choice)))
