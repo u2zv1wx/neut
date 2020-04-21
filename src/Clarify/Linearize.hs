@@ -25,12 +25,15 @@ linearize' ::
   [(Ident, CodePlus)] -> -- [(xn, tn), ..., (x1, t1)]  (reversed closed chain)
   CodePlus ->
   WithEnv CodePlus
-linearize' _ [] e = return e
-linearize' nm ((x, t) : xts) e = do
-  (nmT, t') <- distinguishCode (map fst xts) t
-  let newNm = merge [nmT, nm]
-  e' <- withHeader newNm x t' e
-  linearize' newNm xts e'
+linearize' nm binder e =
+  case binder of
+    [] ->
+      return e
+    (x, t) : xts -> do
+      (nmT, t') <- distinguishCode (map fst xts) t
+      let newNm = merge [nmT, nm]
+      e' <- withHeader newNm x t' e
+      linearize' newNm xts e'
 
 -- insert header for a variable
 withHeader :: NameMap -> Ident -> CodePlus -> CodePlus -> WithEnv CodePlus
@@ -126,77 +129,84 @@ toLinearChain xs = do
 --   bind sigVar3 := expVar @ (1, tmpB) in
 --   let (x3, x4) := sigVar3 in
 --   e
-withHeaderRelevant' ::
-  CodePlus -> DataPlus -> LinearChain -> CodePlus -> WithEnv CodePlus
-withHeaderRelevant' _ _ [] cont = return cont
-withHeaderRelevant' t expVar ((x, (x1, x2)) : chain) cont@(m, _) = do
-  cont' <- withHeaderRelevant' t expVar chain cont
-  (sigVarName, sigVar) <- newDataUpsilonWith m "sig"
-  return
-    ( m,
-      CodeUpElim
-        sigVarName
+withHeaderRelevant' :: CodePlus -> DataPlus -> LinearChain -> CodePlus -> WithEnv CodePlus
+withHeaderRelevant' t expVar ch cont@(m, _) =
+  case ch of
+    [] ->
+      return cont
+    (x, (x1, x2)) : chain -> do
+      cont' <- withHeaderRelevant' t expVar chain cont
+      (sigVarName, sigVar) <- newDataUpsilonWith m "sig"
+      return
         ( m,
-          CodePiElimDownElim
-            expVar
-            [(m, DataEnumIntro (EnumValueIntS 64 1)), (m, DataUpsilon x)]
+          CodeUpElim
+            sigVarName
+            ( m,
+              CodePiElimDownElim
+                expVar
+                [(m, DataEnumIntro (EnumValueIntS 64 1)), (m, DataUpsilon x)]
+            )
+            (m, sigmaElim [x1, x2] sigVar cont')
         )
-        (m, sigmaElim [x1, x2] sigVar cont')
-    )
 
 merge :: [NameMap] -> NameMap
 merge = foldr (IntMap.unionWith (++)) IntMap.empty
 
 distinguishData :: [Ident] -> DataPlus -> WithEnv (NameMap, DataPlus)
-distinguishData zs d@(ml, DataUpsilon x) =
-  if x `notElem` zs
-    then return (IntMap.empty, d)
-    else do
-      x' <- newNameWith x
-      return (IntMap.singleton (asInt x) [x'], (ml, DataUpsilon x'))
-distinguishData zs (ml, DataSigmaIntro mk ds) = do
-  (vss, ds') <- unzip <$> mapM (distinguishData zs) ds
-  return (merge vss, (ml, DataSigmaIntro mk ds'))
-distinguishData zs (m, DataStructIntro dks) = do
-  let (ds, ks) = unzip dks
-  (vss, ds') <- unzip <$> mapM (distinguishData zs) ds
-  return (merge vss, (m, DataStructIntro $ zip ds' ks))
-distinguishData _ d = return (IntMap.empty, d)
+distinguishData zs term =
+  case term of
+    (ml, DataUpsilon x) ->
+      if x `notElem` zs
+        then return (IntMap.empty, term)
+        else do
+          x' <- newNameWith x
+          return (IntMap.singleton (asInt x) [x'], (ml, DataUpsilon x'))
+    (ml, DataSigmaIntro mk ds) -> do
+      (vss, ds') <- unzip <$> mapM (distinguishData zs) ds
+      return (merge vss, (ml, DataSigmaIntro mk ds'))
+    (m, DataStructIntro dks) -> do
+      let (ds, ks) = unzip dks
+      (vss, ds') <- unzip <$> mapM (distinguishData zs) ds
+      return (merge vss, (m, DataStructIntro $ zip ds' ks))
+    _ ->
+      return (IntMap.empty, term)
 
 distinguishCode :: [Ident] -> CodePlus -> WithEnv (NameMap, CodePlus)
-distinguishCode zs (ml, CodeConst theta) = do
-  (vs, theta') <- distinguishConst zs theta
-  return (vs, (ml, CodeConst theta'))
-distinguishCode zs (ml, CodePiElimDownElim d ds) = do
-  (vs, d') <- distinguishData zs d
-  (vss, ds') <- unzip <$> mapM (distinguishData zs) ds
-  return (merge $ vs : vss, (ml, CodePiElimDownElim d' ds'))
-distinguishCode zs (ml, CodeSigmaElim mk xs d e) = do
-  (vs1, d') <- distinguishData zs d
-  let zs' = filter (`notElem` xs) zs
-  (vs2, e') <- distinguishCode zs' e
-  return (merge [vs1, vs2], (ml, CodeSigmaElim mk xs d' e'))
-distinguishCode zs (ml, CodeUpIntro d) = do
-  (vs, d') <- distinguishData zs d
-  return (vs, (ml, CodeUpIntro d'))
-distinguishCode zs (ml, CodeUpElim x e1 e2) = do
-  (vs1, e1') <- distinguishCode zs e1
-  if x `elem` zs
-    then return (vs1, (ml, CodeUpElim x e1' e2))
-    else do
-      (vs2, e2') <- distinguishCode zs e2
-      return (merge [vs1, vs2], (ml, CodeUpElim x e1' e2'))
-distinguishCode zs (ml, CodeEnumElim varInfo d branchList) = do
-  (vs, varInfo', d') <- distinguishBranch zs varInfo d
-  return (vs, (ml, CodeEnumElim varInfo' d' branchList))
-distinguishCode zs (ml, CodeStructElim xts d e) = do
-  (vs1, d') <- distinguishData zs d
-  let zs' = filter (`notElem` map fst xts) zs
-  (vs2, e') <- distinguishCode zs' e
-  return (merge [vs1, vs2], (ml, CodeStructElim xts d' e'))
-distinguishCode zs (ml, CodeCase varInfo d branchList) = do
-  (vs, varInfo', d') <- distinguishBranch zs varInfo d
-  return (vs, (ml, CodeCase varInfo' d' branchList))
+distinguishCode zs term =
+  case term of
+    (ml, CodeConst theta) -> do
+      (vs, theta') <- distinguishConst zs theta
+      return (vs, (ml, CodeConst theta'))
+    (ml, CodePiElimDownElim d ds) -> do
+      (vs, d') <- distinguishData zs d
+      (vss, ds') <- unzip <$> mapM (distinguishData zs) ds
+      return (merge $ vs : vss, (ml, CodePiElimDownElim d' ds'))
+    (ml, CodeSigmaElim mk xs d e) -> do
+      (vs1, d') <- distinguishData zs d
+      let zs' = filter (`notElem` xs) zs
+      (vs2, e') <- distinguishCode zs' e
+      return (merge [vs1, vs2], (ml, CodeSigmaElim mk xs d' e'))
+    (ml, CodeUpIntro d) -> do
+      (vs, d') <- distinguishData zs d
+      return (vs, (ml, CodeUpIntro d'))
+    (ml, CodeUpElim x e1 e2) -> do
+      (vs1, e1') <- distinguishCode zs e1
+      if x `elem` zs
+        then return (vs1, (ml, CodeUpElim x e1' e2))
+        else do
+          (vs2, e2') <- distinguishCode zs e2
+          return (merge [vs1, vs2], (ml, CodeUpElim x e1' e2'))
+    (ml, CodeEnumElim varInfo d branchList) -> do
+      (vs, varInfo', d') <- distinguishBranch zs varInfo d
+      return (vs, (ml, CodeEnumElim varInfo' d' branchList))
+    (ml, CodeStructElim xts d e) -> do
+      (vs1, d') <- distinguishData zs d
+      let zs' = filter (`notElem` map fst xts) zs
+      (vs2, e') <- distinguishCode zs' e
+      return (merge [vs1, vs2], (ml, CodeStructElim xts d' e'))
+    (ml, CodeCase varInfo d branchList) -> do
+      (vs, varInfo', d') <- distinguishBranch zs varInfo d
+      return (vs, (ml, CodeCase varInfo' d' branchList))
 
 distinguishBranch :: [Ident] -> SubstDataPlus -> DataPlus -> WithEnv (NameMap, SubstDataPlus, DataPlus)
 distinguishBranch zs varInfo d = do
@@ -207,17 +217,19 @@ distinguishBranch zs varInfo d = do
   return (merge (vs : vss), varInfo', d')
 
 distinguishConst :: [Ident] -> Const -> WithEnv (NameMap, Const)
-distinguishConst zs (ConstUnaryOp op d) = do
-  (vs, d') <- distinguishData zs d
-  return (vs, ConstUnaryOp op d')
-distinguishConst zs (ConstBinaryOp op d1 d2) = do
-  (vs1, d1') <- distinguishData zs d1
-  (vs2, d2') <- distinguishData zs d2
-  return (merge [vs1, vs2], ConstBinaryOp op d1' d2')
-distinguishConst zs (ConstArrayAccess lowType d1 d2) = do
-  (vs1, d1') <- distinguishData zs d1
-  (vs2, d2') <- distinguishData zs d2
-  return (merge [vs1, vs2], ConstArrayAccess lowType d1' d2')
-distinguishConst zs (ConstSysCall num ds) = do
-  (vss, ds') <- unzip <$> mapM (distinguishData zs) ds
-  return (merge vss, ConstSysCall num ds')
+distinguishConst zs term =
+  case term of
+    ConstUnaryOp op d -> do
+      (vs, d') <- distinguishData zs d
+      return (vs, ConstUnaryOp op d')
+    ConstBinaryOp op d1 d2 -> do
+      (vs1, d1') <- distinguishData zs d1
+      (vs2, d2') <- distinguishData zs d2
+      return (merge [vs1, vs2], ConstBinaryOp op d1' d2')
+    ConstArrayAccess lowType d1 d2 -> do
+      (vs1, d1') <- distinguishData zs d1
+      (vs2, d2') <- distinguishData zs d2
+      return (merge [vs1, vs2], ConstArrayAccess lowType d1' d2')
+    ConstSysCall num ds -> do
+      (vss, ds') <- unzip <$> mapM (distinguishData zs) ds
+      return (merge vss, ConstSysCall num ds')
