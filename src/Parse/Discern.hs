@@ -35,22 +35,38 @@ discern' nenv =
     (m, WeakTermUpsilon x@(I (s, _))) -> do
       penv <- gets prefixEnv
       mx <- lookupName m penv nenv x
-      b1 <- lookupEnumValueNameWithPrefix s
-      b2 <- lookupEnumTypeNameWithPrefix s
-      mc <- lookupConstantMaybe m penv s
-      case (mx, b1, b2, mc) of
-        (Just x', _, _, _) -> return (m, WeakTermUpsilon x')
-        (_, Just s', _, _) -> return (m, WeakTermEnumIntro (EnumValueLabel s'))
-        (_, _, Just s', _) -> return (m, WeakTermEnum (EnumTypeLabel s'))
-        (_, _, _, Just c) -> return (m, WeakTermConst c)
-        _ -> raiseError m $ "undefined variable:  " <> asText x
+      case mx of
+        Just x' -> return (m, WeakTermUpsilon x')
+        Nothing -> do
+          b1 <- lookupEnumValueNameWithPrefix s
+          case b1 of
+            Just s' -> return (m, WeakTermEnumIntro (EnumValueLabel s'))
+            Nothing -> do
+              b2 <- lookupEnumTypeNameWithPrefix s
+              case b2 of
+                Just s' -> return (m, WeakTermEnum (EnumTypeLabel s'))
+                Nothing -> do
+                  mc <- lookupConstantMaybe m penv s
+                  case mc of
+                    Just c -> return (m, WeakTermConst c)
+                    Nothing -> raiseError m $ "undefined variable:  " <> asText x
     (m, WeakTermPi mName xts t) -> do
       (xts', t') <- discernBinder nenv xts t
-      return (m, WeakTermPi mName xts' t')
+      case mName of
+        Nothing -> return (m, WeakTermPi mName xts' t')
+        Just name -> do
+          penv <- gets prefixEnv
+          name' <- lookupName'' m penv nenv name
+          return (m, WeakTermPi (Just name') xts' t')
     (m, WeakTermPiIntro info xts e) -> do
-      info' <- fmap2M (mapM (discernWeakIdentPlus nenv)) info
       (xts', e') <- discernBinder nenv xts e
-      return (m, WeakTermPiIntro info' xts' e')
+      case info of
+        Nothing -> return (m, WeakTermPiIntro Nothing xts' e')
+        Just (name, args) -> do
+          penv <- gets prefixEnv
+          name' <- lookupName'' m penv nenv name
+          args' <- mapM (discernFreeIdentPlus nenv) args
+          return (m, WeakTermPiIntro (Just (name', args')) xts' e')
     (m, WeakTermPiElim e es) -> do
       es' <- mapM (discern' nenv) es
       e' <- discern' nenv e
@@ -107,7 +123,7 @@ discern' nenv =
       penv <- gets prefixEnv
       cxtes' <-
         flip mapM cxtes $ \(((mc, c), xts), body) -> do
-          c' <- lookupConstant mc penv c
+          c' <- lookupName'' mc penv nenv c
           (xts', body') <- discernBinder nenv xts body
           return (((mc, c'), xts'), body')
       return (m, WeakTermCase indName e' cxtes')
@@ -138,8 +154,8 @@ discernBinder nenv binder e =
       (xts', e') <- discernBinder (insertName x x' nenv) xts e
       return ((mx, x', t') : xts', e')
 
-discernWeakIdentPlus :: NameEnv -> WeakIdentPlus -> WithEnv WeakIdentPlus
-discernWeakIdentPlus nenv (m, x, t) = do
+discernFreeIdentPlus :: NameEnv -> WeakIdentPlus -> WithEnv WeakIdentPlus
+discernFreeIdentPlus nenv (m, x, t) = do
   t' <- discern' nenv t
   penv <- gets prefixEnv
   x' <- lookupName'' m penv nenv x
@@ -154,7 +170,8 @@ discernIdent m x = do
 discernIdentPlus :: WeakIdentPlus -> WithEnv WeakIdentPlus
 discernIdentPlus (m, x, t) = do
   nenv <- gets topNameEnv
-  (_, x', t') <- discernWeakIdentPlus nenv (m, x, t)
+  t' <- discern' nenv t
+  x' <- newDefinedNameWith m x
   modify (\env -> env {topNameEnv = Map.insert (asText x) x' (topNameEnv env)})
   return (m, x', t')
 
@@ -266,13 +283,6 @@ lookupConstantMaybe' m penv x =
           removeFromIntactSet m query
           return $ Just query
         else lookupConstantMaybe' m prefixList x
-
-lookupConstant :: Meta -> [T.Text] -> T.Text -> WithEnv T.Text
-lookupConstant m penv x = do
-  mc <- lookupConstantMaybe m penv x
-  case mc of
-    Just c -> return c
-    Nothing -> raiseError m $ "undefined constant: " <> x
 
 lookupEnum :: (T.Text -> WithEnv Bool) -> T.Text -> WithEnv (Maybe T.Text)
 lookupEnum f name = do
