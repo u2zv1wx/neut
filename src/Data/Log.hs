@@ -24,48 +24,55 @@ data LogLevel
   deriving (Show, Eq)
 
 logLevelToText :: LogLevel -> T.Text
-logLevelToText LogLevelNote = "note"
-logLevelToText LogLevelWarning = "warning"
-logLevelToText LogLevelError = "error"
-logLevelToText LogLevelCritical = "critical"
+logLevelToText level =
+  case level of
+    LogLevelNote ->
+      "note"
+    LogLevelWarning ->
+      "warning"
+    LogLevelError ->
+      "error"
+    LogLevelCritical ->
+      "critical"
 
 logLevelToSGR :: LogLevel -> [SGR]
-logLevelToSGR LogLevelNote =
-  [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Blue]
-logLevelToSGR LogLevelWarning =
-  [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Yellow]
-logLevelToSGR LogLevelError =
-  [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Red]
-logLevelToSGR LogLevelCritical =
-  [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Red]
+logLevelToSGR level =
+  case level of
+    LogLevelNote ->
+      [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Blue]
+    LogLevelWarning ->
+      [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Yellow]
+    LogLevelError ->
+      [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Red]
+    LogLevelCritical ->
+      [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Red]
 
 type Log = (Maybe PosInfo, LogLevel, T.Text)
 
 type ColorFlag = Bool
 
 outputLog :: ColorFlag -> String -> Log -> IO ()
-outputLog b eoe (Nothing, l, t) = do
-  outputLogLevel b l
-  outputLogText t
-  outputFooter eoe
-outputLog b eoe (Just pos, l, t) = do
-  outputPosInfo b pos
+outputLog b eoe (mpos, l, t) = do
+  case mpos of
+    Nothing -> return ()
+    Just pos -> outputPosInfo b pos
   outputLogLevel b l
   outputLogText t
   outputFooter eoe
 
 outputLog' :: ColorFlag -> Log -> IO ()
-outputLog' b (Nothing, l, t) = do
-  outputLogLevel b l
-  TIO.putStr t
-outputLog' b (Just pos, l, t) = do
-  outputPosInfo b pos
+outputLog' b (mpos, l, t) = do
+  case mpos of
+    Nothing -> return ()
+    Just pos -> outputPosInfo b pos
   outputLogLevel b l
   TIO.putStr t
 
 outputFooter :: String -> IO ()
-outputFooter "" = return ()
-outputFooter eoe = putStrLn eoe
+outputFooter eoe =
+  if eoe == ""
+    then return ()
+    else putStrLn eoe
 
 outputPosInfo :: Bool -> PosInfo -> IO ()
 outputPosInfo b (path, loc) =
@@ -83,8 +90,10 @@ outputLogText :: T.Text -> IO ()
 outputLogText = TIO.putStrLn
 
 withSGR :: Bool -> [SGR] -> IO () -> IO ()
-withSGR False _ f = f
-withSGR True arg f = setSGR arg >> f >> setSGR [Reset]
+withSGR b arg f =
+  if b
+    then setSGR arg >> f >> setSGR [Reset]
+    else f
 
 logNote :: PosInfo -> T.Text -> Log
 logNote pos text = (Just pos, LogLevelNote, text)
