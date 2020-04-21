@@ -329,8 +329,11 @@ getVarList :: [WeakTermPlus] -> [Ident]
 getVarList xs = catMaybes $ map asUpsilon xs
 
 toPiElim :: WeakTermPlus -> [(Meta, [WeakTermPlus])] -> WeakTermPlus
-toPiElim e [] = e
-toPiElim e ((m, es) : ess) = toPiElim (m, WeakTermPiElim e es) ess
+toPiElim e args =
+  case args of
+    [] -> e
+    (m, es) : ess ->
+      toPiElim (m, WeakTermPiElim e es) ess
 
 insConstraintQueue :: EnrichedConstraint -> WithEnv ()
 insConstraintQueue c =
@@ -346,41 +349,48 @@ visit h = do
 toVarList :: S.Set Ident -> [WeakTermPlus] -> WithEnv [WeakIdentPlus]
 toVarList = toVarList' []
 
-toVarList' ::
-  Context -> S.Set Ident -> [WeakTermPlus] -> WithEnv [WeakIdentPlus]
-toVarList' _ _ [] = return []
-toVarList' ctx xs (e : es)
-  | (m, WeakTermUpsilon x) <- e,
-    x `S.member` xs = do
-    t <- newTypeHoleInCtx ctx m
-    xts <- toVarList' (ctx ++ [(m, x, t)]) xs es
-    return $ (m, x, t) : xts
-  | otherwise = do
-    let m = metaOf e
-    t <- newTypeHoleInCtx ctx m
-    x <- newNameWith' "hole"
-    xts <- toVarList' (ctx ++ [(m, x, t)]) xs es
-    return $ (m, x, t) : xts
+toVarList' :: Context -> S.Set Ident -> [WeakTermPlus] -> WithEnv [WeakIdentPlus]
+toVarList' ctx xs termList =
+  case termList of
+    [] -> return []
+    e : es
+      | (m, WeakTermUpsilon x) <- e,
+        x `S.member` xs -> do
+        t <- newTypeHoleInCtx ctx m
+        xts <- toVarList' (ctx ++ [(m, x, t)]) xs es
+        return $ (m, x, t) : xts
+      | otherwise -> do
+        let m = metaOf e
+        t <- newTypeHoleInCtx ctx m
+        x <- newNameWith' "hole"
+        xts <- toVarList' (ctx ++ [(m, x, t)]) xs es
+        return $ (m, x, t) : xts
 
 bindFormalArgs :: WeakTermPlus -> [[WeakIdentPlus]] -> WeakTermPlus
-bindFormalArgs e [] = e
-bindFormalArgs e (xts : xtss) = do
-  let e' = bindFormalArgs e xtss
-  (metaOf e', weakTermPiIntro xts e')
+bindFormalArgs e args =
+  case args of
+    [] -> e
+    xts : xtss -> do
+      let e' = bindFormalArgs e xtss
+      (metaOf e', weakTermPiIntro xts e')
 
 lookupAny :: [Ident] -> IntMap.IntMap a -> Maybe (Ident, a)
-lookupAny [] _ = Nothing
-lookupAny (h@(I (_, i)) : ks) sub =
-  case IntMap.lookup i sub of
-    Just v -> Just (h, v)
-    _ -> lookupAny ks sub
+lookupAny is sub =
+  case is of
+    [] -> Nothing
+    j : js ->
+      case IntMap.lookup (asInt j) sub of
+        Just v -> Just (j, v)
+        _ -> lookupAny js sub
 
 lookupAll :: [Ident] -> IntMap.IntMap a -> Maybe [a]
-lookupAll [] _ = return []
-lookupAll (I (_, i) : xs) sub = do
-  v <- IntMap.lookup i sub
-  vs <- lookupAll xs sub
-  return $ v : vs
+lookupAll is sub =
+  case is of
+    [] -> return []
+    j : js -> do
+      v <- IntMap.lookup (asInt j) sub
+      vs <- lookupAll js sub
+      return $ v : vs
 
 toIntS :: Meta -> IntSize -> WeakTermPlus
 toIntS m size = (m, WeakTermEnum $ EnumTypeIntS size)
