@@ -297,8 +297,8 @@ optConcat mNew mOld = do
   return $ mOld' ++ mNew'
 
 asInductive :: [TreePlus] -> WithEnv [TreePlus]
-asInductive =
-  \case
+asInductive treeList =
+  case treeList of
     [] -> return []
     (t : ts) -> do
       (sub, t') <- asInductive' t
@@ -358,15 +358,15 @@ asInductive' t =
     _ -> raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) ...)"
 
 extractArg :: TreePlus -> WithEnv TreePlus
-extractArg =
-  \case
+extractArg tree =
+  case tree of
     (m, TreeLeaf x) -> return (m, TreeLeaf x)
     (_, TreeNode [(m, TreeLeaf x), _]) -> return (m, TreeLeaf x)
     t -> raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
 
 styleRule :: TreePlus -> WithEnv TreePlus
-styleRule =
-  \case
+styleRule tree =
+  case tree of
     (m, TreeNode [(mName, TreeLeaf name), (_, TreeNode xts), t]) ->
       return
         ( m,

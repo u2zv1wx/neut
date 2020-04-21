@@ -17,8 +17,8 @@ macroExpand :: TreePlus -> WithEnv TreePlus
 macroExpand = recurM (macroExpand1 . splice)
 
 recurM :: (Monad m) => (TreePlus -> m TreePlus) -> TreePlus -> m TreePlus
-recurM f =
-  \case
+recurM f tree =
+  case tree of
     (m, TreeLeaf s) -> f (m, TreeLeaf s)
     (m, TreeNode ts) -> do
       ts' <- mapM (recurM f) ts
@@ -78,8 +78,8 @@ macroMatch t1 t2 =
       | otherwise -> return Nothing
 
 applySubst :: MacroSubst -> Notation -> TreePlus
-applySubst sub =
-  \case
+applySubst sub notationTree =
+  case notationTree of
     (i, TreeLeaf s) ->
       case lookup s sub of
         Nothing -> (i, TreeLeaf s)
@@ -103,8 +103,8 @@ checkKeywordCondition t = do
     else raiseError (fst t) "A notation must include at least one keyword"
 
 checkPlusCondition :: Notation -> WithEnv ()
-checkPlusCondition =
-  \case
+checkPlusCondition notationTree =
+  case notationTree of
     (m, TreeLeaf s) ->
       if T.last s /= '+'
         then return ()
@@ -124,32 +124,32 @@ splice = splice'
 
 -- (a b (splice (c (splice (p q)) e)) f) ~> (a b c p q d e)
 splice' :: TreePlus -> TreePlus
-splice' =
-  \case
+splice' tree =
+  case tree of
     t@(_, TreeLeaf _) -> t
     (m, TreeNode ts) -> do
       let ts' = map splice' ts
       (m, TreeNode $ expandSplice $ map findSplice ts')
 
 findSplice :: TreePlus -> Either TreePlus [TreePlus]
-findSplice =
-  \case
+findSplice tree =
+  case tree of
     (_, TreeNode [(_, TreeLeaf "splice"), (_, TreeNode ts)]) ->
       Right ts
     t ->
       Left t
 
 expandSplice :: [Either TreePlus [TreePlus]] -> [TreePlus]
-expandSplice =
-  \case
+expandSplice itemList =
+  case itemList of
     [] -> []
     (Left t : rest) -> t : expandSplice rest
     (Right ts : rest) -> ts ++ expandSplice rest
 
 -- returns the first "Just"
 try :: (Monad m) => (a -> m (Maybe b)) -> [(a, c)] -> m (Maybe (b, c))
-try f =
-  \case
+try f candidateList =
+  case candidateList of
     [] -> return Nothing
     ((s, t) : as) -> do
       mx <- f s

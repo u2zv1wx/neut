@@ -25,8 +25,8 @@ elaborate :: [WeakStmt] -> WithEnv Stmt
 elaborate = elaborateStmt
 
 elaborateStmt :: [WeakStmt] -> WithEnv Stmt
-elaborateStmt =
-  \case
+elaborateStmt stmt =
+  case stmt of
     [] ->
       StmtReturn . newMeta 1 1 <$> getCurrentFilePath
     WeakStmtLet m (mx, x, t) e : cont -> do
@@ -81,8 +81,8 @@ showFloat' :: Float -> String
 showFloat' x = showFFloat Nothing x ""
 
 elaborate' :: WeakTermPlus -> WithEnv TermPlus
-elaborate' =
-  \case
+elaborate' term =
+  case term of
     (m, WeakTermTau) ->
       return (m, TermTau)
     (m, WeakTermUpsilon x) -> do
@@ -259,28 +259,28 @@ elaborate' =
       elaborate' e
 
 isUpsilonOrConst :: TermPlus -> Bool
-isUpsilonOrConst =
-  \case
+isUpsilonOrConst term =
+  case term of
     (_, TermUpsilon _) -> True
     (_, TermConst _) -> True
     _ -> False
 
 getArgLen :: TermPlus -> Maybe Int
-getArgLen =
-  \case
+getArgLen term =
+  case term of
     (_, TermPi _ xts _) -> return $ length xts
     _ -> Nothing
 
 showFormArgs :: Int -> [Int] -> [T.Text]
-showFormArgs k =
-  \case
+showFormArgs k idxList =
+  case idxList of
     [] -> []
     [_] -> ["#" <> T.pack (show k)]
     (_ : is) -> "#" <> T.pack (show k) : showFormArgs (k + 1) is
 
 elaborateWeakCase :: WeakCasePlus -> WithEnv CasePlus
-elaborateWeakCase =
-  \case
+elaborateWeakCase weakCase =
+  case weakCase of
     (m, WeakCaseInt t x) -> do
       t' <- reduceTermPlus <$> elaborate' t
       case t' of

@@ -12,7 +12,6 @@ default-extensions:
 - OverloadedStrings
 - DeriveGeneric
 - ScopedTypeVariables
-- LambdaCase
 
 dependencies:
 - ansi-terminal

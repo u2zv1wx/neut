@@ -29,8 +29,8 @@ discernDef (m, xt, xts, e) = do
 
 -- Alpha-convert all the variables so that different variables have different names.
 discern' :: NameEnv -> WeakTermPlus -> WithEnv WeakTermPlus
-discern' nenv =
-  \case
+discern' nenv term =
+  case term of
     (m, WeakTermTau) -> return (m, WeakTermTau)
     (m, WeakTermUpsilon x@(I (s, _))) -> do
       penv <- gets prefixEnv
@@ -188,8 +188,8 @@ discernIter nenv (mf, f, tf) binder e = do
   return ((mf, f', tf'), binder', e')
 
 discernWeakCase :: Meta -> NameEnv -> WeakCase -> WithEnv WeakCase
-discernWeakCase m nenv =
-  \case
+discernWeakCase m nenv weakCase =
+  case weakCase of
     WeakCaseInt t a -> do
       t' <- discern' nenv t
       return (WeakCaseInt t' a)

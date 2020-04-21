@@ -485,8 +485,6 @@ storeContent' bp bt values cont =
     [] ->
       return cont
     (i, (d, et)) : ids -> do
-      -- storeContent' _ _ [] cont = return cont
-      -- storeContent' bp bt ((i, (d, et)) : ids) cont = do
       cont' <- storeContent' bp bt ids cont
       (locName, loc) <- newDataLocal $ takeBaseName d <> "-location"
       (cast, castThen) <- llvmCast (Just $ takeBaseName d) d et

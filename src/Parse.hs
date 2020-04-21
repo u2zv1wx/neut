@@ -251,8 +251,8 @@ getCurrentSection = do
   return $ getCurrentSection' ns
 
 getCurrentSection' :: [T.Text] -> T.Text
-getCurrentSection' =
-  \case
+getCurrentSection' nameStack =
+  case nameStack of
     [] -> ""
     [n] -> n
     (n : ns) -> getCurrentSection' ns <> ":" <> n
@@ -317,16 +317,16 @@ parseDef xds = do
   return (toLetList $ zip3 nameList typeList bodyList)
 
 prefixFunName :: TreePlus -> WithEnv TreePlus
-prefixFunName =
-  \case
+prefixFunName tree =
+  case tree of
     (m, TreeNode [xt, xts, body]) -> do
       xt' <- prefixTextPlus xt
       return (m, TreeNode [xt', xts, body])
     t -> raiseSyntaxError (fst t) "(TREE TREE TREE)"
 
 prefixTextPlus :: TreePlus -> WithEnv TreePlus
-prefixTextPlus =
-  \case
+prefixTextPlus tree =
+  case tree of
     (m, TreeLeaf "_") -> return (m, TreeLeaf "_")
     (m, TreeLeaf x) -> do
       x' <- withSectionPrefix x
@@ -339,8 +339,8 @@ prefixTextPlus =
     t -> raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
 
 extractFunName :: TreePlus -> WithEnv (Meta, Ident)
-extractFunName =
-  \case
+extractFunName tree =
+  case tree of
     (_, TreeNode ((m, TreeLeaf x) : _)) ->
       return (m, asIdent x)
     (_, TreeNode ((_, TreeNode [(m, TreeLeaf x), _]) : _)) ->
@@ -349,8 +349,8 @@ extractFunName =
       raiseSyntaxError (fst t) "(LEAF ...) | ((LEAF TREE) ...)"
 
 toLetList :: [(Ident, (Meta, WeakTermPlus), WeakTermPlus)] -> [WeakStmt]
-toLetList =
-  \case
+toLetList defList =
+  case defList of
     [] -> []
     ((x, (m, t), e) : rest) -> WeakStmtLet m (m, x, t) e : toLetList rest
 
@@ -367,8 +367,8 @@ compose :: SubstWeakTerm -> SubstWeakTerm -> SubstWeakTerm
 compose s1 s2 = IntMap.union (IntMap.map (substWeakTermPlus s1) s2) s1
 
 parseStmtClause :: TreePlus -> WithEnv (T.Text, [TreePlus])
-parseStmtClause =
-  \case
+parseStmtClause tree =
+  case tree of
     (_, TreeNode ((_, TreeLeaf x) : stmtList)) -> return (x, stmtList)
     (m, _) -> raiseSyntaxError m "(LEAF TREE*)"
 
@@ -380,8 +380,8 @@ retrieveCompileTimeVarValue m var =
     _ -> raiseError m $ "no such compile-time variable defined: " <> var
 
 isSpecialForm :: TreePlus -> Bool
-isSpecialForm =
-  \case
+isSpecialForm tree =
+  case tree of
     (_, TreeNode ((_, TreeLeaf x) : _)) -> S.member x keywordSet
     _ -> False
 
@@ -413,15 +413,15 @@ checkKeywordSanity m x
   | otherwise = return ()
 
 showCyclicPath :: [Path Abs File] -> T.Text
-showCyclicPath =
-  \case
+showCyclicPath pathList =
+  case pathList of
     [] -> ""
     [path] -> T.pack (toFilePath path)
     (path : ps) -> "     " <> T.pack (toFilePath path) <> showCyclicPath' ps
 
 showCyclicPath' :: [Path Abs File] -> T.Text
-showCyclicPath' =
-  \case
+showCyclicPath' pathList =
+  case pathList of
     [] -> ""
     [path] -> "\n  ~> " <> T.pack (toFilePath path)
     (path : ps) -> "\n  ~> " <> T.pack (toFilePath path) <> showCyclicPath' ps
@@ -452,8 +452,8 @@ includeCore m treeList =
         : treeList
 
 adjustPhase :: TreePlus -> WithEnv TreePlus
-adjustPhase =
-  \case
+adjustPhase tree =
+  case tree of
     (m, TreeLeaf x) -> do
       m' <- adjustPhase' m
       return (m', TreeLeaf x)
@@ -476,8 +476,8 @@ warnUnusedVar =
     warnUnusedVar' $ S.toList set'
 
 warnUnusedVar' :: [(PosInfo, T.Text)] -> WithEnv ()
-warnUnusedVar' =
-  \case
+warnUnusedVar' infoList =
+  case infoList of
     [] -> return ()
     ((pos, x) : pxs)
       | T.all (`S.notMember` S.fromList "()") x -> do

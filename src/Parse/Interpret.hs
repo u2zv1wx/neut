@@ -320,8 +320,8 @@ toWeakIdentPlus (m, x) = do
   return (m, x, h)
 
 interpretWeakIdentPlus :: TreePlus -> WithEnv WeakIdentPlus
-interpretWeakIdentPlus =
-  \case
+interpretWeakIdentPlus tree =
+  case tree of
     leaf@(_, TreeLeaf _) -> do
       (m, x') <- interpretLeaf leaf
       h <- newHole m
@@ -333,8 +333,8 @@ interpretWeakIdentPlus =
     t -> raiseSyntaxError (fst t) "(LEAF TREE)"
 
 interpretIter :: TreePlus -> WithEnv Def
-interpretIter =
-  \case
+interpretIter tree =
+  case tree of
     (m, TreeNode [xt, (_, TreeNode xts), e]) -> do
       xt' <- interpretWeakIdentPlus xt
       (xts', e') <- interpretBinder xts e
@@ -342,8 +342,8 @@ interpretIter =
     t -> raiseSyntaxError (fst t) "(TREE (TREE ... TREE) TREE)"
 
 interpretLeaf :: TreePlus -> WithEnv (Meta, Ident)
-interpretLeaf =
-  \case
+interpretLeaf tree =
+  case tree of
     (m, TreeLeaf "_") -> do
       h <- newNameWith'' "H"
       return (m, h)
@@ -353,8 +353,8 @@ interpretLeaf =
       raiseSyntaxError (fst t) "LEAF"
 
 interpretIdentPlus :: TreePlus -> WithEnv WeakIdentPlus
-interpretIdentPlus =
-  \case
+interpretIdentPlus tree =
+  case tree of
     leaf@(_, TreeLeaf _) -> do
       (m, x') <- interpretLeafText leaf
       h <- newHole m
@@ -366,8 +366,8 @@ interpretIdentPlus =
     t -> raiseSyntaxError (fst t) "(LEAF TREE)"
 
 interpretLeafText :: TreePlus -> WithEnv (Meta, T.Text)
-interpretLeafText =
-  \case
+interpretLeafText tree =
+  case tree of
     (m, TreeLeaf "_") -> do
       h <- newTextWith "_"
       return (m, h)
@@ -383,8 +383,8 @@ interpretEnumValueMaybe t =
     (\(_ :: Error) -> return Nothing)
 
 interpretEnumValue :: TreePlus -> WithEnv EnumValue
-interpretEnumValue =
-  \case
+interpretEnumValue tree =
+  case tree of
     (_, TreeLeaf x) ->
       return $ EnumValueLabel x
     e@(m, TreeNode [(_, TreeLeaf t), (_, TreeLeaf x)]) ->
@@ -422,8 +422,8 @@ interpretBinder xts t = do
   return (xts', t')
 
 interpretWeakCase :: TreePlus -> WithEnv WeakCasePlus
-interpretWeakCase =
-  \case
+interpretWeakCase tree =
+  case tree of
     (m, TreeNode [(_, TreeLeaf "enum-introduction"), l]) -> do
       v <- weakenEnumValue <$> interpretEnumValue l
       return (m, v)
@@ -437,8 +437,8 @@ interpretWeakCase =
       return (fst c, v)
 
 interpretClause :: TreePlus -> WithEnv (WeakCasePlus, WeakTermPlus)
-interpretClause =
-  \case
+interpretClause tree =
+  case tree of
     (_, TreeNode [c, e]) -> do
       c' <- interpretWeakCase c
       e' <- interpret e
@@ -447,8 +447,8 @@ interpretClause =
       raiseSyntaxError (fst e) "(TREE TREE)"
 
 interpretStructIntro :: TreePlus -> WithEnv (WeakTermPlus, ArrayKind)
-interpretStructIntro =
-  \case
+interpretStructIntro tree =
+  case tree of
     (_, TreeNode [e, k]) -> do
       e' <- interpret e
       k' <- asArrayKind k
@@ -457,8 +457,8 @@ interpretStructIntro =
       raiseSyntaxError (fst e) "(TREE TREE)"
 
 interpretStructElim :: TreePlus -> WithEnv (Meta, Ident, ArrayKind)
-interpretStructElim =
-  \case
+interpretStructElim tree =
+  case tree of
     (_, TreeNode [(m, TreeLeaf x), k]) -> do
       k' <- asArrayKind k
       return (m, asIdent x, k')
@@ -466,8 +466,8 @@ interpretStructElim =
       raiseSyntaxError (fst e) "(LEAF TREE)"
 
 interpretCaseClause :: TreePlus -> WithEnv (((Meta, Ident), [WeakIdentPlus]), WeakTermPlus)
-interpretCaseClause =
-  \case
+interpretCaseClause tree =
+  case tree of
     (_, TreeNode [(_, TreeNode ((m, TreeLeaf c) : xts)), e]) -> do
       xts' <- mapM interpretWeakIdentPlus xts
       e' <- interpret e
@@ -486,8 +486,8 @@ type CocaseClause = ((Ident, [WeakTermPlus]), [(Ident, WeakTermPlus)])
 --    ...
 --    (b e)))
 interpretCoinductive :: TreePlus -> WithEnv (T.Text, [WeakTermPlus])
-interpretCoinductive =
-  \case
+interpretCoinductive tree =
+  case tree of
     (_, TreeNode ((_, TreeLeaf c) : args)) -> do
       args' <- mapM interpret args
       return (c, args')
@@ -495,8 +495,8 @@ interpretCoinductive =
       raiseSyntaxError (fst t) "(LEAF TREE ... TREE)"
 
 interpretCocaseClause :: TreePlus -> WithEnv CocaseClause
-interpretCocaseClause =
-  \case
+interpretCocaseClause tree =
+  case tree of
     (_, TreeNode (coind : clauseList)) -> do
       (c, args) <- interpretCoinductive coind
       clauseList' <- mapM interpretCocaseClause' clauseList
@@ -505,8 +505,8 @@ interpretCocaseClause =
       raiseSyntaxError (fst t) "((LEAF TREE ... TREE) (LEAF TREE) ... (LEAF TREE))"
 
 interpretCocaseClause' :: TreePlus -> WithEnv (Ident, WeakTermPlus)
-interpretCocaseClause' =
-  \case
+interpretCocaseClause' tree =
+  case tree of
     (_, TreeNode [(_, TreeLeaf label), body]) -> do
       body' <- interpret body
       return (asIdent label, body')
@@ -530,8 +530,8 @@ cocaseAsSigmaIntro m name codType cocaseClauseList = do
           return $ map snd (sortOn fst iesjes) ++ [cocaseBaseValue m codType]
 
 labelToIndex :: Meta -> [T.Text] -> [(Ident, a)] -> WithEnv [(Int, a)]
-labelToIndex m lenv =
-  \case
+labelToIndex m lenv list =
+  case list of
     [] -> return []
     ((x, e) : xes) ->
       case elemIndex (asText x) lenv of
@@ -580,8 +580,8 @@ interpretEnumItem m name ts = do
     else raiseError m "found a collision of discriminant"
 
 interpretEnumItem' :: T.Text -> [TreePlus] -> WithEnv [(T.Text, Int)]
-interpretEnumItem' name =
-  \case
+interpretEnumItem' name treeList =
+  case treeList of
     [] -> return []
     [t] -> do
       (s, mj) <- interpretEnumItem'' t
@@ -592,16 +592,16 @@ interpretEnumItem' name =
       return $ (name <> ":" <> s, fromMaybe (1 + headDiscriminantOf ts') mj) : ts'
 
 interpretEnumItem'' :: TreePlus -> WithEnv (T.Text, Maybe Int)
-interpretEnumItem'' =
-  \case
+interpretEnumItem'' tree =
+  case tree of
     (_, TreeLeaf s) -> return (s, Nothing)
     (_, TreeNode [(_, TreeLeaf s), (_, TreeLeaf i)])
       | Just i' <- readMaybe $ T.unpack i -> return (s, Just i')
     t -> raiseSyntaxError (fst t) "LEAF | (LEAF LEAF)"
 
 headDiscriminantOf :: [(T.Text, Int)] -> Int
-headDiscriminantOf =
-  \case
+headDiscriminantOf labelNumList =
+  case labelNumList of
     [] -> 0
     ((_, i) : _) -> i
 
@@ -635,8 +635,8 @@ readEnumValueIntU t x
   | otherwise = Nothing
 
 asArrayKind :: TreePlus -> WithEnv ArrayKind
-asArrayKind =
-  \case
+asArrayKind tree =
+  case tree of
     e@(_, TreeLeaf x) ->
       case asArrayKindMaybe x of
         Nothing -> raiseSyntaxError (fst e) "SINT-TYPE | UINT-TYPE | FLOAT-TYPE"
@@ -652,8 +652,8 @@ raiseSyntaxError m form =
   raiseError m $ "couldn't match the input with the expected form: " <> form
 
 interpretWith :: TreePlus -> WithEnv WeakTermPlus
-interpretWith =
-  \case
+interpretWith tree =
+  case tree of
     (m, TreeNode (with@(_, TreeLeaf "with") : bind : (_, TreeNode ((_, TreeLeaf "let") : xt : es)) : rest)) -> do
       (borrowVarList, es') <- interpretBorrow m es
       if not (null borrowVarList)
@@ -699,24 +699,24 @@ interpretWith =
       raiseSyntaxError (fst t) "(with TREE TREE+)"
 
 interpretBorrow :: Meta -> [TreePlus] -> WithEnv ([TreePlus], [TreePlus])
-interpretBorrow m =
-  \case
+interpretBorrow m treeList =
+  case treeList of
     [] -> raiseSyntaxError m "(TREE TREE*)"
     es -> do
       let (borrowVarList, e') = interpretBorrow' $ last es
       return (borrowVarList, init es ++ [e'])
 
 interpretBorrow' :: TreePlus -> ([TreePlus], TreePlus)
-interpretBorrow' =
-  \case
+interpretBorrow' tree =
+  case tree of
     t@(_, TreeLeaf _) -> ([], t)
     (m, TreeNode ts) -> do
       let (mmxs, ts') = unzip $ map interpretBorrow'' ts
       (catMaybes mmxs, (m, TreeNode ts'))
 
 interpretBorrow'' :: TreePlus -> (Maybe TreePlus, TreePlus)
-interpretBorrow'' =
-  \case
+interpretBorrow'' tree =
+  case tree of
     (m, TreeLeaf s)
       | T.length s > 1,
         T.head s == '&' ->
