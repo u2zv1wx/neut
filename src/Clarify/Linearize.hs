@@ -1,5 +1,6 @@
 module Clarify.Linearize
   ( linearize,
+    withHeaderAffine,
   )
 where
 
@@ -48,12 +49,6 @@ withHeader nm x t e =
 --   bind _ :=
 --     bind exp := t^# in        --
 --     exp @ (0, x) in           -- AffineApp
---   e
---
--- withHeaderAffine x t e ~>
---   bind _ :=
---     bind exp := t^# in        -- AffineApp
---     exp @ (0, x) in           --
 --   e
 -- 変数xに型t由来のaffineを適用して破棄する。
 withHeaderAffine :: Ident -> CodePlus -> CodePlus -> WithEnv CodePlus

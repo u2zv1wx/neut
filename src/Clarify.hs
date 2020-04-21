@@ -32,15 +32,17 @@ clarifyStmt sub stmt =
     --   ~>
     -- let x := box-intro CONST e1 in
     -- e2{x := box-elim CONST}
-    StmtLet m (_, x, _) e cont -> do
+    StmtLet m (_, x, t) e cont -> do
       tenv <- gets typeEnv
       e' <- clarify' tenv $ substTermPlus sub e
+      t' <- clarify' tenv $ substTermPlus sub t
       constName <- newNameWith x
       insCodeEnv (asText'' constName) [] e' -- box-introduction
       let sub' = IntMap.insert (asInt x) (m, TermBoxElim constName) sub
       cont' <- clarifyStmt sub' cont
       h <- newNameWith'' "_"
-      return (m, CodeUpElim h e' cont')
+      cont'' <- withHeaderAffine h t' cont' -- free the result of e'
+      return (m, CodeUpElim h e' cont'')
 
 clarify' :: TypeEnv -> TermPlus -> WithEnv CodePlus
 clarify' tenv term =
@@ -51,14 +53,14 @@ clarify' tenv term =
       return (m, CodeUpIntro (m, DataUpsilon x))
     (m, TermPi {}) ->
       returnClosureType m
-    lam@(m, TermPiIntro Nothing mxts e) -> do
-      fvs <- nubFVS <$> chainTermPlus tenv lam
+    (m, TermPiIntro Nothing mxts e) -> do
+      fvs <- nubFVS <$> chainTermPlus tenv term
       e' <- clarify' (insTypeEnv1 mxts tenv) e
-      retClosure tenv Nothing fvs m mxts e'
+      retClosure tenv Nothing fvs (m {metaIsReducible = True}) mxts e'
     (m, TermPiIntro (Just (_, name, args)) mxts e) -> do
       e' <- clarify' (insTypeEnv1 mxts tenv) e
       let name' = showInHex name
-      retClosure tenv (Just name') args m mxts e'
+      retClosure tenv (Just name') args (m {metaIsReducible = True}) mxts e'
     (m, TermPiElim e es) -> do
       es' <- mapM (clarifyPlus tenv) es
       e' <- clarify' tenv e
