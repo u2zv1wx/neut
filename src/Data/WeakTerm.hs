@@ -2,6 +2,7 @@ module Data.WeakTerm where
 
 import Data.Basic
 import qualified Data.HashMap.Lazy as Map
+import qualified Data.IntMap as IntMap
 import qualified Data.Set as S
 import qualified Data.Text as T
 
@@ -53,7 +54,7 @@ data WeakCase
 
 type WeakCasePlus = (Meta, WeakCase)
 
-type SubstWeakTerm = Map.HashMap (Either Int T.Text) WeakTermPlus
+type SubstWeakTerm = IntMap.IntMap WeakTermPlus
 
 type WeakIdentPlus = (Meta, Ident, WeakTermPlus)
 
@@ -210,7 +211,7 @@ holeWeakTermPlus' ((_, _, t) : xts) es = do
 substWeakTermPlus :: SubstWeakTerm -> WeakTermPlus -> WeakTermPlus
 substWeakTermPlus _ tau@(_, WeakTermTau) = tau
 substWeakTermPlus sub e1@(_, WeakTermUpsilon x) =
-  case Map.lookup (Left $ asInt x) sub of
+  case IntMap.lookup (asInt x) sub of
     Nothing -> e1
     Just e2@(_, e) -> (supMeta (metaOf e1) (metaOf e2), e)
 substWeakTermPlus sub (m, WeakTermPi mName xts t) = do
@@ -226,16 +227,13 @@ substWeakTermPlus sub (m, WeakTermPiElim e es) = do
   (m, WeakTermPiElim e' es')
 substWeakTermPlus sub (m, WeakTermIter (mx, x, t) xts e) = do
   let t' = substWeakTermPlus sub t
-  let sub' = Map.delete (Left $ asInt x) sub
+  let sub' = IntMap.delete (asInt x) sub
   let (xts', e') = substWeakTermPlus'' sub' xts e
   (m, WeakTermIter (mx, x, t') xts' e')
-substWeakTermPlus sub e@(_, WeakTermConst x) =
-  case Map.lookup (Right x) sub of
-    Nothing -> e
-    Just e2 -> (supMeta (metaOf e) (metaOf e2), snd e2)
+substWeakTermPlus _ e@(_, WeakTermConst _) = e
 substWeakTermPlus _ e@(_, WeakTermBoxElim _) = e
 substWeakTermPlus sub e1@(_, WeakTermZeta x) =
-  case Map.lookup (Left $ asInt x) sub of
+  case IntMap.lookup (asInt x) sub of
     Nothing -> e1
     Just e2@(_, e) -> (supMeta (metaOf e1) (metaOf e2), e)
 substWeakTermPlus sub (m, WeakTermInt t x) = do
@@ -273,7 +271,7 @@ substWeakTermPlus sub (m, WeakTermStructIntro ets) = do
 substWeakTermPlus sub (m, WeakTermStructElim xts v e) = do
   let v' = substWeakTermPlus sub v
   let xs = map (\(_, x, _) -> x) xts
-  let sub' = deleteKeys' sub (map (Left . asInt) xs)
+  let sub' = deleteKeys sub (map asInt xs)
   let e' = substWeakTermPlus sub' e
   (m, WeakTermStructElim xts v' e')
 substWeakTermPlus sub (m, WeakTermCase indName e cxtes) = do
@@ -294,7 +292,7 @@ substWeakTermPlus sub (m, WeakTermErase xs e) = do
 substWeakTermPlus' :: SubstWeakTerm -> [WeakIdentPlus] -> [WeakIdentPlus]
 substWeakTermPlus' _ [] = []
 substWeakTermPlus' sub ((m, x, t) : xts) = do
-  let sub' = Map.delete (Left $ asInt x) sub
+  let sub' = IntMap.delete (asInt x) sub
   let xts' = substWeakTermPlus' sub' xts
   let t' = substWeakTermPlus sub t
   (m, x, t') : xts'
@@ -306,7 +304,7 @@ substWeakTermPlus'' ::
   ([WeakIdentPlus], WeakTermPlus)
 substWeakTermPlus'' sub [] e = ([], substWeakTermPlus sub e)
 substWeakTermPlus'' sub ((m, x, t) : xts) e = do
-  let sub' = Map.delete (Left $ asInt x) sub
+  let sub' = IntMap.delete (asInt x) sub
   let (xts', e') = substWeakTermPlus'' sub' xts e
   let t' = substWeakTermPlus sub t
   ((m, x, t') : xts', e')

@@ -14,6 +14,7 @@ import Data.ByteString.Builder
 import qualified Data.ByteString.Lazy as L
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import qualified Data.IntMap as IntMap
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
@@ -301,7 +302,7 @@ parseDef xds = do
   -- xiの名前をtopNameEnvに追加した状態でそれぞれの定義をdiscernする
   defList' <- mapM (interpretIter >=> discernDef) defList
   -- sub^nを計算する
-  let baseSub = Map.fromList $ map defToSub $ zip nameList defList'
+  let baseSub = IntMap.fromList $ map defToSub $ zip nameList defList'
   let sub = selfCompose (length baseSub) baseSub
   -- sub^nをf1, ..., fnに適用する
   let typeList = map (\(m, (_, _, t), _, _) -> (m, t)) defList'
@@ -346,8 +347,8 @@ toLetList =
     [] -> []
     ((x, (m, t), e) : rest) -> WeakStmtLet m (m, x, t) e : toLetList rest
 
-defToSub :: (Ident, Def) -> (Key, WeakTermPlus)
-defToSub (dom, (m, xt, xts, e)) = (Left $ asInt dom, (m, WeakTermIter xt xts e))
+defToSub :: (Ident, Def) -> (Int, WeakTermPlus)
+defToSub (dom, (m, xt, xts, e)) = (asInt dom, (m, WeakTermIter xt xts e))
 
 selfCompose :: Int -> SubstWeakTerm -> SubstWeakTerm
 selfCompose i sub =
@@ -356,7 +357,7 @@ selfCompose i sub =
     else compose sub $ selfCompose (i - 1) sub
 
 compose :: SubstWeakTerm -> SubstWeakTerm -> SubstWeakTerm
-compose s1 s2 = Map.union (Map.map (substWeakTermPlus s1) s2) s1
+compose s1 s2 = IntMap.union (IntMap.map (substWeakTermPlus s1) s2) s1
 
 parseStmtClause :: TreePlus -> WithEnv (T.Text, [TreePlus])
 parseStmtClause =

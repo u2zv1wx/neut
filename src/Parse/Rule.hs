@@ -11,9 +11,9 @@ where
 
 import Control.Monad.State.Lazy
 import Data.Basic
-import Data.Either
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import qualified Data.IntMap as IntMap
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Tree
@@ -202,8 +202,9 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
         (mb, asIdent bi, (m, weakTermPi (xts' ++ yts) cod))
     case constructor of
       (_, WeakTermPiIntro _ xtsyts (_, WeakTermPiIntro indInfo@(Just (ai', _, _)) atsbts (_, WeakTermPiElim b _))) -> do
-        let as = map (\(_, x, _) -> asText x) ats
+        let as = take (length ats) $ map (\(_, x, _) -> asInt x) atsbts
         modify (\env -> env {revIndEnv = Map.insert bi (ai', is) (revIndEnv env)})
+        insInductive as constructorIdent
         yts' <- mapM (internalize as atsbts) $ drop (length is) xtsyts
         return
           [ WeakStmtLetWT
@@ -255,18 +256,18 @@ toVar' :: WeakIdentPlus -> WeakTermPlus
 toVar' (m, x, _) = (m, WeakTermUpsilon x)
 
 insForm :: Int -> WeakIdentPlus -> WeakTermPlus -> WithEnv ()
-insForm 1 (_, I (x, _), _) e =
-  modify (\env -> env {formationEnv = Map.insert x (Just e) (formationEnv env)})
-insForm _ (_, I (x, _), _) _ =
-  modify (\env -> env {formationEnv = Map.insert x Nothing (formationEnv env)})
+insForm 1 (_, a, _) e =
+  modify (\env -> env {formationEnv = IntMap.insert (asInt a) (Just e) (formationEnv env)})
+insForm _ (_, a, _) _ =
+  modify (\env -> env {formationEnv = IntMap.insert (asInt a) Nothing (formationEnv env)})
 
-insInductive :: [T.Text] -> WeakIdentPlus -> WithEnv ()
+insInductive :: [Int] -> WeakIdentPlus -> WithEnv ()
 insInductive [ai] bt = do
   ienv <- gets indEnv
-  modify (\env -> env {indEnv = Map.insertWith optConcat ai (Just [bt]) ienv})
+  modify (\env -> env {indEnv = IntMap.insertWith optConcat ai (Just [bt]) ienv})
 insInductive as _ =
   forM_ as $ \ai ->
-    modify (\env -> env {indEnv = Map.insert ai Nothing (indEnv env)})
+    modify (\env -> env {indEnv = IntMap.insert ai Nothing (indEnv env)})
 
 optConcat :: Maybe [a] -> Maybe [a] -> Maybe [a]
 optConcat mNew mOld = do
@@ -360,9 +361,9 @@ data Mode
   deriving (Show)
 
 internalize ::
-  [T.Text] -> [WeakIdentPlus] -> WeakIdentPlus -> WithEnv WeakTermPlus
+  [Int] -> [WeakIdentPlus] -> WeakIdentPlus -> WithEnv WeakTermPlus
 internalize as atsbts (m, y, t) = do
-  let sub = Map.fromList $ zip (map Right as) (map toVar' atsbts)
+  let sub = IntMap.fromList $ zip as (map toVar' atsbts)
   theta ModeForward sub atsbts t (m, WeakTermUpsilon y)
 
 flipMode :: Mode -> Mode
@@ -371,7 +372,7 @@ flipMode ModeBackward = ModeForward
 
 isResolved :: SubstWeakTerm -> WeakTermPlus -> Bool
 isResolved sub e = do
-  let outerVarList = lefts $ Map.keys sub
+  let outerVarList = IntMap.keys sub
   let freeVarSet = S.map asInt $ varWeakTermPlus e
   all (`S.notMember` freeVarSet) outerVarList
 
@@ -389,15 +390,15 @@ theta mode isub atsbts t e = do
   ienv <- gets indEnv
   case t of
     (_, WeakTermPi _ xts cod) -> thetaPi mode isub atsbts xts cod e
-    (_, WeakTermPiElim va@(_, WeakTermConst ai) es)
-      | Just _ <- Map.lookup (Right ai) isub ->
+    (_, WeakTermPiElim va@(_, WeakTermUpsilon ai) es)
+      | Just _ <- IntMap.lookup (asInt ai) isub ->
         thetaInductive mode isub ai atsbts es e
       -- nested inductive
-      | Just (Just bts) <- Map.lookup ai ienv,
+      | Just (Just bts) <- IntMap.lookup (asInt ai) ienv,
         not (all (isResolved isub) es) ->
         thetaInductiveNested mode isub atsbts e va ai es bts
       -- nestedの外側がmutualであるとき。このときはエラーとする。
-      | Just Nothing <- Map.lookup ai ienv ->
+      | Just Nothing <- IntMap.lookup (asInt ai) ienv ->
         thetaInductiveNestedMutual (metaOf t) ai
     _ ->
       if isResolved isub t
@@ -432,7 +433,7 @@ thetaPi mode isub atsbts xts cod e = do
 thetaInductive ::
   Mode ->
   SubstWeakTerm ->
-  T.Text ->
+  Ident ->
   [WeakIdentPlus] ->
   [WeakTermPlus] ->
   WeakTermPlus ->
@@ -441,7 +442,7 @@ thetaInductive mode isub a atsbts es e
   | ModeBackward <- mode =
     raiseError (metaOf e) $
       "found a contravariant occurence of `"
-        <> a
+        <> asText a
         <> "` in the antecedent of an introduction rule"
   -- `list @ i64` のように、中身が処理済みであることをチェック (この場合はes == [i64])
   | all (isResolved isub) es =
@@ -454,7 +455,7 @@ thetaInductiveNested ::
   [WeakIdentPlus] -> -- innerのためのatsbts
   WeakTermPlus -> -- 変換されるべきterm
   WeakTermPlus -> -- list Aにおけるlist
-  T.Text -> -- list (トップレベルで定義されている名前、つまりouterの名前)
+  Ident -> -- list (トップレベルで定義されている名前、つまりouterの名前)
   [WeakTermPlus] -> -- list AにおけるA
   [WeakIdentPlus] -> -- トップレベルで定義されているコンストラクタたち
   WithEnv WeakTermPlus
@@ -474,20 +475,20 @@ thetaInductiveNested mode isub atsbts e va aOuter es bts = do
         ((m, weakTermPiIntro xts (m, WeakTermPiElim va es')) : args)
     )
 
-thetaInductiveNestedMutual :: Meta -> T.Text -> WithEnv WeakTermPlus
+thetaInductiveNestedMutual :: Meta -> Ident -> WithEnv WeakTermPlus
 thetaInductiveNestedMutual m ai =
   raiseError m $
     "mutual inductive type `"
-      <> ai
+      <> asText ai
       <> "` cannot be used to construct a nested inductive type"
 
 lookupInductive ::
   Meta ->
-  T.Text ->
+  Ident ->
   WithEnv ([WeakIdentPlus], WeakIdentPlus, [WeakIdentPlus])
 lookupInductive m ai = do
   fenv <- gets formationEnv
-  case Map.lookup ai fenv of
+  case IntMap.lookup (asInt ai) fenv of
     Just (Just (_, WeakTermPiIntro Nothing xts (_, WeakTermPi (Just _) atsbts (_, WeakTermPiElim (_, WeakTermUpsilon _) _)))) -> do
       let at = head atsbts
       let bts = tail atsbts -- valid since a is not mutual
@@ -497,8 +498,8 @@ lookupInductive m ai = do
         "malformed inductive type (Parse.lookupInductive): \n" <> toText e
     Just Nothing ->
       raiseError m $
-        "the inductive type `" <> ai <> "` must be a non-mutual inductive type"
-    Nothing -> raiseCritical m $ "no such inductive type defined: " <> ai
+        "the inductive type `" <> asText ai <> "` must be a non-mutual inductive type"
+    Nothing -> raiseCritical m $ "no such inductive type defined: " <> asText ai
 
 -- nested inductiveにおける引数をinternalizeする。
 -- （これ、recursiveに処理できないの？）
@@ -506,7 +507,7 @@ toInternalizedArg ::
   Mode ->
   SubstWeakTerm -> -- inductiveのためのaのsubst (outer -> inner)
   Ident -> -- innerでのaの名前。listの定義の中に出てくるほうのlist.
-  T.Text -> -- outerでのaの名前。listとか。
+  Ident -> -- outerでのaの名前。listとか。
   [WeakIdentPlus] -> -- aの引数。
   [WeakIdentPlus] -> -- base caseでのinternalizeのための情報。
   [WeakTermPlus] -> -- list @ (e1, ..., en)の引数部分。
@@ -527,8 +528,8 @@ toInternalizedArg mode isub aInner aOuter xts atsbts es es' b (mbInner, _, (_, W
   --   - aOuterの中身はすべて処理済み
   --   - aOuterの外にはeiが出現しうる
   -- という状況が実現できる。これはrecursionの停止を与える。
-  let xs = map (\(_, x, _) -> Left $ asInt x) xts -- fixme: このへんもrenameBinderでやったほうがいい？
-  let sub = Map.fromList $ zip xs es
+  let xs = map (\(_, x, _) -> asInt x) xts -- fixme: このへんもrenameBinderでやったほうがいい？
+  let sub = IntMap.fromList $ zip xs es
   let ts'' = map (substWeakTermPlus sub) ts'
   ys' <- mapM newNameWith ys
   -- これで引数の型の調整が終わったので、あらためてidentPlusの形に整える
@@ -559,14 +560,14 @@ renameBinder ::
 renameBinder [] e = return ([], e)
 renameBinder ((m, x, t) : ats) e = do
   x' <- newNameWith x
-  let sub = Map.singleton (Left $ asInt x) (m, WeakTermUpsilon x')
+  let sub = IntMap.singleton (asInt x) (m, WeakTermUpsilon x')
   let (ats', e') = substWeakTermPlus'' sub ats e -- discern済みなのでこれでオーケーのはず
   (ats'', e'') <- renameBinder ats' e'
   return ((m, x', t) : ats'', e'')
 
 type RuleTypeDom = (Ident, [WeakTermPlus])
 
-type RuleTypeCod = (T.Text, [WeakTermPlus])
+type RuleTypeCod = (Ident, [WeakTermPlus])
 
 type SubstRule = (RuleTypeDom, RuleTypeCod)
 
@@ -591,7 +592,7 @@ substRuleType sub@((a1, es1), (a2, es2)) (m, WeakTermPiElim e es)
     a1 == x =
     case (mapM asUpsilon es1, mapM asUpsilon es) of
       (Just xs', Just ys')
-        | xs' == ys' -> return (m, WeakTermPiElim (mx, WeakTermConst a2) es2) -- `aOuter @ (処理済み, ..., 処理済み)` への変換
+        | xs' == ys' -> return (m, WeakTermPiElim (mx, WeakTermUpsilon a2) es2) -- `aOuter @ (処理済み, ..., 処理済み)` への変換
       _ ->
         raiseError
           m

@@ -32,7 +32,7 @@ data VisitInfo
 
 type FileEnv = Map.HashMap (Path Abs File) VisitInfo
 
-type RuleEnv = Map.HashMap T.Text (Maybe [WeakIdentPlus])
+type RuleEnv = IntMap.IntMap (Maybe [WeakIdentPlus])
 
 type UnivInstEnv = IntMap.IntMap (S.Set Int)
 
@@ -70,7 +70,7 @@ data Env
         revNameEnv :: IntMap.IntMap Int,
         prefixEnv :: [T.Text],
         sectionEnv :: [T.Text],
-        formationEnv :: Map.HashMap T.Text (Maybe WeakTermPlus),
+        formationEnv :: IntMap.IntMap (Maybe WeakTermPlus),
         -- "stream" ~> ["stream", "other-record-type", "head", "tail", "other-destructor"]
         labelEnv :: Map.HashMap T.Text [T.Text],
         -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
@@ -136,8 +136,8 @@ initialEnv =
       topNameEnv = Map.empty,
       prefixEnv = [],
       sectionEnv = [],
-      formationEnv = Map.empty,
-      indEnv = Map.empty,
+      formationEnv = IntMap.empty,
+      indEnv = IntMap.empty,
       labelEnv = Map.empty,
       weakTypeEnv = IntMap.empty,
       typeEnv = Map.empty,

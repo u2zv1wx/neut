@@ -36,7 +36,7 @@ synthesize = do
 resolveStuck ::
   WeakTermPlus -> WeakTermPlus -> Ident -> WeakTermPlus -> WithEnv ()
 resolveStuck e1 e2 h e = do
-  let s = Map.singleton (Left $ asInt h) e
+  let s = IntMap.singleton (asInt h) e
   let e1' = substWeakTermPlus s e1
   let e2' = substWeakTermPlus s e2
   deleteMin

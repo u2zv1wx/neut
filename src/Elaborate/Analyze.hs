@@ -11,7 +11,6 @@ import Control.Monad.State.Lazy
 import Data.Basic
 import Data.Constraint
 import Data.Env
-import qualified Data.HashMap.Lazy as Map
 import qualified Data.IntMap as IntMap
 import Data.Maybe
 import qualified Data.PQueue.Min as Q
@@ -106,7 +105,7 @@ simp' ((e1@(m1, _), e2@(m2, _)) : cs) = do
   let fvs2 = varWeakTermPlus e2
   case lookupAny (S.toList fmvs) sub of
     Just (h, e) -> do
-      let s = Map.singleton (Left $ asInt h) e
+      let s = IntMap.singleton (asInt h) e
       let e1' = substWeakTermPlus s (m, snd e1)
       let e2' = substWeakTermPlus s (m, snd e2)
       simp $ (e1', e2') : cs
@@ -133,7 +132,7 @@ simp' ((e1@(m1, _), e2@(m2, _)) : cs) = do
             case es of
               [] -> simpPattern h1 ies1 e1' e2' fvs2 cs
               _ -> do
-                let s = Map.fromList $ zip (map (Left . asInt) zs) es
+                let s = IntMap.fromList $ zip (map asInt zs) es
                 simp $ (e1', substWeakTermPlus s e2') : cs
         (_, Just (StuckPiElimZetaStrict h2 ies2))
           | xs2 <- concatMap getVarList ies2,
@@ -144,7 +143,7 @@ simp' ((e1@(m1, _), e2@(m2, _)) : cs) = do
             case es of
               [] -> simpPattern h2 ies2 e2' e1' fvs1 cs
               _ -> do
-                let s = Map.fromList $ zip (map (Left . asInt) zs) es
+                let s = IntMap.fromList $ zip (map asInt zs) es
                 simp $ (substWeakTermPlus s e1', e2') : cs
         (Just (StuckPiElimUpsilon x1 mx1 mess1), _)
           | Just (mBody, body) <- IntMap.lookup (asInt x1) sub ->
@@ -168,7 +167,7 @@ simp' ((e1@(m1, _), e2@(m2, _)) : cs) = do
             case es of
               [] -> simpQuasiPattern h1 ies1 e1' e2' fmvs cs
               _ -> do
-                let s = Map.fromList $ zip (map (Left . asInt) zs) es
+                let s = IntMap.fromList $ zip (map asInt zs) es
                 simp $ (e1', substWeakTermPlus s e2') : cs
         (_, Just (StuckPiElimZetaStrict h2 ies2))
           | xs2 <- concatMap getVarList ies2,
@@ -178,7 +177,7 @@ simp' ((e1@(m1, _), e2@(m2, _)) : cs) = do
             case es of
               [] -> simpQuasiPattern h2 ies2 e2' e1' fmvs cs
               _ -> do
-                let s = Map.fromList $ zip (map (Left . asInt) zs) es
+                let s = IntMap.fromList $ zip (map asInt zs) es
                 simp $ (substWeakTermPlus s e1', e2') : cs
         (Just (StuckPiElimZeta h1 ies1), Nothing)
           | xs1 <- concatMap getVarList ies1,
@@ -195,14 +194,14 @@ simp' ((e1@(m1, _), e2@(m2, _)) : cs) = do
           simp cs
 
 simpBinder :: [WeakIdentPlus] -> [WeakIdentPlus] -> WithEnv ()
-simpBinder = simpBinder' Map.empty
+simpBinder = simpBinder' IntMap.empty
 
 simpBinder' ::
   SubstWeakTerm -> [WeakIdentPlus] -> [WeakIdentPlus] -> WithEnv ()
 simpBinder' sub ((m1, x1, t1) : xts1) ((m2, x2, t2) : xts2) = do
   simp [(t1, substWeakTermPlus sub t2)]
   let var1 = (supMeta m1 m2, WeakTermUpsilon x1)
-  let sub' = Map.insert (Left $ asInt x2) var1 sub
+  let sub' = IntMap.insert (asInt x2) var1 sub
   simpBinder' sub' xts1 xts2
 simpBinder' _ _ _ = return ()
 

@@ -111,8 +111,8 @@ elaborate' =
         Nothing -> raiseError mh "couldn't instantiate the hole here"
         Just (_, WeakTermPiIntro _ xts e)
           | length xts == length es -> do
-            let xs = map (\(_, y, _) -> Left $ asInt y) xts
-            let s = Map.fromList $ zip xs es
+            let xs = map (\(_, y, _) -> asInt y) xts
+            let s = IntMap.fromList $ zip xs es
             elaborate' $ substWeakTermPlus s e
         Just e -> elaborate' $ reduceWeakTermPlus (m, WeakTermPiElim e es)
     (m, WeakTermPiElim e es) -> do
