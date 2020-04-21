@@ -16,10 +16,16 @@ data Constraint
   deriving (Show)
 
 constraintToInt :: Constraint -> Int
-constraintToInt ConstraintAnalyzable {} = 0
-constraintToInt ConstraintQuasiPattern {} = 1
-constraintToInt ConstraintFlexRigid {} = 2
-constraintToInt ConstraintOther {} = 3
+constraintToInt c =
+  case c of
+    ConstraintAnalyzable {} ->
+      0
+    ConstraintQuasiPattern {} ->
+      1
+    ConstraintFlexRigid {} ->
+      2
+    ConstraintOther {} ->
+      3
 
 instance Eq Constraint where
   c1 == c2 = constraintToInt c1 == constraintToInt c2
