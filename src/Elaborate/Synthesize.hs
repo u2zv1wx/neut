@@ -78,10 +78,14 @@ asAnalyzable (Enriched cs hs _) = Enriched cs hs ConstraintAnalyzable
 
 -- Try the list of alternatives.
 tryPlanList :: Meta -> [WithEnv a] -> WithEnv a
-tryPlanList m [] = raiseError m "cannot synthesize(tryPlanList)."
-tryPlanList _ [plan] = plan
-tryPlanList m (plan : planList) =
-  catch plan (\(_ :: Error) -> tryPlanList m planList)
+tryPlanList m planList =
+  case planList of
+    [] ->
+      raiseError m "cannot synthesize(tryPlanList)."
+    [plan] ->
+      plan
+    plan : rest ->
+      catch plan (\(_ :: Error) -> tryPlanList m rest)
 
 deleteMin :: WithEnv ()
 deleteMin =
@@ -105,19 +109,23 @@ toIndexInfo :: Eq a => [a] -> [(a, [Int])]
 toIndexInfo xs = toIndexInfo' $ zip xs [0 ..]
 
 toIndexInfo' :: Eq a => [(a, Int)] -> [(a, [Int])]
-toIndexInfo' [] = []
-toIndexInfo' ((x, i) : xs) = do
-  let (is, xs') = toIndexInfo'' x xs
-  let xs'' = toIndexInfo' xs'
-  (x, i : is) : xs''
+toIndexInfo' input =
+  case input of
+    [] -> []
+    ((x, i) : xs) -> do
+      let (is, xs') = toIndexInfo'' x xs
+      let xs'' = toIndexInfo' xs'
+      (x, i : is) : xs''
 
 toIndexInfo'' :: Eq a => a -> [(a, Int)] -> ([Int], [(a, Int)])
-toIndexInfo'' _ [] = ([], [])
-toIndexInfo'' x ((y, i) : ys) = do
-  let (is, ys') = toIndexInfo'' x ys
-  if x == y
-    then (i : is, ys') -- remove x from the list
-    else (is, (y, i) : ys')
+toIndexInfo'' x info =
+  case info of
+    [] -> ([], [])
+    ((y, i) : ys) -> do
+      let (is, ys') = toIndexInfo'' x ys
+      if x == y
+        then (i : is, ys') -- remove x from the list
+        else (is, (y, i) : ys')
 
 chooseActive :: [(Ident, [Int])] -> [[(Ident, Int)]]
 chooseActive xs = do
@@ -125,14 +133,15 @@ chooseActive xs = do
   pickup xs'
 
 pickup :: Eq a => [[a]] -> [[a]]
-pickup [] = [[]]
-pickup (xs : xss) = do
-  let yss = pickup xss
-  x <- xs
-  map (x :) yss
+pickup input =
+  case input of
+    [] -> [[]]
+    (xs : xss) -> do
+      let yss = pickup xss
+      x <- xs
+      map (x :) yss
 
-discardInactive ::
-  [WeakIdentPlus] -> [(Ident, Int)] -> WithEnv [WeakIdentPlus]
+discardInactive :: [WeakIdentPlus] -> [(Ident, Int)] -> WithEnv [WeakIdentPlus]
 discardInactive xs indexList =
   forM (zip xs [0 ..]) $ \((mx, x, t), i) ->
     case lookup x indexList of
@@ -144,11 +153,13 @@ discardInactive xs indexList =
 
 -- takeByCount [1, 3, 2] [a, b, c, d, e, f, g, h] ~> [[a], [b, c, d], [e, f]]
 takeByCount :: [Int] -> [a] -> [[a]]
-takeByCount [] _ = []
-takeByCount (i : is) xs = do
-  let ys = take i xs
-  let yss = takeByCount is (drop i xs)
-  ys : yss
+takeByCount idxList xs =
+  case idxList of
+    [] -> []
+    i : is -> do
+      let ys = take i xs
+      let yss = takeByCount is (drop i xs)
+      ys : yss
 
 throwTypeErrors :: WithEnv ()
 throwTypeErrors = do
@@ -158,22 +169,27 @@ throwTypeErrors = do
   throw $ Error errorList
 
 setupPosInfo :: [EnrichedConstraint] -> [(PosInfo, PreConstraint)]
-setupPosInfo [] = []
-setupPosInfo (Enriched (e1, e2) _ _ : cs) = do
-  let pos1 = getPosInfo $ metaOf e1
-  let pos2 = getPosInfo $ metaOf e2
-  case snd pos1 `compare` snd pos2 of
-    LT -> (pos2, (e2, e1)) : setupPosInfo cs
-    _ -> (pos1, (e1, e2)) : setupPosInfo cs
+setupPosInfo constraintList =
+  case constraintList of
+    [] -> []
+    Enriched (e1, e2) _ _ : cs -> do
+      let pos1 = getPosInfo $ metaOf e1
+      let pos2 = getPosInfo $ metaOf e2
+      case snd pos1 `compare` snd pos2 of
+        LT -> (pos2, (e2, e1)) : setupPosInfo cs
+        _ -> (pos1, (e1, e2)) : setupPosInfo cs
 
 constructErrors :: [PosInfo] -> [(PosInfo, PreConstraint)] -> WithEnv [Log]
-constructErrors _ [] = return []
-constructErrors ps ((pos, (e1, e2)) : pcs) = do
-  e1' <- unravel e1
-  e2' <- unravel e2
-  let msg = constructErrorMsg e1' e2'
-  as <- constructErrors (pos : ps) pcs
-  return $ logError pos msg : as
+constructErrors ps info =
+  case info of
+    [] ->
+      return []
+    (pos, (e1, e2)) : pcs -> do
+      e1' <- unravel e1
+      e2' <- unravel e2
+      let msg = constructErrorMsg e1' e2'
+      as <- constructErrors (pos : ps) pcs
+      return $ logError pos msg : as
 
 constructErrorMsg :: WeakTermPlus -> WeakTermPlus -> T.Text
 constructErrorMsg e1 e2 =
@@ -183,67 +199,76 @@ constructErrorMsg e1 e2 =
     <> toText e2
 
 unravel :: WeakTermPlus -> WithEnv WeakTermPlus
-unravel (m, WeakTermTau) = return (m, WeakTermTau)
-unravel (m, WeakTermUpsilon x) = do
-  x' <- unravelUpsilon x
-  return (m, WeakTermUpsilon x')
-unravel (m, WeakTermPi mName xts t) = do
-  (xts', t') <- unravelBinder xts t
-  return (m, WeakTermPi mName xts' t')
-unravel (m, WeakTermPiIntro info xts e) = do
-  (xts', e') <- unravelBinder xts e
-  return (m, WeakTermPiIntro info xts' e')
-unravel (m, WeakTermPiElim e es) = do
-  e' <- unravel e
-  es' <- mapM unravel es
-  return (m, WeakTermPiElim e' es')
-unravel (m, WeakTermIter (mx, x, t) xts e) = do
-  x' <- unravelUpsilon x
-  (xts', e') <- unravelBinder xts e
-  return (m, WeakTermIter (mx, x', t) xts' e')
-unravel (m, WeakTermConst x) = return (m, WeakTermConst x)
-unravel (m, WeakTermBoxElim x) = return (m, WeakTermBoxElim x)
-unravel (m, WeakTermZeta h) = do
-  h' <- unravelZeta h
-  return (m, WeakTermZeta h')
-unravel (m, WeakTermInt t x) =
-  return (m, WeakTermInt t x)
-unravel (m, WeakTermFloat t x) =
-  return (m, WeakTermFloat t x)
-unravel (m, WeakTermEnum s) = return (m, WeakTermEnum s)
-unravel (m, WeakTermEnumIntro x) = return (m, WeakTermEnumIntro x)
-unravel (m, WeakTermEnumElim (e, t) caseList) = do
-  e' <- unravel e
-  caseList' <- unravelCaseList caseList
-  return (m, WeakTermEnumElim (e', t) caseList')
-unravel (m, WeakTermArray dom kind) = do
-  dom' <- unravel dom
-  return (m, WeakTermArray dom' kind)
-unravel (m, WeakTermArrayIntro kind es) = do
-  es' <- mapM unravel es
-  return (m, WeakTermArrayIntro kind es')
-unravel (m, WeakTermArrayElim kind xts e1 e2) = do
-  e1' <- unravel e1
-  (xts', e2') <- unravelBinder xts e2
-  return (m, WeakTermArrayElim kind xts' e1' e2')
-unravel (m, WeakTermStruct ts) = return (m, WeakTermStruct ts)
-unravel (m, WeakTermStructIntro ets) = do
-  let (es, ts) = unzip ets
-  es' <- mapM unravel es
-  return (m, WeakTermStructIntro $ zip es' ts)
-unravel (m, WeakTermStructElim xts e1 e2) = do
-  e1' <- unravel e1
-  (xts', e2') <- unravelStruct xts e2
-  return (m, WeakTermStructElim xts' e1' e2')
-unravel (m, WeakTermCase indName e cxtes) = do
-  e' <- unravel e
-  cxtes' <-
-    flip mapM cxtes $ \((c, xts), body) -> do
-      (xts', body') <- unravelBinder xts body
-      return ((c, xts'), body')
-  return (m, WeakTermCase indName e' cxtes')
-unravel (_, WeakTermQuestion e _) = unravel e
-unravel (_, WeakTermErase _ e) = unravel e
+unravel term =
+  case term of
+    (m, WeakTermTau) ->
+      return (m, WeakTermTau)
+    (m, WeakTermUpsilon x) -> do
+      x' <- unravelUpsilon x
+      return (m, WeakTermUpsilon x')
+    (m, WeakTermPi mName xts t) -> do
+      (xts', t') <- unravelBinder xts t
+      return (m, WeakTermPi mName xts' t')
+    (m, WeakTermPiIntro info xts e) -> do
+      (xts', e') <- unravelBinder xts e
+      return (m, WeakTermPiIntro info xts' e')
+    (m, WeakTermPiElim e es) -> do
+      e' <- unravel e
+      es' <- mapM unravel es
+      return (m, WeakTermPiElim e' es')
+    (m, WeakTermIter (mx, x, t) xts e) -> do
+      x' <- unravelUpsilon x
+      (xts', e') <- unravelBinder xts e
+      return (m, WeakTermIter (mx, x', t) xts' e')
+    (m, WeakTermConst x) ->
+      return (m, WeakTermConst x)
+    (m, WeakTermBoxElim x) ->
+      return (m, WeakTermBoxElim x)
+    (m, WeakTermZeta h) -> do
+      h' <- unravelZeta h
+      return (m, WeakTermZeta h')
+    (m, WeakTermInt t x) ->
+      return (m, WeakTermInt t x)
+    (m, WeakTermFloat t x) ->
+      return (m, WeakTermFloat t x)
+    (m, WeakTermEnum s) ->
+      return (m, WeakTermEnum s)
+    (m, WeakTermEnumIntro x) ->
+      return (m, WeakTermEnumIntro x)
+    (m, WeakTermEnumElim (e, t) caseList) -> do
+      e' <- unravel e
+      caseList' <- unravelCaseList caseList
+      return (m, WeakTermEnumElim (e', t) caseList')
+    (m, WeakTermArray dom kind) -> do
+      dom' <- unravel dom
+      return (m, WeakTermArray dom' kind)
+    (m, WeakTermArrayIntro kind es) -> do
+      es' <- mapM unravel es
+      return (m, WeakTermArrayIntro kind es')
+    (m, WeakTermArrayElim kind xts e1 e2) -> do
+      e1' <- unravel e1
+      (xts', e2') <- unravelBinder xts e2
+      return (m, WeakTermArrayElim kind xts' e1' e2')
+    (m, WeakTermStruct ts) -> return (m, WeakTermStruct ts)
+    (m, WeakTermStructIntro ets) -> do
+      let (es, ts) = unzip ets
+      es' <- mapM unravel es
+      return (m, WeakTermStructIntro $ zip es' ts)
+    (m, WeakTermStructElim xts e1 e2) -> do
+      e1' <- unravel e1
+      (xts', e2') <- unravelStruct xts e2
+      return (m, WeakTermStructElim xts' e1' e2')
+    (m, WeakTermCase indName e cxtes) -> do
+      e' <- unravel e
+      cxtes' <-
+        flip mapM cxtes $ \((c, xts), body) -> do
+          (xts', body') <- unravelBinder xts body
+          return ((c, xts'), body')
+      return (m, WeakTermCase indName e' cxtes')
+    (_, WeakTermQuestion e _) ->
+      unravel e
+    (_, WeakTermErase _ e) ->
+      unravel e
 
 unravelUpsilon :: Ident -> WithEnv Ident
 unravelUpsilon (I (s, i)) = do
@@ -270,37 +295,33 @@ unravelBinder ::
   [WeakIdentPlus] ->
   WeakTermPlus ->
   WithEnv ([WeakIdentPlus], WeakTermPlus)
-unravelBinder [] e = do
-  e' <- unravel e
-  return ([], e')
-unravelBinder ((mx, x, t) : xts) e = do
-  t' <- unravel t
-  x' <- unravelUpsilon x
-  (xts', e') <- unravelBinder xts e
-  return ((mx, x', t') : xts', e')
+unravelBinder binder e =
+  case binder of
+    [] -> do
+      e' <- unravel e
+      return ([], e')
+    (mx, x, t) : xts -> do
+      t' <- unravel t
+      x' <- unravelUpsilon x
+      (xts', e') <- unravelBinder xts e
+      return ((mx, x', t') : xts', e')
 
-unravelCaseList ::
-  [(WeakCasePlus, WeakTermPlus)] -> WithEnv [(WeakCasePlus, WeakTermPlus)]
+unravelCaseList :: [(WeakCasePlus, WeakTermPlus)] -> WithEnv [(WeakCasePlus, WeakTermPlus)]
 unravelCaseList caseList = do
   let (ls, es) = unzip caseList
-  ls' <- mapM unravelWeakCase ls
   es' <- mapM unravel es
-  return $ zip ls' es'
-
-unravelWeakCase :: WeakCasePlus -> WithEnv WeakCasePlus
-unravelWeakCase (m, WeakCaseInt t a) = do
-  t' <- unravel t
-  return (m, WeakCaseInt t' a)
-unravelWeakCase l = return l
+  return $ zip ls es'
 
 unravelStruct ::
   [(Meta, Ident, ArrayKind)] ->
   WeakTermPlus ->
   WithEnv ([(Meta, Ident, ArrayKind)], WeakTermPlus)
-unravelStruct [] e = do
-  e' <- unravel e
-  return ([], e')
-unravelStruct ((mx, x, t) : xts) e = do
-  x' <- unravelUpsilon x
-  (xts', e') <- unravelStruct xts e
-  return ((mx, x', t) : xts', e')
+unravelStruct binder e =
+  case binder of
+    [] -> do
+      e' <- unravel e
+      return ([], e')
+    (mx, x, t) : xts -> do
+      x' <- unravelUpsilon x
+      (xts', e') <- unravelStruct xts e
+      return ((mx, x', t) : xts', e')
