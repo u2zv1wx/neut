@@ -95,299 +95,365 @@ weakTermPi :: [WeakIdentPlus] -> WeakTermPlus -> WeakTerm
 weakTermPi = WeakTermPi Nothing
 
 varWeakTermPlus :: WeakTermPlus -> S.Set Ident
-varWeakTermPlus (_, WeakTermTau) = S.empty
-varWeakTermPlus (_, WeakTermUpsilon x) = S.singleton x
-varWeakTermPlus (_, WeakTermPi _ xts t) = varWeakTermPlus' xts [t]
-varWeakTermPlus (_, WeakTermPiIntro _ xts e) = varWeakTermPlus' xts [e]
-varWeakTermPlus (_, WeakTermPiElim e es) = do
-  let xs = varWeakTermPlus e
-  let ys = S.unions $ map varWeakTermPlus es
-  S.union xs ys
-varWeakTermPlus (_, WeakTermIter (_, x, t) xts e) = do
-  let set1 = varWeakTermPlus t
-  let set2 = S.filter (/= x) (varWeakTermPlus' xts [e])
-  S.union set1 set2
-varWeakTermPlus (_, WeakTermConst _) = S.empty
-varWeakTermPlus (_, WeakTermBoxElim _) = S.empty
-varWeakTermPlus (_, WeakTermZeta _) = S.empty
-varWeakTermPlus (_, WeakTermInt t _) = varWeakTermPlus t
-varWeakTermPlus (_, WeakTermFloat t _) = varWeakTermPlus t
-varWeakTermPlus (_, WeakTermEnum _) = S.empty
-varWeakTermPlus (_, WeakTermEnumIntro _) = S.empty
-varWeakTermPlus (_, WeakTermEnumElim (e, t) les) = do
-  let xs = varWeakTermPlus t
-  let ys = varWeakTermPlus e
-  let zs = S.unions $ map (varWeakTermPlus . snd) les
-  S.unions [xs, ys, zs]
-varWeakTermPlus (_, WeakTermArray dom _) = varWeakTermPlus dom
-varWeakTermPlus (_, WeakTermArrayIntro _ es) = S.unions $ map varWeakTermPlus es
-varWeakTermPlus (_, WeakTermArrayElim _ xts d e) =
-  varWeakTermPlus d `S.union` varWeakTermPlus' xts [e]
-varWeakTermPlus (_, WeakTermStruct {}) = S.empty
-varWeakTermPlus (_, WeakTermStructIntro ets) =
-  S.unions $ map (varWeakTermPlus . fst) ets
-varWeakTermPlus (_, WeakTermStructElim xts d e) = do
-  let xs = map (\(_, x, _) -> x) xts
-  let set1 = varWeakTermPlus d
-  let set2 = S.filter (`notElem` xs) (varWeakTermPlus e)
-  S.union set1 set2
-varWeakTermPlus (_, WeakTermCase _ e cxes) = do
-  let xs = varWeakTermPlus e
-  let ys =
-        S.unions $ map (\((_, xts), body) -> varWeakTermPlus' xts [body]) cxes
-  S.union xs ys
-varWeakTermPlus (_, WeakTermQuestion e t) = do
-  let set1 = varWeakTermPlus e
-  let set2 = varWeakTermPlus t
-  S.union set1 set2
-varWeakTermPlus (_, WeakTermErase _ e) = varWeakTermPlus e
+varWeakTermPlus term =
+  case term of
+    (_, WeakTermTau) ->
+      S.empty
+    (_, WeakTermUpsilon x) ->
+      S.singleton x
+    (_, WeakTermPi _ xts t) ->
+      varWeakTermPlus' xts [t]
+    (_, WeakTermPiIntro _ xts e) ->
+      varWeakTermPlus' xts [e]
+    (_, WeakTermPiElim e es) -> do
+      let xs = varWeakTermPlus e
+      let ys = S.unions $ map varWeakTermPlus es
+      S.union xs ys
+    (_, WeakTermIter (_, x, t) xts e) -> do
+      let set1 = varWeakTermPlus t
+      let set2 = S.filter (/= x) (varWeakTermPlus' xts [e])
+      S.union set1 set2
+    (_, WeakTermConst _) ->
+      S.empty
+    (_, WeakTermBoxElim _) ->
+      S.empty
+    (_, WeakTermZeta _) ->
+      S.empty
+    (_, WeakTermInt t _) ->
+      varWeakTermPlus t
+    (_, WeakTermFloat t _) ->
+      varWeakTermPlus t
+    (_, WeakTermEnum _) ->
+      S.empty
+    (_, WeakTermEnumIntro _) ->
+      S.empty
+    (_, WeakTermEnumElim (e, t) les) -> do
+      let xs = varWeakTermPlus t
+      let ys = varWeakTermPlus e
+      let zs = S.unions $ map (varWeakTermPlus . snd) les
+      S.unions [xs, ys, zs]
+    (_, WeakTermArray dom _) ->
+      varWeakTermPlus dom
+    (_, WeakTermArrayIntro _ es) ->
+      S.unions $ map varWeakTermPlus es
+    (_, WeakTermArrayElim _ xts d e) ->
+      varWeakTermPlus d `S.union` varWeakTermPlus' xts [e]
+    (_, WeakTermStruct {}) ->
+      S.empty
+    (_, WeakTermStructIntro ets) ->
+      S.unions $ map (varWeakTermPlus . fst) ets
+    (_, WeakTermStructElim xts d e) -> do
+      let xs = map (\(_, x, _) -> x) xts
+      let set1 = varWeakTermPlus d
+      let set2 = S.filter (`notElem` xs) (varWeakTermPlus e)
+      S.union set1 set2
+    (_, WeakTermCase _ e cxes) -> do
+      let xs = varWeakTermPlus e
+      let ys = S.unions $ map (\((_, xts), body) -> varWeakTermPlus' xts [body]) cxes
+      S.union xs ys
+    (_, WeakTermQuestion e t) -> do
+      let set1 = varWeakTermPlus e
+      let set2 = varWeakTermPlus t
+      S.union set1 set2
+    (_, WeakTermErase _ e) ->
+      varWeakTermPlus e
 
 varWeakTermPlus' :: [WeakIdentPlus] -> [WeakTermPlus] -> S.Set Ident
-varWeakTermPlus' [] es = S.unions $ map varWeakTermPlus es
-varWeakTermPlus' ((_, x, t) : xts) es = do
-  let hs1 = varWeakTermPlus t
-  let hs2 = varWeakTermPlus' xts es
-  S.union hs1 $ S.filter (/= x) hs2
+varWeakTermPlus' binder es =
+  case binder of
+    [] ->
+      S.unions $ map varWeakTermPlus es
+    ((_, x, t) : xts) -> do
+      let hs1 = varWeakTermPlus t
+      let hs2 = varWeakTermPlus' xts es
+      S.union hs1 $ S.filter (/= x) hs2
 
 holeWeakTermPlus :: WeakTermPlus -> S.Set Ident
-holeWeakTermPlus (_, WeakTermTau) = S.empty
-holeWeakTermPlus (_, WeakTermUpsilon _) = S.empty
-holeWeakTermPlus (_, WeakTermPi _ xts t) = holeWeakTermPlus' xts [t]
-holeWeakTermPlus (_, WeakTermPiIntro _ xts e) = holeWeakTermPlus' xts [e]
-holeWeakTermPlus (_, WeakTermPiElim e es) = do
-  let set1 = holeWeakTermPlus e
-  let set2 = S.unions $ map holeWeakTermPlus es
-  S.union set1 set2
-holeWeakTermPlus (_, WeakTermIter (_, _, t) xts e) = do
-  let set1 = holeWeakTermPlus t
-  let set2 = holeWeakTermPlus' xts [e]
-  S.union set1 set2
-holeWeakTermPlus (_, WeakTermZeta h) = S.singleton h
-holeWeakTermPlus (_, WeakTermConst _) = S.empty
-holeWeakTermPlus (_, WeakTermBoxElim _) = S.empty
-holeWeakTermPlus (_, WeakTermInt t _) = holeWeakTermPlus t
-holeWeakTermPlus (_, WeakTermFloat t _) = holeWeakTermPlus t
-holeWeakTermPlus (_, WeakTermEnum _) = S.empty
-holeWeakTermPlus (_, WeakTermEnumIntro _) = S.empty
-holeWeakTermPlus (_, WeakTermEnumElim (e, t) les) = do
-  let set1 = holeWeakTermPlus e
-  let set2 = holeWeakTermPlus t
-  let set3 = S.unions $ map (\(_, body) -> holeWeakTermPlus body) les
-  S.unions [set1, set2, set3]
-holeWeakTermPlus (_, WeakTermArray dom _) = holeWeakTermPlus dom
-holeWeakTermPlus (_, WeakTermArrayIntro _ es) =
-  S.unions $ map holeWeakTermPlus es
-holeWeakTermPlus (_, WeakTermArrayElim _ xts d e) = do
-  let set1 = holeWeakTermPlus d
-  let set2 = holeWeakTermPlus' xts [e]
-  S.union set1 set2
-holeWeakTermPlus (_, WeakTermStruct {}) = S.empty
-holeWeakTermPlus (_, WeakTermStructIntro ets) =
-  S.unions $ map (holeWeakTermPlus . fst) ets
-holeWeakTermPlus (_, WeakTermStructElim _ d e) = do
-  let set1 = holeWeakTermPlus d
-  let set2 = holeWeakTermPlus e
-  S.union set1 set2
-holeWeakTermPlus (_, WeakTermCase _ e cxes) = do
-  let set1 = holeWeakTermPlus e
-  let set2 =
-        S.unions $ map (\((_, xts), body) -> holeWeakTermPlus' xts [body]) cxes
-  S.union set1 set2
-holeWeakTermPlus (_, WeakTermQuestion e t) = do
-  let set1 = holeWeakTermPlus e
-  let set2 = holeWeakTermPlus t
-  S.union set1 set2
-holeWeakTermPlus (_, WeakTermErase _ e) = holeWeakTermPlus e
+holeWeakTermPlus term =
+  case term of
+    (_, WeakTermTau) ->
+      S.empty
+    (_, WeakTermUpsilon _) ->
+      S.empty
+    (_, WeakTermPi _ xts t) ->
+      holeWeakTermPlus' xts [t]
+    (_, WeakTermPiIntro _ xts e) ->
+      holeWeakTermPlus' xts [e]
+    (_, WeakTermPiElim e es) -> do
+      let set1 = holeWeakTermPlus e
+      let set2 = S.unions $ map holeWeakTermPlus es
+      S.union set1 set2
+    (_, WeakTermIter (_, _, t) xts e) -> do
+      let set1 = holeWeakTermPlus t
+      let set2 = holeWeakTermPlus' xts [e]
+      S.union set1 set2
+    (_, WeakTermZeta h) ->
+      S.singleton h
+    (_, WeakTermConst _) ->
+      S.empty
+    (_, WeakTermBoxElim _) ->
+      S.empty
+    (_, WeakTermInt t _) ->
+      holeWeakTermPlus t
+    (_, WeakTermFloat t _) ->
+      holeWeakTermPlus t
+    (_, WeakTermEnum _) ->
+      S.empty
+    (_, WeakTermEnumIntro _) ->
+      S.empty
+    (_, WeakTermEnumElim (e, t) les) -> do
+      let set1 = holeWeakTermPlus e
+      let set2 = holeWeakTermPlus t
+      let set3 = S.unions $ map (\(_, body) -> holeWeakTermPlus body) les
+      S.unions [set1, set2, set3]
+    (_, WeakTermArray dom _) ->
+      holeWeakTermPlus dom
+    (_, WeakTermArrayIntro _ es) ->
+      S.unions $ map holeWeakTermPlus es
+    (_, WeakTermArrayElim _ xts d e) -> do
+      let set1 = holeWeakTermPlus d
+      let set2 = holeWeakTermPlus' xts [e]
+      S.union set1 set2
+    (_, WeakTermStruct {}) ->
+      S.empty
+    (_, WeakTermStructIntro ets) ->
+      S.unions $ map (holeWeakTermPlus . fst) ets
+    (_, WeakTermStructElim _ d e) -> do
+      let set1 = holeWeakTermPlus d
+      let set2 = holeWeakTermPlus e
+      S.union set1 set2
+    (_, WeakTermCase _ e cxes) -> do
+      let set1 = holeWeakTermPlus e
+      let set2 = S.unions $ map (\((_, xts), body) -> holeWeakTermPlus' xts [body]) cxes
+      S.union set1 set2
+    (_, WeakTermQuestion e t) -> do
+      let set1 = holeWeakTermPlus e
+      let set2 = holeWeakTermPlus t
+      S.union set1 set2
+    (_, WeakTermErase _ e) ->
+      holeWeakTermPlus e
 
 holeWeakTermPlus' :: [WeakIdentPlus] -> [WeakTermPlus] -> S.Set Ident
-holeWeakTermPlus' [] es = S.unions $ map holeWeakTermPlus es
-holeWeakTermPlus' ((_, _, t) : xts) es = do
-  let set1 = holeWeakTermPlus t
-  let set2 = holeWeakTermPlus' xts es
-  S.union set1 set2
+holeWeakTermPlus' binder es =
+  case binder of
+    [] ->
+      S.unions $ map holeWeakTermPlus es
+    ((_, _, t) : xts) -> do
+      let set1 = holeWeakTermPlus t
+      let set2 = holeWeakTermPlus' xts es
+      S.union set1 set2
 
 -- fixme: const substは不要
 substWeakTermPlus :: SubstWeakTerm -> WeakTermPlus -> WeakTermPlus
-substWeakTermPlus _ tau@(_, WeakTermTau) = tau
-substWeakTermPlus sub e1@(_, WeakTermUpsilon x) =
-  case IntMap.lookup (asInt x) sub of
-    Nothing -> e1
-    Just e2@(_, e) -> (supMeta (metaOf e1) (metaOf e2), e)
-substWeakTermPlus sub (m, WeakTermPi mName xts t) = do
-  let (xts', t') = substWeakTermPlus'' sub xts t
-  (m, WeakTermPi mName xts' t')
-substWeakTermPlus sub (m, WeakTermPiIntro info xts body) = do
-  let info' = fmap2 (substWeakTermPlus' sub) info
-  let (xts', body') = substWeakTermPlus'' sub xts body
-  (m, WeakTermPiIntro info' xts' body')
-substWeakTermPlus sub (m, WeakTermPiElim e es) = do
-  let e' = substWeakTermPlus sub e
-  let es' = map (substWeakTermPlus sub) es
-  (m, WeakTermPiElim e' es')
-substWeakTermPlus sub (m, WeakTermIter (mx, x, t) xts e) = do
-  let t' = substWeakTermPlus sub t
-  let sub' = IntMap.delete (asInt x) sub
-  let (xts', e') = substWeakTermPlus'' sub' xts e
-  (m, WeakTermIter (mx, x, t') xts' e')
-substWeakTermPlus _ e@(_, WeakTermConst _) = e
-substWeakTermPlus _ e@(_, WeakTermBoxElim _) = e
-substWeakTermPlus sub e1@(_, WeakTermZeta x) =
-  case IntMap.lookup (asInt x) sub of
-    Nothing -> e1
-    Just e2@(_, e) -> (supMeta (metaOf e1) (metaOf e2), e)
-substWeakTermPlus sub (m, WeakTermInt t x) = do
-  let t' = substWeakTermPlus sub t
-  (m, WeakTermInt t' x)
-substWeakTermPlus sub (m, WeakTermFloat t x) = do
-  let t' = substWeakTermPlus sub t
-  (m, WeakTermFloat t' x)
-substWeakTermPlus _ (m, WeakTermEnum x) =
-  (m, WeakTermEnum x)
-substWeakTermPlus _ (m, WeakTermEnumIntro l) =
-  (m, WeakTermEnumIntro l)
-substWeakTermPlus sub (m, WeakTermEnumElim (e, t) branchList) = do
-  let t' = substWeakTermPlus sub t
-  let e' = substWeakTermPlus sub e
-  let (caseList, es) = unzip branchList
-  let es' = map (substWeakTermPlus sub) es
-  (m, WeakTermEnumElim (e', t') (zip caseList es'))
-substWeakTermPlus sub (m, WeakTermArray dom k) = do
-  let dom' = substWeakTermPlus sub dom
-  (m, WeakTermArray dom' k)
-substWeakTermPlus sub (m, WeakTermArrayIntro k es) = do
-  let es' = map (substWeakTermPlus sub) es
-  (m, WeakTermArrayIntro k es')
-substWeakTermPlus sub (m, WeakTermArrayElim mk xts v e) = do
-  let v' = substWeakTermPlus sub v
-  let (xts', e') = substWeakTermPlus'' sub xts e
-  (m, WeakTermArrayElim mk xts' v' e')
-substWeakTermPlus _ (m, WeakTermStruct ts) =
-  (m, WeakTermStruct ts)
-substWeakTermPlus sub (m, WeakTermStructIntro ets) = do
-  let (es, ts) = unzip ets
-  let es' = map (substWeakTermPlus sub) es
-  (m, WeakTermStructIntro $ zip es' ts)
-substWeakTermPlus sub (m, WeakTermStructElim xts v e) = do
-  let v' = substWeakTermPlus sub v
-  let xs = map (\(_, x, _) -> x) xts
-  let sub' = deleteKeys sub (map asInt xs)
-  let e' = substWeakTermPlus sub' e
-  (m, WeakTermStructElim xts v' e')
-substWeakTermPlus sub (m, WeakTermCase indName e cxtes) = do
-  let e' = substWeakTermPlus sub e
-  let cxtes' =
-        flip map cxtes $ \((c, xts), body) -> do
-          let (xts', body') = substWeakTermPlus'' sub xts body
-          ((c, xts'), body')
-  (m, WeakTermCase indName e' cxtes')
-substWeakTermPlus sub (m, WeakTermQuestion e t) = do
-  let e' = substWeakTermPlus sub e
-  let t' = substWeakTermPlus sub t
-  (m, WeakTermQuestion e' t')
-substWeakTermPlus sub (m, WeakTermErase xs e) = do
-  let e' = substWeakTermPlus sub e
-  (m, WeakTermErase xs e')
+substWeakTermPlus sub term =
+  case term of
+    tau@(_, WeakTermTau) ->
+      tau
+    e1@(_, WeakTermUpsilon x) ->
+      case IntMap.lookup (asInt x) sub of
+        Nothing -> e1
+        Just e2@(_, e) -> (supMeta (metaOf e1) (metaOf e2), e)
+    (m, WeakTermPi mName xts t) -> do
+      let (xts', t') = substWeakTermPlus'' sub xts t
+      (m, WeakTermPi mName xts' t')
+    (m, WeakTermPiIntro info xts body) -> do
+      let info' = fmap2 (substWeakTermPlus' sub) info
+      let (xts', body') = substWeakTermPlus'' sub xts body
+      (m, WeakTermPiIntro info' xts' body')
+    (m, WeakTermPiElim e es) -> do
+      let e' = substWeakTermPlus sub e
+      let es' = map (substWeakTermPlus sub) es
+      (m, WeakTermPiElim e' es')
+    (m, WeakTermIter (mx, x, t) xts e) -> do
+      let t' = substWeakTermPlus sub t
+      let sub' = IntMap.delete (asInt x) sub
+      let (xts', e') = substWeakTermPlus'' sub' xts e
+      (m, WeakTermIter (mx, x, t') xts' e')
+    e@(_, WeakTermConst _) ->
+      e
+    e@(_, WeakTermBoxElim _) ->
+      e
+    e1@(_, WeakTermZeta x) ->
+      case IntMap.lookup (asInt x) sub of
+        Nothing -> e1
+        Just e2@(_, e) -> (supMeta (metaOf e1) (metaOf e2), e)
+    (m, WeakTermInt t x) -> do
+      let t' = substWeakTermPlus sub t
+      (m, WeakTermInt t' x)
+    (m, WeakTermFloat t x) -> do
+      let t' = substWeakTermPlus sub t
+      (m, WeakTermFloat t' x)
+    (m, WeakTermEnum x) ->
+      (m, WeakTermEnum x)
+    (m, WeakTermEnumIntro l) ->
+      (m, WeakTermEnumIntro l)
+    (m, WeakTermEnumElim (e, t) branchList) -> do
+      let t' = substWeakTermPlus sub t
+      let e' = substWeakTermPlus sub e
+      let (caseList, es) = unzip branchList
+      let es' = map (substWeakTermPlus sub) es
+      (m, WeakTermEnumElim (e', t') (zip caseList es'))
+    (m, WeakTermArray dom k) -> do
+      let dom' = substWeakTermPlus sub dom
+      (m, WeakTermArray dom' k)
+    (m, WeakTermArrayIntro k es) -> do
+      let es' = map (substWeakTermPlus sub) es
+      (m, WeakTermArrayIntro k es')
+    (m, WeakTermArrayElim mk xts v e) -> do
+      let v' = substWeakTermPlus sub v
+      let (xts', e') = substWeakTermPlus'' sub xts e
+      (m, WeakTermArrayElim mk xts' v' e')
+    (m, WeakTermStruct ts) ->
+      (m, WeakTermStruct ts)
+    (m, WeakTermStructIntro ets) -> do
+      let (es, ts) = unzip ets
+      let es' = map (substWeakTermPlus sub) es
+      (m, WeakTermStructIntro $ zip es' ts)
+    (m, WeakTermStructElim xts v e) -> do
+      let v' = substWeakTermPlus sub v
+      let xs = map (\(_, x, _) -> x) xts
+      let sub' = deleteKeys sub (map asInt xs)
+      let e' = substWeakTermPlus sub' e
+      (m, WeakTermStructElim xts v' e')
+    (m, WeakTermCase indName e cxtes) -> do
+      let e' = substWeakTermPlus sub e
+      let cxtes' =
+            flip map cxtes $ \((c, xts), body) -> do
+              let (xts', body') = substWeakTermPlus'' sub xts body
+              ((c, xts'), body')
+      (m, WeakTermCase indName e' cxtes')
+    (m, WeakTermQuestion e t) -> do
+      let e' = substWeakTermPlus sub e
+      let t' = substWeakTermPlus sub t
+      (m, WeakTermQuestion e' t')
+    (m, WeakTermErase xs e) -> do
+      let e' = substWeakTermPlus sub e
+      (m, WeakTermErase xs e')
 
 substWeakTermPlus' :: SubstWeakTerm -> [WeakIdentPlus] -> [WeakIdentPlus]
-substWeakTermPlus' _ [] = []
-substWeakTermPlus' sub ((m, x, t) : xts) = do
-  let sub' = IntMap.delete (asInt x) sub
-  let xts' = substWeakTermPlus' sub' xts
-  let t' = substWeakTermPlus sub t
-  (m, x, t') : xts'
+substWeakTermPlus' sub binder =
+  case binder of
+    [] ->
+      []
+    ((m, x, t) : xts) -> do
+      let sub' = IntMap.delete (asInt x) sub
+      let xts' = substWeakTermPlus' sub' xts
+      let t' = substWeakTermPlus sub t
+      (m, x, t') : xts'
 
 substWeakTermPlus'' ::
   SubstWeakTerm ->
   [WeakIdentPlus] ->
   WeakTermPlus ->
   ([WeakIdentPlus], WeakTermPlus)
-substWeakTermPlus'' sub [] e = ([], substWeakTermPlus sub e)
-substWeakTermPlus'' sub ((m, x, t) : xts) e = do
-  let sub' = IntMap.delete (asInt x) sub
-  let (xts', e') = substWeakTermPlus'' sub' xts e
-  let t' = substWeakTermPlus sub t
-  ((m, x, t') : xts', e')
+substWeakTermPlus'' sub binder e =
+  case binder of
+    [] ->
+      ([], substWeakTermPlus sub e)
+    ((m, x, t) : xts) -> do
+      let sub' = IntMap.delete (asInt x) sub
+      let (xts', e') = substWeakTermPlus'' sub' xts e
+      let t' = substWeakTermPlus sub t
+      ((m, x, t') : xts', e')
 
 metaOf :: WeakTermPlus -> Meta
 metaOf = fst
 
 asUpsilon :: WeakTermPlus -> Maybe Ident
-asUpsilon (_, WeakTermUpsilon x) = Just x
-asUpsilon _ = Nothing
+asUpsilon term =
+  case term of
+    (_, WeakTermUpsilon x) ->
+      Just x
+    _ ->
+      Nothing
 
 toText :: WeakTermPlus -> T.Text
-toText (_, WeakTermTau) = "tau"
-toText (_, WeakTermUpsilon x) = asText x
-toText piType@(_, WeakTermPi Nothing xts cod) =
-  case extractSigmaArg piType of
-    Just yts ->
-      case splitLast yts of
-        Just (zts, (_, _, t))
-          | isDependent zts t ->
-            showCons ["Σ", inParen $ showTypeArgs zts t, toText t]
+toText term =
+  case term of
+    (_, WeakTermTau) ->
+      "tau"
+    (_, WeakTermUpsilon x) ->
+      asText x
+    (_, WeakTermPi Nothing xts cod) ->
+      case extractSigmaArg term of
+        Just yts ->
+          case splitLast yts of
+            Just (zts, (_, _, t))
+              | isDependent zts t ->
+                showCons ["Σ", inParen $ showTypeArgs zts t, toText t]
+              | otherwise -> do
+                let (_, _, ts) = unzip3 zts
+                showCons $ "product" : map toText (ts ++ [t])
+            Nothing -> "(product)"
+        Nothing
+          | isDependent xts cod ->
+            showCons ["Π", inParen $ showTypeArgs xts cod, toText cod]
           | otherwise -> do
-            let (_, _, ts) = unzip3 zts
-            showCons $ "product" : map toText (ts ++ [t])
-        Nothing -> "(product)"
-    Nothing
-      | isDependent xts cod ->
-        showCons ["Π", inParen $ showTypeArgs xts cod, toText cod]
-      | otherwise -> do
-        let (_, _, ts) = unzip3 xts
-        showCons ["arrow", showCons $ map toText ts, toText cod]
-toText (_, WeakTermPi (Just _) _ cod) = toText cod
--- toText (m, WeakTermPi _ xts cod) = "+" <> toText (m, WeakTermPi Nothing xts cod)
-toText (_, WeakTermPiIntro Nothing xts e) = do
-  let argStr = inParen $ showItems $ map showArg xts
-  showCons ["λ", argStr, toText e]
-toText (_, WeakTermPiIntro (Just (_, name, _)) _ _) =
-  "<#" <> name <> "-" <> "internal" <> "#>"
-toText (_, WeakTermPiElim e es) =
-  showCons $ map toText $ e : es
-toText (_, WeakTermIter (_, x, _) xts e) = do
-  let argStr = inParen $ showItems $ map showArg xts
-  showCons ["μ", asText x, argStr, toText e]
-toText (_, WeakTermConst x) = x
-toText (_, WeakTermBoxElim x) = asText x
-toText (_, WeakTermZeta (I (_, i))) = "?M" <> T.pack (show i)
-toText (_, WeakTermInt _ a) = T.pack $ show a
-toText (_, WeakTermFloat _ a) = T.pack $ show a
-toText (_, WeakTermEnum enumType) =
-  case enumType of
-    EnumTypeLabel l -> l
-    EnumTypeIntS size -> "i" <> T.pack (show size)
-    EnumTypeIntU size -> "u" <> T.pack (show size)
-toText (_, WeakTermEnumIntro v) = showEnumValue v
-toText (_, WeakTermEnumElim (e, _) mles) = do
-  let (mls, es) = unzip mles
-  let les = zip (map snd mls) es
-  showCons ["case", toText e, showItems (map showClause les)]
-toText (_, WeakTermArray dom k) =
-  showCons ["array", toText dom, showArrayKind k]
-toText (_, WeakTermArrayIntro _ es) = showArray $ map toText es
-toText (_, WeakTermArrayElim _ xts e1 e2) = do
-  let argStr = inParen $ showItems $ map showArg xts
-  showCons ["array-elimination", argStr, toText e1, toText e2]
-toText (_, WeakTermStruct ks) = showCons $ "struct" : map showArrayKind ks
-toText (_, WeakTermStructIntro ets) =
-  showStruct $ map (toText . fst) ets
-toText (_, WeakTermStructElim xts e1 e2) = do
-  let argStr = inParen $ showItems $ map (\(_, x, _) -> asText x) xts
-  showCons ["struct-elimination", argStr, toText e1, toText e2]
-toText (_, WeakTermCase _ e cxtes) =
-  showCons
-    ( "case"
-        : toText e
-        : flip
-          map
-          cxtes
-          ( \((c, xts), body) -> do
-              let xs = map (\(_, x, _) -> asText x) xts
-              showCons [showCons (asText (snd c) : xs), toText body]
-          )
-    )
-toText (_, WeakTermQuestion e _) = toText e
-toText (_, WeakTermErase _ e) = toText e
+            let (_, _, ts) = unzip3 xts
+            showCons ["arrow", showCons $ map toText ts, toText cod]
+    (_, WeakTermPi (Just _) _ cod) ->
+      toText cod
+    (_, WeakTermPiIntro Nothing xts e) -> do
+      let argStr = inParen $ showItems $ map showArg xts
+      showCons ["λ", argStr, toText e]
+    (_, WeakTermPiIntro (Just (_, name, _)) _ _) ->
+      "<#" <> name <> "-" <> "internal" <> "#>"
+    (_, WeakTermPiElim e es) ->
+      showCons $ map toText $ e : es
+    (_, WeakTermIter (_, x, _) xts e) -> do
+      let argStr = inParen $ showItems $ map showArg xts
+      showCons ["μ", asText x, argStr, toText e]
+    (_, WeakTermConst x) ->
+      x
+    (_, WeakTermBoxElim x) ->
+      asText x
+    (_, WeakTermZeta (I (_, i))) ->
+      "?M" <> T.pack (show i)
+    (_, WeakTermInt _ a) ->
+      T.pack $ show a
+    (_, WeakTermFloat _ a) ->
+      T.pack $ show a
+    (_, WeakTermEnum enumType) ->
+      case enumType of
+        EnumTypeLabel l -> l
+        EnumTypeIntS size -> "i" <> T.pack (show size)
+        EnumTypeIntU size -> "u" <> T.pack (show size)
+    (_, WeakTermEnumIntro v) ->
+      showEnumValue v
+    (_, WeakTermEnumElim (e, _) mles) -> do
+      let (mls, es) = unzip mles
+      let les = zip (map snd mls) es
+      showCons ["case", toText e, showItems (map showClause les)]
+    (_, WeakTermArray dom k) ->
+      showCons ["array", toText dom, showArrayKind k]
+    (_, WeakTermArrayIntro _ es) ->
+      showArray $ map toText es
+    (_, WeakTermArrayElim _ xts e1 e2) -> do
+      let argStr = inParen $ showItems $ map showArg xts
+      showCons ["array-elimination", argStr, toText e1, toText e2]
+    (_, WeakTermStruct ks) ->
+      showCons $ "struct" : map showArrayKind ks
+    (_, WeakTermStructIntro ets) ->
+      showStruct $ map (toText . fst) ets
+    (_, WeakTermStructElim xts e1 e2) -> do
+      let argStr = inParen $ showItems $ map (\(_, x, _) -> asText x) xts
+      showCons ["struct-elimination", argStr, toText e1, toText e2]
+    (_, WeakTermCase _ e cxtes) ->
+      showCons
+        ( "case"
+            : toText e
+            : flip
+              map
+              cxtes
+              ( \((c, xts), body) -> do
+                  let xs = map (\(_, x, _) -> asText x) xts
+                  showCons [showCons (asText (snd c) : xs), toText body]
+              )
+        )
+    (_, WeakTermQuestion e _) ->
+      toText e
+    (_, WeakTermErase _ e) ->
+      toText e
 
 inParen :: T.Text -> T.Text
 inParen s = "(" <> s <> ")"
@@ -405,51 +471,84 @@ showArg :: (Meta, Ident, WeakTermPlus) -> T.Text
 showArg (_, x, t) = inParen $ asText x <> " " <> toText t
 
 showTypeArgs :: [WeakIdentPlus] -> WeakTermPlus -> T.Text
-showTypeArgs [] _ = T.empty
-showTypeArgs [(_, x, t)] cod
-  | x `S.member` varWeakTermPlus cod = inParen $ asText x <> " " <> toText t
-  | otherwise = inParen $ "_" <> " " <> toText t
-showTypeArgs ((_, x, t) : xts) cod
-  | x `S.member` varWeakTermPlus' xts [cod] = do
-    let s1 = inParen $ asText x <> " " <> toText t
-    let s2 = showTypeArgs xts cod
-    s1 <> " " <> s2
-  | otherwise = do
-    let s1 = inParen $ "_" <> " " <> toText t
-    let s2 = showTypeArgs xts cod
-    s1 <> " " <> s2
+showTypeArgs args cod =
+  case args of
+    [] ->
+      T.empty
+    [(_, x, t)]
+      | x `S.member` varWeakTermPlus cod ->
+        inParen $ asText x <> " " <> toText t
+      | otherwise ->
+        inParen $ "_" <> " " <> toText t
+    (_, x, t) : xts
+      | x `S.member` varWeakTermPlus' xts [cod] -> do
+        let s1 = inParen $ asText x <> " " <> toText t
+        let s2 = showTypeArgs xts cod
+        s1 <> " " <> s2
+      | otherwise -> do
+        let s1 = inParen $ "_" <> " " <> toText t
+        let s2 = showTypeArgs xts cod
+        s1 <> " " <> s2
 
 isDependent :: [WeakIdentPlus] -> WeakTermPlus -> Bool
-isDependent [] _ = False
-isDependent ((_, x, _) : xts) cod
-  | x `S.member` varWeakTermPlus' xts [cod] = True
-  | otherwise = isDependent xts cod
+isDependent binder cod =
+  case binder of
+    [] ->
+      False
+    (_, x, _) : xts
+      | x `S.member` varWeakTermPlus' xts [cod] ->
+        True
+      | otherwise ->
+        isDependent xts cod
 
 showClause :: (WeakCase, WeakTermPlus) -> T.Text
 showClause (c, e) = inParen $ showWeakCase c <> " " <> toText e
 
 showWeakCase :: WeakCase -> T.Text
-showWeakCase (WeakCaseLabel l) = l
-showWeakCase (WeakCaseIntS _ a) = T.pack $ show a
-showWeakCase (WeakCaseIntU _ a) = T.pack $ show a
-showWeakCase (WeakCaseInt _ a) = T.pack $ show a
-showWeakCase WeakCaseDefault = "default"
+showWeakCase weakCase =
+  case weakCase of
+    WeakCaseLabel l ->
+      l
+    WeakCaseIntS _ a ->
+      T.pack $ show a
+    WeakCaseIntU _ a ->
+      T.pack $ show a
+    WeakCaseInt _ a ->
+      T.pack $ show a
+    WeakCaseDefault ->
+      "default"
 
 weakenEnumValue :: EnumValue -> WeakCase
-weakenEnumValue (EnumValueLabel l) = WeakCaseLabel l
-weakenEnumValue (EnumValueIntS t a) = WeakCaseIntS t a
-weakenEnumValue (EnumValueIntU t a) = WeakCaseIntU t a
+weakenEnumValue enumValue =
+  case enumValue of
+    EnumValueLabel l ->
+      WeakCaseLabel l
+    EnumValueIntS t a ->
+      WeakCaseIntS t a
+    EnumValueIntU t a ->
+      WeakCaseIntU t a
 
 showEnumValue :: EnumValue -> T.Text
-showEnumValue (EnumValueLabel l) = l
-showEnumValue (EnumValueIntS _ a) = T.pack $ show a
-showEnumValue (EnumValueIntU _ a) = T.pack $ show a
+showEnumValue enumValue =
+  case enumValue of
+    EnumValueLabel l ->
+      l
+    EnumValueIntS _ a ->
+      T.pack $ show a
+    EnumValueIntU _ a ->
+      T.pack $ show a
 
 showArrayKind :: ArrayKind -> T.Text
-showArrayKind (ArrayKindIntS size) = T.pack $ "i" ++ show size
-showArrayKind (ArrayKindIntU size) = T.pack $ "u" ++ show size
-showArrayKind (ArrayKindFloat size) = T.pack $ "f" ++ show (sizeAsInt size)
-showArrayKind ArrayKindVoidPtr = "void*"
+showArrayKind arrayKind =
+  case arrayKind of
+    ArrayKindIntS size ->
+      T.pack $ "i" ++ show size
+    ArrayKindIntU size ->
+      T.pack $ "u" ++ show size
+    ArrayKindFloat size ->
+      T.pack $ "f" ++ show (sizeAsInt size)
+    ArrayKindVoidPtr ->
+      "void*"
 
 showItems :: [T.Text] -> T.Text
 showItems = T.intercalate " "
@@ -467,15 +566,21 @@ showStruct :: [T.Text] -> T.Text
 showStruct = inBrace . T.intercalate " "
 
 extractSigmaArg :: WeakTermPlus -> Maybe [WeakIdentPlus]
-extractSigmaArg (_, WeakTermPi _ [(_, z, (_, WeakTermTau)), (_, _, (_, WeakTermPi _ xts (_, WeakTermUpsilon z')))] (_, WeakTermUpsilon z''))
-  | z == z',
-    z == z'' =
-    return xts
-extractSigmaArg _ = Nothing
+extractSigmaArg term =
+  case term of
+    (_, WeakTermPi _ [(_, z, (_, WeakTermTau)), (_, _, (_, WeakTermPi _ xts (_, WeakTermUpsilon z')))] (_, WeakTermUpsilon z''))
+      | z == z',
+        z == z'' ->
+        return xts
+    _ -> Nothing
 
 splitLast :: [a] -> Maybe ([a], a)
-splitLast [] = Nothing
-splitLast [x] = return ([], x)
-splitLast (x : xs) = do
-  (xs', z) <- splitLast xs
-  return (x : xs', z)
+splitLast input =
+  case input of
+    [] ->
+      Nothing
+    [x] ->
+      return ([], x)
+    (x : xs) -> do
+      (xs', z) <- splitLast xs
+      return (x : xs', z)
