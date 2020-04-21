@@ -192,13 +192,13 @@
 
 
 
-;; (attribute my-id (implicit 0 1 2))
+(attribute my-id (implicit 0 1 2))
 
 ?my-id
 
 ;; (attribute my-id (implicit 1))
 
-;; ?@my-id
+?@my-id
 
 
 
@@ -231,6 +231,7 @@
 ;; (i64:add top tau)
 
 ?p
+
 
 (inductive choice ()
   (item-1 () (choice))

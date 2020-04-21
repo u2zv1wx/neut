@@ -33,14 +33,16 @@ setupIndPrefix inputTree =
     (m, TreeNode ((ma, TreeLeaf a) : xts : rules)) -> do
       rules' <- mapM (setupIndPrefix' a) rules
       return (m, TreeNode ((ma, TreeLeaf a) : xts : rules'))
-    _ -> raiseSyntaxError (fst inputTree) "(LEAF (TREE ... TREE) TREE)"
+    _ ->
+      raiseSyntaxError (fst inputTree) "(LEAF (TREE ... TREE) TREE)"
 
 setupIndPrefix' :: T.Text -> TreePlus -> WithEnv TreePlus
 setupIndPrefix' a inputTree =
   case inputTree of
     (m, TreeNode ((mb, TreeLeaf b) : rest)) ->
       return (m, TreeNode ((mb, TreeLeaf (a <> ":" <> b)) : rest))
-    _ -> raiseSyntaxError (fst inputTree) "(LEAF (TREE ... TREE) TREE)"
+    _ ->
+      raiseSyntaxError (fst inputTree) "(LEAF (TREE ... TREE) TREE)"
 
 -- variable naming convention on parsing connectives:
 --   a : the name of a formation rule, like `nat`, `list`, `stream`, etc.
@@ -70,7 +72,8 @@ parseConnective' inputTree =
       xts' <- mapM interpretWeakIdentPlus xts
       rules' <- mapM parseRule rules
       return (m, name, xts', rules')
-    _ -> raiseSyntaxError (fst inputTree) "(LEAF (TREE ... TREE) ...)"
+    _ ->
+      raiseSyntaxError (fst inputTree) "(LEAF (TREE ... TREE) ...)"
 
 toIndInfo :: [TreePlus] -> WithEnv ([WeakTextPlus], [WeakTextPlus])
 toIndInfo ts = do
@@ -175,20 +178,20 @@ toInductive ats bts connective@(m, ai, xts, _) = do
       (m, weakTermPiIntro xts (m, WeakTermPi (Just ai) atsbts cod))
   at' <- discernIdentPlus at
   insForm (length ats) at' indType
-  -- definition of induction principle (fold)
+  -- definition of  (fold)
   z <- newNameWith'' "_"
   let zt = (m, z, cod)
   let indArgs = xts ++ [zt] ++ atsbts
-  inductionPrinciple <-
+  fold <-
     discern
       (m, weakTermPiIntro indArgs (m, WeakTermPiElim (toVar' zt) (map toVar' atsbts)))
-  indIdent <-
+  foldIdent <-
     discernIdentPlus
-      (m, asIdent $ ai <> ":induction", (m, weakTermPi indArgs cod))
-  updateImplicit m (ai <> ":induction") [0 .. length xts - 1] -- inductionというかfoldですが
+      (m, asIdent $ ai <> ":fold", (m, weakTermPi indArgs cod))
+  updateImplicit m (ai <> ":fold") [0 .. length xts - 1]
   return
     [ WeakStmtLetWT m at' indType,
-      WeakStmtLetWT m indIdent inductionPrinciple
+      WeakStmtLetWT m foldIdent fold
     ]
 
 toInductiveIntroList :: [WeakTextPlus] -> Connective -> WithEnv [WeakStmt]
@@ -310,7 +313,8 @@ optConcat mNew mOld = do
 asInductive :: [TreePlus] -> WithEnv [TreePlus]
 asInductive treeList =
   case treeList of
-    [] -> return []
+    [] ->
+      return []
     (t : ts) -> do
       (sub, t') <- asInductive' t
       ts' <- asInductive $ map (substTree sub) ts
@@ -371,9 +375,12 @@ asInductive' t =
 extractArg :: TreePlus -> WithEnv TreePlus
 extractArg tree =
   case tree of
-    (m, TreeLeaf x) -> return (m, TreeLeaf x)
-    (_, TreeNode [(m, TreeLeaf x), _]) -> return (m, TreeLeaf x)
-    t -> raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
+    (m, TreeLeaf x) ->
+      return (m, TreeLeaf x)
+    (_, TreeNode [(m, TreeLeaf x), _]) ->
+      return (m, TreeLeaf x)
+    t ->
+      raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
 
 styleRule :: TreePlus -> WithEnv TreePlus
 styleRule tree =
@@ -424,7 +431,8 @@ theta ::
 theta mode isub atsbts t e = do
   ienv <- gets indEnv
   case t of
-    (_, WeakTermPi _ xts cod) -> thetaPi mode isub atsbts xts cod e
+    (_, WeakTermPi _ xts cod) ->
+      thetaPi mode isub atsbts xts cod e
     (_, WeakTermPiElim va@(_, WeakTermUpsilon ai) es)
       | Just _ <- IntMap.lookup (asInt ai) isub ->
         thetaInductive mode isub ai atsbts es e
@@ -482,7 +490,8 @@ thetaInductive mode isub a atsbts es e
   -- `list @ i64` のように、中身が処理済みであることをチェック (この場合はes == [i64])
   | all (isResolved isub) es =
     return (fst e, WeakTermPiElim e (map toVar' atsbts))
-  | otherwise = raiseError (metaOf e) "found a self-nested inductive type"
+  | otherwise =
+    raiseError (metaOf e) "found a self-nested inductive type"
 
 thetaInductiveNested ::
   Mode ->
@@ -594,7 +603,8 @@ renameBinder ::
   WithEnv ([WeakIdentPlus], WeakTermPlus)
 renameBinder binder e =
   case binder of
-    [] -> return ([], e)
+    [] ->
+      return ([], e)
     (m, x, t) : ats -> do
       x' <- newNameWith x
       let sub = IntMap.singleton (asInt x) (m, WeakTermUpsilon x')
@@ -711,7 +721,8 @@ substRuleType sub@((a1, es1), (a2, es2)) term =
 substRuleType' :: SubstRule -> [WeakIdentPlus] -> WithEnv [WeakIdentPlus]
 substRuleType' sub binder =
   case binder of
-    [] -> return []
+    [] ->
+      return []
     (m, x, t) : xts -> do
       t' <- substRuleType sub t
       if fst (fst sub) == x
