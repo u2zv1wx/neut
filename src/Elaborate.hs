@@ -215,7 +215,7 @@ elaborate' =
       e1' <- elaborate' e1
       e2' <- elaborate' e2
       return (m, TermStructElim xts e1' e2')
-    (m, WeakTermCase indName e cxtes) -> do
+    (m, WeakTermCase mIndName e cxtes) -> do
       e' <- elaborate' e
       cxtes' <-
         forM cxtes $ \((c, xts), body) -> do
@@ -225,23 +225,23 @@ elaborate' =
       eenv <- gets enumEnv
       case cxtes' of
         [] ->
-          case Map.lookup indName eenv of
-            Nothing -> raiseError m $ "no such inductive type defined: " <> indName
-            Just [] -> return (m, TermCase indName e' cxtes')
-            Just _ ->
-              raiseError m $
-                "the inductive type `" <> indName <> "` is not a bottom-type"
+          case mIndName of
+            Nothing -> return (m, TermCase Nothing e' cxtes') -- ex falso quodlibet
+            Just indName -> raiseError m $ "the inductive type `" <> asText indName <> "` is not a bottom-type"
         _ ->
-          case Map.lookup indName eenv of
-            Nothing -> raiseError m $ "no such inductive type defined: " <> indName
-            Just bis -> do
-              let bs' = map (snd . fst . fst) cxtes
-              let isLinear = linearCheck bs'
-              let isExhaustive = length bis == length bs'
-              case (isLinear, isExhaustive) of
-                (False, _) -> raiseError m "found a non-linear pattern"
-                (_, False) -> raiseError m "found a non-exhaustive pattern"
-                (True, True) -> return (m, TermCase indName e' cxtes')
+          case mIndName of
+            Nothing -> raiseCritical m undefined
+            Just indName ->
+              case Map.lookup (asText indName) eenv of
+                Nothing -> raiseError m $ "no such inductive type defined: " <> asText indName
+                Just bis -> do
+                  let bs' = map (snd . fst . fst) cxtes
+                  let isLinear = linearCheck bs'
+                  let isExhaustive = length bis == length bs'
+                  case (isLinear, isExhaustive) of
+                    (False, _) -> raiseError m "found a non-linear pattern"
+                    (_, False) -> raiseError m "found a non-exhaustive pattern"
+                    (True, True) -> return (m, TermCase (Just indName) e' cxtes')
     (m, WeakTermQuestion e t) -> do
       e' <- elaborate' e
       whenCheck $ do

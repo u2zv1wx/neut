@@ -48,9 +48,10 @@ clarify' tenv lam@(m, TermPiIntro Nothing mxts e) = do
   fvs <- nubFVS <$> chainTermPlus tenv lam
   e' <- clarify' (insTypeEnv1 mxts tenv) e
   retClosure tenv Nothing fvs m mxts e'
-clarify' tenv (m, TermPiIntro (Just (name, args)) mxts e) = do
+clarify' tenv (m, TermPiIntro (Just (_, name, args)) mxts e) = do
   e' <- clarify' (insTypeEnv1 mxts tenv) e
-  let name' = showInHex name
+  -- let name' = showInHex name
+  let name' = asText'' name
   retClosure tenv (Just name') args m mxts e'
 clarify' tenv (m, TermPiElim e es) = do
   es' <- mapM (clarifyPlus tenv) es
@@ -154,7 +155,8 @@ clarifyCase tenv m cxtes typeVarName envVarName lamVarName = do
   es <- (mapM (clarifyCase' tenv m envVarName) >=> alignFVS tenv m fvs) cxtes
   (y, e', yVar) <- clarifyPlus tenv (m, TermUpsilon lamVarName)
   let sub = IntMap.fromList $ map (\(mx, x, _) -> (asInt x, (mx, DataUpsilon x))) fvs
-  let cs = map (fst . fst) cxtes
+  -- let cs = map (fst . fst) cxtes
+  let cs = map (\(((mc, c), _), _) -> (mc, asText'' c)) cxtes
   return $ bindLet [(y, e')] (m, CodeCase sub yVar (zip cs es))
 
 constructCaseFVS ::
