@@ -27,15 +27,19 @@ parseInductive m ts = do
   parseConnective m ts' toInductive toInductiveIntroList
 
 setupIndPrefix :: TreePlus -> WithEnv TreePlus
-setupIndPrefix (m, TreeNode ((ma, TreeLeaf a) : xts : rules)) = do
-  rules' <- mapM (setupIndPrefix' a) rules
-  return (m, TreeNode ((ma, TreeLeaf a) : xts : rules'))
-setupIndPrefix t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) TREE)"
+setupIndPrefix inputTree =
+  case inputTree of
+    (m, TreeNode ((ma, TreeLeaf a) : xts : rules)) -> do
+      rules' <- mapM (setupIndPrefix' a) rules
+      return (m, TreeNode ((ma, TreeLeaf a) : xts : rules'))
+    _ -> raiseSyntaxError (fst inputTree) "(LEAF (TREE ... TREE) TREE)"
 
 setupIndPrefix' :: T.Text -> TreePlus -> WithEnv TreePlus
-setupIndPrefix' a (m, TreeNode ((mb, TreeLeaf b) : rest)) =
-  return (m, TreeNode ((mb, TreeLeaf (a <> ":" <> b)) : rest))
-setupIndPrefix' _ t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) TREE)"
+setupIndPrefix' a inputTree =
+  case inputTree of
+    (m, TreeNode ((mb, TreeLeaf b) : rest)) ->
+      return (m, TreeNode ((mb, TreeLeaf (a <> ":" <> b)) : rest))
+    _ -> raiseSyntaxError (fst inputTree) "(LEAF (TREE ... TREE) TREE)"
 
 -- variable naming convention on parsing connectives:
 --   a : the name of a formation rule, like `nat`, `list`, `stream`, etc.
@@ -59,11 +63,13 @@ parseConnective m ts f g = do
   return $ connectiveList' ++ ruleList
 
 parseConnective' :: TreePlus -> WithEnv Connective
-parseConnective' (m, TreeNode ((_, TreeLeaf name) : (_, TreeNode xts) : rules)) = do
-  xts' <- mapM interpretWeakIdentPlus xts
-  rules' <- mapM parseRule rules
-  return (m, name, xts', rules')
-parseConnective' t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) ...)"
+parseConnective' inputTree =
+  case inputTree of
+    (m, TreeNode ((_, TreeLeaf name) : (_, TreeNode xts) : rules)) -> do
+      xts' <- mapM interpretWeakIdentPlus xts
+      rules' <- mapM parseRule rules
+      return (m, name, xts', rules')
+    _ -> raiseSyntaxError (fst inputTree) "(LEAF (TREE ... TREE) ...)"
 
 toIndInfo :: [TreePlus] -> WithEnv ([WeakTextPlus], [WeakTextPlus])
 toIndInfo ts = do
@@ -115,19 +121,30 @@ generateProjections ts = do
   return $ concat $ concat stmtListList
 
 separate :: WeakTermPlus -> WithEnv (WeakIdentPlus, WeakTermPlus)
-separate (_, WeakTermPi _ [xt] cod) = return (xt, cod)
-separate t = raiseSyntaxError (fst t) "(pi (TREE) TREE)"
+separate e =
+  case e of
+    (_, WeakTermPi _ [xt] cod) ->
+      return (xt, cod)
+    _ ->
+      raiseSyntaxError (fst e) "(pi (TREE) TREE)"
 
 takeXTS :: WeakTermPlus -> WithEnv [WeakIdentPlus]
-takeXTS (_, WeakTermPi _ xts _) = return xts
-takeXTS t = raiseSyntaxError (fst t) "(pi (TREE ... TREE) TREE)"
+takeXTS t =
+  case t of
+    (_, WeakTermPi _ xts _) ->
+      return xts
+    _ ->
+      raiseSyntaxError (fst t) "(pi (TREE ... TREE) TREE)"
 
 parseRule :: TreePlus -> WithEnv Rule
-parseRule (m, TreeNode [(mName, TreeLeaf name), (_, TreeNode xts), t]) = do
-  t' <- interpret t
-  xts' <- mapM interpretWeakIdentPlus xts
-  return (m, name, mName, xts', t')
-parseRule t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) TREE)"
+parseRule inputTree =
+  case inputTree of
+    (m, TreeNode [(mName, TreeLeaf name), (_, TreeNode xts), t]) -> do
+      t' <- interpret t
+      xts' <- mapM interpretWeakIdentPlus xts
+      return (m, name, mName, xts', t')
+    _ ->
+      raiseSyntaxError (fst inputTree) "(LEAF (TREE ... TREE) TREE)"
 
 checkNameSanity :: Meta -> [WeakTextPlus] -> WithEnv ()
 checkNameSanity m atsbts = do
@@ -256,18 +273,21 @@ toVar' :: WeakIdentPlus -> WeakTermPlus
 toVar' (m, x, _) = (m, WeakTermUpsilon x)
 
 insForm :: Int -> WeakIdentPlus -> WeakTermPlus -> WithEnv ()
-insForm 1 (_, a, _) e =
-  modify (\env -> env {formationEnv = IntMap.insert (asInt a) (Just e) (formationEnv env)})
-insForm _ (_, a, _) _ =
-  modify (\env -> env {formationEnv = IntMap.insert (asInt a) Nothing (formationEnv env)})
+insForm i (_, a, _) e
+  | i == 1 =
+    modify (\env -> env {formationEnv = IntMap.insert (asInt a) (Just e) (formationEnv env)})
+  | otherwise =
+    modify (\env -> env {formationEnv = IntMap.insert (asInt a) Nothing (formationEnv env)})
 
 insInductive :: [Int] -> WeakIdentPlus -> WithEnv ()
-insInductive [ai] bt = do
-  ienv <- gets indEnv
-  modify (\env -> env {indEnv = IntMap.insertWith optConcat ai (Just [bt]) ienv})
-insInductive as _ =
-  forM_ as $ \ai ->
-    modify (\env -> env {indEnv = IntMap.insert ai Nothing (indEnv env)})
+insInductive as bt =
+  case as of
+    [ai] -> do
+      ienv <- gets indEnv
+      modify (\env -> env {indEnv = IntMap.insertWith optConcat ai (Just [bt]) ienv})
+    _ ->
+      forM_ as $ \ai ->
+        modify (\env -> env {indEnv = IntMap.insert ai Nothing (indEnv env)})
 
 optConcat :: Maybe [a] -> Maybe [a] -> Maybe [a]
 optConcat mNew mOld = do
