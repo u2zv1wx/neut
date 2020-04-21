@@ -1,7 +1,6 @@
 module Data.WeakTerm where
 
 import Data.Basic
-import qualified Data.HashMap.Lazy as Map
 import qualified Data.IntMap as IntMap
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -480,8 +479,3 @@ splitLast [x] = return ([], x)
 splitLast (x : xs) = do
   (xs', z) <- splitLast xs
   return (x : xs', z)
-
-type Key = Either Int T.Text
-
-deleteKeys' :: Map.HashMap Key a -> [Key] -> Map.HashMap Key a
-deleteKeys' = foldr Map.delete
