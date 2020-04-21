@@ -78,33 +78,41 @@ parseOpt =
     )
 
 parseBuildOpt :: Parser Command
-parseBuildOpt = do
-  let inputPathOpt =
-        argument str $ mconcat [metavar "INPUT", help "The path of input file"]
-  let outputPathOpt =
-        optional
-          $ strOption
-          $ mconcat
+parseBuildOpt =
+  Build
+    <$> argument
+      str
+      ( mconcat
+          [ metavar "INPUT",
+            help "The path of input file"
+          ]
+      )
+    <*> optional
+      ( strOption $
+          mconcat
             [ long "output",
               short 'o',
               metavar "OUTPUT",
               help "The path of output file"
             ]
-  let outputKindOpt =
-        option kindReader $
-          mconcat
-            [ long "emit",
-              metavar "KIND",
-              value OutputKindObject,
-              help "The type of output file"
-            ]
-  let incrementalOpt =
-        flag False True $
-          mconcat
-            [ long "incremental",
-              help "Set this to enable incremental compilation"
-            ]
-  Build <$> inputPathOpt <*> outputPathOpt <*> outputKindOpt <*> incrementalOpt
+      )
+    <*> option
+      kindReader
+      ( mconcat
+          [ long "emit",
+            metavar "KIND",
+            value OutputKindObject,
+            help "The type of output file"
+          ]
+      )
+    <*> flag
+      False
+      True
+      ( mconcat
+          [ long "incremental",
+            help "Set this to enable incremental compilation"
+          ]
+      )
 
 kindReader :: ReadM OutputKind
 kindReader = do

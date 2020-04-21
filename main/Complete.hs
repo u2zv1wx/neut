@@ -60,7 +60,7 @@ modifyFileForCompletion ::
 modifyFileForCompletion (I (s, _)) content l c = do
   let xs = T.lines content
   let (ys, ws) = splitAt (l - 1) xs
-  (targetLine, zs) <- headTailMaybe ws
+  (targetLine, zs) <- uncons ws
   (s1, s2) <- splitAtMaybe (c - 1) targetLine
   (ch, s2') <- headTailMaybeText s2
   case ch of
@@ -85,67 +85,81 @@ modifyFileForCompletion (I (s, _)) content l c = do
 compInfo :: CursorName -> [WeakStmt] -> Either CompInfo ()
 compInfo c = compInfoWeakStmtList c []
 
-compInfoWeakStmtList ::
-  CursorName -> CompInfo -> [WeakStmt] -> Either CompInfo ()
-compInfoWeakStmtList _ _ [] = return ()
-compInfoWeakStmtList c info (WeakStmtLet _ (mx, x, t) e : ss) = do
-  compInfoWeakTermPlus c info t
-  let info' = (x, mx) : info
-  compInfoWeakTermPlus c info' e
-  compInfoWeakStmtList c info' ss
-compInfoWeakStmtList c info (_ : ss) = compInfoWeakStmtList c info ss
+compInfoWeakStmtList :: CursorName -> CompInfo -> [WeakStmt] -> Either CompInfo ()
+compInfoWeakStmtList c info stmtList =
+  case stmtList of
+    [] ->
+      return ()
+    WeakStmtLet _ (mx, x, t) e : ss -> do
+      compInfoWeakTermPlus c info t
+      let info' = (x, mx) : info
+      compInfoWeakTermPlus c info' e
+      compInfoWeakStmtList c info' ss
+    _ : ss ->
+      compInfoWeakStmtList c info ss
 
-compInfoWeakTermPlus ::
-  CursorName -> CompInfo -> WeakTermPlus -> Either CompInfo ()
-compInfoWeakTermPlus _ _ (_, WeakTermTau) = return ()
-compInfoWeakTermPlus c info (_, WeakTermUpsilon x)
-  | asText c == asText x = Left info
-  | otherwise = return ()
-compInfoWeakTermPlus c info (_, WeakTermPi _ xts t) =
-  compInfoBinder c info xts t
-compInfoWeakTermPlus c info (_, WeakTermPiIntro _ xts e) =
-  compInfoBinder c info xts e
-compInfoWeakTermPlus c info (_, WeakTermPiElim e es) = do
-  mapM_ (compInfoWeakTermPlus c info) es
-  compInfoWeakTermPlus c info e
-compInfoWeakTermPlus c info (_, WeakTermIter (mx, x, t) xts e) = do
-  compInfoWeakTermPlus c info t
-  let info' = (x, mx) : info
-  compInfoBinder c info' xts e
-compInfoWeakTermPlus _ _ (_, WeakTermZeta _) = return ()
-compInfoWeakTermPlus _ _ (_, WeakTermConst _) = return ()
-compInfoWeakTermPlus _ _ (_, WeakTermBoxElim _) = return ()
-compInfoWeakTermPlus c info (_, WeakTermInt t _) = compInfoWeakTermPlus c info t
-compInfoWeakTermPlus c info (_, WeakTermFloat t _) =
-  compInfoWeakTermPlus c info t
-compInfoWeakTermPlus _ _ (_, WeakTermEnum _) = return ()
-compInfoWeakTermPlus _ _ (_, WeakTermEnumIntro _) = return ()
-compInfoWeakTermPlus c info (_, WeakTermEnumElim (e, _) les) = do
-  compInfoWeakTermPlus c info e
-  let (_, es) = unzip les
-  mapM_ (compInfoWeakTermPlus c info) es
-compInfoWeakTermPlus c info (_, WeakTermArray dom _) =
-  compInfoWeakTermPlus c info dom
-compInfoWeakTermPlus c info (_, WeakTermArrayIntro _ es) =
-  mapM_ (compInfoWeakTermPlus c info) es
-compInfoWeakTermPlus c info (_, WeakTermArrayElim _ xts e1 e2) = do
-  compInfoWeakTermPlus c info e1
-  compInfoBinder c info xts e2
-compInfoWeakTermPlus _ _ (_, WeakTermStruct _) = return ()
-compInfoWeakTermPlus c info (_, WeakTermStructIntro eks) = do
-  let es = map fst eks
-  mapM_ (compInfoWeakTermPlus c info) es
-compInfoWeakTermPlus c info (_, WeakTermStructElim mxks e1 e2) = do
-  compInfoWeakTermPlus c info e1
-  compInfoArrayElim c info mxks e2
-compInfoWeakTermPlus c info (_, WeakTermCase _ e cxtes) = do
-  compInfoWeakTermPlus c info e
-  forM_ cxtes $ \((_, xts), body) -> compInfoBinder c info xts body
-compInfoWeakTermPlus c info (_, WeakTermQuestion e t) = do
-  compInfoWeakTermPlus c info e
-  compInfoWeakTermPlus c info t
-compInfoWeakTermPlus c info (_, WeakTermErase _ e) =
-  compInfoWeakTermPlus c info e
+compInfoWeakTermPlus :: CursorName -> CompInfo -> WeakTermPlus -> Either CompInfo ()
+compInfoWeakTermPlus c info term =
+  case term of
+    (_, WeakTermTau) ->
+      return ()
+    (_, WeakTermUpsilon x)
+      | asText c == asText x ->
+        Left info
+      | otherwise ->
+        return ()
+    (_, WeakTermPi _ xts t) ->
+      compInfoBinder c info xts t
+    (_, WeakTermPiIntro _ xts e) ->
+      compInfoBinder c info xts e
+    (_, WeakTermPiElim e es) -> do
+      mapM_ (compInfoWeakTermPlus c info) es
+      compInfoWeakTermPlus c info e
+    (_, WeakTermIter (mx, x, t) xts e) -> do
+      compInfoWeakTermPlus c info t
+      let info' = (x, mx) : info
+      compInfoBinder c info' xts e
+    (_, WeakTermZeta _) ->
+      return ()
+    (_, WeakTermConst _) ->
+      return ()
+    (_, WeakTermBoxElim _) ->
+      return ()
+    (_, WeakTermInt t _) ->
+      compInfoWeakTermPlus c info t
+    (_, WeakTermFloat t _) ->
+      compInfoWeakTermPlus c info t
+    (_, WeakTermEnum _) ->
+      return ()
+    (_, WeakTermEnumIntro _) ->
+      return ()
+    (_, WeakTermEnumElim (e, _) les) -> do
+      compInfoWeakTermPlus c info e
+      let (_, es) = unzip les
+      mapM_ (compInfoWeakTermPlus c info) es
+    (_, WeakTermArray dom _) ->
+      compInfoWeakTermPlus c info dom
+    (_, WeakTermArrayIntro _ es) ->
+      mapM_ (compInfoWeakTermPlus c info) es
+    (_, WeakTermArrayElim _ xts e1 e2) -> do
+      compInfoWeakTermPlus c info e1
+      compInfoBinder c info xts e2
+    (_, WeakTermStruct _) ->
+      return ()
+    (_, WeakTermStructIntro eks) -> do
+      let es = map fst eks
+      mapM_ (compInfoWeakTermPlus c info) es
+    (_, WeakTermStructElim mxks e1 e2) -> do
+      compInfoWeakTermPlus c info e1
+      compInfoArrayElim c info mxks e2
+    (_, WeakTermCase _ e cxtes) -> do
+      compInfoWeakTermPlus c info e
+      forM_ cxtes $ \((_, xts), body) -> compInfoBinder c info xts body
+    (_, WeakTermQuestion e t) -> do
+      compInfoWeakTermPlus c info e
+      compInfoWeakTermPlus c info t
+    (_, WeakTermErase _ e) ->
+      compInfoWeakTermPlus c info e
 
 compInfoBinder ::
   CursorName ->
@@ -153,11 +167,14 @@ compInfoBinder ::
   [WeakIdentPlus] ->
   WeakTermPlus ->
   Either CompInfo ()
-compInfoBinder s info [] e = compInfoWeakTermPlus s info e
-compInfoBinder s info ((mx, x, t) : xts) e = do
-  compInfoWeakTermPlus s info t
-  let info' = (x, mx) : info
-  compInfoBinder s info' xts e
+compInfoBinder s info binder e =
+  case binder of
+    [] ->
+      compInfoWeakTermPlus s info e
+    (mx, x, t) : xts -> do
+      compInfoWeakTermPlus s info t
+      let info' = (x, mx) : info
+      compInfoBinder s info' xts e
 
 compInfoArrayElim ::
   CursorName ->
@@ -165,16 +182,20 @@ compInfoArrayElim ::
   [(Meta, Ident, ArrayKind)] ->
   WeakTermPlus ->
   Either CompInfo ()
-compInfoArrayElim s info [] e = compInfoWeakTermPlus s info e
-compInfoArrayElim s info ((mx, x, _) : xts) e = do
-  let info' = (x, mx) : info
-  compInfoArrayElim s info' xts e
+compInfoArrayElim s info binder e =
+  case binder of
+    [] ->
+      compInfoWeakTermPlus s info e
+    (mx, x, _) : xts -> do
+      let info' = (x, mx) : info
+      compInfoArrayElim s info' xts e
 
 filterCompInfo :: Prefix -> (Ident, Meta) -> Bool
-filterCompInfo _ (I (x, _), _)
-  | "private:" `T.isPrefixOf` x = False
-filterCompInfo prefix (I (x, _), _) =
-  prefix `T.isPrefixOf` x && T.all (`S.notMember` S.fromList "()") x
+filterCompInfo prefix (I (x, _), _)
+  | "private:" `T.isPrefixOf` x =
+    False
+  | otherwise =
+    prefix `T.isPrefixOf` x && T.all (`S.notMember` S.fromList "()") x
 
 enrich :: (Ident, Meta) -> [(Ident, Meta)]
 enrich (x, m) = map (\y -> (y, m)) $ toSuffixList x
@@ -186,12 +207,10 @@ toSuffixList (I (s, i)) = map (\x -> I (x, i)) $ toSuffixList' s
 toSuffixList' :: T.Text -> [T.Text]
 toSuffixList' s =
   case T.findIndex (== ':') s of
-    Nothing -> [s]
-    Just i -> s : toSuffixList' (T.drop (toEnum i + 1) s)
-
-headTailMaybe :: [a] -> Maybe (a, [a])
-headTailMaybe [] = Nothing
-headTailMaybe (x : xs) = return (x, xs)
+    Nothing ->
+      [s]
+    Just i ->
+      s : toSuffixList' (T.drop (toEnum i + 1) s)
 
 headTailMaybeText :: T.Text -> Maybe (Char, T.Text)
 headTailMaybeText s
