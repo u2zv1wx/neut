@@ -14,7 +14,6 @@ import Data.Basic
 import Data.Either
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
-import qualified Data.IntMap as IntMap
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Tree
@@ -147,7 +146,7 @@ toInductive ats bts connective@(m, ai, xts, _) = do
   -- definition of inductive type
   indType <-
     discern
-      (m, weakTermPiIntro xts (m, WeakTermPi (Just (asIdent ai)) atsbts cod))
+      (m, weakTermPiIntro xts (m, WeakTermPi (Just ai) atsbts cod))
   at' <- discernIdentPlus at
   insForm (length ats) at' indType
   -- definition of induction principle (fold)
@@ -193,7 +192,7 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
             (xts' ++ yts)
             ( m,
               WeakTermPiIntro
-                (Just (asIdent ai, asIdent bi, xts' ++ yts))
+                (Just (asIdent ai, bi, xts' ++ yts))
                 (ats ++ bts)
                 (m, WeakTermPiElim (mb, WeakTermUpsilon (asIdent bi)) (map toVar' yts))
             )
@@ -202,9 +201,9 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
       discernIdentPlus
         (mb, asIdent bi, (m, weakTermPi (xts' ++ yts) cod))
     case constructor of
-      (_, WeakTermPiIntro _ xtsyts (_, WeakTermPiIntro indInfo@(Just (ai', bi', _)) atsbts (_, WeakTermPiElim b _))) -> do
+      (_, WeakTermPiIntro _ xtsyts (_, WeakTermPiIntro indInfo@(Just (ai', _, _)) atsbts (_, WeakTermPiElim b _))) -> do
         let as = map (\(_, x, _) -> asText x) ats
-        modify (\env -> env {revIndEnv = IntMap.insert (asInt bi') (ai', is) (revIndEnv env)})
+        modify (\env -> env {revIndEnv = Map.insert bi (ai', is) (revIndEnv env)})
         yts' <- mapM (internalize as atsbts) $ drop (length is) xtsyts
         return
           [ WeakStmtLetWT

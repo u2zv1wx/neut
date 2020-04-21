@@ -39,11 +39,10 @@ infer' ctx (m, WeakTermPiIntro info xts e) = do
   case info of
     Nothing -> return ((m, weakTermPiIntro xts' e'), (m, weakTermPi xts' t'))
     Just (indName, consName, args) -> do
-      -- (ai, _) <- lookupRevIndEnv m name
       args' <- inferSigma ctx args
       return
         ( (m, WeakTermPiIntro (Just (indName, consName, args')) xts' e'),
-          (m, WeakTermPi (Just indName) xts' t')
+          (m, WeakTermPi (Just $ asText indName) xts' t')
         )
 infer' ctx (m, WeakTermPiElim e es) = do
   etls <- mapM (infer' ctx) es
@@ -233,7 +232,7 @@ getIndInfo cs = do
 getIndInfo' :: (Meta, Ident) -> WithEnv ((Meta, Ident), [Int])
 getIndInfo' (m, c) = do
   rienv <- gets revIndEnv
-  case IntMap.lookup (asInt c) rienv of
+  case Map.lookup (asText c) rienv of
     Just (i, is) -> return ((m, i), is)
     _ -> raiseError m $ "no such constructor defined: " <> asText c
 

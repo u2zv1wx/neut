@@ -52,12 +52,7 @@ discern' nenv =
                     Nothing -> raiseError m $ "undefined variable:  " <> asText x
     (m, WeakTermPi mName xts t) -> do
       (xts', t') <- discernBinder nenv xts t
-      case mName of
-        Nothing -> return (m, WeakTermPi mName xts' t')
-        Just name -> do
-          penv <- gets prefixEnv
-          name' <- lookupName'' m penv nenv name
-          return (m, WeakTermPi (Just name') xts' t')
+      return (m, WeakTermPi mName xts' t')
     (m, WeakTermPiIntro info xts e) -> do
       (xts', e') <- discernBinder nenv xts e
       case info of
@@ -65,9 +60,8 @@ discern' nenv =
         Just (indName, consName, args) -> do
           penv <- gets prefixEnv
           indName' <- lookupName'' m penv nenv indName
-          consName' <- lookupName'' m penv nenv consName
           args' <- mapM (discernFreeIdentPlus nenv) args
-          return (m, WeakTermPiIntro (Just (indName', consName', args')) xts' e')
+          return (m, WeakTermPiIntro (Just (indName', consName, args')) xts' e')
     (m, WeakTermPiElim e es) -> do
       es' <- mapM (discern' nenv) es
       e' <- discern' nenv e

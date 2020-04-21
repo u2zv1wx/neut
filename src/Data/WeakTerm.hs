@@ -8,9 +8,9 @@ import qualified Data.Text as T
 data WeakTerm
   = WeakTermTau
   | WeakTermUpsilon Ident
-  | WeakTermPi (Maybe Ident) [WeakIdentPlus] WeakTermPlus
+  | WeakTermPi (Maybe T.Text) [WeakIdentPlus] WeakTermPlus
   | WeakTermPiIntro
-      (Maybe (Ident, Ident, [WeakIdentPlus]))
+      (Maybe (Ident, T.Text, [WeakIdentPlus]))
       [WeakIdentPlus]
       WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
@@ -344,7 +344,7 @@ toText (_, WeakTermPiIntro Nothing xts e) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["λ", argStr, toText e]
 toText (_, WeakTermPiIntro (Just (_, name, _)) _ _) =
-  "<#" <> asText name <> "-" <> "internal" <> "#>"
+  "<#" <> name <> "-" <> "internal" <> "#>"
 toText (_, WeakTermPiElim e es) =
   showCons $ map toText $ e : es
 toText (_, WeakTermIter (_, x, _) xts e) = do

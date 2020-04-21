@@ -16,7 +16,7 @@
   (witness i64
     (mul x -1)))
 
-(definition private:print-digit ((x i64))
+(definition print-digit ((x i64))
   (witness top
     (with let-bind
       (print-character (unsafe:cast i64 u8 (add x 48))))))

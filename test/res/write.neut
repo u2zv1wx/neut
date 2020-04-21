@@ -39,6 +39,7 @@
 
 ;; (end os)
 
+
 (use os)
 
 ;; こっちだとmalloc/freeがめっちゃ発生する。

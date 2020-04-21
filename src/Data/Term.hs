@@ -11,8 +11,8 @@ import GHC.Generics (Generic)
 data Term
   = TermTau
   | TermUpsilon Ident
-  | TermPi (Maybe Ident) [IdentPlus] TermPlus
-  | TermPiIntro (Maybe (Ident, Ident, [IdentPlus])) [IdentPlus] TermPlus
+  | TermPi (Maybe T.Text) [IdentPlus] TermPlus
+  | TermPiIntro (Maybe (Ident, T.Text, [IdentPlus])) [IdentPlus] TermPlus
   | TermPiElim TermPlus [TermPlus]
   | TermIter IdentPlus [IdentPlus] TermPlus
   | TermConst T.Text

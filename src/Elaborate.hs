@@ -50,8 +50,10 @@ elaborateStmt =
       cont' <- elaborateStmt cont
       return $ StmtLet m (mx, x, t'') e' cont'
     WeakStmtConstDecl (_, c, t) : cont -> do
-      t' <- reduceTermPlus <$> elaborate' t
-      insTypeEnv (Right c) t'
+      t' <- inferType t
+      analyze >> synthesize >> refine >> cleanup
+      t'' <- reduceTermPlus <$> elaborate' t'
+      insTypeEnv (Right c) t''
       elaborateStmt cont
     WeakStmtVerify m e : cont -> do
       whenCheck $ do
@@ -68,7 +70,7 @@ elaborateStmt =
 cleanup :: WithEnv ()
 cleanup = do
   modify (\env -> env {constraintEnv = []})
-  modify (\env -> env {weakTypeEnv = IntMap.empty})
+  -- modify (\env -> env {weakTypeEnv = IntMap.empty})
   modify (\env -> env {zetaEnv = IntMap.empty})
 
 refine :: WithEnv ()
