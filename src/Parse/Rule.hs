@@ -306,54 +306,56 @@ asInductive =
       return $ t' : ts'
 
 asInductive' :: TreePlus -> WithEnv ((T.Text, T.Text), TreePlus)
-asInductive' (m, TreeNode ((_, TreeLeaf a) : (_, TreeNode xts) : rules)) = do
-  let a' = "(" <> a <> ")"
-  let sub = (a, a')
-  let xts' = map (substTree sub) xts
-  rules'' <- mapM styleRule $ map (substTree sub) rules
-  let hole = "(_)"
-  argList <- mapM extractArg xts
-  return
-    ( (a, a'),
-      ( m,
-        TreeNode
-          [ (m, TreeLeaf a),
-            (m, TreeNode xts'),
-            ( m,
-              TreeNode
-                [ (m, TreeLeaf "unfold"),
-                  ( m,
-                    TreeNode
-                      ( [ ( m,
-                            TreeNode
-                              [ (m, TreeLeaf a'),
-                                ( m,
-                                  TreeNode
-                                    [ (m, TreeLeaf "pi"),
-                                      (m, TreeNode xts'),
-                                      (m, TreeLeaf "tau")
-                                    ]
-                                )
-                              ]
+asInductive' t =
+  case t of
+    (m, TreeNode ((_, TreeLeaf a) : (_, TreeNode xts) : rules)) -> do
+      let a' = "(" <> a <> ")"
+      let sub = (a, a')
+      let xts' = map (substTree sub) xts
+      rules'' <- mapM styleRule $ map (substTree sub) rules
+      let hole = "(_)"
+      argList <- mapM extractArg xts
+      return
+        ( (a, a'),
+          ( m,
+            TreeNode
+              [ (m, TreeLeaf a),
+                (m, TreeNode xts'),
+                ( m,
+                  TreeNode
+                    [ (m, TreeLeaf "unfold"),
+                      ( m,
+                        TreeNode
+                          ( [ ( m,
+                                TreeNode
+                                  [ (m, TreeLeaf a'),
+                                    ( m,
+                                      TreeNode
+                                        [ (m, TreeLeaf "pi"),
+                                          (m, TreeNode xts'),
+                                          (m, TreeLeaf "tau")
+                                        ]
+                                    )
+                                  ]
+                              )
+                            ]
+                              ++ rules''
+                              ++ [ ( m,
+                                     TreeNode
+                                       [ (m, TreeLeaf hole),
+                                         (m, TreeNode ((m, TreeLeaf a') : argList))
+                                       ]
+                                   )
+                                 ]
                           )
-                        ]
-                          ++ rules''
-                          ++ [ ( m,
-                                 TreeNode
-                                   [ (m, TreeLeaf hole),
-                                     (m, TreeNode ((m, TreeLeaf a') : argList))
-                                   ]
-                               )
-                             ]
-                      )
-                  ),
-                  (m, TreeNode ((m, TreeLeaf a) : argList))
-                ]
-            )
-          ]
-      )
-    )
-asInductive' t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) ...)"
+                      ),
+                      (m, TreeNode ((m, TreeLeaf a) : argList))
+                    ]
+                )
+              ]
+          )
+        )
+    _ -> raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) ...)"
 
 extractArg :: TreePlus -> WithEnv TreePlus
 extractArg =
@@ -387,8 +389,10 @@ internalize as atsbts (m, y, t) = do
   theta ModeForward sub atsbts t (m, WeakTermUpsilon y)
 
 flipMode :: Mode -> Mode
-flipMode ModeForward = ModeBackward
-flipMode ModeBackward = ModeForward
+flipMode mode =
+  case mode of
+    ModeForward -> ModeBackward
+    ModeBackward -> ModeForward
 
 isResolved :: SubstWeakTerm -> WeakTermPlus -> Bool
 isResolved sub e = do
@@ -577,13 +581,15 @@ renameBinder ::
   [WeakIdentPlus] ->
   WeakTermPlus ->
   WithEnv ([WeakIdentPlus], WeakTermPlus)
-renameBinder [] e = return ([], e)
-renameBinder ((m, x, t) : ats) e = do
-  x' <- newNameWith x
-  let sub = IntMap.singleton (asInt x) (m, WeakTermUpsilon x')
-  let (ats', e') = substWeakTermPlus'' sub ats e -- discern済みなのでこれでオーケーのはず
-  (ats'', e'') <- renameBinder ats' e'
-  return ((m, x', t) : ats'', e'')
+renameBinder binder e =
+  case binder of
+    [] -> return ([], e)
+    (m, x, t) : ats -> do
+      x' <- newNameWith x
+      let sub = IntMap.singleton (asInt x) (m, WeakTermUpsilon x')
+      let (ats', e') = substWeakTermPlus'' sub ats e -- discern済みなのでこれでオーケーのはず
+      (ats'', e'') <- renameBinder ats' e'
+      return ((m, x', t) : ats'', e'')
 
 type RuleTypeDom = (Ident, [WeakTermPlus])
 
@@ -593,118 +599,130 @@ type SubstRule = (RuleTypeDom, RuleTypeCod)
 
 -- subst a @ (e1, ..., en) ~> a' @ (e1', ..., en')
 substRuleType :: SubstRule -> WeakTermPlus -> WithEnv WeakTermPlus
-substRuleType _ (m, WeakTermTau) = return (m, WeakTermTau)
-substRuleType _ (m, WeakTermUpsilon x) = return (m, WeakTermUpsilon x)
-substRuleType sub (m, WeakTermPi mName xts t) = do
-  (xts', t') <- substRuleType'' sub xts t
-  return (m, WeakTermPi mName xts' t')
-substRuleType sub (m, WeakTermPiIntro info xts body) = do
-  (xts', body') <- substRuleType'' sub xts body
-  case info of
-    Nothing -> return (m, WeakTermPiIntro Nothing xts' body')
-    Just (indName, consName, args) -> do
-      args' <- substRuleType' sub args
-      return (m, WeakTermPiIntro (Just (indName, consName, args')) xts' body')
--- info' <- fmap2M (substRuleType' sub) info
--- return (m, WeakTermPiIntro info' xts' body')
-substRuleType sub@((a1, es1), (a2, es2)) (m, WeakTermPiElim e es)
-  | (mx, WeakTermUpsilon x) <- e,
-    a1 == x =
-    case (mapM asUpsilon es1, mapM asUpsilon es) of
-      (Just xs', Just ys')
-        | xs' == ys' -> return (m, WeakTermPiElim (mx, WeakTermUpsilon a2) es2) -- `aOuter @ (処理済み, ..., 処理済み)` への変換
-      _ ->
-        raiseError
-          m
-          "generalized inductive type cannot be used to construct a nested inductive type"
-  | otherwise = do
-    e' <- substRuleType sub e
-    es' <- mapM (substRuleType sub) es
-    return (m, WeakTermPiElim e' es')
-substRuleType sub (m, WeakTermIter (mx, x, t) xts e) = do
-  t' <- substRuleType sub t
-  if fst (fst sub) == x
-    then return (m, WeakTermIter (mx, x, t') xts e)
-    else do
-      (xts', e') <- substRuleType'' sub xts e
-      return (m, WeakTermIter (mx, x, t') xts' e')
-substRuleType _ (m, WeakTermConst x) = return (m, WeakTermConst x)
-substRuleType _ (m, WeakTermBoxElim x) = return (m, WeakTermBoxElim x)
-substRuleType _ (m, WeakTermZeta x) = return (m, WeakTermZeta x)
-substRuleType sub (m, WeakTermInt t x) = do
-  t' <- substRuleType sub t
-  return (m, WeakTermInt t' x)
-substRuleType sub (m, WeakTermFloat t x) = do
-  t' <- substRuleType sub t
-  return (m, WeakTermFloat t' x)
-substRuleType _ (m, WeakTermEnum x) = return (m, WeakTermEnum x)
-substRuleType _ (m, WeakTermEnumIntro l) = return (m, WeakTermEnumIntro l)
-substRuleType sub (m, WeakTermEnumElim (e, t) branchList) = do
-  t' <- substRuleType sub t
-  e' <- substRuleType sub e
-  let (caseList, es) = unzip branchList
-  es' <- mapM (substRuleType sub) es
-  return (m, WeakTermEnumElim (e', t') (zip caseList es'))
-substRuleType sub (m, WeakTermArray dom k) = do
-  dom' <- substRuleType sub dom
-  return (m, WeakTermArray dom' k)
-substRuleType sub (m, WeakTermArrayIntro k es) = do
-  es' <- mapM (substRuleType sub) es
-  return (m, WeakTermArrayIntro k es')
-substRuleType sub (m, WeakTermArrayElim mk xts v e) = do
-  v' <- substRuleType sub v
-  (xts', e') <- substRuleType'' sub xts e
-  return (m, WeakTermArrayElim mk xts' v' e')
-substRuleType _ (m, WeakTermStruct ts) = return (m, WeakTermStruct ts)
-substRuleType sub (m, WeakTermStructIntro ets) = do
-  let (es, ts) = unzip ets
-  es' <- mapM (substRuleType sub) es
-  return (m, WeakTermStructIntro $ zip es' ts)
-substRuleType sub (m, WeakTermStructElim xts v e) = do
-  v' <- substRuleType sub v
-  let xs = map (\(_, x, _) -> x) xts
-  if fst (fst sub) `elem` xs
-    then return (m, WeakTermStructElim xts v' e)
-    else do
-      e' <- substRuleType sub e
-      return (m, WeakTermStructElim xts v' e')
-substRuleType sub (m, WeakTermCase indName e cxtes) = do
-  e' <- substRuleType sub e
-  cxtes' <-
-    flip mapM cxtes $ \((c, xts), body) -> do
+substRuleType sub@((a1, es1), (a2, es2)) term =
+  case term of
+    (m, WeakTermTau) ->
+      return (m, WeakTermTau)
+    (m, WeakTermUpsilon x) ->
+      return (m, WeakTermUpsilon x)
+    (m, WeakTermPi mName xts t) -> do
+      (xts', t') <- substRuleType'' sub xts t
+      return (m, WeakTermPi mName xts' t')
+    (m, WeakTermPiIntro info xts body) -> do
       (xts', body') <- substRuleType'' sub xts body
-      return ((c, xts'), body')
-  return (m, WeakTermCase indName e' cxtes')
-substRuleType sub (m, WeakTermQuestion e t) = do
-  e' <- substRuleType sub e
-  t' <- substRuleType sub t
-  return (m, WeakTermQuestion e' t')
-substRuleType sub (m, WeakTermErase xs e) = do
-  e' <- substRuleType sub e
-  return (m, WeakTermErase xs e')
+      case info of
+        Nothing -> return (m, WeakTermPiIntro Nothing xts' body')
+        Just (indName, consName, args) -> do
+          args' <- substRuleType' sub args
+          return (m, WeakTermPiIntro (Just (indName, consName, args')) xts' body')
+    (m, WeakTermPiElim e es)
+      | (mx, WeakTermUpsilon x) <- e,
+        a1 == x ->
+        case (mapM asUpsilon es1, mapM asUpsilon es) of
+          (Just xs', Just ys')
+            | xs' == ys' -> return (m, WeakTermPiElim (mx, WeakTermUpsilon a2) es2) -- `aOuter @ (処理済み, ..., 処理済み)` への変換
+          _ ->
+            raiseError
+              m
+              "generalized inductive type cannot be used to construct a nested inductive type"
+      | otherwise -> do
+        e' <- substRuleType sub e
+        es' <- mapM (substRuleType sub) es
+        return (m, WeakTermPiElim e' es')
+    (m, WeakTermIter (mx, x, t) xts e) -> do
+      t' <- substRuleType sub t
+      if fst (fst sub) == x
+        then return (m, WeakTermIter (mx, x, t') xts e)
+        else do
+          (xts', e') <- substRuleType'' sub xts e
+          return (m, WeakTermIter (mx, x, t') xts' e')
+    (m, WeakTermConst x) ->
+      return (m, WeakTermConst x)
+    (m, WeakTermBoxElim x) ->
+      return (m, WeakTermBoxElim x)
+    (m, WeakTermZeta x) ->
+      return (m, WeakTermZeta x)
+    (m, WeakTermInt t x) -> do
+      t' <- substRuleType sub t
+      return (m, WeakTermInt t' x)
+    (m, WeakTermFloat t x) -> do
+      t' <- substRuleType sub t
+      return (m, WeakTermFloat t' x)
+    (m, WeakTermEnum x) ->
+      return (m, WeakTermEnum x)
+    (m, WeakTermEnumIntro l) ->
+      return (m, WeakTermEnumIntro l)
+    (m, WeakTermEnumElim (e, t) branchList) -> do
+      t' <- substRuleType sub t
+      e' <- substRuleType sub e
+      let (caseList, es) = unzip branchList
+      es' <- mapM (substRuleType sub) es
+      return (m, WeakTermEnumElim (e', t') (zip caseList es'))
+    (m, WeakTermArray dom k) -> do
+      dom' <- substRuleType sub dom
+      return (m, WeakTermArray dom' k)
+    (m, WeakTermArrayIntro k es) -> do
+      es' <- mapM (substRuleType sub) es
+      return (m, WeakTermArrayIntro k es')
+    (m, WeakTermArrayElim mk xts v e) -> do
+      v' <- substRuleType sub v
+      (xts', e') <- substRuleType'' sub xts e
+      return (m, WeakTermArrayElim mk xts' v' e')
+    (m, WeakTermStruct ts) ->
+      return (m, WeakTermStruct ts)
+    (m, WeakTermStructIntro ets) -> do
+      let (es, ts) = unzip ets
+      es' <- mapM (substRuleType sub) es
+      return (m, WeakTermStructIntro $ zip es' ts)
+    (m, WeakTermStructElim xts v e) -> do
+      v' <- substRuleType sub v
+      let xs = map (\(_, x, _) -> x) xts
+      if fst (fst sub) `elem` xs
+        then return (m, WeakTermStructElim xts v' e)
+        else do
+          e' <- substRuleType sub e
+          return (m, WeakTermStructElim xts v' e')
+    (m, WeakTermCase indName e cxtes) -> do
+      e' <- substRuleType sub e
+      cxtes' <-
+        flip mapM cxtes $ \((c, xts), body) -> do
+          (xts', body') <- substRuleType'' sub xts body
+          return ((c, xts'), body')
+      return (m, WeakTermCase indName e' cxtes')
+    (m, WeakTermQuestion e t) -> do
+      e' <- substRuleType sub e
+      t' <- substRuleType sub t
+      return (m, WeakTermQuestion e' t')
+    (m, WeakTermErase xs e) -> do
+      e' <- substRuleType sub e
+      return (m, WeakTermErase xs e')
 
 substRuleType' :: SubstRule -> [WeakIdentPlus] -> WithEnv [WeakIdentPlus]
-substRuleType' _ [] = return []
-substRuleType' sub ((m, x, t) : xts) = do
-  t' <- substRuleType sub t
-  if fst (fst sub) == x
-    then return $ (m, x, t') : xts
-    else do
-      xts' <- substRuleType' sub xts
-      return $ (m, x, t') : xts'
+substRuleType' sub binder =
+  case binder of
+    [] -> return []
+    (m, x, t) : xts -> do
+      t' <- substRuleType sub t
+      if fst (fst sub) == x
+        then return $ (m, x, t') : xts
+        else do
+          xts' <- substRuleType' sub xts
+          return $ (m, x, t') : xts'
 
 substRuleType'' ::
   SubstRule ->
   [WeakIdentPlus] ->
   WeakTermPlus ->
   WithEnv ([WeakIdentPlus], WeakTermPlus)
-substRuleType'' sub [] e = do
-  e' <- substRuleType sub e
-  return ([], e')
-substRuleType'' sub ((m, x, t) : xts) e = do
-  t' <- substRuleType sub t
-  if fst (fst sub) == x
-    then return ((m, x, t') : xts, e)
-    else do
-      (xts', e') <- substRuleType'' sub xts e
-      return ((m, x, t') : xts', e')
+substRuleType'' sub binder e =
+  case binder of
+    [] -> do
+      e' <- substRuleType sub e
+      return ([], e')
+    (m, x, t) : xts -> do
+      t' <- substRuleType sub t
+      if fst (fst sub) == x
+        then return ((m, x, t') : xts, e)
+        else do
+          (xts', e') <- substRuleType'' sub xts e
+          return ((m, x, t') : xts', e')
