@@ -273,24 +273,35 @@ lookupTypeEnv m x name = do
         "the constant `" <> name <> "` is not found in the type environment."
 
 lookupTypeEnv' :: Meta -> TypeEnvKey -> TypeEnv -> T.Text -> WithEnv TermPlus
-lookupTypeEnv' m (Right s) _ _
-  | Just _ <- asLowTypeMaybe s = return (m, TermTau)
-  | Just op <- asUnaryOpMaybe s = unaryOpToType m op
-  | Just op <- asBinaryOpMaybe s = binaryOpToType m op
-  | Just lowType <- asArrayAccessMaybe s = arrayAccessToType m lowType
 lookupTypeEnv' m key tenv name =
-  case Map.lookup key tenv of
-    Just t -> return t
-    Nothing ->
-      raiseCritical m $
-        "the constant `" <> name <> "` is not found in the type environment."
+  case key of
+    Right s
+      | Just _ <- asLowTypeMaybe s ->
+        return (m, TermTau)
+      | Just op <- asUnaryOpMaybe s ->
+        unaryOpToType m op
+      | Just op <- asBinaryOpMaybe s ->
+        binaryOpToType m op
+      | Just lowType <- asArrayAccessMaybe s ->
+        arrayAccessToType m lowType
+    _ ->
+      case Map.lookup key tenv of
+        Just t -> return t
+        Nothing ->
+          raiseCritical m $
+            "the constant `" <> name <> "` is not found in the type environment."
 
 lowTypeToType :: Meta -> LowType -> WithEnv TermPlus
-lowTypeToType m (LowTypeIntS s) = return (m, TermEnum (EnumTypeIntS s))
-lowTypeToType m (LowTypeIntU s) = return (m, TermEnum (EnumTypeIntU s))
-lowTypeToType m (LowTypeFloat s) =
-  return (m, TermConst $ "f" <> T.pack (show (sizeAsInt s)))
-lowTypeToType m _ = raiseCritical m "invalid argument passed to lowTypeToType"
+lowTypeToType m lowType =
+  case lowType of
+    LowTypeIntS s ->
+      return (m, TermEnum (EnumTypeIntS s))
+    LowTypeIntU s ->
+      return (m, TermEnum (EnumTypeIntU s))
+    LowTypeFloat s ->
+      return (m, TermConst $ "f" <> T.pack (show (sizeAsInt s)))
+    _ ->
+      raiseCritical m "invalid argument passed to lowTypeToType"
 
 unaryOpToType :: Meta -> UnaryOp -> WithEnv TermPlus
 unaryOpToType m op = do
