@@ -377,11 +377,15 @@ llvmCodeCase m v (((_, c), code) : branchList) = do
   (tmp, tmpVar) <- newDataLocal c
   (base, baseVar) <- newDataLocal $ takeBaseName v
   (isEq, isEqVar) <- newDataLocal "cmp"
-  uncastThenCmpThenBranch <-
-    llvmUncastLet tmp (LLVMDataGlobal $ showInHex c) (toFunPtrType [])
-      $ LLVMLet isEq (LLVMOpBinaryOp (BinaryOpEQ voidPtr) tmpVar baseVar)
-      $ LLVMBranch isEqVar code' cont
-  llvmDataLet base v uncastThenCmpThenBranch
+  cenv <- gets codeEnv
+  case Map.lookup c cenv of
+    Nothing -> raiseCritical m "llvmCodeCase"
+    Just (Definition _ args _) -> do
+      uncastThenCmpThenBranch <-
+        llvmUncastLet tmp (LLVMDataGlobal c) (toFunPtrType args)
+          $ LLVMLet isEq (LLVMOpBinaryOp (BinaryOpEQ voidPtr) tmpVar baseVar)
+          $ LLVMBranch isEqVar code' cont
+      llvmDataLet base v uncastThenCmpThenBranch
 
 data AggPtrType
   = AggPtrTypeArray Int LowType

@@ -68,10 +68,11 @@ elaborateStmt =
       elaborateStmt cont
 
 cleanup :: WithEnv ()
-cleanup = do
+cleanup =
   modify (\env -> env {constraintEnv = []})
-  -- modify (\env -> env {weakTypeEnv = IntMap.empty})
-  modify (\env -> env {zetaEnv = IntMap.empty})
+
+-- modify (\env -> env {weakTypeEnv = IntMap.empty})
+-- modify (\env -> env {zetaEnv = IntMap.empty})
 
 refine :: WithEnv ()
 refine =
