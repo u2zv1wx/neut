@@ -51,10 +51,6 @@ clarify' tenv lam@(m, TermPiIntro Nothing mxts e) = do
 clarify' tenv (m, TermPiIntro (Just (_, name, args)) mxts e) = do
   e' <- clarify' (insTypeEnv1 mxts tenv) e
   let name' = showInHex name
-  -- let name' = asText'' name
-  -- p $ T.unpack $ "arg-len-of " <> name <> ":"
-  -- p' $ length mxts + 1
-  -- ここでname'の引数の数の情報をenvに登録するとよい？
   retClosure tenv (Just name') args m mxts e'
 clarify' tenv (m, TermPiElim e es) = do
   es' <- mapM (clarifyPlus tenv) es
