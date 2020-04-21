@@ -82,7 +82,6 @@ reduceCodePlus term =
               case lookup CaseDefault les of
                 Just body -> reduceCodePlus $ substCodePlus varInfo body
                 Nothing -> return (m, CodeEnumElim varInfo v les)
-        -- return (m, CodeEnumElim IntMap.empty v $ zip ls es'')
         _ -> return (m, CodeEnumElim varInfo v les)
     (m, CodeStructElim xks d e) -> do
       let (xs, ks1) = unzip xks
