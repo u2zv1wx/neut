@@ -71,9 +71,6 @@ cleanup :: WithEnv ()
 cleanup =
   modify (\env -> env {constraintEnv = []})
 
--- modify (\env -> env {weakTypeEnv = IntMap.empty})
--- modify (\env -> env {zetaEnv = IntMap.empty})
-
 refine :: WithEnv ()
 refine =
   modify (\env -> env {substEnv = IntMap.map reduceWeakTermPlus (substEnv env)})
