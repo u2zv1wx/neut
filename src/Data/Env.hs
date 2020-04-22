@@ -30,14 +30,6 @@ data VisitInfo
   = VisitInfoActive
   | VisitInfoFinish
 
--- type FileEnv = Map.HashMap (Path Abs File) VisitInfo
-
--- type RuleEnv = IntMap.IntMap (Maybe [WeakIdentPlus])
-
--- type UnivInstEnv = IntMap.IntMap (S.Set Int)
-
--- type TypeEnvKey = Either Int T.Text
-
 type TypeEnv = IntMap.IntMap TermPlus
 
 data Env
