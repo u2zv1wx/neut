@@ -171,8 +171,10 @@ evalWithEnv :: WithEnv a -> Env -> IO (Either Error a)
 evalWithEnv c env = do
   resultOrErr <- try $ runStateT c env
   case resultOrErr of
-    Left err -> return $ Left err
-    Right (result, _) -> return $ Right result
+    Left err ->
+      return $ Left err
+    Right (result, _) ->
+      return $ Right result
 
 {-# INLINE newCount #-}
 newCount :: WithEnv Int
@@ -225,7 +227,8 @@ getTarget :: WithEnv Target
 getTarget = do
   mtarget <- gets target
   case mtarget of
-    Just t -> return t
+    Just t ->
+      return t
     Nothing -> do
       currentOS <- getOS
       currentArch <- getArch
@@ -234,15 +237,20 @@ getTarget = do
 getOS :: WithEnv OS
 getOS =
   case os of
-    "linux" -> return OSLinux
-    "darwin" -> return OSDarwin
-    s -> raiseCritical' $ "unsupported target os: " <> T.pack (show s)
+    "linux" ->
+      return OSLinux
+    "darwin" ->
+      return OSDarwin
+    s ->
+      raiseCritical' $ "unsupported target os: " <> T.pack (show s)
 
 getArch :: WithEnv Arch
 getArch =
   case arch of
-    "x86_64" -> return Arch64
-    s -> raiseCritical' $ "unsupported target arch: " <> T.pack (show s)
+    "x86_64" ->
+      return Arch64
+    s ->
+      raiseCritical' $ "unsupported target arch: " <> T.pack (show s)
 
 {-# INLINE newDataUpsilonWith #-}
 newDataUpsilonWith :: Meta -> T.Text -> WithEnv (Ident, DataPlus)
@@ -260,7 +268,8 @@ lookupTypeEnv :: Meta -> Int -> T.Text -> WithEnv TermPlus
 lookupTypeEnv m x name = do
   tenv <- gets typeEnv
   case IntMap.lookup x tenv of
-    Just t -> return t
+    Just t ->
+      return t
     Nothing ->
       raiseCritical m $
         "the variable `" <> name <> "` is not found in the type environment."
@@ -379,12 +388,18 @@ insEnumEnv m name xis = do
 
 isConstant :: T.Text -> WithEnv Bool
 isConstant name
-  | name == "f16" = return True
-  | name == "f32" = return True
-  | name == "f64" = return True
-  | Just _ <- asUnaryOpMaybe name = return True
-  | Just _ <- asBinaryOpMaybe name = return True
-  | Just _ <- asArrayAccessMaybe name = return True
+  | name == "f16" =
+    return True
+  | name == "f32" =
+    return True
+  | name == "f64" =
+    return True
+  | Just _ <- asUnaryOpMaybe name =
+    return True
+  | Just _ <- asBinaryOpMaybe name =
+    return True
+  | Just _ <- asArrayAccessMaybe name =
+    return True
   | otherwise = do
     set <- gets constantSet
     return $ S.member name set
@@ -399,8 +414,10 @@ p' s = liftIO $ putStrLn $ Pr.ppShow s
 lowTypeToArrayKind :: Meta -> LowType -> WithEnv ArrayKind
 lowTypeToArrayKind m lowType =
   case lowTypeToArrayKindMaybe lowType of
-    Just k -> return k
-    Nothing -> raiseCritical m "Infer.lowTypeToArrayKind"
+    Just k ->
+      return k
+    Nothing ->
+      raiseCritical m "Infer.lowTypeToArrayKind"
 
 raiseError :: Meta -> T.Text -> WithEnv a
 raiseError m text = throw $ Error [logError (getPosInfo m) text]
@@ -435,7 +452,8 @@ isCacheAvailable :: Path Abs File -> WithEnv Bool
 isCacheAvailable path = do
   g <- gets depGraph
   case Map.lookup path g of
-    Nothing -> isCacheAvailable' path
+    Nothing ->
+      isCacheAvailable' path
     Just xs -> do
       b <- isCacheAvailable' path
       bs <- mapM isCacheAvailable xs
@@ -494,8 +512,10 @@ lookupRevIndEnv :: Meta -> T.Text -> WithEnv (Ident, [Int])
 lookupRevIndEnv m bi = do
   rienv <- gets revIndEnv
   case Map.lookup bi rienv of
-    Nothing -> raiseCritical m $ "no such constructor defined: `" <> bi <> "`"
-    Just val -> return val
+    Nothing ->
+      raiseCritical m $ "no such constructor defined: `" <> bi <> "`"
+    Just val ->
+      return val
 
 insertConstant :: Meta -> T.Text -> WithEnv ()
 insertConstant m x = do
