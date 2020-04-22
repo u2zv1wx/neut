@@ -53,9 +53,12 @@ substLLVMData sub llvmData =
   case llvmData of
     LLVMDataLocal x ->
       case IntMap.lookup (asInt x) sub of
-        Just d -> d
-        Nothing -> LLVMDataLocal x
-    _ -> llvmData
+        Just d ->
+          d
+        Nothing ->
+          LLVMDataLocal x
+    _ ->
+      llvmData
 
 substLLVMOp :: SubstLLVM -> LLVMOp -> LLVMOp
 substLLVMOp sub llvmOp =

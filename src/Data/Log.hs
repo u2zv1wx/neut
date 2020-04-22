@@ -54,8 +54,10 @@ type ColorFlag = Bool
 outputLog :: ColorFlag -> String -> Log -> IO ()
 outputLog b eoe (mpos, l, t) = do
   case mpos of
-    Nothing -> return ()
-    Just pos -> outputPosInfo b pos
+    Nothing ->
+      return ()
+    Just pos ->
+      outputPosInfo b pos
   outputLogLevel b l
   outputLogText t
   outputFooter eoe
@@ -63,8 +65,10 @@ outputLog b eoe (mpos, l, t) = do
 outputLog' :: ColorFlag -> Log -> IO ()
 outputLog' b (mpos, l, t) = do
   case mpos of
-    Nothing -> return ()
-    Just pos -> outputPosInfo b pos
+    Nothing ->
+      return ()
+    Just pos ->
+      outputPosInfo b pos
   outputLogLevel b l
   TIO.putStr t
 
