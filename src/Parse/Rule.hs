@@ -178,7 +178,7 @@ toInductive ats bts connective@(m, ai, xts, _) = do
       (m, weakTermPiIntro xts (m, WeakTermPi (Just ai) atsbts cod))
   at' <- discernIdentPlus at
   insForm (length ats) at' indType
-  -- definition of  (fold)
+  -- definition of fold
   z <- newNameWith'' "_"
   let zt = (m, z, cod)
   let indArgs = xts ++ [zt] ++ atsbts
@@ -393,7 +393,8 @@ styleRule tree =
               (m, TreeNode [(m, TreeLeaf "pi"), (m, TreeNode xts), t])
             ]
         )
-    t -> raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) TREE)"
+    t ->
+      raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) TREE)"
 
 data Mode
   = ModeForward
@@ -543,7 +544,8 @@ lookupInductive m ai = do
     Just Nothing ->
       raiseError m $
         "the inductive type `" <> asText ai <> "` must be a non-mutual inductive type"
-    Nothing -> raiseCritical m $ "no such inductive type defined: " <> asText ai
+    Nothing ->
+      raiseCritical m $ "no such inductive type defined: " <> asText ai
 
 -- nested inductiveにおける引数をinternalizeする。
 -- （これ、recursiveに処理できないの？）
@@ -591,7 +593,6 @@ toInternalizedArg mode isub aInner aOuter xts atsbts es es' b (mbInner, _, (_, W
         ytsInner'
         (mbInner, WeakTermPiElim (toVar' b) (es' ++ args))
     )
--- (mbInner, WeakTermPiElim (toVar' b) (es' ++ args)))
 toInternalizedArg _ _ _ _ _ _ _ _ _ (m, _, _) =
   raiseCritical
     m
@@ -641,7 +642,8 @@ substRuleType sub@((a1, es1), (a2, es2)) term =
         a1 == x ->
         case (mapM asUpsilon es1, mapM asUpsilon es) of
           (Just xs', Just ys')
-            | xs' == ys' -> return (m, WeakTermPiElim (mx, WeakTermUpsilon a2) es2) -- `aOuter @ (処理済み, ..., 処理済み)` への変換
+            | xs' == ys' ->
+              return (m, WeakTermPiElim (mx, WeakTermUpsilon a2) es2) -- `aOuter @ (処理済み, ..., 処理済み)` への変換
           _ ->
             raiseError
               m
