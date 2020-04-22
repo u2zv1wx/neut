@@ -1,0 +1,1 @@
+(string:print "hello, world!\n")
