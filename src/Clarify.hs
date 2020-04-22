@@ -675,9 +675,8 @@ chainTermPlus tenv term =
   case term of
     (_, TermTau) ->
       return []
-    (m, TermUpsilon x) -> do
-      (xts, t) <- obtainChain m x tenv
-      return $ xts ++ [(m, x, t)]
+    (m, TermUpsilon x) ->
+      obtainChain m x tenv
     (_, TermPi _ xts t) ->
       chainTermPlus' tenv xts [t]
     (_, TermPiIntro _ xts e) ->
@@ -751,7 +750,7 @@ insTypeEnv1 xts tenv =
     (_, x, t) : rest ->
       insTypeEnv' (asInt x) t $ insTypeEnv1 rest tenv
 
-obtainChain :: Meta -> Ident -> TypeEnv -> WithEnv ([IdentPlus], TermPlus)
+obtainChain :: Meta -> Ident -> TypeEnv -> WithEnv [IdentPlus]
 obtainChain m x tenv = do
   cenv <- gets chainEnv
   case IntMap.lookup (asInt x) cenv of
@@ -760,5 +759,6 @@ obtainChain m x tenv = do
     Nothing -> do
       t <- lookupTypeEnv' m x tenv
       xts <- chainTermPlus tenv t
-      modify (\env -> env {chainEnv = IntMap.insert (asInt x) (xts, t) cenv})
-      return (xts, t)
+      let chain = xts ++ [(m, x, t)]
+      modify (\env -> env {chainEnv = IntMap.insert (asInt x) chain cenv})
+      return chain

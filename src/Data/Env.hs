@@ -51,7 +51,6 @@ data Env
         -- macro transformers
         notationEnv :: [(TreePlus, TreePlus)],
         constantSet :: S.Set T.Text,
-        -- path ~> identifiers defined in the file at toplevel
         fileEnv :: Map.HashMap (Path Abs File) VisitInfo,
         traceEnv :: [Path Abs File],
         -- [("choice", [("left", 0), ("right", 1)]), ...]
@@ -78,11 +77,9 @@ data Env
         -- const ~> (index of implicit arguments of the const)
         impEnv :: IntMap.IntMap [Int],
         weakTypeEnv :: IntMap.IntMap WeakTermPlus,
-        typeEnv :: TypeEnv,
         constTypeEnv :: Map.HashMap T.Text TermPlus,
         constraintEnv :: [PreConstraint],
         constraintQueue :: ConstraintQueue,
-        -- metavar ~> beta-equivalent weakterm
         substEnv :: IntMap.IntMap WeakTermPlus,
         defEnv :: IntMap.IntMap TermPlus,
         zetaEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus),
@@ -90,9 +87,10 @@ data Env
         -- clarify
         --
         -- f ~> thunk (lam (x1 ... xn) e)
+        typeEnv :: TypeEnv,
         codeEnv :: Map.HashMap T.Text Definition,
         nameSet :: S.Set T.Text,
-        chainEnv :: IntMap.IntMap ([Data.Term.IdentPlus], TermPlus),
+        chainEnv :: IntMap.IntMap [IdentPlus],
         --
         -- LLVM
         --
