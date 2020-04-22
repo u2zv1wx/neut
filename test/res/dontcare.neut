@@ -13,7 +13,7 @@
   (some ((x a))
     (option a)))
 
-(definition functor-form ((m (hom tau tau)))
+(define functor-form ((m (hom tau tau)))
   (pi
     ((a tau)
      (b tau)
@@ -28,7 +28,7 @@
      (_ (k f)))
     (fake f)))
 
-(definition map
+(define map
   (witness (functor-form option)
     (lambda (a b f m)
       (case m
@@ -44,7 +44,7 @@
      (_ A))
     B))
 
-(definition witness-fake
+(define witness-fake
   (witness (fake option)
     (fake:unfold
       fake

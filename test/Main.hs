@@ -22,17 +22,17 @@ test :: Path Abs File -> IO Bool
 test srcPath = do
   (binaryPath, _) <- splitExtension srcPath
   answerPath <- addExtension ".answer" binaryPath
-  dataDir <- getDataDir
-  srcPath' <- stripProperPrefix dataDir srcPath
   callProcess "neut" ["build", toFilePath srcPath, "-o", toFilePath binaryPath]
   result <- readProcess (toFilePath binaryPath) [] []
+  removeFile binaryPath
   expectedResult <- readFile $ toFilePath answerPath
+  (basename, _) <- splitExtension $ filename srcPath
   if result == expectedResult
     then do
-      outputPass $ toFilePath srcPath'
+      outputPass $ toFilePath basename
       return True
     else do
-      outputFail $ toFilePath srcPath'
+      outputFail $ toFilePath basename
       putStrLn $ "  expected: " <> stylize expectedResult
       putStrLn $ "     found: " <> stylize result
       return False
