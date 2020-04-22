@@ -149,7 +149,8 @@ withHeaderRelevant' t expVar ch cont@(m, _) =
         )
 
 merge :: [NameMap] -> NameMap
-merge = foldr (IntMap.unionWith (++)) IntMap.empty
+merge =
+  foldr (IntMap.unionWith (++)) IntMap.empty
 
 distinguishData :: [Ident] -> DataPlus -> WithEnv (NameMap, DataPlus)
 distinguishData zs term =

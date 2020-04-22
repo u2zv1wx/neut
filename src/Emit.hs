@@ -54,7 +54,8 @@ emitDefinition retType name args asm = do
   return $ [header] <> content <> [footer]
 
 sig :: Builder -> Builder -> [Builder] -> Builder
-sig retType name args = "define " <> retType <> " @" <> name <> showLocals args
+sig retType name args =
+  "define " <> retType <> " @" <> name <> showLocals args
 
 emitBlock :: Builder -> Ident -> LLVM -> WithEnv [Builder]
 emitBlock funName (I (_, i)) asm = do
@@ -329,13 +330,16 @@ emitSysCallOp num ds = do
         unwordsL ["call fastcc i8* asm sideeffect \"syscall\",", regStr, argStr]
 
 emitOp :: Builder -> WithEnv [Builder]
-emitOp s = return ["  " <> s]
+emitOp s =
+  return ["  " <> s]
 
 emitRet :: Builder -> LLVMData -> WithEnv [Builder]
-emitRet retType d = emitOp $ unwordsL ["ret", retType, showLLVMData d]
+emitRet retType d =
+  emitOp $ unwordsL ["ret", retType, showLLVMData d]
 
 emitLabel :: Builder -> Builder
-emitLabel s = s <> ":"
+emitLabel s =
+  s <> ":"
 
 constructLabelList :: [a] -> WithEnv [Ident]
 constructLabelList input =
@@ -378,19 +382,24 @@ showBranch lowType i label =
     <> showLLVMData (LLVMDataLocal label)
 
 showArg :: LLVMData -> Builder
-showArg d = "i8* " <> showLLVMData d
+showArg d =
+  "i8* " <> showLLVMData d
 
 showLocal :: Builder -> Builder
-showLocal x = "i8* " <> x
+showLocal x =
+  "i8* " <> x
 
 showArgs :: [LLVMData] -> Builder
-showArgs ds = "(" <> showItems showArg ds <> ")"
+showArgs ds =
+  "(" <> showItems showArg ds <> ")"
 
 showLocals :: [Builder] -> Builder
-showLocals ds = "(" <> showItems showLocal ds <> ")"
+showLocals ds =
+  "(" <> showItems showLocal ds <> ")"
 
 showLowTypeAsIfPtr :: LowType -> Builder
-showLowTypeAsIfPtr t = showLowType t <> "*"
+showLowTypeAsIfPtr t =
+  showLowType t <> "*"
 
 showLowTypeAsIfNonPtr :: LowType -> Builder
 showLowTypeAsIfNonPtr lowType =

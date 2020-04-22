@@ -21,7 +21,8 @@ import qualified Data.Text as T
 import Reduce.Term
 
 clarify :: Stmt -> WithEnv CodePlus
-clarify = clarifyStmt IntMap.empty
+clarify =
+  clarifyStmt IntMap.empty
 
 clarifyStmt :: SubstTerm -> Stmt -> WithEnv CodePlus
 clarifyStmt sub stmt =
@@ -146,7 +147,8 @@ clarifyPlus tenv e@(m, _) = do
   return (varName, e', var)
 
 constructEnumFVS :: TypeEnv -> [TermPlus] -> WithEnv [IdentPlus]
-constructEnumFVS tenv es = nubFVS <$> concat <$> mapM (chainTermPlus tenv) es
+constructEnumFVS tenv es =
+  nubFVS <$> concat <$> mapM (chainTermPlus tenv) es
 
 alignFVS :: TypeEnv -> Meta -> [IdentPlus] -> [CodePlus] -> WithEnv [CodePlus]
 alignFVS tenv m fvs es = do
@@ -189,7 +191,8 @@ chainCaseClause tenv (((m, _), xts), body) =
   chainTermPlus tenv (m, termPiIntro xts body)
 
 nubFVS :: [IdentPlus] -> [IdentPlus]
-nubFVS = nubBy (\(_, x, _) (_, y, _) -> x == y)
+nubFVS =
+  nubBy (\(_, x, _) (_, y, _) -> x == y)
 
 clarifyCase' :: TypeEnv -> Meta -> Ident -> Clause -> WithEnv CodePlus
 clarifyCase' tenv m envVarName ((_, xts), e) = do
@@ -227,7 +230,8 @@ clarifyConst tenv m x
         return (m, CodeUpIntro (m, DataConst x)) -- external constant
 
 immType :: Meta -> TermPlus
-immType m = (m, TermEnum (EnumTypeIntS 64))
+immType m =
+  (m, TermEnum (EnumTypeIntS 64))
 
 clarifyCast :: TypeEnv -> Meta -> WithEnv CodePlus
 clarifyCast tenv m = do
@@ -346,62 +350,64 @@ knot m z cls = do
       modify (\env -> env {codeEnv = Map.insert (asText'' z) def' cenv})
 
 asSysCallMaybe :: OS -> T.Text -> Maybe (Syscall, [Arg])
-asSysCallMaybe OSLinux name =
-  case name of
-    "os:read" ->
-      return (Right ("read", 0), [ArgUnused, ArgImm, ArgArray, ArgImm])
-    "os:write" ->
-      return (Right ("write", 1), [ArgUnused, ArgImm, ArgArray, ArgImm])
-    "os:open" ->
-      return (Right ("open", 2), [ArgUnused, ArgArray, ArgImm, ArgImm])
-    "os:close" ->
-      return (Right ("close", 3), [ArgImm])
-    "os:socket" ->
-      return (Right ("socket", 41), [ArgImm, ArgImm, ArgImm])
-    "os:connect" ->
-      return (Right ("connect", 42), [ArgImm, ArgStruct, ArgImm])
-    "os:accept" ->
-      return (Right ("accept", 43), [ArgImm, ArgStruct, ArgArray])
-    "os:bind" ->
-      return (Right ("bind", 49), [ArgImm, ArgStruct, ArgImm])
-    "os:listen" ->
-      return (Right ("listen", 50), [ArgImm, ArgImm])
-    "os:fork" ->
-      return (Right ("fork", 57), [])
-    "os:exit" ->
-      return (Right ("exit", 60), [ArgUnused, ArgImm])
-    "os:wait4" ->
-      return (Right ("wait4", 61), [ArgImm, ArgArray, ArgImm, ArgStruct])
-    _ ->
-      Nothing
-asSysCallMaybe OSDarwin name =
-  case name of
-    "os:exit" ->
-      return (Left "exit", [ArgUnused, ArgImm]) -- 0x2000001
-    "os:fork" ->
-      return (Left "fork", []) -- 0x2000002
-    "os:read" ->
-      return (Left "read", [ArgUnused, ArgImm, ArgArray, ArgImm]) -- 0x2000003
-    "os:write" ->
-      return (Left "write", [ArgUnused, ArgImm, ArgArray, ArgImm]) -- 0x2000004
-    "os:open" ->
-      return (Left "open", [ArgUnused, ArgArray, ArgImm, ArgImm]) -- 0x2000005
-    "os:close" ->
-      return (Left "close", [ArgImm]) -- 0x2000006
-    "os:wait4" ->
-      return (Left "wait4", [ArgImm, ArgArray, ArgImm, ArgStruct]) -- 0x2000007
-    "os:accept" ->
-      return (Left "accept", [ArgImm, ArgStruct, ArgArray]) -- 0x2000030
-    "os:socket" ->
-      return (Left "socket", [ArgImm, ArgImm, ArgImm]) -- 0x2000097
-    "os:connect" ->
-      return (Left "connect", [ArgImm, ArgStruct, ArgImm]) -- 0x2000098
-    "os:bind" ->
-      return (Left "bind", [ArgImm, ArgStruct, ArgImm]) -- 0x2000104
-    "os:listen" ->
-      return (Left "listen", [ArgImm, ArgImm]) -- 0x2000106
-    _ ->
-      Nothing
+asSysCallMaybe os name =
+  case os of
+    OSLinux ->
+      case name of
+        "os:read" ->
+          return (Right ("read", 0), [ArgUnused, ArgImm, ArgArray, ArgImm])
+        "os:write" ->
+          return (Right ("write", 1), [ArgUnused, ArgImm, ArgArray, ArgImm])
+        "os:open" ->
+          return (Right ("open", 2), [ArgUnused, ArgArray, ArgImm, ArgImm])
+        "os:close" ->
+          return (Right ("close", 3), [ArgImm])
+        "os:socket" ->
+          return (Right ("socket", 41), [ArgImm, ArgImm, ArgImm])
+        "os:connect" ->
+          return (Right ("connect", 42), [ArgImm, ArgStruct, ArgImm])
+        "os:accept" ->
+          return (Right ("accept", 43), [ArgImm, ArgStruct, ArgArray])
+        "os:bind" ->
+          return (Right ("bind", 49), [ArgImm, ArgStruct, ArgImm])
+        "os:listen" ->
+          return (Right ("listen", 50), [ArgImm, ArgImm])
+        "os:fork" ->
+          return (Right ("fork", 57), [])
+        "os:exit" ->
+          return (Right ("exit", 60), [ArgUnused, ArgImm])
+        "os:wait4" ->
+          return (Right ("wait4", 61), [ArgImm, ArgArray, ArgImm, ArgStruct])
+        _ ->
+          Nothing
+    OSDarwin ->
+      case name of
+        "os:exit" ->
+          return (Left "exit", [ArgUnused, ArgImm]) -- 0x2000001
+        "os:fork" ->
+          return (Left "fork", []) -- 0x2000002
+        "os:read" ->
+          return (Left "read", [ArgUnused, ArgImm, ArgArray, ArgImm]) -- 0x2000003
+        "os:write" ->
+          return (Left "write", [ArgUnused, ArgImm, ArgArray, ArgImm]) -- 0x2000004
+        "os:open" ->
+          return (Left "open", [ArgUnused, ArgArray, ArgImm, ArgImm]) -- 0x2000005
+        "os:close" ->
+          return (Left "close", [ArgImm]) -- 0x2000006
+        "os:wait4" ->
+          return (Left "wait4", [ArgImm, ArgArray, ArgImm, ArgStruct]) -- 0x2000007
+        "os:accept" ->
+          return (Left "accept", [ArgImm, ArgStruct, ArgArray]) -- 0x2000030
+        "os:socket" ->
+          return (Left "socket", [ArgImm, ArgImm, ArgImm]) -- 0x2000097
+        "os:connect" ->
+          return (Left "connect", [ArgImm, ArgStruct, ArgImm]) -- 0x2000098
+        "os:bind" ->
+          return (Left "bind", [ArgImm, ArgStruct, ArgImm]) -- 0x2000104
+        "os:listen" ->
+          return (Left "listen", [ArgImm, ArgImm]) -- 0x2000106
+        _ ->
+          Nothing
 
 data Arg
   = ArgImm
@@ -574,10 +580,13 @@ makeClosure mName mxts2 m mxts1 e = do
   return (m, sigmaIntro [envExp, fvEnv, (m, DataConst name)])
 
 toName :: Maybe T.Text -> WithEnv T.Text
-toName (Just name) = return name
-toName Nothing = do
-  i <- newCount
-  return $ "thunk-" <> T.pack (show i)
+toName mName =
+  case mName of
+    Just name ->
+      return name
+    Nothing -> do
+      i <- newCount
+      return $ "thunk-" <> T.pack (show i)
 
 registerIfNecessary ::
   Meta ->
@@ -735,9 +744,12 @@ dropFst xyzs = do
   zip ys zs
 
 insTypeEnv1 :: [IdentPlus] -> TypeEnv -> TypeEnv
-insTypeEnv1 [] tenv = tenv
-insTypeEnv1 ((_, x, t) : rest) tenv =
-  insTypeEnv' (asInt x) t $ insTypeEnv1 rest tenv
+insTypeEnv1 xts tenv =
+  case xts of
+    [] ->
+      tenv
+    (_, x, t) : rest ->
+      insTypeEnv' (asInt x) t $ insTypeEnv1 rest tenv
 
 obtainChain :: Meta -> Ident -> TypeEnv -> WithEnv ([IdentPlus], TermPlus)
 obtainChain m x tenv = do

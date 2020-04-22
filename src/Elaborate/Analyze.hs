@@ -21,7 +21,8 @@ import Elaborate.Infer
 import Reduce.WeakTerm
 
 analyze :: WithEnv ()
-analyze = gets constraintEnv >>= simp
+analyze =
+  gets constraintEnv >>= simp
 
 simp :: [PreConstraint] -> WithEnv ()
 simp cs =
@@ -139,7 +140,6 @@ simp' constraintList =
                     simp $ pairList ++ cs
                 (Just (StuckPiElimConst x1 _ mess1), Just (StuckPiElimConst x2 _ mess2))
                   | x1 == x2,
-                    -- Nothing <- Map.lookup x1 cenv,
                     Just pairList <- asPairList (map snd mess1) (map snd mess2) ->
                     simp $ pairList ++ cs
                 (Just (StuckPiElimZetaStrict h1 ies1), _)
@@ -209,7 +209,8 @@ simp' constraintList =
                   simp cs
 
 simpBinder :: [WeakIdentPlus] -> [WeakIdentPlus] -> WithEnv ()
-simpBinder = simpBinder' IntMap.empty
+simpBinder =
+  simpBinder' IntMap.empty
 
 simpBinder' :: SubstWeakTerm -> [WeakIdentPlus] -> [WeakIdentPlus] -> WithEnv ()
 simpBinder' sub args1 args2 =
@@ -324,13 +325,16 @@ asStuckedTerm term =
       Nothing
 
 occurCheck :: Ident -> S.Set Ident -> Bool
-occurCheck h fmvs = h `S.notMember` fmvs
+occurCheck h fmvs =
+  h `S.notMember` fmvs
 
 includeCheck :: [Ident] -> S.Set Ident -> [Ident]
-includeCheck xs ys = filter (`notElem` xs) $ S.toList ys
+includeCheck xs ys =
+  filter (`notElem` xs) $ S.toList ys
 
 getVarList :: [WeakTermPlus] -> [Ident]
-getVarList xs = catMaybes $ map asUpsilon xs
+getVarList xs =
+  catMaybes $ map asUpsilon xs
 
 toPiElim :: WeakTermPlus -> [(Meta, [WeakTermPlus])] -> WeakTermPlus
 toPiElim e args =
@@ -352,7 +356,8 @@ visit h = do
   simp $ map (\(Enriched c _ _) -> c) $ Q.toList q1
 
 toVarList :: S.Set Ident -> [WeakTermPlus] -> WithEnv [WeakIdentPlus]
-toVarList = toVarList' []
+toVarList =
+  toVarList' []
 
 toVarList' :: Context -> S.Set Ident -> [WeakTermPlus] -> WithEnv [WeakIdentPlus]
 toVarList' ctx xs termList =
@@ -404,10 +409,12 @@ lookupAll is sub =
       return $ v : vs
 
 toIntS :: Meta -> IntSize -> WeakTermPlus
-toIntS m size = (m, WeakTermEnum $ EnumTypeIntS size)
+toIntS m size =
+  (m, WeakTermEnum $ EnumTypeIntS size)
 
 toIntU :: Meta -> IntSize -> WeakTermPlus
-toIntU m size = (m, WeakTermEnum $ EnumTypeIntU size)
+toIntU m size =
+  (m, WeakTermEnum $ EnumTypeIntU size)
 
 throwArityError :: Meta -> Int -> Int -> WithEnv a
 throwArityError m i1 i2 =

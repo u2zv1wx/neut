@@ -9,7 +9,8 @@ data Tree
   | TreeNode [TreePlus]
   deriving (Show)
 
-type TreePlus = (Meta, Tree)
+type TreePlus =
+  (Meta, Tree)
 
 asLeaf :: TreePlus -> Maybe (Meta, T.Text)
 asLeaf tree =

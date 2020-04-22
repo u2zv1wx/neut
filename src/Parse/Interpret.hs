@@ -271,20 +271,6 @@ interpret inputTree =
     (m, TreeNode es) ->
       interpretAux m es
 
--- (cocase (a e ... e)
---   ((a e ... e)
---    (b e)
---    ...
---    (b e))
---   ((a e ... e)
---    (b e)
---    ...
---    (b e)))
--- (record (a e ... e)
---    (b e)
---    ...
---    (b e))
-
 interpretAux :: Meta -> [TreePlus] -> WithEnv WeakTermPlus
 interpretAux m es = do
   ml <- interpretEnumValueMaybe (m, TreeNode es)
@@ -474,8 +460,7 @@ interpretEnumValue tree =
     t ->
       raiseSyntaxError (fst t) "LEAF | (LEAF LEAF)"
 
-interpretBinder ::
-  [TreePlus] -> TreePlus -> WithEnv ([WeakIdentPlus], WeakTermPlus)
+interpretBinder :: [TreePlus] -> TreePlus -> WithEnv ([WeakIdentPlus], WeakTermPlus)
 interpretBinder xts t = do
   xts' <- mapM interpretWeakIdentPlus xts
   t' <- interpret t
@@ -536,7 +521,8 @@ interpretCaseClause tree =
     t ->
       raiseSyntaxError (fst t) "((LEAF TREE ... TREE) TREE)"
 
-type CocaseClause = ((Ident, [WeakTermPlus]), [(Ident, WeakTermPlus)])
+type CocaseClause =
+  ((Ident, [WeakTermPlus]), [(Ident, WeakTermPlus)])
 
 -- (cocase (a e ... e)
 --   ((a e ... e)
@@ -690,10 +676,12 @@ readEnumType c str k -- n1, n2, ..., n{i}, ..., n{2^64}
     Nothing
 
 readEnumTypeIntS :: T.Text -> Maybe Int
-readEnumTypeIntS str = readEnumType 'i' str 23
+readEnumTypeIntS str =
+  readEnumType 'i' str 23
 
 readEnumTypeIntU :: T.Text -> Maybe Int
-readEnumTypeIntU str = readEnumType 'u' str 23
+readEnumTypeIntU str =
+  readEnumType 'u' str 23
 
 readEnumValueIntS :: T.Text -> T.Text -> Maybe EnumValue
 readEnumValueIntS t x
@@ -724,7 +712,8 @@ asArrayKind tree =
       raiseSyntaxError (fst t) "LEAF"
 
 toValueIntU :: IntSize -> Integer -> WeakTerm
-toValueIntU size i = WeakTermEnumIntro $ EnumValueIntU size i
+toValueIntU size i =
+  WeakTermEnumIntro $ EnumValueIntU size i
 
 raiseSyntaxError :: Meta -> T.Text -> WithEnv a
 raiseSyntaxError m form =

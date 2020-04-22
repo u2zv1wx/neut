@@ -17,33 +17,44 @@ newtype Ident
 instance Binary Ident
 
 asText :: Ident -> T.Text
-asText (I (s, _)) = s
+asText (I (s, _)) =
+  s
 
 asText' :: Ident -> T.Text
-asText' (I (s, i)) = s <> "-" <> T.pack (show i)
+asText' (I (s, i)) =
+  s <> "-" <> T.pack (show i)
 
 asText'' :: Ident -> T.Text
-asText'' (I (_, i)) = "_" <> T.pack (show i)
+asText'' (I (_, i)) =
+  "_" <> T.pack (show i)
 
 asIdent :: T.Text -> Ident
-asIdent s = I (s, 0)
+asIdent s =
+  I (s, 0)
 
 asInt :: Ident -> Int
-asInt (I (_, i)) = i
+asInt (I (_, i)) =
+  i
 
 instance Show Ident where
-  show (I (s, i)) = T.unpack s ++ "-" ++ show i
+  show (I (s, i)) =
+    T.unpack s ++ "-" ++ show i
 
-type Phase = Int
+type Phase =
+  Int
 
-type Line = Int
+type Line =
+  Int
 
-type Column = Int
+type Column =
+  Int
 
-type Loc = (Phase, Line, Column)
+type Loc =
+  (Phase, Line, Column)
 
 unwrapPath :: Path a b -> FilePath
-unwrapPath (Path path) = path
+unwrapPath (Path path) =
+  path
 
 data Meta
   = Meta
@@ -75,13 +86,16 @@ instance Binary Meta where
 
 -- required to derive the eqality on WeakTerm
 instance Eq Meta where
-  _ == _ = True
+  _ == _ =
+    True
 
 instance Show Meta where
-  show _ = "_"
+  show _ =
+    "_"
 
 instance Ord Meta where
-  compare _ _ = EQ
+  compare _ _ =
+    EQ
 
 showMeta :: Meta -> String
 showMeta m = do
@@ -125,15 +139,19 @@ newMeta l c path =
       metaIsExplicit = False
     }
 
-type PosInfo = (Path Abs File, Loc)
+type PosInfo =
+  (Path Abs File, Loc)
 
 getPosInfo :: Meta -> PosInfo
-getPosInfo m = (metaFileName m, metaLocation m)
+getPosInfo m =
+  (metaFileName m, metaLocation m)
 
 showPosInfo :: Path Abs File -> Loc -> String
-showPosInfo path (_, l, c) = toFilePath path ++ ":" ++ show l ++ ":" ++ show c
+showPosInfo path (_, l, c) =
+  toFilePath path ++ ":" ++ show l ++ ":" ++ show c
 
-type IntSize = Int
+type IntSize =
+  Int
 
 data FloatSize
   = FloatSize16
@@ -188,7 +206,8 @@ data Case
 
 instance Binary Case
 
-type CasePlus = (Meta, Case)
+type CasePlus =
+  (Meta, Case)
 
 data LowType
   = LowTypeIntS IntSize
@@ -201,9 +220,9 @@ data LowType
   | LowTypePtr LowType
   deriving (Eq, Ord, Show)
 
--- これasArrayKindMaybeから実装したほうがよさそう？
 asLowTypeMaybe :: T.Text -> Maybe LowType
-asLowTypeMaybe name = arrayKindToLowType <$> asArrayKindMaybe name
+asLowTypeMaybe name =
+  arrayKindToLowType <$> asArrayKindMaybe name
 
 sizeAsInt :: FloatSize -> Int
 sizeAsInt size =
@@ -225,16 +244,19 @@ data ArrayKind
 instance Binary ArrayKind
 
 voidPtr :: LowType
-voidPtr = LowTypePtr (LowTypeIntS 8)
+voidPtr =
+  LowTypePtr (LowTypeIntS 8)
 
 arrVoidPtr :: ArrayKind
-arrVoidPtr = ArrayKindVoidPtr
+arrVoidPtr =
+  ArrayKindVoidPtr
 
 asArrayAccessMaybe :: T.Text -> Maybe LowType
 asArrayAccessMaybe name
   | Just (typeStr, "array-access") <- breakOnMaybe ":" name =
     asLowTypeMaybe typeStr
-  | otherwise = Nothing
+  | otherwise =
+    Nothing
 
 lowTypeToArrayKindMaybe :: LowType -> Maybe ArrayKind
 lowTypeToArrayKindMaybe lowType =
@@ -263,7 +285,8 @@ arrayKindToLowType arrayKind =
 asArrayKindMaybe :: T.Text -> Maybe ArrayKind
 asArrayKindMaybe s =
   case T.uncons s of
-    Nothing -> Nothing
+    Nothing ->
+      Nothing
     Just (c, rest) ->
       case c of
         'i'
@@ -301,7 +324,8 @@ asUnaryOpMaybe name
     Just codType <- asLowTypeMaybe codTypeStr,
     Just op <- asConvOpMaybe domType codType convOpStr =
     Just op
-  | otherwise = Nothing
+  | otherwise =
+    Nothing
 
 unaryOpToDomCod :: UnaryOp -> (LowType, LowType)
 unaryOpToDomCod unaryOp =
@@ -361,7 +385,8 @@ asBinaryOpMaybe name
     Just lowType <- asLowTypeMaybe typeStr,
     Just f <- asBinaryOpMaybe' opStr =
     Just $ f lowType
-  | otherwise = Nothing
+  | otherwise =
+    Nothing
 
 binaryOpToDomCod :: BinaryOp -> (LowType, LowType)
 binaryOpToDomCod binaryOp =
@@ -443,7 +468,8 @@ asBinaryOpMaybe' name =
     _ ->
       Nothing
 
-type Target = (OS, Arch)
+type Target =
+  (OS, Arch)
 
 data OS
   = OSLinux
@@ -451,23 +477,30 @@ data OS
   deriving (Eq, Show)
 
 showOS :: OS -> T.Text
-showOS OSLinux = "linux"
-showOS OSDarwin = "darwin"
+showOS os =
+  case os of
+    OSLinux ->
+      "linux"
+    OSDarwin ->
+      "darwin"
 
 data Arch
   = Arch64
   deriving (Eq, Show)
 
 showArch :: Arch -> T.Text
-showArch Arch64 = "x64"
+showArch Arch64 =
+  "x64"
 
 -- Left name-of-interface-function | Right (name-of-syscall, number-of-syscall)
 -- the `Left` here is required since direct use of syscall in macOS is deprecated since 10.12, and thus we need to
 -- use corresponding interface functions.
-type Syscall = Either T.Text (T.Text, Integer)
+type Syscall =
+  Either T.Text (T.Text, Integer)
 
 linearCheck :: (Eq a, Ord a) => [a] -> Bool
-linearCheck = linearCheck' S.empty
+linearCheck =
+  linearCheck' S.empty
 
 linearCheck' :: (Eq a, Ord a) => S.Set a -> [a] -> Bool
 linearCheck' found input =
@@ -492,10 +525,12 @@ breakOnMaybe needle text =
         else return (h, T.tail t)
 
 deleteKeys :: IntMap.IntMap a -> [Int] -> IntMap.IntMap a
-deleteKeys = foldr IntMap.delete
+deleteKeys =
+  foldr IntMap.delete
 
 showInHex :: T.Text -> T.Text
-showInHex x = "x" <> foldr (<>) "" (map showInHex' (encode $ T.unpack x))
+showInHex x =
+  "x" <> foldr (<>) "" (map showInHex' (encode $ T.unpack x))
 
 showInHex' :: Word8 -> T.Text
 showInHex' w = do
@@ -541,12 +576,5 @@ hex i =
       " "
 
 fmap2 :: (Functor f, Functor g) => (a -> b) -> f (g a) -> f (g b)
-fmap2 f = fmap (fmap f)
-
-fmap2M :: (Monad m) => (b -> m c) -> Maybe (a, b) -> m (Maybe (a, c))
-fmap2M f m =
-  case m of
-    Nothing -> return Nothing
-    Just (x, y) -> do
-      y' <- f y
-      return $ Just (x, y')
+fmap2 f =
+  fmap (fmap f)

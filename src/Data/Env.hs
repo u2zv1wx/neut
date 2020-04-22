@@ -24,13 +24,15 @@ import System.Directory (createDirectoryIfMissing)
 import System.Info
 import qualified Text.Show.Pretty as Pr
 
-type ConstraintQueue = Q.MinQueue EnrichedConstraint
+type ConstraintQueue =
+  Q.MinQueue EnrichedConstraint
 
 data VisitInfo
   = VisitInfoActive
   | VisitInfoFinish
 
-type TypeEnv = IntMap.IntMap TermPlus
+type TypeEnv =
+  IntMap.IntMap TermPlus
 
 data Env
   = Env
@@ -158,7 +160,8 @@ newtype Error
 
 instance Exception Error
 
-type WithEnv a = StateT Env IO a
+type WithEnv a =
+  StateT Env IO a
 
 whenCheck :: WithEnv () -> WithEnv ()
 whenCheck f = do
@@ -257,10 +260,12 @@ newDataUpsilonWith m name = do
   return (x, (m, DataUpsilon x))
 
 insTypeEnv :: Int -> TermPlus -> WithEnv ()
-insTypeEnv x t = modify (\e -> e {typeEnv = IntMap.insert x t (typeEnv e)})
+insTypeEnv x t =
+  modify (\e -> e {typeEnv = IntMap.insert x t (typeEnv e)})
 
 insTypeEnv' :: Int -> TermPlus -> TypeEnv -> TypeEnv
-insTypeEnv' = IntMap.insert
+insTypeEnv' =
+  IntMap.insert
 
 lookupTypeEnv :: Meta -> Int -> T.Text -> WithEnv TermPlus
 lookupTypeEnv m x name = do
@@ -404,10 +409,12 @@ isConstant name
 
 -- for debug
 p :: String -> WithEnv ()
-p s = liftIO $ putStrLn s
+p s =
+  liftIO $ putStrLn s
 
 p' :: (Show a) => a -> WithEnv ()
-p' s = liftIO $ putStrLn $ Pr.ppShow s
+p' s =
+  liftIO $ putStrLn $ Pr.ppShow s
 
 lowTypeToArrayKind :: Meta -> LowType -> WithEnv ArrayKind
 lowTypeToArrayKind m lowType =
@@ -418,13 +425,16 @@ lowTypeToArrayKind m lowType =
       raiseCritical m "Infer.lowTypeToArrayKind"
 
 raiseError :: Meta -> T.Text -> WithEnv a
-raiseError m text = throw $ Error [logError (getPosInfo m) text]
+raiseError m text =
+  throw $ Error [logError (getPosInfo m) text]
 
 raiseCritical :: Meta -> T.Text -> WithEnv a
-raiseCritical m text = throw $ Error [logCritical (getPosInfo m) text]
+raiseCritical m text =
+  throw $ Error [logCritical (getPosInfo m) text]
 
 raiseCritical' :: T.Text -> WithEnv a
-raiseCritical' text = throw $ Error [logCritical' text]
+raiseCritical' text =
+  throw $ Error [logCritical' text]
 
 getCurrentFilePath :: WithEnv (Path Abs File)
 getCurrentFilePath = do
@@ -432,7 +442,8 @@ getCurrentFilePath = do
   return $ head tenv
 
 getCurrentDirPath :: WithEnv (Path Abs Dir)
-getCurrentDirPath = parent <$> getCurrentFilePath
+getCurrentDirPath =
+  parent <$> getCurrentFilePath
 
 getLibraryDirPath :: WithEnv (Path Abs Dir)
 getLibraryDirPath = do

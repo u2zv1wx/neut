@@ -22,17 +22,23 @@ import System.Exit
 import System.Process
 import Text.Read (readMaybe)
 
-type InputPath = String
+type InputPath =
+  String
 
-type OutputPath = String
+type OutputPath =
+  String
 
-type CheckOptEndOfEntry = String
+type CheckOptEndOfEntry =
+  String
 
-type ShouldColorize = Bool
+type ShouldColorize =
+  Bool
 
-type Line = Int
+type Line =
+  Int
 
-type Column = Int
+type Column =
+  Int
 
 data OutputKind
   = OutputKindObject
@@ -41,10 +47,14 @@ data OutputKind
   deriving (Show)
 
 instance Read OutputKind where
-  readsPrec _ "object" = [(OutputKindObject, [])]
-  readsPrec _ "llvm" = [(OutputKindLLVM, [])]
-  readsPrec _ "asm" = [(OutputKindAsm, [])]
-  readsPrec _ _ = []
+  readsPrec _ "object" =
+    [(OutputKindObject, [])]
+  readsPrec _ "llvm" =
+    [(OutputKindLLVM, [])]
+  readsPrec _ "asm" =
+    [(OutputKindAsm, [])]
+  readsPrec _ _ =
+    []
 
 data Command
   = Build InputPath (Maybe OutputPath) OutputKind
@@ -53,7 +63,8 @@ data Command
   | Complete InputPath Line Column
 
 main :: IO ()
-main = execParser (info (helper <*> parseOpt) fullDesc) >>= run
+main =
+  execParser (info (helper <*> parseOpt) fullDesc) >>= run
 
 parseOpt :: Parser Command
 parseOpt =
@@ -108,8 +119,10 @@ kindReader :: ReadM OutputKind
 kindReader = do
   s <- str
   case readMaybe s of
-    Nothing -> readerError $ "unknown mode:" ++ s
-    Just m -> return m
+    Nothing ->
+      readerError $ "unknown mode:" ++ s
+    Just m ->
+      return m
 
 parseCheckOpt :: Parser Command
 parseCheckOpt =
@@ -258,13 +271,16 @@ constructOutputArchivePath inputPath mPath =
       addExtension ".tar.gz" outputPath
 
 runBuild :: Path Abs File -> WithEnv Builder
-runBuild = parse >=> elaborate >=> clarify >=> toLLVM >=> emit
+runBuild =
+  parse >=> elaborate >=> clarify >=> toLLVM >=> emit
 
 runCheck :: Path Abs File -> WithEnv ()
-runCheck = parse >=> elaborate >=> \_ -> return ()
+runCheck =
+  parse >=> elaborate >=> \_ -> return ()
 
 seqIO :: [IO ()] -> IO ()
-seqIO = foldr (>>) (return ())
+seqIO =
+  foldr (>>) (return ())
 
 clangOptWith :: OutputKind -> Path Abs File -> [String]
 clangOptWith kind outputPath =

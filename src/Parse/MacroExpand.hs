@@ -14,7 +14,8 @@ import Data.Tree
 type MacroSubst = [(T.Text, TreePlus)]
 
 macroExpand :: TreePlus -> WithEnv TreePlus
-macroExpand = recurM (macroExpand1 . splice)
+macroExpand =
+  recurM (macroExpand1 . splice)
 
 recurM :: (Monad m) => (TreePlus -> m TreePlus) -> TreePlus -> m TreePlus
 recurM f tree =
@@ -39,7 +40,8 @@ macroExpand1 t@(i, _) = do
         Nothing ->
           return t
 
-type Notation = TreePlus
+type Notation =
+  TreePlus
 
 macroMatch ::
   TreePlus -> -- input tree
@@ -99,7 +101,8 @@ applySubst sub notationTree =
       (i, TreeNode $ map (applySubst sub) ts)
 
 toSpliceTree :: Meta -> [TreePlus] -> TreePlus
-toSpliceTree m ts = (m, TreeNode [(m, TreeLeaf "splice"), (m, TreeNode ts)])
+toSpliceTree m ts =
+  (m, TreeNode [(m, TreeLeaf "splice"), (m, TreeNode ts)])
 
 checkNotationSanity :: Notation -> WithEnv ()
 checkNotationSanity t = do
@@ -134,7 +137,8 @@ checkPlusCondition notationTree =
           checkPlusCondition ts'
 
 splice :: TreePlus -> TreePlus
-splice = splice'
+splice =
+  splice'
 
 -- (a b (splice (c (splice (p q)) e)) f) ~> (a b c p q d e)
 splice' :: TreePlus -> TreePlus

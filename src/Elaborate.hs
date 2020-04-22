@@ -22,7 +22,8 @@ import Reduce.Term
 import Reduce.WeakTerm
 
 elaborate :: [WeakStmt] -> WithEnv Stmt
-elaborate = elaborateStmt
+elaborate =
+  elaborateStmt
 
 elaborateStmt :: [WeakStmt] -> WithEnv Stmt
 elaborateStmt stmt =
@@ -78,7 +79,8 @@ refine =
   modify (\env -> env {substEnv = IntMap.map reduceWeakTermPlus (substEnv env)})
 
 showFloat' :: Float -> String
-showFloat' x = showFFloat Nothing x ""
+showFloat' x =
+  showFFloat Nothing x ""
 
 elaborate' :: WeakTermPlus -> WithEnv TermPlus
 elaborate' term =

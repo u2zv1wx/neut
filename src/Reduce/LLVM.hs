@@ -11,7 +11,8 @@ import Data.LLVM
 import qualified Data.Map as Map
 import qualified Data.Set as S
 
-type SizeMap = Map.Map SizeInfo [(Int, LLVMData)]
+type SizeMap =
+  Map.Map SizeInfo [(Int, LLVMData)]
 
 reduceLLVM :: SubstLLVM -> SizeMap -> LLVM -> WithEnv LLVM
 reduceLLVM sub sizeMap llvm =

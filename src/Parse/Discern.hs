@@ -216,8 +216,8 @@ discernWeakCase m nenv weakCase =
           return (WeakCaseLabel l')
         Nothing ->
           raiseError m $ "no such enum-value is defined: " <> l
-    l ->
-      return l
+    _ ->
+      return weakCase
 
 discernStruct ::
   NameEnv ->
@@ -243,7 +243,8 @@ newDefinedNameWith m (I (s, _)) = do
   return x
 
 insertName :: Ident -> Ident -> NameEnv -> NameEnv
-insertName (I (s, _)) = Map.insert s
+insertName (I (s, _)) =
+  Map.insert s
 
 insertIntoIntactSet :: Meta -> T.Text -> WithEnv ()
 insertIntoIntactSet m x =
@@ -330,10 +331,12 @@ lookupEnum' f penv name =
         else lookupEnum' f prefixList name
 
 lookupEnumValueNameWithPrefix :: T.Text -> WithEnv (Maybe T.Text)
-lookupEnumValueNameWithPrefix = lookupEnum isDefinedEnumValue
+lookupEnumValueNameWithPrefix =
+  lookupEnum isDefinedEnumValue
 
 lookupEnumTypeNameWithPrefix :: T.Text -> WithEnv (Maybe T.Text)
-lookupEnumTypeNameWithPrefix = lookupEnum isDefinedEnumType
+lookupEnumTypeNameWithPrefix =
+  lookupEnum isDefinedEnumType
 
 isDefinedEnumValue :: T.Text -> WithEnv Bool
 isDefinedEnumValue name = do

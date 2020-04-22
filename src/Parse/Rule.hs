@@ -166,8 +166,7 @@ checkNameSanity m atsbts = do
       m
       "the names of the rules of inductive/coinductive type must be distinct"
 
-toInductive ::
-  [WeakTextPlus] -> [WeakTextPlus] -> Connective -> WithEnv [WeakStmt]
+toInductive :: [WeakTextPlus] -> [WeakTextPlus] -> Connective -> WithEnv [WeakStmt]
 toInductive ats bts connective@(m, ai, xts, _) = do
   at <- formationRuleOf connective >>= ruleAsWeakIdentPlus
   let cod = (m, WeakTermPiElim (m, WeakTermUpsilon $ asIdent ai) (map toVar' xts))
@@ -268,10 +267,12 @@ ruleAsWeakTextPlus (mb, b, m, xts, t) =
   return (mb, b, (m, weakTermPi xts t))
 
 textPlusToWeakIdentPlus :: WeakTextPlus -> WeakIdentPlus
-textPlusToWeakIdentPlus (mx, x, t) = (mx, asIdent x, t)
+textPlusToWeakIdentPlus (mx, x, t) =
+  (mx, asIdent x, t)
 
 formationRuleOf :: Connective -> WithEnv Rule
-formationRuleOf (m, a, xts, _) = return (m, a, m, xts, (m, WeakTermTau))
+formationRuleOf (m, a, xts, _) =
+  return (m, a, m, xts, (m, WeakTermTau))
 
 formationRuleOf' :: Connective -> WithEnv Rule
 formationRuleOf' (m, x, xts, rules) = do
@@ -282,10 +283,12 @@ formationRuleOf' (m, x, xts, rules) = do
   return (m, x, m, xts, (m, WeakTermTau))
 
 toInternalRuleList :: Connective -> WithEnv [WeakTextPlus]
-toInternalRuleList (_, _, _, rules) = mapM ruleAsWeakTextPlus rules
+toInternalRuleList (_, _, _, rules) =
+  mapM ruleAsWeakTextPlus rules
 
 toVar' :: WeakIdentPlus -> WeakTermPlus
-toVar' (m, x, _) = (m, WeakTermUpsilon x)
+toVar' (m, x, _) =
+  (m, WeakTermUpsilon x)
 
 insForm :: Int -> WeakIdentPlus -> WeakTermPlus -> WithEnv ()
 insForm i (_, a, _) e
@@ -403,8 +406,7 @@ data Mode
   | ModeBackward
   deriving (Show)
 
-internalize ::
-  [Int] -> [WeakIdentPlus] -> WeakIdentPlus -> WithEnv WeakTermPlus
+internalize :: [Int] -> [WeakIdentPlus] -> WeakIdentPlus -> WithEnv WeakTermPlus
 internalize as atsbts (m, y, t) = do
   let sub = IntMap.fromList $ zip as (map toVar' atsbts)
   theta ModeForward sub atsbts t (m, WeakTermUpsilon y)
@@ -617,11 +619,14 @@ renameBinder binder e =
       (ats'', e'') <- renameBinder ats' e'
       return ((m, x', t) : ats'', e'')
 
-type RuleTypeDom = (Ident, [WeakTermPlus])
+type RuleTypeDom =
+  (Ident, [WeakTermPlus])
 
-type RuleTypeCod = (Ident, [WeakTermPlus])
+type RuleTypeCod =
+  (Ident, [WeakTermPlus])
 
-type SubstRule = (RuleTypeDom, RuleTypeCod)
+type SubstRule =
+  (RuleTypeDom, RuleTypeCod)
 
 -- subst a @ (e1, ..., en) ~> a' @ (e1', ..., en')
 substRuleType :: SubstRule -> WeakTermPlus -> WithEnv WeakTermPlus

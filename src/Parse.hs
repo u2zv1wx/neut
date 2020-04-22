@@ -68,10 +68,12 @@ insDepGraph includeePath = do
         (\env -> env {depGraph = Map.insertWith (++) includerPath [includeePath] (depGraph env)})
 
 pushTrace :: Path Abs File -> WithEnv ()
-pushTrace path = modify (\env -> env {traceEnv = path : traceEnv env})
+pushTrace path =
+  modify (\env -> env {traceEnv = path : traceEnv env})
 
 popTrace :: WithEnv ()
-popTrace = modify (\env -> env {traceEnv = tail (traceEnv env)})
+popTrace =
+  modify (\env -> env {traceEnv = tail (traceEnv env)})
 
 parse' :: [TreePlus] -> WithEnv [WeakStmt]
 parse' stmtTreeList =
@@ -262,7 +264,8 @@ parseAttr mx x tree =
             raiseSyntaxError (fst tree) "(implicit LEAF ... LEAF)"
         _ ->
           raiseError m $ "unknown attribute: " <> headAtom
-    _ -> raiseSyntaxError (fst tree) "(LEAF TREE ... LEAF)"
+    _ ->
+      raiseSyntaxError (fst tree) "(LEAF TREE ... LEAF)"
 
 withSectionPrefix :: T.Text -> WithEnv T.Text
 withSectionPrefix x = do
@@ -277,15 +280,20 @@ getCurrentSection = do
 getCurrentSection' :: [T.Text] -> T.Text
 getCurrentSection' nameStack =
   case nameStack of
-    [] -> ""
-    [n] -> n
-    (n : ns) -> getCurrentSection' ns <> ":" <> n
+    [] ->
+      ""
+    [n] ->
+      n
+    (n : ns) ->
+      getCurrentSection' ns <> ":" <> n
 
 readStrOrThrow :: (Read a) => Meta -> T.Text -> WithEnv a
 readStrOrThrow m quotedStr =
   case readMaybe (T.unpack quotedStr) of
-    Nothing -> raiseError m "the atom here must be a string"
-    Just str -> return str
+    Nothing ->
+      raiseError m "the atom here must be a string"
+    Just str ->
+      return str
 
 includeFile ::
   Meta ->
@@ -308,7 +316,8 @@ includeFile m mPath pathString computeDirPath as = do
       tenv <- gets traceEnv
       let cyclicPath = dropWhile (/= newPath) (reverse tenv) ++ [newPath]
       raiseError m' $ "found cyclic inclusion:\n" <> showCyclicPath cyclicPath
-    Just VisitInfoFinish -> parse' as
+    Just VisitInfoFinish ->
+      parse' as
     Nothing -> do
       includedWeakStmtList <- visit newPath
       defList <- parse' as
@@ -319,10 +328,12 @@ ensureEnvSanity m = do
   ns <- gets sectionEnv
   penv <- gets prefixEnv
   case (null ns, null penv) of
-    (False, _) -> raiseError m "`include` can only be used at top-level section"
+    (False, _) ->
+      raiseError m "`include` can only be used at top-level section"
     (_, False) ->
       raiseError m "`include` can only be used with no prefix assumption"
-    _ -> return ()
+    _ ->
+      return ()
 
 parseDef :: [TreePlus] -> WithEnv [WeakStmt]
 parseDef xds = do
@@ -346,12 +357,14 @@ prefixFunName tree =
     (m, TreeNode [xt, xts, body]) -> do
       xt' <- prefixTextPlus xt
       return (m, TreeNode [xt', xts, body])
-    t -> raiseSyntaxError (fst t) "(TREE TREE TREE)"
+    t ->
+      raiseSyntaxError (fst t) "(TREE TREE TREE)"
 
 prefixTextPlus :: TreePlus -> WithEnv TreePlus
 prefixTextPlus tree =
   case tree of
-    (m, TreeLeaf "_") -> return (m, TreeLeaf "_")
+    (m, TreeLeaf "_") ->
+      return (m, TreeLeaf "_")
     (m, TreeLeaf x) -> do
       x' <- withSectionPrefix x
       return (m, TreeLeaf x')
@@ -360,7 +373,8 @@ prefixTextPlus tree =
     (m, TreeNode [(mx, TreeLeaf x), t]) -> do
       x' <- withSectionPrefix x
       return (m, TreeNode [(mx, TreeLeaf x'), t])
-    t -> raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
+    t ->
+      raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
 
 extractFunName :: TreePlus -> WithEnv (Meta, Ident)
 extractFunName tree =
@@ -375,11 +389,14 @@ extractFunName tree =
 toLetList :: [(Ident, (Meta, WeakTermPlus), WeakTermPlus)] -> [WeakStmt]
 toLetList defList =
   case defList of
-    [] -> []
-    ((x, (m, t), e) : rest) -> WeakStmtLet m (m, x, t) e : toLetList rest
+    [] ->
+      []
+    ((x, (m, t), e) : rest) ->
+      WeakStmtLet m (m, x, t) e : toLetList rest
 
 defToSub :: (Ident, Def) -> (Int, WeakTermPlus)
-defToSub (dom, (m, xt, xts, e)) = (asInt dom, (m, WeakTermIter xt xts e))
+defToSub (dom, (m, xt, xts, e)) =
+  (asInt dom, (m, WeakTermIter xt xts e))
 
 selfCompose :: Int -> SubstWeakTerm -> SubstWeakTerm
 selfCompose i sub =
@@ -388,26 +405,34 @@ selfCompose i sub =
     else compose sub $ selfCompose (i - 1) sub
 
 compose :: SubstWeakTerm -> SubstWeakTerm -> SubstWeakTerm
-compose s1 s2 = IntMap.union (IntMap.map (substWeakTermPlus s1) s2) s1
+compose s1 s2 =
+  IntMap.union (IntMap.map (substWeakTermPlus s1) s2) s1
 
 parseStmtClause :: TreePlus -> WithEnv (T.Text, [TreePlus])
 parseStmtClause tree =
   case tree of
-    (_, TreeNode ((_, TreeLeaf x) : stmtList)) -> return (x, stmtList)
-    (m, _) -> raiseSyntaxError m "(LEAF TREE*)"
+    (_, TreeNode ((_, TreeLeaf x) : stmtList)) ->
+      return (x, stmtList)
+    (m, _) ->
+      raiseSyntaxError m "(LEAF TREE*)"
 
 retrieveCompileTimeVarValue :: Meta -> T.Text -> WithEnv T.Text
 retrieveCompileTimeVarValue m var =
   case var of
-    "OS" -> showOS <$> getOS
-    "architecture" -> showArch <$> getArch
-    _ -> raiseError m $ "no such compile-time variable defined: " <> var
+    "OS" ->
+      showOS <$> getOS
+    "architecture" ->
+      showArch <$> getArch
+    _ ->
+      raiseError m $ "no such compile-time variable defined: " <> var
 
 isSpecialForm :: TreePlus -> Bool
 isSpecialForm tree =
   case tree of
-    (_, TreeNode ((_, TreeLeaf x) : _)) -> S.member x keywordSet
-    _ -> False
+    (_, TreeNode ((_, TreeLeaf x) : _)) ->
+      S.member x keywordSet
+    _ ->
+      False
 
 keywordSet :: S.Set T.Text
 keywordSet =
@@ -433,23 +458,32 @@ keywordSet =
 
 checkKeywordSanity :: Meta -> T.Text -> WithEnv ()
 checkKeywordSanity m x
-  | x == "" = raiseError m "empty string for a keyword"
-  | T.last x == '+' = raiseError m "A +-suffixed name cannot be a keyword"
-  | otherwise = return ()
+  | x == "" =
+    raiseError m "empty string for a keyword"
+  | T.last x == '+' =
+    raiseError m "A +-suffixed name cannot be a keyword"
+  | otherwise =
+    return ()
 
 showCyclicPath :: [Path Abs File] -> T.Text
 showCyclicPath pathList =
   case pathList of
-    [] -> ""
-    [path] -> T.pack (toFilePath path)
-    (path : ps) -> "     " <> T.pack (toFilePath path) <> showCyclicPath' ps
+    [] ->
+      ""
+    [path] ->
+      T.pack (toFilePath path)
+    (path : ps) ->
+      "     " <> T.pack (toFilePath path) <> showCyclicPath' ps
 
 showCyclicPath' :: [Path Abs File] -> T.Text
 showCyclicPath' pathList =
   case pathList of
-    [] -> ""
-    [path] -> "\n  ~> " <> T.pack (toFilePath path)
-    (path : ps) -> "\n  ~> " <> T.pack (toFilePath path) <> showCyclicPath' ps
+    [] ->
+      ""
+    [path] ->
+      "\n  ~> " <> T.pack (toFilePath path)
+    (path : ps) ->
+      "\n  ~> " <> T.pack (toFilePath path) <> showCyclicPath' ps
 
 ensureFileExistence :: Meta -> Path Abs File -> WithEnv ()
 ensureFileExistence m path = do
@@ -465,7 +499,8 @@ extract bytestr pkgPath =
 includeCore :: Meta -> [TreePlus] -> [TreePlus]
 includeCore m treeList =
   case treeList of
-    ((_, TreeNode [(_, TreeLeaf "no-implicit-core")]) : rest) -> rest
+    ((_, TreeNode [(_, TreeLeaf "no-implicit-core")]) : rest) ->
+      rest
     _ ->
       ( m,
         TreeNode
@@ -503,9 +538,11 @@ warnUnusedVar =
 warnUnusedVar' :: [(PosInfo, T.Text)] -> WithEnv ()
 warnUnusedVar' infoList =
   case infoList of
-    [] -> return ()
+    [] ->
+      return ()
     ((pos, x) : pxs)
       | T.all (`S.notMember` S.fromList "()") x -> do
         warn pos $ "defined but not used: `" <> x <> "`"
         warnUnusedVar' pxs
-      | otherwise -> warnUnusedVar' pxs
+      | otherwise ->
+        warnUnusedVar' pxs

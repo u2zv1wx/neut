@@ -21,10 +21,12 @@ import Data.WeakTerm
 type Context = [WeakIdentPlus]
 
 infer :: WeakTermPlus -> WithEnv (WeakTermPlus, WeakTermPlus)
-infer = infer' []
+infer =
+  infer' []
 
 inferType :: WeakTermPlus -> WithEnv WeakTermPlus
-inferType = inferType' []
+inferType =
+  inferType' []
 
 infer' :: Context -> WeakTermPlus -> WithEnv (WeakTermPlus, WeakTermPlus)
 infer' ctx term =

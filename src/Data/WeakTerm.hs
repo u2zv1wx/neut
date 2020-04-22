@@ -41,7 +41,8 @@ data WeakTerm
   | WeakTermErase [(Meta, T.Text)] WeakTermPlus
   deriving (Show, Eq)
 
-type WeakTermPlus = (Meta, WeakTerm)
+type WeakTermPlus =
+  (Meta, WeakTerm)
 
 data WeakCase
   = WeakCaseIntS IntSize Integer
@@ -51,23 +52,31 @@ data WeakCase
   | WeakCaseDefault
   deriving (Show, Eq)
 
-type WeakCasePlus = (Meta, WeakCase)
+type WeakCasePlus =
+  (Meta, WeakCase)
 
-type SubstWeakTerm = IntMap.IntMap WeakTermPlus
+type SubstWeakTerm =
+  IntMap.IntMap WeakTermPlus
 
-type WeakIdentPlus = (Meta, Ident, WeakTermPlus)
+type WeakIdentPlus =
+  (Meta, Ident, WeakTermPlus)
 
-type WeakTextPlus = (Meta, T.Text, WeakTermPlus)
+type WeakTextPlus =
+  (Meta, T.Text, WeakTermPlus)
 
-type Def = (Meta, WeakIdentPlus, [WeakIdentPlus], WeakTermPlus)
+type Def =
+  (Meta, WeakIdentPlus, [WeakIdentPlus], WeakTermPlus)
 
-type IdentDef = (Ident, Def)
+type IdentDef =
+  (Ident, Def)
 
 weakTermPiIntro :: [WeakIdentPlus] -> WeakTermPlus -> WeakTerm
-weakTermPiIntro = WeakTermPiIntro Nothing
+weakTermPiIntro =
+  WeakTermPiIntro Nothing
 
 toVar :: Meta -> Ident -> WeakTermPlus
-toVar m x = (m, WeakTermUpsilon x)
+toVar m x =
+  (m, WeakTermUpsilon x)
 
 type Rule = -- inference rule
   ( Meta, -- location of the name
@@ -92,7 +101,8 @@ data WeakStmt
   deriving (Show)
 
 weakTermPi :: [WeakIdentPlus] -> WeakTermPlus -> WeakTerm
-weakTermPi = WeakTermPi Nothing
+weakTermPi =
+  WeakTermPi Nothing
 
 varWeakTermPlus :: WeakTermPlus -> S.Set Ident
 varWeakTermPlus term =
@@ -243,7 +253,6 @@ holeWeakTermPlus' binder es =
       let set2 = holeWeakTermPlus' xts es
       S.union set1 set2
 
--- fixme: const substは不要
 substWeakTermPlus :: SubstWeakTerm -> WeakTermPlus -> WeakTermPlus
 substWeakTermPlus sub term =
   case term of
@@ -269,10 +278,10 @@ substWeakTermPlus sub term =
       let sub' = IntMap.delete (asInt x) sub
       let (xts', e') = substWeakTermPlus'' sub' xts e
       (m, WeakTermIter (mx, x, t') xts' e')
-    e@(_, WeakTermConst _) ->
-      e
-    e@(_, WeakTermBoxElim _) ->
-      e
+    (_, WeakTermConst _) ->
+      term
+    (_, WeakTermBoxElim _) ->
+      term
     e1@(_, WeakTermZeta x) ->
       case IntMap.lookup (asInt x) sub of
         Nothing -> e1
@@ -357,7 +366,8 @@ substWeakTermPlus'' sub binder e =
       ((m, x, t') : xts', e')
 
 metaOf :: WeakTermPlus -> Meta
-metaOf = fst
+metaOf =
+  fst
 
 asUpsilon :: WeakTermPlus -> Maybe Ident
 asUpsilon term =
@@ -456,19 +466,24 @@ toText term =
       toText e
 
 inParen :: T.Text -> T.Text
-inParen s = "(" <> s <> ")"
+inParen s =
+  "(" <> s <> ")"
 
 inAngle :: T.Text -> T.Text
-inAngle s = "<" <> s <> ">"
+inAngle s =
+  "<" <> s <> ">"
 
 inBrace :: T.Text -> T.Text
-inBrace s = "{" <> s <> "}"
+inBrace s =
+  "{" <> s <> "}"
 
 inBracket :: T.Text -> T.Text
-inBracket s = "[" <> s <> "]"
+inBracket s =
+  "[" <> s <> "]"
 
 showArg :: (Meta, Ident, WeakTermPlus) -> T.Text
-showArg (_, x, t) = inParen $ asText x <> " " <> toText t
+showArg (_, x, t) =
+  inParen $ asText x <> " " <> toText t
 
 showTypeArgs :: [WeakIdentPlus] -> WeakTermPlus -> T.Text
 showTypeArgs args cod =
@@ -502,7 +517,8 @@ isDependent binder cod =
         isDependent xts cod
 
 showClause :: (WeakCase, WeakTermPlus) -> T.Text
-showClause (c, e) = inParen $ showWeakCase c <> " " <> toText e
+showClause (c, e) =
+  inParen $ showWeakCase c <> " " <> toText e
 
 showWeakCase :: WeakCase -> T.Text
 showWeakCase weakCase =
@@ -551,19 +567,24 @@ showArrayKind arrayKind =
       "void*"
 
 showItems :: [T.Text] -> T.Text
-showItems = T.intercalate " "
+showItems =
+  T.intercalate " "
 
 showCons :: [T.Text] -> T.Text
-showCons = inParen . T.intercalate " "
+showCons =
+  inParen . T.intercalate " "
 
 showTuple :: [T.Text] -> T.Text
-showTuple = inAngle . T.intercalate " "
+showTuple =
+  inAngle . T.intercalate " "
 
 showArray :: [T.Text] -> T.Text
-showArray = inBracket . T.intercalate " "
+showArray =
+  inBracket . T.intercalate " "
 
 showStruct :: [T.Text] -> T.Text
-showStruct = inBrace . T.intercalate " "
+showStruct =
+  inBrace . T.intercalate " "
 
 extractSigmaArg :: WeakTermPlus -> Maybe [WeakIdentPlus]
 extractSigmaArg term =

@@ -16,11 +16,14 @@ import Parse
 import Parse.Tokenize
 import Path
 
-type CompInfo = [(Ident, Meta)]
+type CompInfo =
+  [(Ident, Meta)]
 
-type CursorName = Ident
+type CursorName =
+  Ident
 
-type Prefix = T.Text
+type Prefix =
+  T.Text
 
 complete :: Path Abs File -> Line -> Column -> WithEnv [String]
 complete inputPath l c = do
@@ -88,7 +91,8 @@ modifyFileForCompletion (I (s, _)) content l c = do
       return (prefix, T.unlines $ ys ++ [targetLine'] ++ zs)
 
 compInfo :: CursorName -> [WeakStmt] -> Either CompInfo ()
-compInfo c = compInfoWeakStmtList c []
+compInfo c =
+  compInfoWeakStmtList c []
 
 compInfoWeakStmtList :: CursorName -> CompInfo -> [WeakStmt] -> Either CompInfo ()
 compInfoWeakStmtList c info stmtList =
@@ -203,11 +207,13 @@ filterCompInfo prefix (I (x, _), _)
     prefix `T.isPrefixOf` x && T.all (`S.notMember` S.fromList "()") x
 
 enrich :: (Ident, Meta) -> [(Ident, Meta)]
-enrich (x, m) = map (\y -> (y, m)) $ toSuffixList x
+enrich (x, m) =
+  map (\y -> (y, m)) $ toSuffixList x
 
 -- "bar:buz:qux" ~> ["bar:buz:qux", "buz:qux", "qux"]
 toSuffixList :: Ident -> [Ident]
-toSuffixList (I (s, i)) = map (\x -> I (x, i)) $ toSuffixList' s
+toSuffixList (I (s, i)) =
+  map (\x -> I (x, i)) $ toSuffixList' s
 
 toSuffixList' :: T.Text -> [T.Text]
 toSuffixList' s =

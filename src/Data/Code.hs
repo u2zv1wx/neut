@@ -40,9 +40,11 @@ data Definition
   = Definition IsFixed [Ident] CodePlus
   deriving (Show)
 
-type DataPlus = (Meta, Data)
+type DataPlus =
+  (Meta, Data)
 
-type CodePlus = (Meta, Code)
+type CodePlus =
+  (Meta, Code)
 
 asUpsilon :: DataPlus -> Maybe Ident
 asUpsilon term =
@@ -53,12 +55,15 @@ asUpsilon term =
       Nothing
 
 sigmaIntro :: [DataPlus] -> Data
-sigmaIntro = DataSigmaIntro arrVoidPtr
+sigmaIntro =
+  DataSigmaIntro arrVoidPtr
 
 sigmaElim :: [Ident] -> DataPlus -> CodePlus -> Code
-sigmaElim = CodeSigmaElim arrVoidPtr
+sigmaElim =
+  CodeSigmaElim arrVoidPtr
 
-type SubstDataPlus = IntMap.IntMap DataPlus
+type SubstDataPlus =
+  IntMap.IntMap DataPlus
 
 substDataPlus :: SubstDataPlus -> DataPlus -> DataPlus
 substDataPlus sub term =

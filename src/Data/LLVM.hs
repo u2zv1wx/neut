@@ -44,9 +44,11 @@ data LLVMOp
       [LLVMData] -- arguments
   deriving (Show)
 
-type SizeInfo = LowType
+type SizeInfo =
+  LowType
 
-type SubstLLVM = IntMap.IntMap LLVMData
+type SubstLLVM =
+  IntMap.IntMap LLVMData
 
 substLLVMData :: SubstLLVM -> LLVMData -> LLVMData
 substLLVMData sub llvmData =

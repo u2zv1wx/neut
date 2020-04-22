@@ -47,9 +47,11 @@ logLevelToSGR level =
     LogLevelCritical ->
       [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Red]
 
-type Log = (Maybe PosInfo, LogLevel, T.Text)
+type Log =
+  (Maybe PosInfo, LogLevel, T.Text)
 
-type ColorFlag = Bool
+type ColorFlag =
+  Bool
 
 outputLog :: ColorFlag -> String -> Log -> IO ()
 outputLog b eoe (mpos, l, t) = do
@@ -91,7 +93,8 @@ outputLogLevel b l =
     TIO.putStr ": "
 
 outputLogText :: T.Text -> IO ()
-outputLogText = TIO.putStrLn
+outputLogText =
+  TIO.putStrLn
 
 withSGR :: Bool -> [SGR] -> IO () -> IO ()
 withSGR b arg f =
@@ -100,19 +103,25 @@ withSGR b arg f =
     else f
 
 logNote :: PosInfo -> T.Text -> Log
-logNote pos text = (Just pos, LogLevelNote, text)
+logNote pos text =
+  (Just pos, LogLevelNote, text)
 
 logNote' :: T.Text -> Log
-logNote' text = (Nothing, LogLevelNote, text)
+logNote' text =
+  (Nothing, LogLevelNote, text)
 
 logWarning :: PosInfo -> T.Text -> Log
-logWarning pos text = (Just pos, LogLevelWarning, text)
+logWarning pos text =
+  (Just pos, LogLevelWarning, text)
 
 logError :: PosInfo -> T.Text -> Log
-logError pos text = (Just pos, LogLevelError, text)
+logError pos text =
+  (Just pos, LogLevelError, text)
 
 logCritical :: PosInfo -> T.Text -> Log
-logCritical pos text = (Just pos, LogLevelCritical, text)
+logCritical pos text =
+  (Just pos, LogLevelCritical, text)
 
 logCritical' :: T.Text -> Log
-logCritical' text = (Nothing, LogLevelCritical, text)
+logCritical' text =
+  (Nothing, LogLevelCritical, text)

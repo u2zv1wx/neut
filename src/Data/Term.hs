@@ -39,15 +39,20 @@ data Term
 
 instance Binary Term
 
-type TextPlus = (Meta, T.Text, TermPlus)
+type TextPlus =
+  (Meta, T.Text, TermPlus)
 
-type TermPlus = (Meta, Term)
+type TermPlus =
+  (Meta, Term)
 
-type Clause = (((Meta, Ident), [IdentPlus]), TermPlus)
+type Clause =
+  (((Meta, Ident), [IdentPlus]), TermPlus)
 
-type SubstTerm = IntMap.IntMap TermPlus
+type SubstTerm =
+  IntMap.IntMap TermPlus
 
-type IdentPlus = (Meta, Ident, TermPlus)
+type IdentPlus =
+  (Meta, Ident, TermPlus)
 
 data Stmt
   = StmtReturn Meta
@@ -55,10 +60,12 @@ data Stmt
   deriving (Show)
 
 termPi :: [IdentPlus] -> TermPlus -> Term
-termPi = TermPi Nothing
+termPi =
+  TermPi Nothing
 
 termPiIntro :: [IdentPlus] -> TermPlus -> Term
-termPiIntro = TermPiIntro Nothing
+termPiIntro =
+  TermPiIntro Nothing
 
 asUpsilon :: TermPlus -> Maybe Ident
 asUpsilon term =

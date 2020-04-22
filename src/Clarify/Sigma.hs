@@ -139,7 +139,8 @@ supplyName mName =
       return (x, t)
 
 cartArrayName :: T.Text
-cartArrayName = "cartesian-array"
+cartArrayName =
+  "cartesian-array"
 
 returnArrayType :: Meta -> WithEnv CodePlus
 returnArrayType m = do
@@ -154,7 +155,8 @@ returnArrayType m = do
   return (m, CodeUpIntro t)
 
 cartClsName :: T.Text
-cartClsName = "cartesian-closure"
+cartClsName =
+  "cartesian-closure"
 
 returnClosureType :: Meta -> WithEnv CodePlus
 returnClosureType m = do

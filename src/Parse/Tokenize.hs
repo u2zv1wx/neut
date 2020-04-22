@@ -37,7 +37,8 @@ tokenize input = do
       return result
 
 program :: Tokenizer [TreePlus]
-program = program' []
+program =
+  program' []
 
 program' :: [TreePlus] -> Tokenizer [TreePlus]
 program' ts = do
@@ -141,10 +142,12 @@ comment = do
       return () -- no newline at the end of file
 
 many :: Tokenizer a -> Tokenizer [a]
-many f = sepEndBy f (return ())
+many f =
+  sepEndBy f (return ())
 
 sepEndBy :: Tokenizer a -> Tokenizer () -> Tokenizer [a]
-sepEndBy f g = sepEndBy' (f >>= return . Right) g []
+sepEndBy f g =
+  sepEndBy' (f >>= return . Right) g []
 
 sepEndBy' :: Tokenizer (Either [a] a) -> Tokenizer () -> [a] -> Tokenizer [a]
 sepEndBy' f g acc = do
@@ -173,7 +176,8 @@ string = do
   modify (\env -> env {text = rest'})
   return x
 
-type EscapeFlag = Bool
+type EscapeFlag =
+  Bool
 
 headStringLengthOf :: EscapeFlag -> T.Text -> Int -> Tokenizer Int
 headStringLengthOf flag s i =
@@ -205,19 +209,23 @@ currentMeta = do
 
 {-# INLINE isSymbolChar #-}
 isSymbolChar :: Char -> Bool
-isSymbolChar c = c `S.notMember` nonSymbolSet
+isSymbolChar c =
+  c `S.notMember` nonSymbolSet
 
 {-# INLINE spaceSet #-}
 spaceSet :: S.Set Char
-spaceSet = S.fromList " "
+spaceSet =
+  S.fromList " "
 
 {-# INLINE newlineSet #-}
 newlineSet :: S.Set Char
-newlineSet = S.fromList "\n"
+newlineSet =
+  S.fromList "\n"
 
 {-# INLINE nonSymbolSet #-}
 nonSymbolSet :: S.Set Char
-nonSymbolSet = S.fromList "() \"\n;"
+nonSymbolSet =
+  S.fromList "() \"\n;"
 
 {-# INLINE updateStreamL #-}
 updateStreamL :: T.Text -> Tokenizer ()
@@ -226,13 +234,16 @@ updateStreamL s =
 
 {-# INLINE updateStreamC #-}
 updateStreamC :: Int -> T.Text -> Tokenizer ()
-updateStreamC c s = modify (\env -> env {text = s, column = c + column env})
+updateStreamC c s =
+  modify (\env -> env {text = s, column = c + column env})
 
 incrementLine :: Tokenizer ()
-incrementLine = modify (\env -> env {line = 1 + line env, column = 1})
+incrementLine =
+  modify (\env -> env {line = 1 + line env, column = 1})
 
 incrementColumn :: Tokenizer ()
-incrementColumn = modify (\env -> env {column = 1 + column env})
+incrementColumn =
+  modify (\env -> env {column = 1 + column env})
 
 raiseTokenizeError :: T.Text -> Tokenizer a
 raiseTokenizeError txt = do

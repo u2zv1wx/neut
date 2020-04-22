@@ -533,10 +533,12 @@ newDataLocal' mName = do
   return (x, LLVMDataLocal x)
 
 i64 :: LowType
-i64 = LowTypeIntS 64
+i64 =
+  LowTypeIntS 64
 
 i32 :: LowType
-i32 = LowTypeIntS 32
+i32 =
+  LowTypeIntS 32
 
 newNameWith'' :: Maybe T.Text -> WithEnv Ident
 newNameWith'' mName =

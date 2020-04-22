@@ -64,10 +64,12 @@ returnCartesianImmediate m = do
   return (m, CodeUpIntro v)
 
 switch :: CodePlus -> CodePlus -> [(Case, CodePlus)]
-switch e1 e2 = [(CaseValue (EnumValueIntS 64 0), e1), (CaseDefault, e2)]
+switch e1 e2 =
+  [(CaseValue (EnumValueIntS 64 0), e1), (CaseDefault, e2)]
 
 cartImmName :: T.Text
-cartImmName = "cartesian-immediate"
+cartImmName =
+  "cartesian-immediate"
 
 tryCache :: Meta -> T.Text -> WithEnv () -> WithEnv DataPlus
 tryCache m key doInsertion = do
@@ -102,14 +104,16 @@ cartesianImmediate m =
     insCodeEnv cartImmName args e
 
 affineImmediate :: DataPlus -> WithEnv CodePlus
-affineImmediate (m, _) = return (m, CodeUpIntro (m, sigmaIntro []))
+affineImmediate (m, _) =
+  return (m, CodeUpIntro (m, sigmaIntro []))
 
 relevantImmediate :: DataPlus -> WithEnv CodePlus
 relevantImmediate argVar@(m, _) =
   return (m, CodeUpIntro (m, sigmaIntro [argVar, argVar]))
 
 cartStructName :: T.Text
-cartStructName = "cartesian-struct"
+cartStructName =
+  "cartesian-struct"
 
 cartesianStruct :: Meta -> [ArrayKind] -> WithEnv DataPlus
 cartesianStruct m ks =

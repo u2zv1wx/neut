@@ -78,7 +78,8 @@ resolveIdent h@(I (_, i)) e = do
   synthesize
 
 asAnalyzable :: EnrichedConstraint -> EnrichedConstraint
-asAnalyzable (Enriched cs hs _) = Enriched cs hs ConstraintAnalyzable
+asAnalyzable (Enriched cs hs _) =
+  Enriched cs hs ConstraintAnalyzable
 
 -- Try the list of alternatives.
 tryPlanList :: Meta -> [WithEnv a] -> WithEnv a
@@ -110,7 +111,8 @@ toAltList xts = do
 
 -- [x, x, y, z, z] ~> [(x, [0, 1]), (y, [2]), (z, [3, 4])]
 toIndexInfo :: Eq a => [a] -> [(a, [Int])]
-toIndexInfo xs = toIndexInfo' $ zip xs [0 ..]
+toIndexInfo xs =
+  toIndexInfo' $ zip xs [0 ..]
 
 toIndexInfo' :: Eq a => [(a, Int)] -> [(a, [Int])]
 toIndexInfo' input =
