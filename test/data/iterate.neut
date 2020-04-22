@@ -11,3 +11,12 @@
       (i64:mul x (self (i64:sub x 1))))))
 
 (i64:print (fact 10)) ;; 3628800
+
+;; iterate with type annotation
+(let fact
+  (iterate (self (hom i64 i64)) ((x i64))
+    (if (i64:le x 0)
+      1
+      (i64:mul x (self (i64:sub x 1))))))
+
+(i64:print (fact 5)) ;; 120
