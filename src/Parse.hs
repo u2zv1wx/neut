@@ -175,7 +175,7 @@ parse' stmtTreeList =
                 defList <- parse' restStmtList
                 return $ WeakStmtConstDecl (m', name', t') : defList
               | otherwise -> raiseSyntaxError m "(constant LEAF TREE)"
-            "definition"
+            "define"
               | [name@(_, TreeLeaf _), body] <- rest ->
                 parse' $ (m, TreeNode [(m, TreeLeaf "let"), name, body]) : restStmtList
               | name@(mFun, TreeLeaf _) : xts@(_, TreeNode _) : body : rest' <- rest ->
@@ -415,7 +415,7 @@ keywordSet =
     [ "attribute",
       "coinductive",
       "constant",
-      "definition",
+      "define",
       "end",
       "ensure",
       "enum",

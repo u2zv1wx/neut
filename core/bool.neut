@@ -8,11 +8,11 @@
   (true 1)
   (false 0))
 
-(definition and i1:and)
+(define and i1:and)
 
-(definition or i1:or)
+(define or i1:or)
 
-(definition not ((b bool))
+(define not ((b bool))
   (if b
     false
     true))

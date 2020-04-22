@@ -1,4 +1,4 @@
-;; (definition test ()
+;; (define test ()
 ;;   "あ")
 
 ;; (os:write os:stdout (test) 3)
@@ -87,10 +87,10 @@
 
 (verify some-theorem)
 
-;; (definition my-verify ((A tau) (p A))
+;; (define my-verify ((A tau) (p A))
 ;;   ((irreducible (lambda ((x A)) (string:print "verified"))) p))
 
-(definition loop ((x i64))
+(define loop ((x i64))
   (witness i64
     (loop x)))
 
@@ -139,7 +139,7 @@
 
 (i64:print -1234321)
 
-(definition fact ((n i64))
+(define fact ((n i64))
   (witness i64
     (if (i64:le n 0)
       1
@@ -176,9 +176,9 @@
 ;; @?equal:refl
 
 
-(definition my-id ((a tau) (_ tau) (_ tau) (x a)) x)
+(define my-id ((a tau) (_ tau) (_ tau) (x a)) x)
 
-;; (definition my-id ((?a tau) (x a)) x)
+;; (define my-id ((?a tau) (x a)) x)
 
 ;; #my-id
 ?my-id
@@ -208,7 +208,7 @@
 
 ?my-id
 
-(definition id ((a tau) (x a)) x)
+(define id ((a tau) (x a)) x)
 
 
 (id i64 (i64 3)) ;; これでよくね？
@@ -240,14 +240,14 @@
   (item-1 () (choice))
   (item-2 () (choice)))
 
-(definition hoge-func ((x i64)) x)
+(define hoge-func ((x i64)) x)
 
 
 ?choice:fold
 ;; (choice:fold (choice:item-1) (lambda () i64) ?admit ?admit)
 
 
-(definition flip ((c (choice)))
+(define flip ((c (choice)))
   (witness (choice)
     (case c
       ((choice:item-1)
@@ -257,10 +257,10 @@
 
 ?flip
 
-(definition 日本語でもべつにいい ((x i64)) (i64:add x 10))
+(define 日本語でもべつにいい ((x i64)) (i64:add x 10))
 
 
-(definition sample ((x i64)) (i64:add x 10))
+(define sample ((x i64)) (i64:add x 10))
 
 (theorem double-flip-is-identity
   (pi ((c (choice)))
@@ -288,7 +288,8 @@
 
 
 
-(definition unused-function ((_ tau)) tau)
+(define unused-function ((_ tau)) tau)
+
 
 
 

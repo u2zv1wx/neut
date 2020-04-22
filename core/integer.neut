@@ -12,17 +12,17 @@
 
 (section i64)
 
-(definition negate ((x i64))
+(define negate ((x i64))
   (witness i64
     (mul x -1)))
 
-(definition print-digit ((x i64))
+(define print-digit ((x i64))
   (witness top
     (with let-bind
       (print-character (unsafe:cast i64 u8 (add x 48))))))
 
 ;; とりあえず直接printする。ホントはbufferをつかって実装するべき。
-(definition print ((x i64))
+(define print ((x i64))
   (witness top
     (if (< x 0)
       (with let-bind

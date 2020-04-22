@@ -4,21 +4,21 @@
 
 (include library "core/top.neut")
 
-(definition string
+(define string
   (sigma
     ((len u64))
     (array len u8)))
 
 (use os)
 
-(definition print-character ((value u8))
+(define print-character ((value u8))
   (witness top
     (with let-bind
       (let char (array-introduction u8 value))
       (os:write * os:stdout char 1)
       top:unit)))
 
-(definition string:print ((str string))
+(define string:print ((str string))
   (witness (product string u64)
     ;; (let (tuple n content) str) ← こんなふうに書けると嬉しい？
     ;; (...)

@@ -14,7 +14,7 @@
   (some ((x a))
     (option a)))
 
-(definition map
+(define map
   (witness (functor-form option)
     (lambda (_ _ f m)
       (case m
@@ -25,12 +25,12 @@
 
 ;; (satisfies-functor option), (satisfies-return option)みたいに書いてもいいかも。
 
-(definition return
+(define return
   (witness (return-type option)
     (lambda (_ x)
       (some x))))
 
-(definition bind
+(define bind
   (witness (bind-type option)
     (lambda (_ _ m k)
       (case m
@@ -39,7 +39,7 @@
         ((some x)
           (k x))))))
 
-(definition from-option
+(define from-option
   ((a tau)
    (x a)
    (m (option a)))
@@ -66,13 +66,13 @@
 
 ?monad:unfold
 
-(definition witness-functor
+(define witness-functor
   (witness (functor option)
     (record (functor option)
       (map
         option:map))))
 
-(definition witness-monad
+(define witness-monad
   (witness (monad option)
     (record (monad option)
       (witness-functor
@@ -91,7 +91,7 @@
 ;;   (case option:witness-functor
 ;;     ((functor:unfold f ma base-value) (ma base-value))))
 
-;; (definition witness-fake
+;; (define witness-fake
 ;;   (witness (fake option)
 ;;     (fake:unfold
 ;;       fake

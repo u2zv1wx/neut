@@ -2,7 +2,7 @@
 
 (include "foundation.neut")
 
-(definition compose
+(define compose
   ((a tau)
    (b tau)
    (c tau)
@@ -14,13 +14,13 @@
 
 ;; (attribute compose (implicit 0 1 2))
 
-(definition let-bind ((a tau) (b tau) (x a) (k (hom a b)))
+(define let-bind ((a tau) (b tau) (x a) (k (hom a b)))
   (witness b
     (k x)))
 
 (provide compose)
 
 (provide let-bind)
-;; (definition let-bind ([a tau] [b tau] (x a) (k (hom a b)))
+;; (define let-bind ([a tau] [b tau] (x a) (k (hom a b)))
 ;;   (witness b
 ;;     (k x)))

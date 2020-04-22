@@ -57,7 +57,7 @@
     ()
     i64))
 
-(definition rusage
+(define rusage
   (struct
     i64   ;; ru_utime           user CPU time used
     i64   ;; (microsec)
@@ -86,7 +86,7 @@
      (usage rusage))
     (product (array 1 i64) rusage i64)))
 
-(definition sockaddr
+(define sockaddr
   (struct
     u8    ;; total length
     u8    ;; address family
@@ -94,7 +94,7 @@
     u32   ;; empty (8 byte so far)
     u64)) ;; empty (16 byte so far)
 
-(definition sockaddr-in
+(define sockaddr-in
   (struct
     u8    ;; total length
     u8    ;; address family
@@ -102,7 +102,7 @@
     u32   ;; ipv4 addr
     u64)) ;; empty
 
-(definition sockaddr-in6
+(define sockaddr-in6
   (struct
     u8    ;; length of this struct
     u8    ;; AF_INET6
