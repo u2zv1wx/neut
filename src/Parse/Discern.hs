@@ -153,22 +153,6 @@ discern' nenv term =
       let nenv' = Map.filterWithKey (\k _ -> k `notElem` xs) nenv
       discern' nenv' e
 
-discernBinder ::
-  NameEnv ->
-  [WeakIdentPlus] ->
-  WeakTermPlus ->
-  WithEnv ([WeakIdentPlus], WeakTermPlus)
-discernBinder nenv binder e =
-  case binder of
-    [] -> do
-      e' <- discern' nenv e
-      return ([], e')
-    ((mx, x, t) : xts) -> do
-      t' <- discern' nenv t
-      x' <- newDefinedNameWith mx x
-      (xts', e') <- discernBinder (insertName x x' nenv) xts e
-      return ((mx, x', t') : xts', e')
-
 discernFreeIdentPlus :: NameEnv -> WeakIdentPlus -> WithEnv WeakIdentPlus
 discernFreeIdentPlus nenv (m, x, t) = do
   t' <- discern' nenv t
@@ -190,6 +174,22 @@ discernIdentPlus (m, x, t) = do
   modify (\env -> env {topNameEnv = Map.insert (asText x) x' (topNameEnv env)})
   return (m, x', t')
 
+discernBinder ::
+  NameEnv ->
+  [WeakIdentPlus] ->
+  WeakTermPlus ->
+  WithEnv ([WeakIdentPlus], WeakTermPlus)
+discernBinder nenv binder e =
+  case binder of
+    [] -> do
+      e' <- discern' nenv e
+      return ([], e')
+    (mx, x, t) : xts -> do
+      t' <- discern' nenv t
+      x' <- newDefinedNameWith mx x
+      (xts', e') <- discernBinder (insertName x x' nenv) xts e
+      return ((mx, x', t') : xts', e')
+
 discernIter ::
   NameEnv ->
   WeakIdentPlus ->
@@ -198,10 +198,25 @@ discernIter ::
   WithEnv (WeakIdentPlus, [WeakIdentPlus], WeakTermPlus)
 discernIter nenv (mf, f, tf) binder e = do
   tf' <- discern' nenv tf
-  f' <- newDefinedNameWith mf f
-  removeFromIntactSet mf $ asText f'
-  (binder', e') <- discernBinder (insertName f f' nenv) binder e
-  return ((mf, f', tf'), binder', e')
+  discernIter' nenv (mf, f, tf') binder e
+
+discernIter' ::
+  NameEnv ->
+  WeakIdentPlus ->
+  [WeakIdentPlus] ->
+  WeakTermPlus ->
+  WithEnv (WeakIdentPlus, [WeakIdentPlus], WeakTermPlus)
+discernIter' nenv self@(mf, f, tf') binder e =
+  case binder of
+    [] -> do
+      f' <- newDefinedNameWith mf f
+      e' <- discern' (insertName f f' nenv) e
+      return ((mf, f', tf'), [], e')
+    ((mx, x, t) : xts) -> do
+      t' <- discern' nenv t
+      x' <- newDefinedNameWith mx x
+      (self', xts', e') <- discernIter' (insertName x x' nenv) self xts e
+      return (self', (mx, x', t') : xts', e')
 
 discernWeakCase :: Meta -> NameEnv -> WeakCase -> WithEnv WeakCase
 discernWeakCase m nenv weakCase =
