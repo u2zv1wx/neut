@@ -2,6 +2,7 @@ module Main where
 
 import Control.Exception.Safe
 import Control.Monad
+import Data.List
 import Data.Log
 import Path
 import Path.IO
@@ -13,7 +14,7 @@ main = do
   dataDir <- getDataDir
   (_, contents) <- listDir dataDir
   progList <- filterM isSourceFile contents
-  resultList <- forM progList test
+  resultList <- forM (sort progList) test
   if or resultList
     then return ()
     else exitWith (ExitFailure 1)
