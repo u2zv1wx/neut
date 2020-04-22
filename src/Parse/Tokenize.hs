@@ -31,8 +31,10 @@ tokenize input = do
   let env = TEnv {text = input, line = 1, column = 1, filePath = path}
   resultOrError <- liftIO $ try $ runStateT program env
   case resultOrError of
-    Left (Error err) -> throw $ Error err
-    Right (result, _) -> return result
+    Left (Error err) ->
+      throw $ Error err
+    Right (result, _) ->
+      return result
 
 program :: Tokenizer [TreePlus]
 program = program' []
@@ -50,8 +52,10 @@ term :: Tokenizer TreePlus
 term = do
   s <- gets text
   case T.uncons s of
-    Just ('(', _) -> node
-    _ -> leaf
+    Just ('(', _) ->
+      node
+    _ ->
+      leaf
 
 leaf :: Tokenizer TreePlus
 leaf = do
@@ -72,7 +76,8 @@ leaf = do
           "unexpected character: '"
             <> T.singleton c
             <> "'\nexpecting: SYMBOL-CHAR"
-    Nothing -> raiseTokenizeError "unexpected end of input\nexpecting: LEAF"
+    Nothing ->
+      raiseTokenizeError "unexpected end of input\nexpecting: LEAF"
 
 node :: Tokenizer TreePlus
 node = do
@@ -107,25 +112,33 @@ skip = do
   space
   s <- gets text
   case T.uncons s of
-    Just (';', _) -> comment
-    _ -> space
+    Just (';', _) ->
+      comment
+    _ ->
+      space
 
 space :: Tokenizer ()
 space = do
   s <- gets text
   case T.uncons s of
     Just (c, rest)
-      | c `S.member` spaceSet -> updateStreamC 1 rest >> space
-      | c `S.member` newlineSet -> updateStreamL rest >> space
-    _ -> return ()
+      | c `S.member` spaceSet ->
+        updateStreamC 1 rest >> space
+      | c `S.member` newlineSet ->
+        updateStreamL rest >> space
+    _ ->
+      return ()
 
 comment :: Tokenizer ()
 comment = do
   s <- gets text
   case T.uncons s of
-    Just ('\n', rest) -> updateStreamL rest >> skip
-    Just (_, rest) -> updateStreamC 1 rest >> comment
-    Nothing -> return () -- no newline at the end of file
+    Just ('\n', rest) ->
+      updateStreamL rest >> skip
+    Just (_, rest) ->
+      updateStreamC 1 rest >> comment
+    Nothing ->
+      return () -- no newline at the end of file
 
 many :: Tokenizer a -> Tokenizer [a]
 many f = sepEndBy f (return ())
@@ -138,8 +151,10 @@ sepEndBy' f g acc = do
   itemOrResult <- catch f (\(_ :: Error) -> return $ Left $ reverse acc)
   g
   case itemOrResult of
-    Right item -> sepEndBy' f g (item : acc)
-    Left result -> return result
+    Right item ->
+      sepEndBy' f g (item : acc)
+    Left result ->
+      return result
 
 symbol :: Tokenizer T.Text
 symbol = do
@@ -163,7 +178,8 @@ type EscapeFlag = Bool
 headStringLengthOf :: EscapeFlag -> T.Text -> Int -> Tokenizer Int
 headStringLengthOf flag s i =
   case T.uncons s of
-    Nothing -> raiseTokenizeError "unexpected end of input while lexing string"
+    Nothing ->
+      raiseTokenizeError "unexpected end of input while lexing string"
     Just (c, rest)
       | c == '"' -> do
         incrementColumn

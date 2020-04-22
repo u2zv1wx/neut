@@ -249,7 +249,8 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
                   )
               )
           ]
-      _ -> raiseCritical m "inductive-intro"
+      _ ->
+        raiseCritical m "inductive-intro"
   | otherwise =
     raiseError m $
       "the succedent of an introduction rule of `"
@@ -370,7 +371,8 @@ asInductive' t =
               ]
           )
         )
-    _ -> raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) ...)"
+    _ ->
+      raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) ...)"
 
 extractArg :: TreePlus -> WithEnv TreePlus
 extractArg tree =
@@ -561,42 +563,44 @@ toInternalizedArg ::
   WeakIdentPlus -> -- outerでのコンストラクタ。
   WeakIdentPlus -> -- innerでのコンストラクタ。xts部分の引数だけouterのコンストラクタと型がずれていることに注意。
   WithEnv WeakTermPlus
-toInternalizedArg mode isub aInner aOuter xts atsbts es es' b (mbInner, _, (_, WeakTermPi _ ytsInner _)) = do
-  let (ms, ys, ts) = unzip3 ytsInner
-  let vxs = map toVar' xts
-  -- 引数の型を適切にsubstする。これによって、aInner (x1, ..., xn)の出現がaOuter (e1', ..., en')へと置き換えられて、
-  -- 結果的にaOuterの中身はすべて処理済みとなる。
-  -- ytsInnerはPiの内部でのコンストラクタの型であるから、substをするときはaInnerからsubstを行なう必要がある。……本当か？
-  -- このsubstを行なうことで結局z @ (aOuter, ARGS)のARGS部分の引数がaOuter関連のもので揃うから正しいはず。
-  ts' <- mapM (substRuleType ((aInner, vxs), (aOuter, es'))) ts
-  -- aInner (x1, ..., xn) ~> aOuter (e1', ..., en')が終わったら、こんどは型のxiをeiに置き換える。
-  -- これによって、
-  --   - aOuterの中身はすべて処理済み
-  --   - aOuterの外にはeiが出現しうる
-  -- という状況が実現できる。これはrecursionの停止を与える。
-  let xs = map (\(_, x, _) -> asInt x) xts -- fixme: このへんもrenameBinderでやったほうがいい？
-  let sub = IntMap.fromList $ zip xs es
-  let ts'' = map (substWeakTermPlus sub) ts'
-  ys' <- mapM newNameWith ys
-  -- これで引数の型の調整が終わったので、あらためてidentPlusの形に整える
-  -- もしかしたらyって名前を別名に変更したほうがいいかもしれないが。
-  let ytsInner' = zip3 ms ys' ts''
-  -- 引数をコンストラクタに渡せるようにするために再帰的にinternalizeをおこなう。
-  -- list (item-outer A)みたいな形だったものは、list (item-inner A)となっているはずなので、thetaは停止する。
-  -- list (list (item-outer A))みたいな形だったものも、list (list (item-inner A))となってthetaは停止する。
-  let f (m, y, t) = theta mode isub atsbts t (m, WeakTermUpsilon y)
-  args <- mapM f ytsInner'
-  -- あとは結果を返すだけ
-  return
-    ( mbInner,
-      weakTermPiIntro
-        ytsInner'
-        (mbInner, WeakTermPiElim (toVar' b) (es' ++ args))
-    )
-toInternalizedArg _ _ _ _ _ _ _ _ _ (m, _, _) =
-  raiseCritical
-    m
-    "the type of an introduction rule must be represented by a Pi-type, but its not"
+toInternalizedArg mode isub aInner aOuter xts atsbts es es' b bInner =
+  case bInner of
+    (mbInner, _, (_, WeakTermPi _ ytsInner _)) -> do
+      let (ms, ys, ts) = unzip3 ytsInner
+      let vxs = map toVar' xts
+      -- 引数の型を適切にsubstする。これによって、aInner (x1, ..., xn)の出現がaOuter (e1', ..., en')へと置き換えられて、
+      -- 結果的にaOuterの中身はすべて処理済みとなる。
+      -- ytsInnerはPiの内部でのコンストラクタの型であるから、substをするときはaInnerからsubstを行なう必要がある。……本当か？
+      -- このsubstを行なうことで結局z @ (aOuter, ARGS)のARGS部分の引数がaOuter関連のもので揃うから正しいはず。
+      ts' <- mapM (substRuleType ((aInner, vxs), (aOuter, es'))) ts
+      -- aInner (x1, ..., xn) ~> aOuter (e1', ..., en')が終わったら、こんどは型のxiをeiに置き換える。
+      -- これによって、
+      --   - aOuterの中身はすべて処理済み
+      --   - aOuterの外にはeiが出現しうる
+      -- という状況が実現できる。これはrecursionの停止を与える。
+      let xs = map (\(_, x, _) -> asInt x) xts -- fixme: このへんもrenameBinderでやったほうがいい？
+      let sub = IntMap.fromList $ zip xs es
+      let ts'' = map (substWeakTermPlus sub) ts'
+      ys' <- mapM newNameWith ys
+      -- これで引数の型の調整が終わったので、あらためてidentPlusの形に整える
+      -- もしかしたらyって名前を別名に変更したほうがいいかもしれないが。
+      let ytsInner' = zip3 ms ys' ts''
+      -- 引数をコンストラクタに渡せるようにするために再帰的にinternalizeをおこなう。
+      -- list (item-outer A)みたいな形だったものは、list (item-inner A)となっているはずなので、thetaは停止する。
+      -- list (list (item-outer A))みたいな形だったものも、list (list (item-inner A))となってthetaは停止する。
+      let f (m, y, t) = theta mode isub atsbts t (m, WeakTermUpsilon y)
+      args <- mapM f ytsInner'
+      -- あとは結果を返すだけ
+      return
+        ( mbInner,
+          weakTermPiIntro
+            ytsInner'
+            (mbInner, WeakTermPiElim (toVar' b) (es' ++ args))
+        )
+    (m, _, _) ->
+      raiseCritical
+        m
+        "the type of an introduction rule must be represented by a Pi-type, but its not"
 
 renameBinder ::
   [WeakIdentPlus] ->

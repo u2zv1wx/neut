@@ -385,7 +385,8 @@ interpretWeakIdentPlus tree =
       (m, x') <- interpretLeaf x
       t' <- interpret t
       return (m, x', t')
-    t -> raiseSyntaxError (fst t) "(LEAF TREE)"
+    t ->
+      raiseSyntaxError (fst t) "(LEAF TREE)"
 
 interpretIter :: TreePlus -> WithEnv Def
 interpretIter tree =
@@ -394,7 +395,8 @@ interpretIter tree =
       xt' <- interpretWeakIdentPlus xt
       (xts', e') <- interpretBinder xts e
       return (m, xt', xts', e')
-    t -> raiseSyntaxError (fst t) "(TREE (TREE ... TREE) TREE)"
+    t ->
+      raiseSyntaxError (fst t) "(TREE (TREE ... TREE) TREE)"
 
 interpretLeaf :: TreePlus -> WithEnv (Meta, Ident)
 interpretLeaf tree =
@@ -418,7 +420,8 @@ interpretIdentPlus tree =
       (m, x') <- interpretLeafText x
       t' <- interpret t
       return (m, asIdent x', t')
-    t -> raiseSyntaxError (fst t) "(LEAF TREE)"
+    t ->
+      raiseSyntaxError (fst t) "(LEAF TREE)"
 
 interpretLeafText :: TreePlus -> WithEnv (Meta, T.Text)
 interpretLeafText tree =
@@ -466,8 +469,10 @@ interpretEnumValue tree =
                   <> T.pack (show size)
                   <> ", but is out of range of u"
                   <> T.pack (show size)
-        _ -> raiseSyntaxError (fst e) "(SINT-TYPE INT) | (UINT-TYPE INT)"
-    t -> raiseSyntaxError (fst t) "LEAF | (LEAF LEAF)"
+        _ ->
+          raiseSyntaxError (fst e) "(SINT-TYPE INT) | (UINT-TYPE INT)"
+    t ->
+      raiseSyntaxError (fst t) "LEAF | (LEAF LEAF)"
 
 interpretBinder ::
   [TreePlus] -> TreePlus -> WithEnv ([WeakIdentPlus], WeakTermPlus)
@@ -482,7 +487,8 @@ interpretWeakCase tree =
     (m, TreeNode [(_, TreeLeaf "enum-introduction"), l]) -> do
       v <- weakenEnumValue <$> interpretEnumValue l
       return (m, v)
-    (m, TreeLeaf "default") -> return (m, WeakCaseDefault)
+    (m, TreeLeaf "default") ->
+      return (m, WeakCaseDefault)
     (m, TreeLeaf i)
       | Just i' <- readMaybe $ T.unpack i -> do
         h <- newHole m
@@ -527,7 +533,8 @@ interpretCaseClause tree =
       xts' <- mapM interpretWeakIdentPlus xts
       e' <- interpret e
       return (((m, asIdent c), xts'), e')
-    t -> raiseSyntaxError (fst t) "((LEAF TREE ... TREE) TREE)"
+    t ->
+      raiseSyntaxError (fst t) "((LEAF TREE ... TREE) TREE)"
 
 type CocaseClause = ((Ident, [WeakTermPlus]), [(Ident, WeakTermPlus)])
 
@@ -565,7 +572,8 @@ interpretCocaseClause' tree =
     (_, TreeNode [(_, TreeLeaf label), body]) -> do
       body' <- interpret body
       return (asIdent label, body')
-    t -> raiseSyntaxError (fst t) "(LEAF TREE)"
+    t ->
+      raiseSyntaxError (fst t) "(LEAF TREE)"
 
 cocaseAsSigmaIntro :: Meta -> T.Text -> WeakTermPlus -> [CocaseClause] -> WithEnv [WeakTermPlus]
 cocaseAsSigmaIntro m name codType cocaseClauseList = do
@@ -573,24 +581,29 @@ cocaseAsSigmaIntro m name codType cocaseClauseList = do
   bes <- asLamClauseList m cocaseClauseList
   lenv <- gets labelEnv
   case Map.lookup name lenv of
-    Nothing -> raiseError m $ "no such coinductive type defined: " <> name
+    Nothing ->
+      raiseError m $ "no such coinductive type defined: " <> name
     Just labelList -> do
       iesjes <- labelToIndex m labelList $ aes ++ bes
       let isLinear = linearCheck $ map fst iesjes
       let isExhaustive = length iesjes == length labelList
       case (isLinear, isExhaustive) of
-        (False, _) -> raiseError m "found a non-linear copattern"
-        (_, False) -> raiseError m "found a non-exhaustive copattern"
+        (False, _) ->
+          raiseError m "found a non-linear copattern"
+        (_, False) ->
+          raiseError m "found a non-exhaustive copattern"
         (True, True) ->
           return $ map snd (sortOn fst iesjes) ++ [cocaseBaseValue m codType]
 
 labelToIndex :: Meta -> [T.Text] -> [(Ident, a)] -> WithEnv [(Int, a)]
 labelToIndex m lenv list =
   case list of
-    [] -> return []
+    [] ->
+      return []
     ((x, e) : xes) ->
       case elemIndex (asText x) lenv of
-        Nothing -> raiseError m $ "no such destructor defined: " <> asText x
+        Nothing ->
+          raiseError m $ "no such destructor defined: " <> asText x
         Just i -> do
           ies <- labelToIndex m lenv xes
           return $ (i, e) : ies
@@ -637,7 +650,8 @@ interpretEnumItem m name ts = do
 interpretEnumItem' :: T.Text -> [TreePlus] -> WithEnv [(T.Text, Int)]
 interpretEnumItem' name treeList =
   case treeList of
-    [] -> return []
+    [] ->
+      return []
     [t] -> do
       (s, mj) <- interpretEnumItem'' t
       return [(name <> ":" <> s, fromMaybe 0 mj)]
@@ -649,16 +663,21 @@ interpretEnumItem' name treeList =
 interpretEnumItem'' :: TreePlus -> WithEnv (T.Text, Maybe Int)
 interpretEnumItem'' tree =
   case tree of
-    (_, TreeLeaf s) -> return (s, Nothing)
+    (_, TreeLeaf s) ->
+      return (s, Nothing)
     (_, TreeNode [(_, TreeLeaf s), (_, TreeLeaf i)])
-      | Just i' <- readMaybe $ T.unpack i -> return (s, Just i')
-    t -> raiseSyntaxError (fst t) "LEAF | (LEAF LEAF)"
+      | Just i' <- readMaybe $ T.unpack i ->
+        return (s, Just i')
+    t ->
+      raiseSyntaxError (fst t) "LEAF | (LEAF LEAF)"
 
 headDiscriminantOf :: [(T.Text, Int)] -> Int
 headDiscriminantOf labelNumList =
   case labelNumList of
-    [] -> 0
-    ((_, i) : _) -> i
+    [] ->
+      0
+    ((_, i) : _) ->
+      i
 
 readEnumType :: Char -> T.Text -> Int -> Maybe Int
 readEnumType c str k -- n1, n2, ..., n{i}, ..., n{2^64}
@@ -667,7 +686,8 @@ readEnumType c str k -- n1, n2, ..., n{i}, ..., n{2^64}
     Just i <- readMaybe $ T.unpack $ T.tail str :: Maybe Int,
     1 <= toInteger i && toInteger i <= 2 ^ k =
     Just i
-  | otherwise = Nothing
+  | otherwise =
+    Nothing
 
 readEnumTypeIntS :: T.Text -> Maybe Int
 readEnumTypeIntS str = readEnumType 'i' str 23
@@ -680,22 +700,26 @@ readEnumValueIntS t x
   | Just (LowTypeIntS i) <- asLowTypeMaybe t,
     Just x' <- readMaybe $ T.unpack x =
     Just $ EnumValueIntS i x'
-  | otherwise = Nothing
+  | otherwise =
+    Nothing
 
 readEnumValueIntU :: T.Text -> T.Text -> Maybe EnumValue
 readEnumValueIntU t x
   | Just (LowTypeIntU i) <- asLowTypeMaybe t,
     Just x' <- readMaybe $ T.unpack x =
     Just $ EnumValueIntU i x'
-  | otherwise = Nothing
+  | otherwise =
+    Nothing
 
 asArrayKind :: TreePlus -> WithEnv ArrayKind
 asArrayKind tree =
   case tree of
     e@(_, TreeLeaf x) ->
       case asArrayKindMaybe x of
-        Nothing -> raiseSyntaxError (fst e) "SINT-TYPE | UINT-TYPE | FLOAT-TYPE"
-        Just t -> return t
+        Nothing ->
+          raiseSyntaxError (fst e) "SINT-TYPE | UINT-TYPE | FLOAT-TYPE"
+        Just t ->
+          return t
     t ->
       raiseSyntaxError (fst t) "LEAF"
 
@@ -741,7 +765,8 @@ interpretWith tree =
           return (m, WeakTermPiElim bind' [h1, h2, e', lam])
     (m, TreeNode (with@(_, TreeLeaf "with") : bind : (_, TreeNode ((_, TreeLeaf "erase") : xs)) : rest)) ->
       case mapM asLeaf xs of
-        Nothing -> raiseSyntaxError m "(with TREE (erase LEAF ... LEAF) TREE*)"
+        Nothing ->
+          raiseSyntaxError m "(with TREE (erase LEAF ... LEAF) TREE*)"
         Just xs' -> do
           rest' <- interpretWith (m, TreeNode (with : bind : rest))
           return (m, WeakTermErase xs' rest')
@@ -756,7 +781,8 @@ interpretWith tree =
 interpretBorrow :: Meta -> [TreePlus] -> WithEnv ([TreePlus], [TreePlus])
 interpretBorrow m treeList =
   case treeList of
-    [] -> raiseSyntaxError m "(TREE TREE*)"
+    [] ->
+      raiseSyntaxError m "(TREE TREE*)"
     es -> do
       let (borrowVarList, e') = interpretBorrow' $ last es
       return (borrowVarList, init es ++ [e'])
@@ -764,7 +790,8 @@ interpretBorrow m treeList =
 interpretBorrow' :: TreePlus -> ([TreePlus], TreePlus)
 interpretBorrow' tree =
   case tree of
-    t@(_, TreeLeaf _) -> ([], t)
+    t@(_, TreeLeaf _) ->
+      ([], t)
     (m, TreeNode ts) -> do
       let (mmxs, ts') = unzip $ map interpretBorrow'' ts
       (catMaybes mmxs, (m, TreeNode ts'))
@@ -776,4 +803,5 @@ interpretBorrow'' tree =
       | T.length s > 1,
         T.head s == '&' ->
         (Just (m, TreeLeaf $ T.tail s), (m, TreeLeaf $ T.tail s))
-    t -> (Nothing, t)
+    t ->
+      (Nothing, t)

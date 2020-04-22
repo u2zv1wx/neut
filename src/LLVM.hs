@@ -415,7 +415,8 @@ llvmCodeEnumElim :: DataPlus -> [(Case, CodePlus)] -> WithEnv LLVM
 llvmCodeEnumElim v branchList = do
   m <- constructSwitch branchList
   case m of
-    Nothing -> return LLVMUnreachable
+    Nothing ->
+      return LLVMUnreachable
     Just (defaultCase, caseList) -> do
       let t = LowTypeIntS 64
       (cast, castThen) <- llvmCast (Just "enum-base") v t
@@ -553,16 +554,21 @@ newNameWith'' mName =
 enumValueToInteger :: Meta -> EnumValue -> WithEnv Integer
 enumValueToInteger m intOrLabel =
   case intOrLabel of
-    EnumValueLabel l -> toInteger <$> getEnumNum m l
-    EnumValueIntS _ i -> return i
-    EnumValueIntU _ i -> return i
+    EnumValueLabel l ->
+      toInteger <$> getEnumNum m l
+    EnumValueIntS _ i ->
+      return i
+    EnumValueIntU _ i ->
+      return i
 
 getEnumNum :: Meta -> T.Text -> WithEnv Int
 getEnumNum m label = do
   renv <- gets revEnumEnv
   case Map.lookup label renv of
-    Nothing -> raiseCritical m $ "no such enum is defined: " <> label
-    Just (_, i) -> return i
+    Nothing ->
+      raiseCritical m $ "no such enum is defined: " <> label
+    Just (_, i) ->
+      return i
 
 insLLVMEnv :: T.Text -> [Ident] -> LLVM -> WithEnv ()
 insLLVMEnv funName args e =

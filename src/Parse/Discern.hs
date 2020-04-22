@@ -212,8 +212,10 @@ discernWeakCase m nenv weakCase =
     WeakCaseLabel l -> do
       ml <- lookupEnumValueNameWithPrefix l
       case ml of
-        Just l' -> return (WeakCaseLabel l')
-        Nothing -> raiseError m $ "no such enum-value is defined: " <> l
+        Just l' ->
+          return (WeakCaseLabel l')
+        Nothing ->
+          raiseError m $ "no such enum-value is defined: " <> l
     l ->
       return l
 
@@ -268,7 +270,8 @@ lookupName' m penv nenv x =
     prefix : prefixList -> do
       let query = prefix <> ":" <> asText x
       case Map.lookup query nenv of
-        Nothing -> lookupName' m prefixList nenv x
+        Nothing ->
+          lookupName' m prefixList nenv x
         Just x' -> do
           removeFromIntactSet m query
           return $ Just x'

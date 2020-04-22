@@ -19,7 +19,8 @@ macroExpand = recurM (macroExpand1 . splice)
 recurM :: (Monad m) => (TreePlus -> m TreePlus) -> TreePlus -> m TreePlus
 recurM f tree =
   case tree of
-    (m, TreeLeaf s) -> f (m, TreeLeaf s)
+    (m, TreeLeaf s) ->
+      f (m, TreeLeaf s)
     (m, TreeNode ts) -> do
       ts' <- mapM (recurM f) ts
       f (m, TreeNode ts')
@@ -33,8 +34,10 @@ macroExpand1 t@(i, _) = do
     else do
       mMatch <- try (macroMatch t) nenv
       case mMatch of
-        Just (sub, skel) -> macroExpand $ applySubst sub $ replaceMeta i skel
-        Nothing -> return t
+        Just (sub, skel) ->
+          macroExpand $ applySubst sub $ replaceMeta i skel
+        Nothing ->
+          return t
 
 type Notation = TreePlus
 
@@ -48,14 +51,19 @@ macroMatch t1 t2 =
       kenv <- gets keywordEnv
       case s2 `elem` kenv of
         True
-          | s1 == s2 -> return $ Just []
-          | otherwise -> return Nothing
-        False -> return $ Just [(s2, t1)]
+          | s1 == s2 ->
+            return $ Just []
+          | otherwise ->
+            return Nothing
+        False ->
+          return $ Just [(s2, t1)]
     ((_, TreeNode _), (_, TreeLeaf s2)) -> do
       kenv <- gets keywordEnv
       case s2 `elem` kenv of
-        True -> return Nothing
-        False -> return $ Just [(s2, t1)]
+        True ->
+          return Nothing
+        False ->
+          return $ Just [(s2, t1)]
     ((_, TreeLeaf _), (_, TreeNode _)) ->
       return Nothing
     ((_, TreeNode []), (_, TreeNode [])) ->
@@ -75,15 +83,18 @@ macroMatch t1 t2 =
       | length ts1 == length ts2 -> do
         mzs <- sequence <$> zipWithM macroMatch ts1 ts2
         return $ mzs >>= \zs -> Just $ join zs
-      | otherwise -> return Nothing
+      | otherwise ->
+        return Nothing
 
 applySubst :: MacroSubst -> Notation -> TreePlus
 applySubst sub notationTree =
   case notationTree of
     (i, TreeLeaf s) ->
       case lookup s sub of
-        Nothing -> (i, TreeLeaf s)
-        Just t -> replaceMeta i t
+        Nothing ->
+          (i, TreeLeaf s)
+        Just t ->
+          replaceMeta i t
     (i, TreeNode ts) ->
       (i, TreeNode $ map (applySubst sub) ts)
 
@@ -112,12 +123,15 @@ checkPlusCondition notationTree =
           raiseError
             m
             "The '+'-suffixed name can be occurred only at the end of a list"
-    (_, TreeNode []) -> return ()
+    (_, TreeNode []) ->
+      return ()
     (_, TreeNode ts) -> do
       mapM_ checkPlusCondition $ init ts
       case last ts of
-        (_, TreeLeaf _) -> return ()
-        ts' -> checkPlusCondition ts'
+        (_, TreeLeaf _) ->
+          return ()
+        ts' ->
+          checkPlusCondition ts'
 
 splice :: TreePlus -> TreePlus
 splice = splice'
@@ -126,7 +140,8 @@ splice = splice'
 splice' :: TreePlus -> TreePlus
 splice' tree =
   case tree of
-    t@(_, TreeLeaf _) -> t
+    t@(_, TreeLeaf _) ->
+      t
     (m, TreeNode ts) -> do
       let ts' = map splice' ts
       (m, TreeNode $ expandSplice $ map findSplice ts')
@@ -142,17 +157,23 @@ findSplice tree =
 expandSplice :: [Either TreePlus [TreePlus]] -> [TreePlus]
 expandSplice itemList =
   case itemList of
-    [] -> []
-    (Left t : rest) -> t : expandSplice rest
-    (Right ts : rest) -> ts ++ expandSplice rest
+    [] ->
+      []
+    Left t : rest ->
+      t : expandSplice rest
+    Right ts : rest ->
+      ts ++ expandSplice rest
 
 -- returns the first "Just"
 try :: (Monad m) => (a -> m (Maybe b)) -> [(a, c)] -> m (Maybe (b, c))
 try f candidateList =
   case candidateList of
-    [] -> return Nothing
+    [] ->
+      return Nothing
     ((s, t) : as) -> do
       mx <- f s
       case mx of
-        Nothing -> try f as
-        Just x -> return $ Just (x, t)
+        Nothing ->
+          try f as
+        Just x ->
+          return $ Just (x, t)

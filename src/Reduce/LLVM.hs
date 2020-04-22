@@ -18,7 +18,6 @@ reduceLLVM sub sizeMap llvm =
   case llvm of
     LLVMReturn d ->
       return $ LLVMReturn $ substLLVMData sub d
-    -- reduceLLVM sub _ (LLVMReturn d) = return $ LLVMReturn $ substLLVMData sub d
     LLVMLet x (LLVMOpBitcast d from to) cont
       | from == to -> do
         let sub' = IntMap.insert (asInt x) (substLLVMData sub d) sub

@@ -421,8 +421,10 @@ getRegList :: WithEnv [Builder]
 getRegList = do
   targetOS <- getOS
   case targetOS of
-    OSLinux -> return ["rax", "rdi", "rsi", "rdx", "rcx", "r8", "r9"]
-    OSDarwin -> return ["rax", "rdi", "rsi", "rdx", "r10", "r8", "r9"]
+    OSLinux ->
+      return ["rax", "rdi", "rsi", "rdx", "rcx", "r8", "r9"]
+    OSDarwin ->
+      return ["rax", "rdi", "rsi", "rdx", "r10", "r8", "r9"]
 
 showLowType :: LowType -> Builder
 showLowType lowType =

@@ -40,7 +40,8 @@ infer' ctx term =
     (m, WeakTermPiIntro info xts e) -> do
       (xts', (e', t')) <- inferBinder ctx xts e
       case info of
-        Nothing -> return ((m, weakTermPiIntro xts' e'), (m, weakTermPi xts' t'))
+        Nothing ->
+          return ((m, weakTermPiIntro xts' e'), (m, weakTermPi xts' t'))
         Just (indName, consName, args) -> do
           args' <- inferSigma ctx args
           return
@@ -64,7 +65,8 @@ infer' ctx term =
     (m, WeakTermZeta x) -> do
       zenv <- gets zetaEnv
       case IntMap.lookup (asInt x) zenv of
-        Just hole -> return hole
+        Just hole ->
+          return hole
         Nothing -> do
           (app, higherApp) <- newHoleInCtx ctx m
           modify
@@ -212,7 +214,6 @@ insertHoleIfNecessary' m x es = do
       return es
     Just is -> do
       t <- lookupWeakTypeEnv m x
-      -- tl <- lookupTypeEnv m (Right x) x
       case t of
         (_, WeakTermPi _ xts _) ->
           supplyHole' m 0 (length xts) is es
@@ -234,10 +235,6 @@ supplyHole' m idx len is es
       else supplyHole' m (idx + 1) len is es
   | otherwise =
     return es
-
--- insertHoleIfNecessary (m, WeakTermConst x) es
---   | not (metaIsExplicit m) = insertHoleIfNecessary' m x es
--- insertHoleIfNecessary _ es = return es
 
 inferArgs ::
   Meta ->
@@ -288,8 +285,10 @@ getIndInfo' :: (Meta, Ident) -> WithEnv ((Meta, Ident), [Int])
 getIndInfo' (m, c) = do
   rienv <- gets revIndEnv
   case Map.lookup (asText c) rienv of
-    Just (i, is) -> return ((m, i), is)
-    _ -> raiseError m $ "no such constructor defined: " <> asText c
+    Just (i, is) ->
+      return ((m, i), is)
+    _ ->
+      raiseError m $ "no such constructor defined: " <> asText c
 
 checkIntegrity :: [(Meta, Ident)] -> WithEnv ()
 checkIntegrity mis =

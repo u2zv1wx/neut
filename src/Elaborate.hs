@@ -107,7 +107,8 @@ elaborate' term =
     (m, WeakTermPiElim (mh, WeakTermZeta (I (_, x))) es) -> do
       sub <- gets substEnv
       case IntMap.lookup x sub of
-        Nothing -> raiseError mh "couldn't instantiate the hole here"
+        Nothing ->
+          raiseError mh "couldn't instantiate the hole here"
         Just (_, WeakTermPiIntro _ xts e)
           | length xts == length es -> do
             let xs = map (\(_, y, _) -> asInt y) xts

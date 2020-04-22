@@ -26,7 +26,8 @@ analyze = gets constraintEnv >>= simp
 simp :: [PreConstraint] -> WithEnv ()
 simp cs =
   case cs of
-    [] -> return ()
+    [] ->
+      return ()
     ((e1, e2) : rest) ->
       simp' $ (reduceWeakTermPlus e1, reduceWeakTermPlus e2) : rest
 
@@ -319,7 +320,8 @@ asStuckedTerm term =
           Just $ StuckPiElimUpsilon x mx $ ess ++ [(m, es)]
         Nothing ->
           Nothing
-    _ -> Nothing
+    _ ->
+      Nothing
 
 occurCheck :: Ident -> S.Set Ident -> Bool
 occurCheck h fmvs = h `S.notMember` fmvs
@@ -333,7 +335,8 @@ getVarList xs = catMaybes $ map asUpsilon xs
 toPiElim :: WeakTermPlus -> [(Meta, [WeakTermPlus])] -> WeakTermPlus
 toPiElim e args =
   case args of
-    [] -> e
+    [] ->
+      e
     (m, es) : ess ->
       toPiElim (m, WeakTermPiElim e es) ess
 
@@ -354,7 +357,8 @@ toVarList = toVarList' []
 toVarList' :: Context -> S.Set Ident -> [WeakTermPlus] -> WithEnv [WeakIdentPlus]
 toVarList' ctx xs termList =
   case termList of
-    [] -> return []
+    [] ->
+      return []
     e : es
       | (m, WeakTermUpsilon x) <- e,
         x `S.member` xs -> do
@@ -371,7 +375,8 @@ toVarList' ctx xs termList =
 bindFormalArgs :: WeakTermPlus -> [[WeakIdentPlus]] -> WeakTermPlus
 bindFormalArgs e args =
   case args of
-    [] -> e
+    [] ->
+      e
     xts : xtss -> do
       let e' = bindFormalArgs e xtss
       (metaOf e', weakTermPiIntro xts e')
@@ -379,16 +384,20 @@ bindFormalArgs e args =
 lookupAny :: [Ident] -> IntMap.IntMap a -> Maybe (Ident, a)
 lookupAny is sub =
   case is of
-    [] -> Nothing
+    [] ->
+      Nothing
     j : js ->
       case IntMap.lookup (asInt j) sub of
-        Just v -> Just (j, v)
-        _ -> lookupAny js sub
+        Just v ->
+          Just (j, v)
+        _ ->
+          lookupAny js sub
 
 lookupAll :: [Ident] -> IntMap.IntMap a -> Maybe [a]
 lookupAll is sub =
   case is of
-    [] -> return []
+    [] ->
+      return []
     j : js -> do
       v <- IntMap.lookup (asInt j) sub
       vs <- lookupAll js sub

@@ -33,6 +33,7 @@ clarifyStmt sub stmt =
     -- let x := box-intro CONST e1 in
     -- e2{x := box-elim CONST}
     StmtLet m (_, x, t) e cont -> do
+      -- ここは非同期でコンパイルできそう（というか、StmtVisitでファイル単位で非同期、とかでよさそう？）
       tenv <- gets typeEnv
       e' <- clarify' tenv $ substTermPlus sub e
       t' <- clarify' tenv $ substTermPlus sub t
@@ -241,7 +242,6 @@ clarifyCast tenv m = do
 
 clarifyUnaryOp :: TypeEnv -> T.Text -> UnaryOp -> Meta -> WithEnv CodePlus
 clarifyUnaryOp tenv name op m = do
-  -- t <- lookupTypeEnv' m (Right name) tenv name
   t <- lookupConstTypeEnv m name
   let t' = reduceTermPlus t
   case t' of
@@ -259,7 +259,6 @@ clarifyUnaryOp tenv name op m = do
 
 clarifyBinaryOp :: TypeEnv -> T.Text -> BinaryOp -> Meta -> WithEnv CodePlus
 clarifyBinaryOp tenv name op m = do
-  -- t <- lookupTypeEnv' m (Right name) tenv name
   t <- lookupConstTypeEnv m name
   let t' = reduceTermPlus t
   case t' of
@@ -279,7 +278,6 @@ clarifyBinaryOp tenv name op m = do
 clarifyArrayAccess :: TypeEnv -> Meta -> T.Text -> LowType -> WithEnv CodePlus
 clarifyArrayAccess tenv m name lowType = do
   arrayAccessType <- lookupConstTypeEnv m name
-  -- arrayAccessType <- lookupTypeEnv' m (Right name) tenv name
   let arrayAccessType' = reduceTermPlus arrayAccessType
   case arrayAccessType' of
     (_, TermPi _ xts cod)
@@ -306,7 +304,6 @@ clarifySysCall ::
   WithEnv CodePlus
 clarifySysCall tenv name syscall args m = do
   sysCallType <- lookupConstTypeEnv m name
-  -- sysCallType <- lookupTypeEnv' m (Right name) tenv name
   let sysCallType' = reduceTermPlus sysCallType
   case sysCallType' of
     (_, TermPi _ xts cod)
@@ -320,8 +317,12 @@ clarifySysCall tenv name syscall args m = do
       raiseCritical m $ "the type of " <> name <> " is wrong"
 
 iterativeApp :: [a -> a] -> a -> a
-iterativeApp [] x = x
-iterativeApp (f : fs) x = f (iterativeApp fs x)
+iterativeApp functionList x =
+  case functionList of
+    [] ->
+      x
+    f : fs ->
+      f (iterativeApp fs x)
 
 clarifyBinder :: TypeEnv -> [IdentPlus] -> WithEnv [(Meta, Ident, CodePlus)]
 clarifyBinder tenv binder =
@@ -715,8 +716,7 @@ chainTermPlus tenv term =
       return $ xs1 ++ filter (\(_, y, _) -> y `notElem` xs) xs2
     (_, TermCase _ e cxtes) -> do
       xs <- chainTermPlus tenv e
-      ys <-
-        concat <$> mapM (\((_, xts), body) -> chainTermPlus' tenv xts [body]) cxtes
+      ys <- concat <$> mapM (\((_, xts), body) -> chainTermPlus' tenv xts [body]) cxtes
       return $ xs ++ ys
 
 chainTermPlus' :: TypeEnv -> [IdentPlus] -> [TermPlus] -> WithEnv [IdentPlus]
