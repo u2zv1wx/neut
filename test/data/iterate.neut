@@ -1,0 +1,16 @@
+(let f0
+  (iterate foo ()
+    (i64 0)))
+
+(i64:print (f0))
+
+(let fact
+  (iterate self ((x i64))
+    (if (i64:le x 0)
+      1
+      (i64:mul x (self (i64:sub x 1))))))
+
+(i64:print (fact 10)) ;; 3628800
+
+;; (let bind-check
+;;   (iterate foo ((x foo)) (i64 1)))
