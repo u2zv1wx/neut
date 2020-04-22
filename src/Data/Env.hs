@@ -97,9 +97,7 @@ data Env
         llvmEnv :: Map.HashMap T.Text ([Ident], LLVM),
         -- external functions that must be declared in LLVM IR
         declEnv :: Map.HashMap T.Text ([LowType], LowType),
-        nopFreeSet :: S.Set Int,
-        cachePathList :: [Path Abs File],
-        depGraph :: Map.HashMap (Path Abs File) [Path Abs File]
+        nopFreeSet :: S.Set Int
       }
 
 initialEnv :: Env
@@ -147,9 +145,7 @@ initialEnv =
       defEnv = IntMap.empty,
       zetaEnv = IntMap.empty,
       nameSet = S.empty,
-      nopFreeSet = S.empty,
-      cachePathList = [],
-      depGraph = Map.empty
+      nopFreeSet = S.empty
     }
 
 newtype Error
@@ -448,42 +444,6 @@ getLibraryDirPath = do
   let ver = showVersion version
   relLibPath <- parseRelDir $ ".local/share/neut/" <> ver <> "/library"
   getDirPath relLibPath
-
-getObjectCacheDirPath :: WithEnv (Path Abs Dir)
-getObjectCacheDirPath = do
-  let ver = showVersion version
-  relCachePath <- parseRelDir $ ".cache/neut/" <> ver <> "/object"
-  getDirPath relCachePath
-
-isCacheAvailable :: Path Abs File -> WithEnv Bool
-isCacheAvailable path = do
-  g <- gets depGraph
-  case Map.lookup path g of
-    Nothing ->
-      isCacheAvailable' path
-    Just xs -> do
-      b <- isCacheAvailable' path
-      bs <- mapM isCacheAvailable xs
-      return $ and $ b : bs
-
-isCacheAvailable' :: Path Abs File -> WithEnv Bool
-isCacheAvailable' srcPath = do
-  cachePath <- toCacheFilePath srcPath
-  b <- doesFileExist cachePath
-  if not b
-    then return False
-    else do
-      srcModTime <- getModificationTime srcPath
-      cacheModTime <- getModificationTime cachePath
-      return $ srcModTime < cacheModTime
-
-toCacheFilePath :: Path Abs File -> WithEnv (Path Abs File)
-toCacheFilePath srcPath = do
-  cacheDirPath <- getObjectCacheDirPath
-  srcPath' <- parseRelFile $ "." <> toFilePath srcPath
-  item <- replaceExtension ".o" $ cacheDirPath </> srcPath'
-  ensureDir $ parent item
-  replaceExtension ".o" $ cacheDirPath </> srcPath'
 
 getDirPath :: Path Rel Dir -> WithEnv (Path Abs Dir)
 getDirPath base = do
