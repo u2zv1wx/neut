@@ -25,13 +25,17 @@ synthesize = do
   q <- gets constraintQueue
   sub <- gets substEnv
   case Q.getMin q of
-    Nothing -> return ()
+    Nothing ->
+      return ()
     Just (Enriched (e1, e2) hs _)
-      | Just (h, e) <- lookupAny (S.toList hs) sub -> resolveStuck e1 e2 h e
+      | Just (h, e) <- lookupAny (S.toList hs) sub ->
+        resolveStuck e1 e2 h e
     Just (Enriched _ _ (ConstraintQuasiPattern m ess e)) ->
       resolvePiElim m ess e
-    Just (Enriched _ _ (ConstraintFlexRigid m ess e)) -> resolvePiElim m ess e
-    _ -> throwTypeErrors
+    Just (Enriched _ _ (ConstraintFlexRigid m ess e)) ->
+      resolvePiElim m ess e
+    _ ->
+      throwTypeErrors
 
 resolveStuck ::
   WeakTermPlus -> WeakTermPlus -> Ident -> WeakTermPlus -> WithEnv ()
@@ -111,7 +115,8 @@ toIndexInfo xs = toIndexInfo' $ zip xs [0 ..]
 toIndexInfo' :: Eq a => [(a, Int)] -> [(a, [Int])]
 toIndexInfo' input =
   case input of
-    [] -> []
+    [] ->
+      []
     ((x, i) : xs) -> do
       let (is, xs') = toIndexInfo'' x xs
       let xs'' = toIndexInfo' xs'
@@ -120,7 +125,8 @@ toIndexInfo' input =
 toIndexInfo'' :: Eq a => a -> [(a, Int)] -> ([Int], [(a, Int)])
 toIndexInfo'' x info =
   case info of
-    [] -> ([], [])
+    [] ->
+      ([], [])
     ((y, i) : ys) -> do
       let (is, ys') = toIndexInfo'' x ys
       if x == y
@@ -128,14 +134,14 @@ toIndexInfo'' x info =
         else (is, (y, i) : ys')
 
 chooseActive :: [(Ident, [Int])] -> [[(Ident, Int)]]
-chooseActive xs = do
-  let xs' = map (\(x, is) -> zip (repeat x) is) xs
-  pickup xs'
+chooseActive xs =
+  pickup $ map (\(x, is) -> zip (repeat x) is) xs
 
 pickup :: Eq a => [[a]] -> [[a]]
 pickup input =
   case input of
-    [] -> [[]]
+    [] ->
+      [[]]
     (xs : xss) -> do
       let yss = pickup xss
       x <- xs
@@ -146,7 +152,8 @@ discardInactive xs indexList =
   forM (zip xs [0 ..]) $ \((mx, x, t), i) ->
     case lookup x indexList of
       Just j
-        | i == j -> return (mx, x, t)
+        | i == j ->
+          return (mx, x, t)
       _ -> do
         y <- newNameWith' "hole"
         return (mx, y, t)
@@ -155,7 +162,8 @@ discardInactive xs indexList =
 takeByCount :: [Int] -> [a] -> [[a]]
 takeByCount idxList xs =
   case idxList of
-    [] -> []
+    [] ->
+      []
     i : is -> do
       let ys = take i xs
       let yss = takeByCount is (drop i xs)
@@ -171,13 +179,16 @@ throwTypeErrors = do
 setupPosInfo :: [EnrichedConstraint] -> [(PosInfo, PreConstraint)]
 setupPosInfo constraintList =
   case constraintList of
-    [] -> []
+    [] ->
+      []
     Enriched (e1, e2) _ _ : cs -> do
       let pos1 = getPosInfo $ metaOf e1
       let pos2 = getPosInfo $ metaOf e2
       case snd pos1 `compare` snd pos2 of
-        LT -> (pos2, (e2, e1)) : setupPosInfo cs
-        _ -> (pos1, (e1, e2)) : setupPosInfo cs
+        LT ->
+          (pos2, (e2, e1)) : setupPosInfo cs
+        _ ->
+          (pos1, (e1, e2)) : setupPosInfo cs
 
 constructErrors :: [PosInfo] -> [(PosInfo, PreConstraint)] -> WithEnv [Log]
 constructErrors ps info =
@@ -274,7 +285,8 @@ unravelUpsilon :: Ident -> WithEnv Ident
 unravelUpsilon (I (s, i)) = do
   nenv <- gets nameEnv
   case Map.lookup s nenv of
-    Just s' -> return $ I (s', i)
+    Just s' ->
+      return $ I (s', i)
     Nothing -> do
       j <- newCountPP
       let s' = T.pack $ "var" ++ show j
@@ -285,7 +297,8 @@ unravelZeta :: Ident -> WithEnv Ident
 unravelZeta (I (s, i)) = do
   rnenv <- gets revNameEnv
   case IntMap.lookup i rnenv of
-    Just j -> return $ I (s, j)
+    Just j ->
+      return $ I (s, j)
     Nothing -> do
       j <- newCountPP
       modify (\env -> env {revNameEnv = IntMap.insert i j rnenv})

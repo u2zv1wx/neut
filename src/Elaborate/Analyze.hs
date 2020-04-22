@@ -33,19 +33,23 @@ simp cs =
 simp' :: [PreConstraint] -> WithEnv ()
 simp' constraintList =
   case constraintList of
-    [] -> return ()
+    [] ->
+      return ()
     (c : cs) ->
       case c of
         ((_, e1), (_, e2))
-          | e1 == e2 -> simp cs
+          | e1 == e2 ->
+            simp cs
         ((m1, WeakTermPi name1 xts1 cod1), (m2, WeakTermPi name2 xts2 cod2))
           | name1 == name2 ->
             if length xts1 /= length xts2
               then do
                 let m = supMeta m1 m2
                 case snd (getPosInfo m1) `compare` snd (getPosInfo m2) of
-                  LT -> throwArityError m (length xts2) (length xts1)
-                  _ -> throwArityError m (length xts1) (length xts2)
+                  LT ->
+                    throwArityError m (length xts2) (length xts1)
+                  _ ->
+                    throwArityError m (length xts1) (length xts2)
               else do
                 xt1 <- asWeakIdentPlus m1 cod1
                 xt2 <- asWeakIdentPlus m2 cod2
@@ -144,7 +148,8 @@ simp' constraintList =
                     zs <- includeCheck xs1 fvs2,
                     Just es <- lookupAll zs sub ->
                     case es of
-                      [] -> simpPattern h1 ies1 e1' e2' fvs2 cs
+                      [] ->
+                        simpPattern h1 ies1 e1' e2' fvs2 cs
                       _ -> do
                         let s = IntMap.fromList $ zip (map asInt zs) es
                         simp $ (e1', substWeakTermPlus s e2') : cs
@@ -155,7 +160,8 @@ simp' constraintList =
                     zs <- includeCheck xs2 fvs1,
                     Just es <- lookupAll zs sub ->
                     case es of
-                      [] -> simpPattern h2 ies2 e2' e1' fvs1 cs
+                      [] ->
+                        simpPattern h2 ies2 e2' e1' fvs1 cs
                       _ -> do
                         let s = IntMap.fromList $ zip (map asInt zs) es
                         simp $ (substWeakTermPlus s e1', e2') : cs
@@ -171,7 +177,8 @@ simp' constraintList =
                     zs <- includeCheck xs1 fvs2,
                     Just es <- lookupAll zs sub ->
                     case es of
-                      [] -> simpQuasiPattern h1 ies1 e1' e2' fmvs cs
+                      [] ->
+                        simpQuasiPattern h1 ies1 e1' e2' fmvs cs
                       _ -> do
                         let s = IntMap.fromList $ zip (map asInt zs) es
                         simp $ (e1', substWeakTermPlus s e2') : cs
@@ -181,7 +188,8 @@ simp' constraintList =
                     zs <- includeCheck xs2 fvs1,
                     Just es <- lookupAll zs sub ->
                     case es of
-                      [] -> simpQuasiPattern h2 ies2 e2' e1' fmvs cs
+                      [] ->
+                        simpQuasiPattern h2 ies2 e2' e1' fmvs cs
                       _ -> do
                         let s = IntMap.fromList $ zip (map asInt zs) es
                         simp $ (substWeakTermPlus s e1', e2') : cs
@@ -210,7 +218,8 @@ simpBinder' sub args1 args2 =
       let var1 = (supMeta m1 m2, WeakTermUpsilon x1)
       let sub' = IntMap.insert (asInt x2) var1 sub
       simpBinder' sub' xts1 xts2
-    _ -> return ()
+    _ ->
+      return ()
 
 simpPattern ::
   Ident ->
@@ -237,8 +246,7 @@ simpQuasiPattern ::
   [PreConstraint] ->
   WithEnv ()
 simpQuasiPattern h1 ies1 e1 e2 fmvs cs = do
-  insConstraintQueue $
-    Enriched (e1, e2) fmvs (ConstraintQuasiPattern h1 ies1 e2)
+  insConstraintQueue $ Enriched (e1, e2) fmvs (ConstraintQuasiPattern h1 ies1 e2)
   simp cs
 
 simpFlexRigid ::
@@ -272,7 +280,8 @@ asPairList list1 list2 =
       | otherwise -> do
         pairList <- asPairList mess1 mess2
         return $ zip es1 es2 ++ pairList
-    _ -> Nothing
+    _ ->
+      Nothing
 
 data Stuck
   = StuckPiElimUpsilon Ident Meta [(Meta, [WeakTermPlus])]
@@ -292,31 +301,24 @@ asStuckedTerm term =
       Just $ StuckPiElimConst x m []
     (mi, WeakTermIter (_, x, _) xts body) ->
       Just $ StuckPiElimIter (mi, x, xts, body, term) []
-    (m, WeakTermPiElim e es)
-      | Just _ <- mapM asUpsilon es ->
-        case asStuckedTerm e of
-          Just (StuckPiElimZeta h iess) -> Just $ StuckPiElimZeta h (iess ++ [es])
-          Just (StuckPiElimZetaStrict h iexss) ->
-            Just $ StuckPiElimZetaStrict h $ iexss ++ [es]
-          Just (StuckPiElimIter mu ess) ->
-            Just $ StuckPiElimIter mu $ ess ++ [(m, es)]
-          Just (StuckPiElimConst x mx ess) ->
-            Just $ StuckPiElimConst x mx $ ess ++ [(m, es)]
-          Just (StuckPiElimUpsilon x mx ess) ->
-            Just $ StuckPiElimUpsilon x mx $ ess ++ [(m, es)]
-          Nothing -> Nothing
-      | otherwise ->
-        case asStuckedTerm e of
-          Just (StuckPiElimZeta h iess) -> Just $ StuckPiElimZeta h $ iess ++ [es]
-          Just (StuckPiElimZetaStrict h iess) ->
-            Just $ StuckPiElimZeta h $ iess ++ [es]
-          Just (StuckPiElimIter mu ess) ->
-            Just $ StuckPiElimIter mu $ ess ++ [(m, es)]
-          Just (StuckPiElimConst x mx ess) ->
-            Just $ StuckPiElimConst x mx $ ess ++ [(m, es)]
-          Just (StuckPiElimUpsilon x mx ess) ->
-            Just $ StuckPiElimUpsilon x mx $ ess ++ [(m, es)]
-          Nothing -> Nothing
+    (m, WeakTermPiElim e es) ->
+      case asStuckedTerm e of
+        Just (StuckPiElimZeta h iess) ->
+          Just $ StuckPiElimZeta h (iess ++ [es])
+        Just (StuckPiElimZetaStrict h iexss) ->
+          case mapM asUpsilon es of
+            Just _ ->
+              Just $ StuckPiElimZetaStrict h $ iexss ++ [es]
+            Nothing ->
+              Just $ StuckPiElimZeta h $ iexss ++ [es]
+        Just (StuckPiElimIter mu ess) ->
+          Just $ StuckPiElimIter mu $ ess ++ [(m, es)]
+        Just (StuckPiElimConst x mx ess) ->
+          Just $ StuckPiElimConst x mx $ ess ++ [(m, es)]
+        Just (StuckPiElimUpsilon x mx ess) ->
+          Just $ StuckPiElimUpsilon x mx $ ess ++ [(m, es)]
+        Nothing ->
+          Nothing
     _ -> Nothing
 
 occurCheck :: Ident -> S.Set Ident -> Bool
