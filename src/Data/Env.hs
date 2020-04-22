@@ -95,7 +95,6 @@ data Env
         -- LLVM
         --
         llvmEnv :: Map.HashMap T.Text ([Ident], LLVM),
-        defVarSet :: S.Set Int,
         -- external functions that must be declared in LLVM IR
         declEnv :: Map.HashMap T.Text ([LowType], LowType),
         nopFreeSet :: S.Set Int,
@@ -137,7 +136,6 @@ initialEnv =
       codeEnv = Map.empty,
       chainEnv = IntMap.empty,
       llvmEnv = Map.empty,
-      defVarSet = S.empty,
       declEnv =
         Map.fromList
           [ ("malloc", ([LowTypeIntS 64], voidPtr)),

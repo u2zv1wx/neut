@@ -18,50 +18,29 @@ reduceLLVM sub sizeMap llvm =
   case llvm of
     LLVMReturn d ->
       return $ LLVMReturn $ substLLVMData sub d
-    LLVMLet x (LLVMOpBitcast d from to) cont
-      | from == to -> do
-        let sub' = IntMap.insert (asInt x) (substLLVMData sub d) sub
-        reduceLLVM sub' sizeMap cont
-    LLVMLet x (LLVMOpAlloc _ (LowTypePtr (LowTypeArray 0 _))) cont -> do
-      let sub' = IntMap.insert (asInt x) LLVMDataNull sub
-      reduceLLVM sub' sizeMap cont
-    LLVMLet x (LLVMOpAlloc _ (LowTypePtr (LowTypeStruct []))) cont -> do
-      let sub' = IntMap.insert (asInt x) LLVMDataNull sub
-      reduceLLVM sub' sizeMap cont
-    LLVMLet x op@(LLVMOpAlloc _ size) cont ->
-      case Map.lookup size sizeMap of
-        Just ((j, d) : rest) -> do
-          modify (\env -> env {nopFreeSet = S.insert j (nopFreeSet env)})
-          let sizeMap' = Map.insert size rest sizeMap
-          let sub' = IntMap.insert (asInt x) (substLLVMData sub d) sub
-          reduceLLVM sub' sizeMap' cont
+    LLVMLet x op cont ->
+      case op of
+        LLVMOpBitcast d from to
+          | from == to -> do
+            let sub' = IntMap.insert (asInt x) (substLLVMData sub d) sub
+            reduceLLVM sub' sizeMap cont
+        LLVMOpAlloc _ (LowTypePtr (LowTypeArray 0 _)) -> do
+          let sub' = IntMap.insert (asInt x) LLVMDataNull sub
+          reduceLLVM sub' sizeMap cont
+        LLVMOpAlloc _ (LowTypePtr (LowTypeStruct [])) -> do
+          let sub' = IntMap.insert (asInt x) LLVMDataNull sub
+          reduceLLVM sub' sizeMap cont
+        LLVMOpAlloc _ size
+          | Just ((j, d) : rest) <- Map.lookup size sizeMap -> do
+            modify (\env -> env {nopFreeSet = S.insert j (nopFreeSet env)})
+            let sizeMap' = Map.insert size rest sizeMap
+            let sub' = IntMap.insert (asInt x) (substLLVMData sub d) sub
+            reduceLLVM sub' sizeMap' cont
         _ -> do
-          b <- isAlreadyDefined x
-          if b
-            then do
-              x' <- newNameWith x
-              let sub' = IntMap.insert (asInt x) (LLVMDataLocal x') sub
-              insVar x'
-              cont' <- reduceLLVM sub' sizeMap cont
-              return $ LLVMLet x' op cont'
-            else do
-              insVar x
-              cont' <- reduceLLVM sub sizeMap cont
-              return $ LLVMLet x op cont'
-    LLVMLet x op cont -> do
-      let op' = substLLVMOp sub op
-      b <- isAlreadyDefined x
-      if b
-        then do
           x' <- newNameWith x
           let sub' = IntMap.insert (asInt x) (LLVMDataLocal x') sub
-          insVar x'
           cont' <- reduceLLVM sub' sizeMap cont
-          return $ LLVMLet x' op' cont'
-        else do
-          insVar x
-          cont' <- reduceLLVM sub sizeMap cont
-          return $ LLVMLet x op' cont'
+          return $ LLVMLet x' (substLLVMOp sub op) cont'
     LLVMCont op@(LLVMOpFree d size j) cont -> do
       let op' = substLLVMOp sub op
       let sizeMap' = Map.insertWith (++) size [(j, d)] sizeMap
@@ -88,11 +67,3 @@ reduceLLVM sub sizeMap llvm =
       return $ LLVMCall d' ds'
     LLVMUnreachable ->
       return LLVMUnreachable
-
-isAlreadyDefined :: Ident -> WithEnv Bool
-isAlreadyDefined x = do
-  set <- gets defVarSet
-  return $ S.member (asInt x) set
-
-insVar :: Ident -> WithEnv ()
-insVar x = modify (\env -> env {defVarSet = S.insert (asInt x) (defVarSet env)})
