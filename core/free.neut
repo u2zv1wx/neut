@@ -21,16 +21,16 @@
 
 (use free-internal)
 
-?free-internal:induction
+?free-internal:fold
 
-(definition free ((g (hom tau tau)))
+(define free ((g (hom tau tau)))
   (witness (hom tau tau)
     (lambda (a)
       (free-internal g a))))
 
 (section free)
 
-(definition map ((g (hom tau tau)))
+(define map ((g (hom tau tau)))
   (witness (functor-form (free g))
     (lambda (a b (f (hom a b)) m)
       (case m
@@ -41,18 +41,18 @@
             (let f' (lambda (x) ((map g) a b f x)))
             (node p val (compose cont f'))))))))
 
-(definition witness-functor ((g (hom tau tau)))
+(define witness-functor ((g (hom tau tau)))
   (witness (functor (free g))
     (record (functor (free g))
       (map
         (free:map g)))))
 
-(definition return ((g (hom tau tau)))
+(define return ((g (hom tau tau)))
   (witness (return-type (free g))
     (lambda (_ x)
       (leaf x))))
 
-(definition bind ((g (hom tau tau)))
+(define bind ((g (hom tau tau)))
   (witness (bind-type (free g))
     (lambda
       ((a tau)
@@ -69,7 +69,7 @@
                 ((bind g) a b (cont x) k)))
             (node p val cont-then-k)))))))
 
-(definition witness-monad ((g (hom tau tau)))
+(define witness-monad ((g (hom tau tau)))
   (witness (monad (free g))
     (record (monad (free g))
       (witness-functor

@@ -262,6 +262,8 @@
 
 (define sample ((x i64)) (i64:add x 10))
 
+(define sample tau)
+
 (theorem double-flip-is-identity
   (pi ((c (choice)))
     (equal
