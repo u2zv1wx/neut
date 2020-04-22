@@ -16,7 +16,6 @@ default-extensions:
 dependencies:
 - ansi-terminal
 - base
-- binary
 - bytestring
 - containers
 - directory
