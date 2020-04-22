@@ -305,6 +305,10 @@
 ;; (provide unused-function)
 (?string:print "\n")
 
+;; (string:print (pi-introduction (x) x))
+
+;; (string:print (100 tau))
+
 
 (string:print "hello, world!\n")
 

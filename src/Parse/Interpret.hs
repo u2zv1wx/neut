@@ -5,7 +5,6 @@ module Parse.Interpret
     interpretIter,
     interpretEnumItem,
     raiseSyntaxError,
-    toWeakIdentPlus,
   )
 where
 
@@ -354,11 +353,6 @@ sigmaElim ::
   WeakTermPlus
 sigmaElim m t xts e1 e2 =
   (m, WeakTermPiElim e1 [t, (m, weakTermPiIntro xts e2)])
-
-toWeakIdentPlus :: (Meta, Ident) -> WithEnv WeakIdentPlus
-toWeakIdentPlus (m, x) = do
-  h <- newHole m
-  return (m, x, h)
 
 interpretWeakIdentPlus :: TreePlus -> WithEnv WeakIdentPlus
 interpretWeakIdentPlus tree =
