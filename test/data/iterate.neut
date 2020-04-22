@@ -1,5 +1,5 @@
 (let f0
-  (iterate foo ()
+  (iterate _ ()
     (i64 0)))
 
 (i64:print (f0))
@@ -11,6 +11,3 @@
       (i64:mul x (self (i64:sub x 1))))))
 
 (i64:print (fact 10)) ;; 3628800
-
-;; (let bind-check
-;;   (iterate foo ((x foo)) (i64 1)))
