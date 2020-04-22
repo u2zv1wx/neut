@@ -15,3 +15,5 @@
 (include "option.neut")
 
 (include "string.neut")
+
+(include "integer.neut")

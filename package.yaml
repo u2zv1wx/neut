@@ -55,7 +55,7 @@ executables:
 
 tests:
   neut-test:
-    main:                Spec.hs
+    main:                Main.hs
     source-dirs:         test
     ghc-options:
     - -threaded

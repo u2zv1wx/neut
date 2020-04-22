@@ -25,6 +25,7 @@ emit mainTerm = do
   zs <- emitDefinition "i64" "main" [] mainTerm'
   xs <-
     forM (HashMap.toList lenv) $ \(name, (args, body)) -> do
+      -- ここも非同期でやれる
       let args' = map (showLLVMData . LLVMDataLocal) args
       body' <- reduceLLVM IntMap.empty Map.empty body
       emitDefinition "i8*" (TE.encodeUtf8Builder name) args' body'
