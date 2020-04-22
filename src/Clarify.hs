@@ -84,9 +84,7 @@ clarify' tenv term =
       let (cs, es) = unzip bs
       fvs <- constructEnumFVS tenv es
       es' <- (mapM (clarify' tenv) >=> alignFVS tenv m fvs) es
-      let sub =
-            IntMap.fromList $
-              map (\(mx, x, _) -> (asInt x, (mx, DataUpsilon x))) fvs
+      let sub = IntMap.fromList $ map (\(mx, x, _) -> (asInt x, (mx, DataUpsilon x))) fvs
       (y, e', yVar) <- clarifyPlus tenv e
       return $ bindLet [(y, e')] (m, CodeEnumElim sub yVar (zip (map snd cs) es'))
     (m, TermArray {}) ->
@@ -201,20 +199,31 @@ clarifyCase' tenv m envVarName ((_, xts), e) = do
 
 clarifyConst :: TypeEnv -> Meta -> T.Text -> WithEnv CodePlus
 clarifyConst tenv m x
-  | Just op <- asUnaryOpMaybe x = clarifyUnaryOp tenv x op m
-  | Just op <- asBinaryOpMaybe x = clarifyBinaryOp tenv x op m
-  | Just _ <- asLowTypeMaybe x = clarify' tenv $ immType m
-  | Just lowType <- asArrayAccessMaybe x = clarifyArrayAccess tenv m x lowType
-  | x == "os:file-descriptor" = clarify' tenv $ immType m
-  | x == "os:stdin" = clarify' tenv (m, TermEnumIntro (EnumValueIntS 64 0))
-  | x == "os:stdout" = clarify' tenv (m, TermEnumIntro (EnumValueIntS 64 1))
-  | x == "os:stderr" = clarify' tenv (m, TermEnumIntro (EnumValueIntS 64 2))
-  | x == "unsafe:cast" = clarifyCast tenv m
+  | Just op <- asUnaryOpMaybe x =
+    clarifyUnaryOp tenv x op m
+  | Just op <- asBinaryOpMaybe x =
+    clarifyBinaryOp tenv x op m
+  | Just _ <- asLowTypeMaybe x =
+    clarify' tenv $ immType m
+  | Just lowType <- asArrayAccessMaybe x =
+    clarifyArrayAccess tenv m x lowType
+  | x == "os:file-descriptor" =
+    clarify' tenv $ immType m
+  | x == "os:stdin" =
+    clarify' tenv (m, TermEnumIntro (EnumValueIntS 64 0))
+  | x == "os:stdout" =
+    clarify' tenv (m, TermEnumIntro (EnumValueIntS 64 1))
+  | x == "os:stderr" =
+    clarify' tenv (m, TermEnumIntro (EnumValueIntS 64 2))
+  | x == "unsafe:cast" =
+    clarifyCast tenv m
   | otherwise = do
     os <- getOS
     case asSysCallMaybe os x of
-      Just (syscall, argInfo) -> clarifySysCall tenv x syscall argInfo m
-      _ -> return (m, CodeUpIntro (m, DataConst x)) -- external constant
+      Just (syscall, argInfo) ->
+        clarifySysCall tenv x syscall argInfo m
+      _ ->
+        return (m, CodeUpIntro (m, DataConst x)) -- external constant
 
 immType :: Meta -> TermPlus
 immType m = (m, TermEnum (EnumTypeIntS 64))
@@ -244,7 +253,8 @@ clarifyUnaryOp tenv name op m = do
         m
         [(mx, x, tx)]
         (m, CodeConst (ConstUnaryOp op varX))
-    _ -> raiseCritical m $ "the arity of " <> name <> " is wrong"
+    _ ->
+      raiseCritical m $ "the arity of " <> name <> " is wrong"
 
 clarifyBinaryOp :: TypeEnv -> T.Text -> BinaryOp -> Meta -> WithEnv CodePlus
 clarifyBinaryOp tenv name op m = do
@@ -261,7 +271,8 @@ clarifyBinaryOp tenv name op m = do
         m
         [(mx, x, tx), (my, y, ty)]
         (m, CodeConst (ConstBinaryOp op varX varY))
-    _ -> raiseCritical m $ "the arity of " <> name <> " is wrong"
+    _ ->
+      raiseCritical m $ "the arity of " <> name <> " is wrong"
 
 clarifyArrayAccess :: TypeEnv -> Meta -> T.Text -> LowType -> WithEnv CodePlus
 clarifyArrayAccess tenv m name lowType = do
@@ -277,8 +288,10 @@ clarifyArrayAccess tenv m name lowType = do
             callThenReturn <- toArrayAccessTail tenv m lowType cod arr index xs
             let body = iterativeApp headerList callThenReturn
             retClosure tenv Nothing [] m xts body
-          _ -> raiseCritical m "the type of array-access is wrong"
-    _ -> raiseCritical m "the type of array-access is wrong"
+          _ ->
+            raiseCritical m "the type of array-access is wrong"
+    _ ->
+      raiseCritical m "the type of array-access is wrong"
 
 -- ここでclsをつくる計算は省略できる (tryCache的に)
 clarifySysCall ::
@@ -299,7 +312,8 @@ clarifySysCall tenv name syscall args m = do
         callThenReturn <- toSysCallTail tenv' m cod syscall ds xs
         let body = iterativeApp headerList callThenReturn
         retClosure tenv Nothing [] m xts body
-    _ -> raiseCritical m $ "the type of " <> name <> " is wrong"
+    _ ->
+      raiseCritical m $ "the type of " <> name <> " is wrong"
 
 iterativeApp :: [a -> a] -> a -> a
 iterativeApp [] x = x
@@ -319,7 +333,8 @@ knot :: Meta -> Ident -> DataPlus -> WithEnv ()
 knot m z cls = do
   cenv <- gets codeEnv
   case Map.lookup (asText'' z) cenv of
-    Nothing -> raiseCritical m "knot"
+    Nothing ->
+      raiseCritical m "knot"
     Just (Definition _ args body) -> do
       let body' = substCodePlus (IntMap.fromList [(asInt z, cls)]) body
       let def' = Definition (IsFixed True) args body'
@@ -525,13 +540,16 @@ rightmostOf term =
       | length xts >= 1 -> do
         let (m, _, t) = last xts
         return (m, t)
-    _ -> raiseCritical (fst term) "rightmost"
+    _ ->
+      raiseCritical (fst term) "rightmost"
 
 sigToPi :: Meta -> TermPlus -> WithEnv (IdentPlus, IdentPlus)
 sigToPi m tPi =
   case tPi of
-    (_, TermPi _ [zu, kp] _) -> return (zu, kp)
-    _ -> raiseCritical m "the type of sigma-intro is wrong"
+    (_, TermPi _ [zu, kp] _) ->
+      return (zu, kp)
+    _ ->
+      raiseCritical m "the type of sigma-intro is wrong"
 
 makeClosure ::
   Maybe T.Text ->
@@ -721,7 +739,8 @@ obtainChain :: Meta -> Ident -> TypeEnv -> WithEnv ([IdentPlus], TermPlus)
 obtainChain m (I (name, x)) tenv = do
   cenv <- gets chainEnv
   case IntMap.lookup x cenv of
-    Just xtst -> return xtst
+    Just xtst ->
+      return xtst
     Nothing -> do
       t <- lookupTypeEnv' m (Left x) tenv name
       xts <- chainTermPlus tenv t
