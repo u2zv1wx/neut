@@ -210,6 +210,7 @@
 
 (definition id ((a tau) (x a)) x)
 
+
 (id i64 (i64 3)) ;; これでよくね？
 ;; (equal * 10 20)とかって書けるわけだし。
 ;; (list:nil *)とか(cons * 10 (cons * 20 (nil *)))とかはめんどくさいだろうか？

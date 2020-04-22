@@ -28,13 +28,16 @@ complete inputPath l c = do
   return $ showCompInfo info
 
 showCompInfo :: CompInfo -> [String]
-showCompInfo [] = []
-showCompInfo ((x, m) : xms) = do
-  let (path, (_, l, c)) = getPosInfo m
-  let pathStr = "\"" <> toFilePath path <> "\""
-  let x' = T.unpack $ asText x
-  let str = "(\"" ++ x' ++ "\" (" ++ pathStr ++ " " ++ show l ++ " " ++ show c ++ "))"
-  str : showCompInfo xms
+showCompInfo info =
+  case info of
+    [] ->
+      []
+    ((x, m) : xms) -> do
+      let (path, (_, l, c)) = getPosInfo m
+      let pathStr = "\"" <> toFilePath path <> "\""
+      let x' = T.unpack $ asText x
+      let str = "(\"" ++ x' ++ "\" (" ++ pathStr ++ " " ++ show l ++ " " ++ show c ++ "))"
+      str : showCompInfo xms
 
 parseForCompletion :: Path Abs File -> Line -> Column -> WithEnv CompInfo
 parseForCompletion path l c = do
@@ -44,27 +47,29 @@ parseForCompletion path l c = do
   content <- liftIO $ TIO.readFile $ toFilePath path
   let s = I ("*cursor*", 0)
   case modifyFileForCompletion s content l c of
-    Nothing -> return []
+    Nothing ->
+      return []
     Just (prefix, content') -> do
       treeList <- tokenize content'
       stmtList <- parse' $ includeCore (newMeta 1 1 path) treeList
       case compInfo s stmtList of
-        Right () -> return []
+        Right () ->
+          return []
         Left info -> do
           let info' = filter (filterCompInfo prefix) $ concatMap enrich info
           let compareLoc m1 m2 = metaLocation m2 `compare` metaLocation m1
           return $ nub $ sortBy (\(_, m1) (_, m2) -> compareLoc m1 m2) info'
 
-modifyFileForCompletion ::
-  CursorName -> T.Text -> Line -> Column -> Maybe (Prefix, T.Text)
+modifyFileForCompletion :: CursorName -> T.Text -> Line -> Column -> Maybe (Prefix, T.Text)
 modifyFileForCompletion (I (s, _)) content l c = do
   let xs = T.lines content
   let (ys, ws) = splitAt (l - 1) xs
   (targetLine, zs) <- uncons ws
   (s1, s2) <- splitAtMaybe (c - 1) targetLine
-  (ch, s2') <- headTailMaybeText s2
+  (ch, s2') <- T.uncons s2
   case ch of
-    '(' -> Nothing
+    '(' ->
+      Nothing
     ')' -> do
       let targetLine' = s1 <> " " <> s <> s2
       return (T.empty, T.unlines $ ys ++ [targetLine'] ++ zs)
@@ -211,11 +216,6 @@ toSuffixList' s =
       [s]
     Just i ->
       s : toSuffixList' (T.drop (toEnum i + 1) s)
-
-headTailMaybeText :: T.Text -> Maybe (Char, T.Text)
-headTailMaybeText s
-  | s == T.empty = Nothing
-  | otherwise = return (T.head s, T.tail s)
 
 splitAtMaybe :: Int -> T.Text -> Maybe (T.Text, T.Text)
 splitAtMaybe i xs =
