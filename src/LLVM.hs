@@ -154,13 +154,11 @@ loadContent' ::
 loadContent' bp bt values cont =
   case values of
     [] -> do
-      -- loadContent' bp bt [] cont = do
       l <- llvmUncast (Just $ takeBaseName' bp) bp bt
       tmp <- newNameWith'' $ Just $ takeBaseName' bp
       j <- newCount
       commConv tmp l $ LLVMCont (LLVMOpFree (LLVMDataLocal tmp) bt j) cont
     (i, (x, et)) : xis -> do
-      -- loadContent' bp bt ((i, (x, et)) : xis) cont = do
       cont' <- loadContent' bp bt xis cont
       (posName, pos) <- newDataLocal' (Just $ asText x)
       return
@@ -547,9 +545,6 @@ newNameWith'' mName =
       newNameWith' "var"
     Just name ->
       newNameWith' name
-
--- newNameWith'' Nothing = newNameWith' "var"
--- newNameWith'' (Just name) = newNameWith' name
 
 enumValueToInteger :: Meta -> EnumValue -> WithEnv Integer
 enumValueToInteger m intOrLabel =

@@ -37,7 +37,8 @@ reduceTermPlus term =
             let xs = map (\(_, x, _) -> asInt x) xts
             let sub = IntMap.fromList $ zip xs es'
             reduceTermPlus $ substTermPlus sub body
-        _ -> (m, app)
+        _ ->
+          (m, app)
     (m, TermIter (mx, x, t) xts e)
       | x `notElem` varTermPlus e ->
         reduceTermPlus (m, termPiIntro xts e)
@@ -55,10 +56,12 @@ reduceTermPlus term =
       case e' of
         (_, TermEnumIntro l) ->
           case lookup (CaseValue l) les'' of
-            Just body -> reduceTermPlus body
+            Just body ->
+              reduceTermPlus body
             Nothing ->
               case lookup CaseDefault les'' of
-                Just body -> reduceTermPlus body
+                Just body ->
+                  reduceTermPlus body
                 Nothing -> do
                   let es' = map reduceTermPlus es
                   let les' = zip ls es'
@@ -82,7 +85,8 @@ reduceTermPlus term =
             let xs = map (\(_, x, _) -> asInt x) xts
             let sub = IntMap.fromList $ zip xs es
             reduceTermPlus $ substTermPlus sub e2
-        _ -> (m, TermArrayElim k xts e1' e2)
+        _ ->
+          (m, TermArrayElim k xts e1' e2)
     (m, TermStructIntro eks) -> do
       let (es, ks) = unzip eks
       let es' = map reduceTermPlus es
@@ -96,7 +100,8 @@ reduceTermPlus term =
             ks1 == ks2 -> do
             let sub = IntMap.fromList $ zip (map asInt xs) es
             reduceTermPlus $ substTermPlus sub e2
-        _ -> (m, TermStructElim xks e1' e2)
+        _ ->
+          (m, TermStructElim xks e1' e2)
     (m, TermCase indName e cxtes) -> do
       let e' = reduceTermPlus e
       let cxtes'' =
@@ -106,7 +111,8 @@ reduceTermPlus term =
               let body' = reduceTermPlus body
               ((c, zip3 ms xs ts'), body')
       (m, TermCase indName e' cxtes'')
-    _ -> term
+    _ ->
+      term
 
 reduceIdentPlus :: IdentPlus -> IdentPlus
 reduceIdentPlus (m, x, t) =
@@ -115,30 +121,51 @@ reduceIdentPlus (m, x, t) =
 isValue :: TermPlus -> Bool
 isValue term =
   case term of
-    (_, TermTau) -> True
-    (_, TermUpsilon _) -> True
-    (_, TermPi {}) -> True
-    (_, TermPiIntro {}) -> True
-    (_, TermIter {}) -> True
-    (_, TermConst x) -> isValueConst x
-    (_, TermFloat _ _) -> True
-    (_, TermEnum _) -> True
-    (_, TermEnumIntro _) -> True
-    (_, TermArray {}) -> True
-    (_, TermArrayIntro _ es) -> and $ map isValue es
-    (_, TermStruct {}) -> True
-    (_, TermStructIntro eks) -> and $ map (isValue . fst) eks
-    _ -> False
+    (_, TermTau) ->
+      True
+    (_, TermUpsilon _) ->
+      True
+    (_, TermPi {}) ->
+      True
+    (_, TermPiIntro {}) ->
+      True
+    (_, TermIter {}) ->
+      True
+    (_, TermConst x) ->
+      isValueConst x
+    (_, TermFloat _ _) ->
+      True
+    (_, TermEnum _) ->
+      True
+    (_, TermEnumIntro _) ->
+      True
+    (_, TermArray {}) ->
+      True
+    (_, TermArrayIntro _ es) ->
+      and $ map isValue es
+    (_, TermStruct {}) ->
+      True
+    (_, TermStructIntro eks) ->
+      and $ map (isValue . fst) eks
+    _ ->
+      False
 
 isValueConst :: T.Text -> Bool
 isValueConst x
-  | Just _ <- asLowTypeMaybe x = True
-  | Just _ <- asUnaryOpMaybe x = True
-  | Just _ <- asBinaryOpMaybe x = True
-  | x == "os:stdin" = True
-  | x == "os:stdout" = True
-  | x == "os:stderr" = True
-  | otherwise = False
+  | Just _ <- asLowTypeMaybe x =
+    True
+  | Just _ <- asUnaryOpMaybe x =
+    True
+  | Just _ <- asBinaryOpMaybe x =
+    True
+  | x == "os:stdin" =
+    True
+  | x == "os:stdout" =
+    True
+  | x == "os:stderr" =
+    True
+  | otherwise =
+    False
 
 normalize :: TermPlus -> WithEnv TermPlus
 normalize term =
@@ -148,8 +175,10 @@ normalize term =
     (m, TermUpsilon x) -> do
       denv <- gets defEnv
       case IntMap.lookup (asInt x) denv of
-        Just e -> normalize e
-        Nothing -> return (m, TermUpsilon x)
+        Just e ->
+          normalize e
+        Nothing ->
+          return (m, TermUpsilon x)
     (m, TermPi mName xts cod) -> do
       let (ms, xs, ts) = unzip3 xts
       ts' <- mapM normalize ts
@@ -172,7 +201,8 @@ normalize term =
           let xs = map (\(_, x, _) -> asInt x) xts
           let sub = IntMap.fromList $ (asInt self, iter) : zip xs es'
           normalize $ substTermPlus sub body
-        _ -> return (m, TermPiElim e' es')
+        _ ->
+          return (m, TermPiElim e' es')
     (m, TermIter (mx, x, t) xts e) -> do
       t' <- normalize t
       let (ms, xs, ts) = unzip3 xts
@@ -197,10 +227,12 @@ normalize term =
       case e' of
         (_, TermEnumIntro l) ->
           case lookup (CaseValue l) les'' of
-            Just body -> normalize body
+            Just body ->
+              normalize body
             Nothing ->
               case lookup CaseDefault les'' of
-                Just body -> normalize body
+                Just body ->
+                  normalize body
                 Nothing -> do
                   es' <- mapM normalize es
                   let les' = zip ls es'
@@ -224,7 +256,8 @@ normalize term =
             let xs = map (\(_, x, _) -> asInt x) xts
             let sub = IntMap.fromList $ zip xs es
             normalize $ substTermPlus sub e2
-        _ -> return (m, TermArrayElim k xts e1' e2)
+        _ ->
+          return (m, TermArrayElim k xts e1' e2)
     (m, TermStruct ks) ->
       return (m, TermStruct ks)
     (m, TermStructIntro eks) -> do
@@ -240,7 +273,8 @@ normalize term =
             ks1 == ks2 -> do
             let sub = IntMap.fromList $ zip (map asInt xs) es
             normalize $ substTermPlus sub e2
-        _ -> return (m, TermStructElim xks e1' e2)
+        _ ->
+          return (m, TermStructElim xks e1' e2)
     (m, TermCase indName e cxtes) -> do
       e' <- normalize e
       cxtes'' <-

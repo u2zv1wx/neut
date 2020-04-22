@@ -37,7 +37,8 @@ reduceWeakTermPlus term =
             let xs = map (\(_, x, _) -> asInt x) xts
             let sub = IntMap.fromList $ zip xs es'
             reduceWeakTermPlus $ substWeakTermPlus sub body
-        _ -> (m, app)
+        _ ->
+          (m, app)
     (m, WeakTermIter (mx, x, t) xts e)
       | x `notElem` varWeakTermPlus e ->
         reduceWeakTermPlus (m, weakTermPiIntro xts e)
@@ -57,12 +58,14 @@ reduceWeakTermPlus term =
       case e' of
         (_, WeakTermEnumIntro l) ->
           case lookup (weakenEnumValue l) les'' of
-            Just body -> reduceWeakTermPlus body
+            Just body ->
+              reduceWeakTermPlus body
             Nothing ->
               case lookup WeakCaseDefault les'' of
                 Just body -> reduceWeakTermPlus body
                 Nothing -> (m, WeakTermEnumElim (e', t') les')
-        _ -> (m, WeakTermEnumElim (e', t') les')
+        _ ->
+          (m, WeakTermEnumElim (e', t') les')
     (m, WeakTermArray dom k) -> do
       let dom' = reduceWeakTermPlus dom
       (m, WeakTermArray dom' k)
@@ -78,7 +81,8 @@ reduceWeakTermPlus term =
             let (_, xs, _) = unzip3 xts
             let sub = IntMap.fromList $ zip (map asInt xs) es
             reduceWeakTermPlus $ substWeakTermPlus sub e2
-        _ -> (m, WeakTermArrayElim k xts e1' e2)
+        _ ->
+          (m, WeakTermArrayElim k xts e1' e2)
     (m, WeakTermStructIntro eks) -> do
       let (es, ks) = unzip eks
       let es' = map reduceWeakTermPlus es
@@ -92,7 +96,8 @@ reduceWeakTermPlus term =
             ks1 == ks2 -> do
             let sub = IntMap.fromList $ zip (map asInt xs) es
             reduceWeakTermPlus $ substWeakTermPlus sub e2
-        _ -> (m, WeakTermStructElim xks e1' e2)
+        _ ->
+          (m, WeakTermStructElim xks e1' e2)
     (m, WeakTermCase indName e cxtes) -> do
       let e' = reduceWeakTermPlus e
       let cxtes'' =

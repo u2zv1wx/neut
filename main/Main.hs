@@ -267,8 +267,12 @@ seqIO :: [IO ()] -> IO ()
 seqIO = foldr (>>) (return ())
 
 clangOptWith :: OutputKind -> Path Abs File -> [String]
-clangOptWith OutputKindAsm outputPath = "-S" : clangBaseOpt outputPath
-clangOptWith _ outputPath = clangBaseOpt outputPath
+clangOptWith kind outputPath =
+  case kind of
+    OutputKindAsm ->
+      "-S" : clangBaseOpt outputPath
+    _ ->
+      clangBaseOpt outputPath
 
 clangBaseOpt :: Path Abs File -> [String]
 clangBaseOpt outputPath =
