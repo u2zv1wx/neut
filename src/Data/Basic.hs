@@ -1,10 +1,10 @@
 module Data.Basic where
 
 import Codec.Binary.UTF8.String
-import Data.Binary hiding (encode)
 import qualified Data.IntMap as IntMap
 import qualified Data.Set as S
 import qualified Data.Text as T
+import Data.Word
 import GHC.Generics hiding (Meta)
 import Path
 import Path.Internal
@@ -13,8 +13,6 @@ import Text.Read hiding (get)
 newtype Ident
   = I (T.Text, Int)
   deriving (Eq, Ord, Generic)
-
-instance Binary Ident
 
 asText :: Ident -> T.Text
 asText (I (s, _)) =
@@ -64,25 +62,6 @@ data Meta
         metaIsExplicit :: Bool
       }
   deriving (Generic)
-
-instance Binary Meta where
-  put m = do
-    put $ unwrapPath $ metaFileName m
-    put $ metaLocation m
-    put $ metaIsReducible m
-    put $ metaIsExplicit m
-  get = do
-    path <- get
-    loc <- get
-    isReducible <- get
-    isExplicit <- get
-    return $
-      Meta
-        { metaFileName = Path path,
-          metaLocation = loc,
-          metaIsReducible = isReducible,
-          metaIsExplicit = isExplicit
-        }
 
 -- required to derive the eqality on WeakTerm
 instance Eq Meta where
@@ -159,8 +138,6 @@ data FloatSize
   | FloatSize64
   deriving (Eq, Ord, Show, Generic)
 
-instance Binary FloatSize
-
 asFloatSize :: Int -> Maybe FloatSize
 asFloatSize size =
   case size of
@@ -189,22 +166,16 @@ data EnumType
   | EnumTypeIntU Int -- u{k}
   deriving (Show, Eq, Generic)
 
-instance Binary EnumType
-
 data EnumValue
   = EnumValueIntS IntSize Integer
   | EnumValueIntU IntSize Integer
   | EnumValueLabel T.Text
   deriving (Show, Eq, Ord, Generic)
 
-instance Binary EnumValue
-
 data Case
   = CaseValue EnumValue
   | CaseDefault
   deriving (Show, Eq, Ord, Generic)
-
-instance Binary Case
 
 type CasePlus =
   (Meta, Case)
@@ -240,8 +211,6 @@ data ArrayKind
   | ArrayKindFloat FloatSize
   | ArrayKindVoidPtr
   deriving (Show, Eq, Generic)
-
-instance Binary ArrayKind
 
 voidPtr :: LowType
 voidPtr =
