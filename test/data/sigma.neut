@@ -1,0 +1,40 @@
+;; nullary sigma-intro
+(let a0 (sigma-introduction))
+
+;; nullary sigma-elim
+(sigma-elimination () a0
+  (string:print "0"))
+
+;; unary sigma-intro
+(let a1
+  (tuple (i64 1)))
+
+;; unary sigma-elim
+(sigma-elimination (x) a1
+  (i64:print x))
+
+;; binary sigma-intro without dependence
+(let a2
+  (tuple (i64 2) (i64 2)))
+
+;; binary sigma-elim without dependence
+(sigma-elimination (x _) a2
+  (i64:print x))
+
+;; binary sigma-elim with dependence
+(let a3
+  (witness (sigma ((a tau)) a)
+    (tuple i64 2)))
+
+;; binary sigma-elim with dependence
+(sigma-elimination (_ _) a3
+  (i64:print 3))
+
+;; 4-ary sigma-intro
+(let a4
+  (witness (product u8 u64 i64 u3)
+    (tuple 4 4 4 4)))
+
+;; 4-ary sigma-elim
+(destruct a4 (_ _ i _)
+  (i64:print i))
