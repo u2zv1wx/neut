@@ -81,7 +81,7 @@ infer' ctx term =
       | Just lt <- asArrayAccessMaybe x ->
         inferExternal m x (arrayAccessToType m lt)
       | otherwise -> do
-        t <- lookupTypeEnv m (Right x) x
+        t <- lookupConstTypeEnv m x
         return ((m, WeakTermConst x), (m, snd $ weaken t))
     (m, WeakTermBoxElim _) ->
       raiseCritical m "`infer'` for box modality"

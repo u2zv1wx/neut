@@ -66,7 +66,7 @@ clarify' tenv term =
       e' <- clarify' tenv e
       callClosure m e' es'
     (m, TermIter (_, x, t) mxts e) -> do
-      let tenv' = insTypeEnv' (Left (asInt x)) t tenv
+      let tenv' = insTypeEnv' (asInt x) t tenv
       e' <- clarify' (insTypeEnv1 mxts tenv') e
       fvs <- nubFVS <$> chainTermPlus tenv term
       retClosureFix tenv x fvs m mxts e'
@@ -241,7 +241,8 @@ clarifyCast tenv m = do
 
 clarifyUnaryOp :: TypeEnv -> T.Text -> UnaryOp -> Meta -> WithEnv CodePlus
 clarifyUnaryOp tenv name op m = do
-  t <- lookupTypeEnv' m (Right name) tenv name
+  -- t <- lookupTypeEnv' m (Right name) tenv name
+  t <- lookupConstTypeEnv m name
   let t' = reduceTermPlus t
   case t' of
     (_, TermPi _ [(mx, x, tx)] _) -> do
@@ -258,7 +259,8 @@ clarifyUnaryOp tenv name op m = do
 
 clarifyBinaryOp :: TypeEnv -> T.Text -> BinaryOp -> Meta -> WithEnv CodePlus
 clarifyBinaryOp tenv name op m = do
-  t <- lookupTypeEnv' m (Right name) tenv name
+  -- t <- lookupTypeEnv' m (Right name) tenv name
+  t <- lookupConstTypeEnv m name
   let t' = reduceTermPlus t
   case t' of
     (_, TermPi _ [(mx, x, tx), (my, y, ty)] _) -> do
@@ -276,7 +278,8 @@ clarifyBinaryOp tenv name op m = do
 
 clarifyArrayAccess :: TypeEnv -> Meta -> T.Text -> LowType -> WithEnv CodePlus
 clarifyArrayAccess tenv m name lowType = do
-  arrayAccessType <- lookupTypeEnv' m (Right name) tenv name
+  arrayAccessType <- lookupConstTypeEnv m name
+  -- arrayAccessType <- lookupTypeEnv' m (Right name) tenv name
   let arrayAccessType' = reduceTermPlus arrayAccessType
   case arrayAccessType' of
     (_, TermPi _ xts cod)
@@ -302,7 +305,8 @@ clarifySysCall ::
   Meta -> -- the meta of the theta
   WithEnv CodePlus
 clarifySysCall tenv name syscall args m = do
-  sysCallType <- lookupTypeEnv' m (Right name) tenv name
+  sysCallType <- lookupConstTypeEnv m name
+  -- sysCallType <- lookupTypeEnv' m (Right name) tenv name
   let sysCallType' = reduceTermPlus sysCallType
   case sysCallType' of
     (_, TermPi _ xts cod)
@@ -326,7 +330,7 @@ clarifyBinder tenv binder =
       return []
     ((m, x, t) : xts) -> do
       t' <- clarify' tenv t
-      xts' <- clarifyBinder (insTypeEnv' (Left (asInt x)) t tenv) xts
+      xts' <- clarifyBinder (insTypeEnv' (asInt x) t tenv) xts
       return $ (m, x, t') : xts'
 
 knot :: Meta -> Ident -> DataPlus -> WithEnv ()
@@ -674,7 +678,7 @@ chainTermPlus tenv term =
       return $ xs1 ++ xs2
     (_, TermIter (_, x, t) xts e) -> do
       xs1 <- chainTermPlus tenv t
-      xs2 <- chainTermPlus' (insTypeEnv' (Left (asInt x)) t tenv) xts [e]
+      xs2 <- chainTermPlus' (insTypeEnv' (asInt x) t tenv) xts [e]
       return $ xs1 ++ filter (\(_, y, _) -> y /= x) xs2
     (_, TermConst _) ->
       return []
@@ -722,7 +726,7 @@ chainTermPlus' tenv binder es =
       concat <$> mapM (chainTermPlus tenv) es
     (_, x, t) : xts -> do
       xs1 <- chainTermPlus tenv t
-      xs2 <- chainTermPlus' (insTypeEnv' (Left (asInt x)) t tenv) xts es
+      xs2 <- chainTermPlus' (insTypeEnv' (asInt x) t tenv) xts es
       return $ xs1 ++ filter (\(_, y, _) -> y /= x) xs2
 
 dropFst :: [(a, b, c)] -> [(b, c)]
@@ -733,16 +737,16 @@ dropFst xyzs = do
 insTypeEnv1 :: [IdentPlus] -> TypeEnv -> TypeEnv
 insTypeEnv1 [] tenv = tenv
 insTypeEnv1 ((_, x, t) : rest) tenv =
-  insTypeEnv' (Left (asInt x)) t $ insTypeEnv1 rest tenv
+  insTypeEnv' (asInt x) t $ insTypeEnv1 rest tenv
 
 obtainChain :: Meta -> Ident -> TypeEnv -> WithEnv ([IdentPlus], TermPlus)
-obtainChain m (I (name, x)) tenv = do
+obtainChain m x tenv = do
   cenv <- gets chainEnv
-  case IntMap.lookup x cenv of
+  case IntMap.lookup (asInt x) cenv of
     Just xtst ->
       return xtst
     Nothing -> do
-      t <- lookupTypeEnv' m (Left x) tenv name
+      t <- lookupTypeEnv' m x tenv
       xts <- chainTermPlus tenv t
-      modify (\env -> env {chainEnv = IntMap.insert x (xts, t) cenv})
+      modify (\env -> env {chainEnv = IntMap.insert (asInt x) (xts, t) cenv})
       return (xts, t)

@@ -55,7 +55,7 @@ elaborateStmt stmt =
       t' <- inferType t
       analyze >> synthesize >> refine >> cleanup
       t'' <- reduceTermPlus <$> elaborate' t'
-      insTypeEnv (Right c) t''
+      insConstTypeEnv c t''
       elaborateStmt cont
     WeakStmtVerify m e : cont -> do
       whenCheck $ do

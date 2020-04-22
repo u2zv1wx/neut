@@ -3,6 +3,7 @@ module LLVM
   )
 where
 
+import Control.Exception.Safe
 import Control.Monad.State.Lazy
 import Data.Basic
 import Data.Code
@@ -317,7 +318,7 @@ llvmDataLet x llvmData cont =
       ns <- gets nameSet
       case Map.lookup y cenv of
         Nothing -> do
-          mt <- lookupTypeEnvMaybe (Right y)
+          mt <- lookupTypeEnvMaybe m y
           case mt of
             Just (_, TermPi _ xts _) -> do
               let y' = "llvm_" <> y
@@ -593,7 +594,6 @@ commConv x llvm cont2 =
     LLVMUnreachable ->
       return LLVMUnreachable
 
-lookupTypeEnvMaybe :: TypeEnvKey -> WithEnv (Maybe TermPlus)
-lookupTypeEnvMaybe x = do
-  tenv <- gets typeEnv
-  return $ Map.lookup x tenv
+lookupTypeEnvMaybe :: Meta -> T.Text -> WithEnv (Maybe TermPlus)
+lookupTypeEnvMaybe m x =
+  catch (lookupConstTypeEnv m x >>= \e -> return (Just e)) (\(_ :: Error) -> return Nothing)

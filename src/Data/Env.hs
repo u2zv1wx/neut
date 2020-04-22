@@ -30,15 +30,15 @@ data VisitInfo
   = VisitInfoActive
   | VisitInfoFinish
 
-type FileEnv = Map.HashMap (Path Abs File) VisitInfo
+-- type FileEnv = Map.HashMap (Path Abs File) VisitInfo
 
-type RuleEnv = IntMap.IntMap (Maybe [WeakIdentPlus])
+-- type RuleEnv = IntMap.IntMap (Maybe [WeakIdentPlus])
 
-type UnivInstEnv = IntMap.IntMap (S.Set Int)
+-- type UnivInstEnv = IntMap.IntMap (S.Set Int)
 
-type TypeEnvKey = Either Int T.Text
+-- type TypeEnvKey = Either Int T.Text
 
-type TypeEnv = Map.HashMap TypeEnvKey TermPlus
+type TypeEnv = IntMap.IntMap TermPlus
 
 data Env
   = Env
@@ -58,7 +58,7 @@ data Env
         notationEnv :: [(TreePlus, TreePlus)],
         constantSet :: S.Set T.Text,
         -- path ~> identifiers defined in the file at toplevel
-        fileEnv :: FileEnv,
+        fileEnv :: Map.HashMap (Path Abs File) VisitInfo,
         traceEnv :: [Path Abs File],
         -- [("choice", [("left", 0), ("right", 1)]), ...]
         enumEnv :: Map.HashMap T.Text [(T.Text, Int)],
@@ -73,7 +73,7 @@ data Env
         -- "stream" ~> ["stream", "other-record-type", "head", "tail", "other-destructor"]
         labelEnv :: Map.HashMap T.Text [T.Text],
         -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
-        indEnv :: RuleEnv,
+        indEnv :: IntMap.IntMap (Maybe [WeakIdentPlus]),
         -- "list:cons" ~> ("list", [0])
         revIndEnv :: Map.HashMap T.Text (Ident, [Int]),
         intactSet :: S.Set (Meta, T.Text),
@@ -85,6 +85,7 @@ data Env
         impEnv :: IntMap.IntMap [Int],
         weakTypeEnv :: IntMap.IntMap WeakTermPlus,
         typeEnv :: TypeEnv,
+        constTypeEnv :: Map.HashMap T.Text TermPlus,
         constraintEnv :: [PreConstraint],
         constraintQueue :: ConstraintQueue,
         -- metavar ~> beta-equivalent weakterm
@@ -138,7 +139,8 @@ initialEnv =
       indEnv = IntMap.empty,
       labelEnv = Map.empty,
       weakTypeEnv = IntMap.empty,
-      typeEnv = Map.empty,
+      typeEnv = IntMap.empty,
+      constTypeEnv = Map.empty,
       impEnv = IntMap.empty,
       codeEnv = Map.empty,
       chainEnv = IntMap.empty,
@@ -256,39 +258,51 @@ newDataUpsilonWith m name = do
   x <- newNameWith' name
   return (x, (m, DataUpsilon x))
 
-insTypeEnv :: TypeEnvKey -> TermPlus -> WithEnv ()
-insTypeEnv x t = modify (\e -> e {typeEnv = Map.insert x t (typeEnv e)})
+insTypeEnv :: Int -> TermPlus -> WithEnv ()
+insTypeEnv x t = modify (\e -> e {typeEnv = IntMap.insert x t (typeEnv e)})
 
-insTypeEnv' :: TypeEnvKey -> TermPlus -> TypeEnv -> TypeEnv
-insTypeEnv' = Map.insert
+insTypeEnv' :: Int -> TermPlus -> TypeEnv -> TypeEnv
+insTypeEnv' = IntMap.insert
 
-lookupTypeEnv :: Meta -> TypeEnvKey -> T.Text -> WithEnv TermPlus
+lookupTypeEnv :: Meta -> Int -> T.Text -> WithEnv TermPlus
 lookupTypeEnv m x name = do
   tenv <- gets typeEnv
-  case Map.lookup x tenv of
+  case IntMap.lookup x tenv of
     Just t -> return t
     Nothing ->
       raiseCritical m $
-        "the constant `" <> name <> "` is not found in the type environment."
+        "the variable `" <> name <> "` is not found in the type environment."
 
-lookupTypeEnv' :: Meta -> TypeEnvKey -> TypeEnv -> T.Text -> WithEnv TermPlus
-lookupTypeEnv' m key tenv name =
-  case key of
-    Right s
-      | Just _ <- asLowTypeMaybe s ->
-        return (m, TermTau)
-      | Just op <- asUnaryOpMaybe s ->
-        unaryOpToType m op
-      | Just op <- asBinaryOpMaybe s ->
-        binaryOpToType m op
-      | Just lowType <- asArrayAccessMaybe s ->
-        arrayAccessToType m lowType
-    _ ->
-      case Map.lookup key tenv of
-        Just t -> return t
-        Nothing ->
-          raiseCritical m $
-            "the constant `" <> name <> "` is not found in the type environment."
+lookupTypeEnv' :: Meta -> Ident -> TypeEnv -> WithEnv TermPlus
+lookupTypeEnv' m (I (name, x)) tenv =
+  case IntMap.lookup x tenv of
+    Just t ->
+      return t
+    Nothing ->
+      raiseCritical m $
+        "the variable `" <> name <> "` is not found in the type environment."
+
+insConstTypeEnv :: T.Text -> TermPlus -> WithEnv ()
+insConstTypeEnv x t =
+  modify (\e -> e {constTypeEnv = Map.insert x t (constTypeEnv e)})
+
+lookupConstTypeEnv :: Meta -> T.Text -> WithEnv TermPlus
+lookupConstTypeEnv m x
+  | Just _ <- asLowTypeMaybe x =
+    return (m, TermTau)
+  | Just op <- asUnaryOpMaybe x =
+    unaryOpToType m op
+  | Just op <- asBinaryOpMaybe x =
+    binaryOpToType m op
+  | Just lowType <- asArrayAccessMaybe x =
+    arrayAccessToType m lowType
+  | otherwise = do
+    ctenv <- gets constTypeEnv
+    case Map.lookup x ctenv of
+      Just t -> return t
+      Nothing ->
+        raiseCritical m $
+          "the constant `" <> x <> "` is not found in the type environment."
 
 lowTypeToType :: Meta -> LowType -> WithEnv TermPlus
 lowTypeToType m lowType =
