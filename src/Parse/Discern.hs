@@ -38,7 +38,8 @@ discernText m x = do
 discern' :: NameEnv -> WeakTermPlus -> WithEnv WeakTermPlus
 discern' nenv term =
   case term of
-    (m, WeakTermTau) -> return (m, WeakTermTau)
+    (m, WeakTermTau) ->
+      return (m, WeakTermTau)
     (m, WeakTermUpsilon x@(I (s, _))) -> do
       penv <- gets prefixEnv
       mx <- lookupName m penv nenv x
@@ -111,7 +112,8 @@ discern' nenv term =
       e1' <- discern' nenv e1
       (xts', e2') <- discernBinder nenv xts e2
       return (m, WeakTermArrayElim kind xts' e1' e2')
-    (m, WeakTermStruct ts) -> return (m, WeakTermStruct ts)
+    (m, WeakTermStruct ts) ->
+      return (m, WeakTermStruct ts)
     (m, WeakTermStructIntro ets) -> do
       let (es, ts) = unzip ets
       es' <- mapM (discern' nenv) es
@@ -205,7 +207,8 @@ discernWeakCase m nenv weakCase =
       case ml of
         Just l' -> return (WeakCaseLabel l')
         Nothing -> raiseError m $ "no such enum-value is defined: " <> l
-    l -> return l
+    l ->
+      return l
 
 discernStruct ::
   NameEnv ->
@@ -247,12 +250,14 @@ lookupName m penv nenv x =
     Just x' -> do
       removeFromIntactSet m $ asText x'
       return $ Just x'
-    Nothing -> lookupName' m penv nenv x
+    Nothing ->
+      lookupName' m penv nenv x
 
 lookupName' :: Meta -> [T.Text] -> NameEnv -> Ident -> WithEnv (Maybe Ident)
 lookupName' m penv nenv x =
   case penv of
-    [] -> return Nothing
+    [] ->
+      return Nothing
     prefix : prefixList -> do
       let query = prefix <> ":" <> asText x
       case Map.lookup query nenv of
@@ -265,8 +270,10 @@ lookupName'' :: Meta -> [T.Text] -> NameEnv -> Ident -> WithEnv Ident
 lookupName'' m penv nenv x = do
   mx <- lookupName m penv nenv x
   case mx of
-    Just x' -> return x'
-    Nothing -> raiseError m $ "(double-prime) undefined variable: " <> asText x
+    Just x' ->
+      return x'
+    Nothing ->
+      raiseError m $ "(double-prime) undefined variable: " <> asText x
 
 lookupConstantMaybe :: Meta -> [T.Text] -> T.Text -> WithEnv (Maybe T.Text)
 lookupConstantMaybe m penv x = do
@@ -280,7 +287,8 @@ lookupConstantMaybe m penv x = do
 lookupConstantMaybe' :: Meta -> [T.Text] -> T.Text -> WithEnv (Maybe T.Text)
 lookupConstantMaybe' m penv x =
   case penv of
-    [] -> return Nothing
+    [] ->
+      return Nothing
     prefix : prefixList -> do
       let query = prefix <> ":" <> x
       b <- isConstant query
@@ -302,7 +310,8 @@ lookupEnum f name = do
 lookupEnum' :: (T.Text -> WithEnv Bool) -> [T.Text] -> T.Text -> WithEnv (Maybe T.Text)
 lookupEnum' f penv name =
   case penv of
-    [] -> return Nothing
+    [] ->
+      return Nothing
     prefix : prefixList -> do
       let name' = prefix <> ":" <> name
       b <- f name'

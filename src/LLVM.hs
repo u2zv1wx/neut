@@ -331,7 +331,8 @@ llvmDataLet x llvmData cont =
                   <> y
                   <> "` is:\n"
                   <> toText (weaken t)
-            Nothing -> raiseCritical m $ "no such global label defined: " <> y
+            Nothing ->
+              raiseCritical m $ "no such global label defined: " <> y
         Just (Definition _ args e)
           | not (y `S.member` ns) -> do
             modify (\env -> env {nameSet = S.insert y ns})
