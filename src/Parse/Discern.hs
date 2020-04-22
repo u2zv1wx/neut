@@ -44,27 +44,33 @@ discern' nenv term =
       penv <- gets prefixEnv
       mx <- lookupName m penv nenv x
       case mx of
-        Just x' -> return (m, WeakTermUpsilon x')
+        Just x' ->
+          return (m, WeakTermUpsilon x')
         Nothing -> do
           b1 <- lookupEnumValueNameWithPrefix s
           case b1 of
-            Just s' -> return (m, WeakTermEnumIntro (EnumValueLabel s'))
+            Just s' ->
+              return (m, WeakTermEnumIntro (EnumValueLabel s'))
             Nothing -> do
               b2 <- lookupEnumTypeNameWithPrefix s
               case b2 of
-                Just s' -> return (m, WeakTermEnum (EnumTypeLabel s'))
+                Just s' ->
+                  return (m, WeakTermEnum (EnumTypeLabel s'))
                 Nothing -> do
                   mc <- lookupConstantMaybe m penv s
                   case mc of
-                    Just c -> return (m, WeakTermConst c)
-                    Nothing -> raiseError m $ "undefined variable:  " <> asText x
+                    Just c ->
+                      return (m, WeakTermConst c)
+                    Nothing ->
+                      raiseError m $ "undefined variable:  " <> asText x
     (m, WeakTermPi mName xts t) -> do
       (xts', t') <- discernBinder nenv xts t
       return (m, WeakTermPi mName xts' t')
     (m, WeakTermPiIntro info xts e) -> do
       (xts', e') <- discernBinder nenv xts e
       case info of
-        Nothing -> return (m, WeakTermPiIntro Nothing xts' e')
+        Nothing ->
+          return (m, WeakTermPiIntro Nothing xts' e')
         Just (indName, consName, args) -> do
           penv <- gets prefixEnv
           indName' <- lookupName'' m penv nenv indName
@@ -131,7 +137,8 @@ discern' nenv term =
           (xts', body') <- discernBinder nenv xts body
           return (((mc, c'), xts'), body')
       case indInfo of
-        Nothing -> return (m, WeakTermCase Nothing e' cxtes')
+        Nothing ->
+          return (m, WeakTermCase Nothing e' cxtes')
         Just indName -> do
           indName' <- lookupName'' m penv nenv indName
           return (m, WeakTermCase (Just indName') e' cxtes')
