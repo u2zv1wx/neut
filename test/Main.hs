@@ -2,6 +2,7 @@ module Main where
 
 import Control.Exception.Safe
 import Control.Monad
+import Data.Log
 import Path
 import Path.IO
 import System.Exit
@@ -21,19 +22,19 @@ test :: Path Abs File -> IO Bool
 test srcPath = do
   (binaryPath, _) <- splitExtension srcPath
   answerPath <- addExtension ".answer" binaryPath
-  putStrLn "source path:"
-  currentDir <- getCurrentDir
-  srcPath' <- stripProperPrefix currentDir srcPath
-  putStrLn $ toFilePath srcPath'
+  dataDir <- getDataDir
+  srcPath' <- stripProperPrefix dataDir srcPath
   callProcess "neut" ["build", toFilePath srcPath, "-o", toFilePath binaryPath]
   result <- readProcess (toFilePath binaryPath) [] []
   expectedResult <- readFile $ toFilePath answerPath
   if result == expectedResult
     then do
-      putStrLn "passed."
+      outputPass $ toFilePath srcPath'
       return True
     else do
-      putStrLn "mismatch."
+      outputFail $ toFilePath srcPath'
+      putStrLn $ "  expected: " <> expectedResult
+      putStrLn $ "     found: " <> result
       return False
 
 getDataDir :: IO (Path Abs Dir)

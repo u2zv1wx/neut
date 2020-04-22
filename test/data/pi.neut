@@ -40,4 +40,4 @@
 
 (i64:print ((f6 f2) 6))
 
-(string:print "\n")
+;; (string:print "\n")

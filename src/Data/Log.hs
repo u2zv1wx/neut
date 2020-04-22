@@ -2,6 +2,8 @@ module Data.Log
   ( Log,
     outputLog,
     outputLog',
+    outputPass,
+    outputFail,
     logNote,
     logNote',
     logWarning,
@@ -18,8 +20,10 @@ import System.Console.ANSI
 
 data LogLevel
   = LogLevelNote
+  | LogLevelPass -- for test
   | LogLevelWarning
   | LogLevelError
+  | LogLevelFail -- for test
   | LogLevelCritical -- "impossible" happened
   deriving (Show, Eq)
 
@@ -28,10 +32,14 @@ logLevelToText level =
   case level of
     LogLevelNote ->
       "note"
+    LogLevelPass ->
+      "pass"
     LogLevelWarning ->
       "warning"
     LogLevelError ->
       "error"
+    LogLevelFail ->
+      "fail"
     LogLevelCritical ->
       "critical"
 
@@ -40,9 +48,13 @@ logLevelToSGR level =
   case level of
     LogLevelNote ->
       [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Blue]
+    LogLevelPass ->
+      [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Blue]
     LogLevelWarning ->
       [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Yellow]
     LogLevelError ->
+      [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Red]
+    LogLevelFail ->
       [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Red]
     LogLevelCritical ->
       [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Red]
@@ -73,6 +85,16 @@ outputLog' b (mpos, l, t) = do
       outputPosInfo b pos
   outputLogLevel b l
   TIO.putStr t
+
+outputPass :: String -> IO ()
+outputPass str = do
+  outputLog' True (Nothing, LogLevelPass, T.pack str)
+  putStr "\n"
+
+outputFail :: String -> IO ()
+outputFail str = do
+  outputLog' True (Nothing, LogLevelFail, T.pack str)
+  putStr "\n"
 
 outputFooter :: String -> IO ()
 outputFooter eoe =
