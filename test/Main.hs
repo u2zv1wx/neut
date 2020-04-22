@@ -33,9 +33,17 @@ test srcPath = do
       return True
     else do
       outputFail $ toFilePath srcPath'
-      putStrLn $ "  expected: " <> expectedResult
-      putStrLn $ "     found: " <> result
+      putStrLn $ "  expected: " <> stylize expectedResult
+      putStrLn $ "     found: " <> stylize result
       return False
+
+stylize :: String -> String
+stylize str =
+  case str of
+    "" ->
+      "(empty)"
+    _ ->
+      str
 
 getDataDir :: IO (Path Abs Dir)
 getDataDir = do
