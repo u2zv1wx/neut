@@ -491,7 +491,8 @@ lookupWeakTypeEnv :: Meta -> Ident -> WithEnv WeakTermPlus
 lookupWeakTypeEnv m s = do
   mt <- lookupWeakTypeEnvMaybe s
   case mt of
-    Just t -> return t
+    Just t ->
+      return t
     Nothing ->
       raiseCritical m $
         asText' s <> " is not found in the weak type environment."
@@ -500,12 +501,16 @@ lookupWeakTypeEnvMaybe :: Ident -> WithEnv (Maybe WeakTermPlus)
 lookupWeakTypeEnvMaybe (I (_, s)) = do
   wtenv <- gets weakTypeEnv
   case IntMap.lookup s wtenv of
-    Nothing -> return Nothing
-    Just t -> return $ Just t
+    Nothing ->
+      return Nothing
+    Just t ->
+      return $ Just t
 
 lookupKind :: Meta -> T.Text -> WithEnv T.Text
 lookupKind m name = do
   renv <- gets revEnumEnv
   case Map.lookup name renv of
-    Nothing -> raiseError m $ "no such enum-intro is defined: " <> name
-    Just (j, _) -> return j
+    Nothing ->
+      raiseError m $ "no such enum-intro is defined: " <> name
+    Just (j, _) ->
+      return j
