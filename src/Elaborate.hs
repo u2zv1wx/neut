@@ -96,11 +96,11 @@ elaborate' term =
       t' <- elaborate' t
       return (m, TermPi mName xts' t')
     (m, WeakTermPiIntro info xts e) -> do
-      -- info' <- fmap2M (mapM elaboratePlus) info
       xts' <- mapM elaboratePlus xts
       e' <- elaborate' e
       case info of
-        Nothing -> return (m, TermPiIntro Nothing xts' e')
+        Nothing ->
+          return (m, TermPiIntro Nothing xts' e')
         Just (indName, consName, args) -> do
           args' <- mapM elaboratePlus args
           return (m, TermPiIntro (Just (indName, consName, args')) xts' e')
@@ -113,7 +113,8 @@ elaborate' term =
             let xs = map (\(_, y, _) -> asInt y) xts
             let s = IntMap.fromList $ zip xs es
             elaborate' $ substWeakTermPlus s e
-        Just e -> elaborate' $ reduceWeakTermPlus (m, WeakTermPiElim e es)
+        Just e ->
+          elaborate' $ reduceWeakTermPlus (m, WeakTermPiElim e es)
     (m, WeakTermPiElim e es) -> do
       e' <- elaborate' e
       es' <- mapM elaborate' es
@@ -228,11 +229,14 @@ elaborate' term =
       case cxtes' of
         [] ->
           case mIndName of
-            Nothing -> return (m, TermCase Nothing e' cxtes') -- ex falso quodlibet
-            Just indName -> raiseError m $ "the inductive type `" <> asText indName <> "` is not a bottom-type"
+            Nothing ->
+              return (m, TermCase Nothing e' cxtes') -- ex falso quodlibet
+            Just indName ->
+              raiseError m $ "the inductive type `" <> asText indName <> "` is not a bottom-type"
         _ ->
           case mIndName of
-            Nothing -> raiseCritical m undefined
+            Nothing ->
+              raiseCritical m undefined
             Just indName ->
               case Map.lookup (asText indName) eenv of
                 Nothing -> raiseError m $ "no such inductive type defined: " <> asText indName
@@ -241,9 +245,12 @@ elaborate' term =
                   let isLinear = linearCheck bs'
                   let isExhaustive = length bis == length bs'
                   case (isLinear, isExhaustive) of
-                    (False, _) -> raiseError m "found a non-linear pattern"
-                    (_, False) -> raiseError m "found a non-exhaustive pattern"
-                    (True, True) -> return (m, TermCase (Just indName) e' cxtes')
+                    (False, _) ->
+                      raiseError m "found a non-linear pattern"
+                    (_, False) ->
+                      raiseError m "found a non-exhaustive pattern"
+                    (True, True) ->
+                      return (m, TermCase (Just indName) e' cxtes')
     (m, WeakTermQuestion e t) -> do
       e' <- elaborate' e
       whenCheck $ do
@@ -252,10 +259,10 @@ elaborate' term =
           (Just len, True) -> do
             (is, e'') <- getImpInfo e'
             let form = toText (weaken e'') : showFormArgs 0 is [0 .. len - 1]
-            -- let form = toText (weaken e') : showFormArgs 0 [0 .. len - 1]
             let formStr = inParen $ showItems form
             note m $ toText (weaken t') <> "\n-\n" <> formStr
-          _ -> note m $ toText (weaken t')
+          _ ->
+            note m $ toText (weaken t')
       return e'
     (_, WeakTermErase _ e) ->
       elaborate' e
@@ -368,5 +375,7 @@ lookupEnumSet :: Meta -> T.Text -> WithEnv [T.Text]
 lookupEnumSet m name = do
   eenv <- gets enumEnv
   case Map.lookup name eenv of
-    Nothing -> raiseError m $ "no such enum defined: " <> name
-    Just xis -> return $ map fst xis
+    Nothing ->
+      raiseError m $ "no such enum defined: " <> name
+    Just xis ->
+      return $ map fst xis
