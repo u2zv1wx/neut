@@ -40,10 +40,14 @@ linearize' nm binder e =
 withHeader :: NameMap -> Ident -> CodePlus -> CodePlus -> WithEnv CodePlus
 withHeader nm x t e =
   case IntMap.lookup (asInt x) nm of
-    Nothing -> withHeaderAffine x t e
-    Just [] -> raiseCritical' $ "impossible. x: " <> asText' x
-    Just [z] -> withHeaderLinear z x e
-    Just (z1 : z2 : zs) -> withHeaderRelevant x t z1 z2 zs e
+    Nothing ->
+      withHeaderAffine x t e
+    Just [] ->
+      raiseCritical' $ "impossible. x: " <> asText' x
+    Just [z] ->
+      withHeaderLinear z x e
+    Just (z1 : z2 : zs) ->
+      withHeaderRelevant x t z1 z2 zs e
 
 -- withHeaderAffine x t e ~>
 --   bind _ :=
