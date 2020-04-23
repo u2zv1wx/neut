@@ -40,3 +40,10 @@
     (qux 3)))
 
 (i64:print p) ;; 3
+
+(let (q i64)
+  (switch sample-3:buz
+    (foo 0)
+    (default 8)))
+
+(i64:print q) ;; 8
