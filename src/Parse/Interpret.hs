@@ -9,7 +9,6 @@ module Parse.Interpret
 where
 
 import Codec.Binary.UTF8.String
-import Control.Exception.Safe
 import Control.Monad.State.Lazy
 import Data.Basic
 import Data.Env
@@ -274,15 +273,16 @@ interpret inputTree =
       interpretAux m es
 
 interpretAux :: Meta -> [TreePlus] -> WithEnv WeakTermPlus
-interpretAux m es = do
-  ml <- interpretEnumValueMaybe (m, TreeNode es)
-  case (ml, es) of
-    (Just l, _) ->
-      return (m, WeakTermEnumIntro l)
-    (_, []) ->
-      raiseSyntaxError m "(TREE TREE*)"
-    (_, f : args) ->
-      interpretPiElim m f args
+interpretAux m es =
+  if isEnumValue es
+    then do
+      enumValue <- interpretEnumValue (m, TreeNode es)
+      return (m, WeakTermEnumIntro enumValue)
+    else case es of
+      [] ->
+        raiseSyntaxError m "(TREE TREE*)"
+      f : args ->
+        interpretPiElim m f args
 
 interpretPiElim :: Meta -> TreePlus -> [TreePlus] -> WithEnv WeakTermPlus
 interpretPiElim m f args = do
@@ -417,11 +417,19 @@ interpretLeafText tree =
     t ->
       raiseSyntaxError (fst t) "LEAF"
 
-interpretEnumValueMaybe :: TreePlus -> WithEnv (Maybe EnumValue)
-interpretEnumValueMaybe t =
-  catch
-    (interpretEnumValue t >>= \x -> return (Just x))
-    (\(_ :: Error) -> return Nothing)
+isEnumValue :: [TreePlus] -> Bool
+isEnumValue tree =
+  case tree of
+    [(_, TreeLeaf t), (_, TreeLeaf x)] ->
+      case (readEnumValueIntS t x, readEnumValueIntU t x) of
+        (Just _, _) ->
+          True
+        (_, Just _) ->
+          True
+        _ ->
+          False
+    _ ->
+      False
 
 interpretEnumValue :: TreePlus -> WithEnv EnumValue
 interpretEnumValue tree =
@@ -436,7 +444,7 @@ interpretEnumValue tree =
             then return v
             else
               raiseError m $
-                "the signed integer "
+                "the integer "
                   <> T.pack (show x')
                   <> " is supposed to be of type i"
                   <> T.pack (show size)
@@ -448,7 +456,7 @@ interpretEnumValue tree =
             then return v
             else
               raiseError m $
-                "the unsigned integer "
+                "the integer "
                   <> T.pack (show x')
                   <> " is supposed to be of type u"
                   <> T.pack (show size)
