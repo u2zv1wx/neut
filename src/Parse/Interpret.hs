@@ -27,6 +27,8 @@ interpret inputTree =
     (m, TreeLeaf atom)
       | atom == "tau" ->
         return (m, WeakTermTau)
+      | atom == "hole" ->
+        newHole m
       | Just x' <- readMaybe $ T.unpack atom -> do
         h <- newHole m
         return (m, WeakTermInt h x')
@@ -110,12 +112,6 @@ interpret inputTree =
             return (m', WeakTermIter xt' xts' e')
           | otherwise ->
             raiseSyntaxError m "(iterate TREE (TREE*) TREE)"
-        "hole"
-          | [x@(_, TreeLeaf _)] <- rest -> do
-            (_, x') <- interpretLeaf x
-            return (m, WeakTermHole x')
-          | otherwise ->
-            raiseSyntaxError m "(hole LEAF)"
         "constant"
           | [(_, TreeLeaf x)] <- rest ->
             return (m, WeakTermConst x)
