@@ -518,22 +518,3 @@ adjustPhase' m = do
   i <- gets phase
   let (_, l, c) = metaLocation m
   return $ m {metaLocation = (i, l, c)}
-
-warnUnusedVar :: WithEnv ()
-warnUnusedVar =
-  whenCheck $ do
-    set <- gets intactSet
-    let set' = S.map (\(m, x) -> (getPosInfo m, x)) set
-    warnUnusedVar' $ S.toList set'
-
-warnUnusedVar' :: [(PosInfo, T.Text)] -> WithEnv ()
-warnUnusedVar' infoList =
-  case infoList of
-    [] ->
-      return ()
-    ((pos, x) : pxs)
-      | T.all (`S.notMember` S.fromList "()") x -> do
-        warn pos $ "defined but not used: `" <> x <> "`"
-        warnUnusedVar' pxs
-      | otherwise ->
-        warnUnusedVar' pxs
