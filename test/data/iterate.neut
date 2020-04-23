@@ -20,3 +20,16 @@
       (i64:mul x (self (i64:sub x 1))))))
 
 (i64:print (fact 5)) ;; 120
+
+;; https://mathworld.wolfram.com/TAKFunction.html
+(let tak
+  (iterate self (x y z)
+    (if (i64:le x y)
+      y
+      (with let-bind
+        (let x' (self (i64:sub x 1) y z))
+        (let y' (self (i64:sub y 1) z x))
+        (let z' (self (i64:sub z 1) x y))
+        (self x' y' z')))))
+
+(i64:print (tak 12 6 0)) ;; 12
