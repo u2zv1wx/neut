@@ -35,7 +35,6 @@ import Text.Read (readMaybe)
 parse :: Path Abs File -> WithEnv [WeakStmt]
 parse inputPath = do
   stmtList <- visit inputPath
-  warnUnusedVar
   pushTrace inputPath
   return stmtList
 
@@ -325,21 +324,49 @@ ensureEnvSanity m = do
     _ ->
       return ()
 
+-- basic idea:
+--   sub = {
+--     x1 := μ x1. e1,
+--     x2 := μ x2. e2,
+--     x3 := μ x3. e3
+--   }
+--   sub^2 = {
+--     x1 := μ x1. e1 {x2 := μ x2. e2, x3 := μ x3. e3}
+--     x2 := μ x2. e2 {x3 := μ x3. e3, x1 := μ x1. e1}
+--     x3 := μ x3. e3 {x1 := μ x1. e1, x2 := μ x2. e2}
+--   }
+--   sub^3 = {
+--     x1 := μ x1. e1 {x2 := μ x2. e2 {x3 := ...}, x3 := μ x3. e3 {x2 := ...}} (closed w.r.t. x1, x2, x3)
+--     x2 := μ x2. e2 {x3 := μ x3. e3 {x1 := ...}, x1 := μ x1. e1 {x2 := ...}} (closed w.r.t. x1, x2, x3)
+--     x3 := μ x3. e3 {x1 := μ x1. e1 {x2 := ...}, x2 := μ x2. e2 {x1 := ...}} (closed w.r.t. x1, x2, x3)
+--   }
 parseDef :: [TreePlus] -> WithEnv [WeakStmt]
 parseDef xds = do
   defList <- mapM (adjustPhase >=> prefixFunName >=> macroExpand) xds
   -- {f1 := def-1, ..., fn := def-n}から{f1, ..., fn}を取り出してトップレベルでdiscernする
+  -- metaNameList <- mapM extractFunName defList
   metaNameList <- mapM (extractFunName >=> uncurry discernIdent) defList
   let nameList = map snd metaNameList
   -- xiの名前をtopNameEnvに追加した状態でそれぞれの定義をdiscernする
+  -- defList' <- mapM interpretIter defList
   defList' <- mapM (interpretIter >=> discernDef) defList
   -- sub^nを計算する
   let baseSub = IntMap.fromList $ map defToSub $ zip nameList defList'
-  let sub = selfCompose (length baseSub) baseSub
+  -- sub^1からスタートだから、sub^nを得るためにはn - 1回追加で合成すればいい
+  let sub = selfCompose (length baseSub - 1) baseSub
+  -- 変数を「閉じる」
+  let iterSelfVarList = map (uncurry toVar . defToName) defList'
+  let aligner = IntMap.fromList $ zip (map asInt nameList) iterSelfVarList
   -- sub^nをf1, ..., fnに適用する
-  let typeList = map (\(m, (_, _, t), _, _) -> (m, t)) defList'
-  let bodyList = map (substWeakTermPlus sub . uncurry toVar) metaNameList
-  return (toLetList $ zip3 nameList typeList bodyList)
+  let closedSub = IntMap.map (substWeakTermPlus aligner) sub -- capturing substitution
+  let typeList = map (\(_, (m, _, t), _, _) -> (m, t)) defList'
+  let bodyList = map (substWeakTermPlus closedSub . uncurry toVar) metaNameList
+  toLetList $ zip3 nameList typeList bodyList
+
+defToName :: Def -> (Meta, Ident)
+defToName (_, (m, x, _), _, _) = (m, x)
+
+-- return (toLetList $ zip3 nameList typeList bodyList)
 
 prefixFunName :: TreePlus -> WithEnv TreePlus
 prefixFunName tree =
@@ -377,13 +404,25 @@ extractFunName tree =
     t ->
       raiseSyntaxError (fst t) "(LEAF ...) | ((LEAF TREE) ...)"
 
-toLetList :: [(Ident, (Meta, WeakTermPlus), WeakTermPlus)] -> [WeakStmt]
+toLetList :: [(Ident, (Meta, WeakTermPlus), WeakTermPlus)] -> WithEnv [WeakStmt]
 toLetList defList =
   case defList of
     [] ->
-      []
-    ((x, (m, t), e) : rest) ->
-      WeakStmtLet m (m, x, t) e : toLetList rest
+      return []
+    ((x, (m, t), e) : rest) -> do
+      t' <- discern t
+      e' <- discern e
+      (_, x') <- discernIdent m x
+      rest' <- toLetList rest
+      return $ WeakStmtLet m (m, x', t') e' : rest'
+
+-- toLetList :: [(Ident, (Meta, WeakTermPlus), WeakTermPlus)] -> [WeakStmt]
+-- toLetList defList =
+--   case defList of
+--     [] ->
+--       []
+--     ((x, (m, t), e) : rest) ->
+--       WeakStmtLet m (m, x, t) e : toLetList rest
 
 defToSub :: (Ident, Def) -> (Int, WeakTermPlus)
 defToSub (dom, (m, xt, xts, e)) =
