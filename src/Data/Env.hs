@@ -82,7 +82,7 @@ data Env
         constraintQueue :: ConstraintQueue,
         substEnv :: IntMap.IntMap WeakTermPlus,
         defEnv :: IntMap.IntMap TermPlus,
-        zetaEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus),
+        holeEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus),
         --
         -- clarify
         --
@@ -143,7 +143,7 @@ initialEnv =
       constraintQueue = Q.empty,
       substEnv = IntMap.empty,
       defEnv = IntMap.empty,
-      zetaEnv = IntMap.empty,
+      holeEnv = IntMap.empty,
       nameSet = S.empty,
       nopFreeSet = S.empty
     }
@@ -216,7 +216,7 @@ newTextWith s = do
 newHole :: Meta -> WithEnv WeakTermPlus
 newHole m = do
   h <- newNameWith'' "hole"
-  return (m, WeakTermZeta h)
+  return (m, WeakTermHole h)
 
 getTarget :: WithEnv Target
 getTarget = do

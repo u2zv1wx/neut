@@ -106,7 +106,7 @@ elaborate' term =
         Just (indName, consName, args) -> do
           args' <- mapM elaboratePlus args
           return (m, TermPiIntro (Just (indName, consName, args')) xts' e')
-    (m, WeakTermPiElim (mh, WeakTermZeta (I (_, x))) es) -> do
+    (m, WeakTermPiElim (mh, WeakTermHole (I (_, x))) es) -> do
       sub <- gets substEnv
       case IntMap.lookup x sub of
         Nothing ->
@@ -127,7 +127,7 @@ elaborate' term =
       xts' <- mapM elaboratePlus xts
       e' <- elaborate' e
       return (m, TermIter (mx, x, t') xts' e')
-    (m, WeakTermZeta _) ->
+    (m, WeakTermHole _) ->
       raiseCritical
         m
         "every meta-variable must be of the form (?M e1 ... en) where n >= 0, but found the meta-variable here that doesn't fit this pattern"

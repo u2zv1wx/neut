@@ -87,8 +87,8 @@ discern' nenv term =
       return (m, WeakTermConst x)
     (m, WeakTermBoxElim x) ->
       return (m, WeakTermBoxElim x)
-    (m, WeakTermZeta h) ->
-      return (m, WeakTermZeta h)
+    (m, WeakTermHole h) ->
+      return (m, WeakTermHole h)
     (m, WeakTermInt t x) -> do
       t' <- discern' nenv t
       return (m, WeakTermInt t' x)

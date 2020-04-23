@@ -15,7 +15,7 @@ data WeakTerm
       WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
   | WeakTermIter WeakIdentPlus [WeakIdentPlus] WeakTermPlus
-  | WeakTermZeta Ident
+  | WeakTermHole Ident
   | WeakTermConst T.Text
   | WeakTermBoxElim Ident
   | WeakTermInt WeakTermPlus Integer
@@ -127,7 +127,7 @@ varWeakTermPlus term =
       S.empty
     (_, WeakTermBoxElim _) ->
       S.empty
-    (_, WeakTermZeta _) ->
+    (_, WeakTermHole _) ->
       S.empty
     (_, WeakTermInt t _) ->
       varWeakTermPlus t
@@ -197,7 +197,7 @@ holeWeakTermPlus term =
       let set1 = holeWeakTermPlus t
       let set2 = holeWeakTermPlus' xts [e]
       S.union set1 set2
-    (_, WeakTermZeta h) ->
+    (_, WeakTermHole h) ->
       S.singleton h
     (_, WeakTermConst _) ->
       S.empty
@@ -282,7 +282,7 @@ substWeakTermPlus sub term =
       term
     (_, WeakTermBoxElim _) ->
       term
-    e1@(_, WeakTermZeta x) ->
+    e1@(_, WeakTermHole x) ->
       case IntMap.lookup (asInt x) sub of
         Nothing -> e1
         Just e2@(_, e) -> (supMeta (metaOf e1) (metaOf e2), e)
@@ -417,7 +417,7 @@ toText term =
       x
     (_, WeakTermBoxElim x) ->
       asText x
-    (_, WeakTermZeta (I (_, i))) ->
+    (_, WeakTermHole (I (_, i))) ->
       "?M" <> T.pack (show i)
     (_, WeakTermInt _ a) ->
       T.pack $ show a

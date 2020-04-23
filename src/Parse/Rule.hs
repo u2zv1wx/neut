@@ -672,8 +672,8 @@ substRuleType sub@((a1, es1), (a2, es2)) term =
       return (m, WeakTermConst x)
     (m, WeakTermBoxElim x) ->
       return (m, WeakTermBoxElim x)
-    (m, WeakTermZeta x) ->
-      return (m, WeakTermZeta x)
+    (m, WeakTermHole x) ->
+      return (m, WeakTermHole x)
     (m, WeakTermInt t x) -> do
       t' <- substRuleType sub t
       return (m, WeakTermInt t' x)

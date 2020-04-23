@@ -128,7 +128,7 @@ compInfoWeakTermPlus c info term =
       compInfoWeakTermPlus c info t
       let info' = (x, mx) : info
       compInfoBinder c info' xts e
-    (_, WeakTermZeta _) ->
+    (_, WeakTermHole _) ->
       return ()
     (_, WeakTermConst _) ->
       return ()

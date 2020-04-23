@@ -110,12 +110,12 @@ interpret inputTree =
             return (m', WeakTermIter xt' xts' e')
           | otherwise ->
             raiseSyntaxError m "(iterate TREE (TREE*) TREE)"
-        "zeta"
+        "hole"
           | [x@(_, TreeLeaf _)] <- rest -> do
             (_, x') <- interpretLeaf x
-            return (m, WeakTermZeta x')
+            return (m, WeakTermHole x')
           | otherwise ->
-            raiseSyntaxError m "(zeta LEAF)"
+            raiseSyntaxError m "(hole LEAF)"
         "constant"
           | [(_, TreeLeaf x)] <- rest ->
             return (m, WeakTermConst x)

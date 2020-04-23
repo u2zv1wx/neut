@@ -37,10 +37,10 @@
 
 ;; monadic composition
 (define compose
-  ((m hole)
-   (a hole)
-   (b hole)
-   (c hole)
+  ((m *)
+   (a *)
+   (b *)
+   (c *)
    (M (monad m))
    (f (hom a (m b)))
    (g (hom b (m c))))

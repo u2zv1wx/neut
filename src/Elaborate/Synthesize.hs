@@ -237,9 +237,9 @@ unravel term =
       return (m, WeakTermConst x)
     (m, WeakTermBoxElim x) ->
       return (m, WeakTermBoxElim x)
-    (m, WeakTermZeta h) -> do
-      h' <- unravelZeta h
-      return (m, WeakTermZeta h')
+    (m, WeakTermHole h) -> do
+      h' <- unravelHole h
+      return (m, WeakTermHole h')
     (m, WeakTermInt t x) ->
       return (m, WeakTermInt t x)
     (m, WeakTermFloat t x) ->
@@ -295,8 +295,8 @@ unravelUpsilon (I (s, i)) = do
       modify (\e -> e {nameEnv = Map.insert s s' nenv})
       return $ I (s', i)
 
-unravelZeta :: Ident -> WithEnv Ident
-unravelZeta (I (s, i)) = do
+unravelHole :: Ident -> WithEnv Ident
+unravelHole (I (s, i)) = do
   rnenv <- gets revNameEnv
   case IntMap.lookup i rnenv of
     Just j ->

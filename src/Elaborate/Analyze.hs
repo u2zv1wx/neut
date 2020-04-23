@@ -142,7 +142,7 @@ simp' constraintList =
                   | x1 == x2,
                     Just pairList <- asPairList (map snd mess1) (map snd mess2) ->
                     simp $ pairList ++ cs
-                (Just (StuckPiElimZetaStrict h1 ies1), _)
+                (Just (StuckPiElimHoleStrict h1 ies1), _)
                   | xs1 <- concatMap getVarList ies1,
                     occurCheck h1 hs2,
                     linearCheck $ filter (`S.member` fvs2) xs1,
@@ -154,7 +154,7 @@ simp' constraintList =
                       _ -> do
                         let s = IntMap.fromList $ zip (map asInt zs) es
                         simp $ (e1', substWeakTermPlus s e2') : cs
-                (_, Just (StuckPiElimZetaStrict h2 ies2))
+                (_, Just (StuckPiElimHoleStrict h2 ies2))
                   | xs2 <- concatMap getVarList ies2,
                     occurCheck h2 hs1,
                     linearCheck $ filter (`S.member` fvs1) xs2,
@@ -172,7 +172,7 @@ simp' constraintList =
                 (_, Just (StuckPiElimUpsilon x2 mx2 mess2))
                   | Just (mBody, body) <- IntMap.lookup (asInt x2) sub ->
                     simp $ (e1, toPiElim (supMeta mx2 mBody, body) mess2) : cs
-                (Just (StuckPiElimZetaStrict h1 ies1), _)
+                (Just (StuckPiElimHoleStrict h1 ies1), _)
                   | xs1 <- concatMap getVarList ies1,
                     occurCheck h1 hs2,
                     zs <- includeCheck xs1 fvs2,
@@ -183,7 +183,7 @@ simp' constraintList =
                       _ -> do
                         let s = IntMap.fromList $ zip (map asInt zs) es
                         simp $ (e1', substWeakTermPlus s e2') : cs
-                (_, Just (StuckPiElimZetaStrict h2 ies2))
+                (_, Just (StuckPiElimHoleStrict h2 ies2))
                   | xs2 <- concatMap getVarList ies2,
                     occurCheck h2 hs1,
                     zs <- includeCheck xs2 fvs1,
@@ -194,12 +194,12 @@ simp' constraintList =
                       _ -> do
                         let s = IntMap.fromList $ zip (map asInt zs) es
                         simp $ (substWeakTermPlus s e1', e2') : cs
-                (Just (StuckPiElimZeta h1 ies1), Nothing)
+                (Just (StuckPiElimHole h1 ies1), Nothing)
                   | xs1 <- concatMap getVarList ies1,
                     occurCheck h1 hs2,
                     [] <- includeCheck xs1 fvs2 ->
                     simpFlexRigid h1 ies1 e1' e2' fmvs cs
-                (Nothing, Just (StuckPiElimZeta h2 ies2))
+                (Nothing, Just (StuckPiElimHole h2 ies2))
                   | xs2 <- concatMap getVarList ies2,
                     occurCheck h2 hs1,
                     [] <- includeCheck xs2 fvs1 ->
@@ -287,8 +287,8 @@ asPairList list1 list2 =
 
 data Stuck
   = StuckPiElimUpsilon Ident Meta [(Meta, [WeakTermPlus])]
-  | StuckPiElimZeta Ident [[WeakTermPlus]]
-  | StuckPiElimZetaStrict Ident [[WeakTermPlus]]
+  | StuckPiElimHole Ident [[WeakTermPlus]]
+  | StuckPiElimHoleStrict Ident [[WeakTermPlus]]
   | StuckPiElimIter IterInfo [(Meta, [WeakTermPlus])]
   | StuckPiElimConst T.Text Meta [(Meta, [WeakTermPlus])]
 
@@ -297,22 +297,22 @@ asStuckedTerm term =
   case term of
     (m, WeakTermUpsilon x) ->
       Just $ StuckPiElimUpsilon x m []
-    (_, WeakTermZeta h) ->
-      Just $ StuckPiElimZetaStrict h []
+    (_, WeakTermHole h) ->
+      Just $ StuckPiElimHoleStrict h []
     (m, WeakTermConst x) ->
       Just $ StuckPiElimConst x m []
     (mi, WeakTermIter (_, x, _) xts body) ->
       Just $ StuckPiElimIter (mi, x, xts, body, term) []
     (m, WeakTermPiElim e es) ->
       case asStuckedTerm e of
-        Just (StuckPiElimZeta h iess) ->
-          Just $ StuckPiElimZeta h (iess ++ [es])
-        Just (StuckPiElimZetaStrict h iexss) ->
+        Just (StuckPiElimHole h iess) ->
+          Just $ StuckPiElimHole h (iess ++ [es])
+        Just (StuckPiElimHoleStrict h iexss) ->
           case mapM asUpsilon es of
             Just _ ->
-              Just $ StuckPiElimZetaStrict h $ iexss ++ [es]
+              Just $ StuckPiElimHoleStrict h $ iexss ++ [es]
             Nothing ->
-              Just $ StuckPiElimZeta h $ iexss ++ [es]
+              Just $ StuckPiElimHole h $ iexss ++ [es]
         Just (StuckPiElimIter mu ess) ->
           Just $ StuckPiElimIter mu $ ess ++ [(m, es)]
         Just (StuckPiElimConst x mx ess) ->

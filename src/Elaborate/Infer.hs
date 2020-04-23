@@ -64,15 +64,15 @@ infer' ctx term =
       let piType = (m, weakTermPi xts' tCod)
       insConstraintEnv piType t'
       return ((m, WeakTermIter (mx, x, t') xts' e'), piType)
-    (m, WeakTermZeta x) -> do
-      zenv <- gets zetaEnv
+    (m, WeakTermHole x) -> do
+      zenv <- gets holeEnv
       case IntMap.lookup (asInt x) zenv of
         Just hole ->
           return hole
         Nothing -> do
           (app, higherApp) <- newHoleInCtx ctx m
           modify
-            (\env -> env {zetaEnv = IntMap.insert (asInt x) (app, higherApp) zenv})
+            (\env -> env {holeEnv = IntMap.insert (asInt x) (app, higherApp) zenv})
           return (app, higherApp)
     (m, WeakTermConst x)
       -- i64, f16, u8, etc.
@@ -413,7 +413,7 @@ inferPiElim ctx m (e, t) ets = do
 --   ?Mt : Pi (x1 : A1, ..., xn : An). Univ
 -- and return ?M @ (x1, ..., xn) : ?Mt @ (x1, ..., xn).
 -- Note that we can't just set `?M : Pi (x1 : A1, ..., xn : An). Univ` since
--- WeakTermZeta might be used as an ordinary term, that is, a term which is not a type.
+-- WeakTermHole might be used as an ordinary term, that is, a term which is not a type.
 newHoleInCtx :: Context -> Meta -> WithEnv (WeakTermPlus, WeakTermPlus)
 newHoleInCtx ctx m = do
   higherHole <- newHole m
