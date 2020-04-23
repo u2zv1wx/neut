@@ -29,25 +29,22 @@ tokenize input = do
   modify (\env -> env {count = 1 + count env})
   path <- getCurrentFilePath
   let env = TEnv {text = input, line = 1, column = 1, filePath = path}
-  resultOrError <- liftIO $ try $ runStateT program env
+  resultOrError <- liftIO $ try $ runStateT (program []) env
   case resultOrError of
     Left (Error err) ->
       throw $ Error err
     Right (result, _) ->
       return result
 
-program :: Tokenizer [TreePlus]
-program =
-  program' []
-
-program' :: [TreePlus] -> Tokenizer [TreePlus]
-program' ts = do
+program :: [TreePlus] -> Tokenizer [TreePlus]
+program ts = do
   skip
-  t <- term
   s <- gets text
   if T.null s
-    then return $ reverse $ t : ts
-    else program' $ t : ts
+    then return $ reverse ts
+    else do
+      t <- term
+      program $ t : ts
 
 term :: Tokenizer TreePlus
 term = do
