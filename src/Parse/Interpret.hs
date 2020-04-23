@@ -35,12 +35,14 @@ interpret inputTree =
       | Just x' <- readMaybe $ T.unpack atom -> do
         h <- newHole m
         return (m, WeakTermFloat h x')
-      | Just i <- readEnumTypeIntS atom ->
+      | Just i <- readEnumTypeIntS atom -> do
+        rangeCheck m 'i' i
         return (m, WeakTermEnum $ EnumTypeIntS i)
-      | Just i <- readEnumTypeIntU atom ->
+      | Just i <- readEnumTypeIntU atom -> do
+        rangeCheck m 'u' i
         return (m, WeakTermEnum $ EnumTypeIntU i)
       | Just str <- readMaybe $ T.unpack atom -> do
-        u8s <- forM (encode str) $ \u -> return (m, toValueIntU 8 (toInteger u))
+        u8s <- forM (encode str) $ \u -> return (m, WeakTermEnumIntro $ EnumValueIntU 8 (toInteger u))
         sigmaIntroString m u8s
       | otherwise ->
         case T.uncons atom of
@@ -147,9 +149,14 @@ interpret inputTree =
         "enum"
           | [(_, TreeLeaf x)] <- rest ->
             case (readEnumTypeIntS x, readEnumTypeIntU x) of
-              (Just i, _) -> return (m, WeakTermEnum $ EnumTypeIntS i)
-              (_, Just i) -> return (m, WeakTermEnum $ EnumTypeIntU i)
-              _ -> return (m, WeakTermEnum $ EnumTypeLabel x)
+              (Just i, _) -> do
+                rangeCheck m 'i' i
+                return (m, WeakTermEnum $ EnumTypeIntS i)
+              (_, Just i) -> do
+                rangeCheck m 'u' i
+                return (m, WeakTermEnum $ EnumTypeIntU i)
+              _ ->
+                return (m, WeakTermEnum $ EnumTypeLabel x)
           | otherwise ->
             raiseSyntaxError m "(enum LEAF)"
         "enum-introduction"
@@ -423,8 +430,9 @@ interpretEnumValue tree =
       return $ EnumValueLabel x
     e@(m, TreeNode [(_, TreeLeaf t), (_, TreeLeaf x)]) ->
       case (readEnumValueIntS t x, readEnumValueIntU t x) of
-        (Just v@(EnumValueIntS size x'), _) ->
-          if (-1) * (2 ^ (size - 1)) <= x' && x' < 2 ^ size
+        (Just v@(EnumValueIntS size x'), _) -> do
+          rangeCheck (fst tree) 'i' size
+          if (-1) * (2 ^ (size - 1)) <= x' && x' < 2 ^ (size - 1)
             then return v
             else
               raiseError m $
@@ -434,7 +442,8 @@ interpretEnumValue tree =
                   <> T.pack (show size)
                   <> ", but is out of range of i"
                   <> T.pack (show size)
-        (_, Just v@(EnumValueIntU size x')) ->
+        (_, Just v@(EnumValueIntU size x')) -> do
+          rangeCheck (fst tree) 'u' size
           if 0 <= x' && x' < 2 ^ size
             then return v
             else
@@ -447,8 +456,8 @@ interpretEnumValue tree =
                   <> T.pack (show size)
         _ ->
           raiseSyntaxError (fst e) "(SINT-TYPE INT) | (UINT-TYPE INT)"
-    t ->
-      raiseSyntaxError (fst t) "LEAF | (LEAF LEAF)"
+    _ ->
+      raiseSyntaxError (fst tree) "LEAF | (LEAF LEAF)"
 
 interpretBinder :: [TreePlus] -> TreePlus -> WithEnv ([WeakIdentPlus], WeakTermPlus)
 interpretBinder xts t = do
@@ -655,23 +664,28 @@ headDiscriminantOf labelNumList =
     ((_, i) : _) ->
       i
 
-readEnumType :: Char -> T.Text -> Int -> Maybe Int
-readEnumType c str k -- n1, n2, ..., n{i}, ..., n{2^64}
+readEnumType :: Char -> T.Text -> Maybe Int
+readEnumType c str
   | T.length str >= 2,
     T.head str == c,
-    Just i <- readMaybe $ T.unpack $ T.tail str :: Maybe Int,
-    1 <= toInteger i && toInteger i <= 2 ^ k =
+    Just i <- readMaybe $ T.unpack $ T.tail str :: Maybe Int =
     Just i
   | otherwise =
     Nothing
 
 readEnumTypeIntS :: T.Text -> Maybe Int
-readEnumTypeIntS str =
-  readEnumType 'i' str 23
+readEnumTypeIntS =
+  readEnumType 'i'
+
+rangeCheck :: Meta -> Char -> Int -> WithEnv ()
+rangeCheck m prefix i =
+  if 1 <= i && i <= 64
+    then return ()
+    else raiseError m $ "the `x` of `" <> T.singleton prefix <> "{x}` must satisfy 1 <= x <= 64"
 
 readEnumTypeIntU :: T.Text -> Maybe Int
-readEnumTypeIntU str =
-  readEnumType 'u' str 23
+readEnumTypeIntU =
+  readEnumType 'u'
 
 readEnumValueIntS :: T.Text -> T.Text -> Maybe EnumValue
 readEnumValueIntS t x
@@ -700,10 +714,6 @@ asArrayKind tree =
           return t
     t ->
       raiseSyntaxError (fst t) "LEAF"
-
-toValueIntU :: IntSize -> Integer -> WeakTerm
-toValueIntU size i =
-  WeakTermEnumIntro $ EnumValueIntU size i
 
 raiseSyntaxError :: Meta -> T.Text -> WithEnv a
 raiseSyntaxError m form =
