@@ -1,0 +1,27 @@
+(no-implicit-core)
+
+(include library "core/notation.neut")
+
+;; (let test "あ")
+
+(let some-value tau)
+
+(constant file-descriptor tau)
+
+(constant stdout file-descriptor)
+
+(constant write
+  (pi
+    ((A u64)
+     (out file-descriptor)
+     (str (array A u8))
+     (len u64))
+    (product (array A u8) u64)))
+
+;; some-valueのところにちゃんとエラーが表示されることをチェック。
+(write hole hole some-value 3)
+
+;; (let len (write hole stdout test 3))
+
+
+;; (string:print "hello, world!\n")
