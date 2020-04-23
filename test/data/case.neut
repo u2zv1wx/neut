@@ -1,0 +1,34 @@
+(inductive bottom ())
+
+(define ex-falso-quodlibet ((a tau) (x (bottom)))
+  (witness a
+    (case x)))
+
+?ex-falso-quodlibet
+
+(inductive my-nat ()
+  (zero ()
+    (my-nat))
+  (succ ((_ (my-nat)))
+    (my-nat)))
+
+(define my-nat-to-i64 ((n (my-nat)))
+  (witness i64
+    (case n
+      ((my-nat:zero)
+        0)
+      ((my-nat:succ m)
+        (i64:add 1 (my-nat-to-i64 m))))))
+
+(use my-nat)
+
+;; case with namespace
+(define _ ((n (my-nat)))
+  (witness i64
+    (case n
+      ((zero)
+        0)
+      ((my-nat:succ m)
+        (i64:add 1 (my-nat-to-i64 m))))))
+
+(i64:print (my-nat-to-i64 (succ (succ (succ (succ (zero)))))))
