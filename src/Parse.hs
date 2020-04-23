@@ -353,8 +353,9 @@ prefixFunName tree =
 prefixTextPlus :: TreePlus -> WithEnv TreePlus
 prefixTextPlus tree =
   case tree of
-    (m, TreeLeaf "_") ->
-      return (m, TreeLeaf "_")
+    (m, TreeLeaf "_") -> do
+      h <- newTextWith "_"
+      return (m, TreeLeaf h)
     (m, TreeLeaf x) -> do
       x' <- withSectionPrefix x
       return (m, TreeLeaf x')
