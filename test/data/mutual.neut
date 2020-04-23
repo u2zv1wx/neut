@@ -36,15 +36,15 @@
 
 ;; (ballad of) big nothing
 (define
-  (p0 ((a i64)) (witness i64 (p1 a)))
+  (p0 ((a i64)) (p1 a))
   (p1 ((a i64)) (p2 a))
   (p2 ((a i64)) (p3 a))
   (p3 ((a i64)) (p4 a))
   (p4 ((a i64)) (p5 (i64:add 1 a)))
   (p5 ((a i64)) (p6 a))
-  (p6 ((a i64)) (p7 a))
+  (p6 ((a i64)) a)
   (p7 ((a i64)) (p8 a))
-  (p8 ((a i64)) (p9 a))
-  (p9 ((a i64)) a))
+  (p8 ((a i64)) (witness i64 (p9 a)))
+  (p9 ((a i64)) (p0 a)))
 
-(print (p0 10))
+(print (p7 10))
