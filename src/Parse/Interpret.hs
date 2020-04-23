@@ -502,9 +502,9 @@ interpretClause tree =
 interpretStructIntro :: TreePlus -> WithEnv (WeakTermPlus, ArrayKind)
 interpretStructIntro tree =
   case tree of
-    (_, TreeNode [e, k]) -> do
-      e' <- interpret e
+    (_, TreeNode [k, e]) -> do
       k' <- asArrayKind k
+      e' <- interpret e
       return (e', k')
     e ->
       raiseSyntaxError (fst e) "(TREE TREE)"
@@ -512,9 +512,11 @@ interpretStructIntro tree =
 interpretStructElim :: TreePlus -> WithEnv (Meta, Ident, ArrayKind)
 interpretStructElim tree =
   case tree of
-    (_, TreeNode [(m, TreeLeaf x), k]) -> do
+    (_, TreeNode [leaf, k]) -> do
+      (m, x) <- interpretLeaf leaf
+      -- interpretLeaf :: TreePlus -> WithEnv (Meta, Ident) --;
       k' <- asArrayKind k
-      return (m, asIdent x, k')
+      return (m, x, k')
     e ->
       raiseSyntaxError (fst e) "(LEAF TREE)"
 
