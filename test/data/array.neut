@@ -1,0 +1,36 @@
+;; empty array
+(let _
+  (array-introduction i64))
+
+(let _
+  (array-introduction u8 1 2 3 2 1 2 4))
+
+(let xs
+  (array-introduction i64 1 2 -30 20))
+
+;; float array
+(let _
+  (array-introduction f16 3.28 2.14 2.0 9.82))
+
+(let _
+  (array-introduction f32 3.28 2.14))
+
+(let _
+  (array-introduction f64 3.28 2.14 3.14159))
+
+(let k
+  (array-elimination i64 (a b c d) xs
+    (i64:add a (i64:add b (i64:add c d)))))
+
+(i64:print k) ;; -7
+
+(let k
+  (with let-bind
+    (let a (i64:array-access 0 * &xs))
+    (let b (i64:array-access 1 4 &xs))
+    (let c (i64:array-access 2 4 &xs))
+    (let d (i64:array-access 3 * &xs))
+    (erase xs)
+    (i64:add a (i64:add b (i64:add c d)))))
+
+(i64:print k) ;; -7
