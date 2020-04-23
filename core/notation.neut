@@ -23,13 +23,9 @@
 
 (notation switch enum-elimination)
 
-;; (keyword hole)
-
-;; (notation hole (zeta _))
-
 (keyword *)
 
-(notation * (hole _))
+(notation * hole)
 
 (keyword lambda)
 
