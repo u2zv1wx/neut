@@ -14,13 +14,22 @@ main = do
   dataDir <- getDataDir
   (_, contents) <- listDir dataDir
   progList <- filterM isSourceFile contents
-  resultList <- forM (sort progList) test
-  if or resultList
+  result <- test $ sort progList
+  if result
     then return ()
     else exitWith (ExitFailure 1)
 
-test :: Path Abs File -> IO Bool
-test srcPath = do
+test :: [Path Abs File] -> IO Bool
+test [] = return True
+test [srcPath] = test' srcPath
+test (srcPath : rest) = do
+  b1 <- test' srcPath
+  putStr "\n"
+  b2 <- test rest
+  return $ b1 && b2
+
+test' :: Path Abs File -> IO Bool
+test' srcPath = do
   (binaryPath, _) <- splitExtension srcPath
   (code, out, _) <- readProcessWithExitCode "neut" ["build", toFilePath srcPath, "-o", toFilePath binaryPath] []
   result <-
@@ -52,19 +61,22 @@ prefixFound :: String
 prefixFound =
   "     found: "
 
+pad :: String
+pad =
+  "            "
+
 stylize :: String -> String
 stylize str =
   case str of
     "" ->
       "(empty)"
     _ ->
-      stylize' (length prefixExpected) str
+      stylize' str
 
-stylize' :: Int -> String -> String
-stylize' pad str = do
+stylize' :: String -> String
+stylize' str = do
   let ls = lines str
-  let ls' = head ls : map (\s -> replicate pad ' ' ++ s) (tail ls)
-  unlines ls'
+  intercalate "\n" $ head ls : map (pad ++) (tail ls)
 
 getDataDir :: IO (Path Abs Dir)
 getDataDir = do
