@@ -286,11 +286,11 @@ clarifyArrayAccess tenv m name lowType = do
   case arrayAccessType' of
     (_, TermPi _ xts cod)
       | length xts == 3 -> do
-        (xs, ds, headerList) <-
-          computeHeader m xts [ArgImm, ArgUnused, ArgArray]
+        (xs, ds, headerList) <- computeHeader m xts [ArgImm, ArgUnused, ArgArray]
         case ds of
           [index, arr] -> do
-            callThenReturn <- toArrayAccessTail tenv m lowType cod arr index xs
+            let tenv' = insTypeEnv1 xts tenv
+            callThenReturn <- toArrayAccessTail tenv' m lowType cod arr index xs
             let body = iterativeApp headerList callThenReturn
             retClosure tenv Nothing [] m xts body
           _ ->
@@ -499,9 +499,9 @@ toArrayAccessTail ::
   DataPlus -> -- index
   [IdentPlus] -> -- borrowed variables
   WithEnv CodePlus
-toArrayAccessTail tenv m lowType cod arr index xs = do
+toArrayAccessTail tenv m lowType cod arr index xts = do
   resultVarName <- newNameWith' "result"
-  result <- retWithBorrowedVars tenv m cod xs resultVarName
+  result <- retWithBorrowedVars tenv m cod xts resultVarName
   return
     ( m,
       CodeUpElim
