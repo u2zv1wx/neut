@@ -718,10 +718,11 @@ asArrayKind tree =
       case asArrayKindMaybe x of
         Nothing ->
           raiseSyntaxError (fst e) "SINT-TYPE | UINT-TYPE | FLOAT-TYPE"
-        Just t ->
+        Just (t, c, size) -> do
+          rangeCheck (fst tree) c size
           return t
-    t ->
-      raiseSyntaxError (fst t) "LEAF"
+    _ ->
+      raiseSyntaxError (fst tree) "LEAF"
 
 raiseSyntaxError :: Meta -> T.Text -> WithEnv a
 raiseSyntaxError m form =

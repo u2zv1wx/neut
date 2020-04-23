@@ -192,8 +192,9 @@ data LowType
   deriving (Eq, Ord, Show)
 
 asLowTypeMaybe :: T.Text -> Maybe LowType
-asLowTypeMaybe name =
-  arrayKindToLowType <$> asArrayKindMaybe name
+asLowTypeMaybe name = do
+  (kind, _, _) <- asArrayKindMaybe name
+  return $ arrayKindToLowType kind
 
 sizeAsInt :: FloatSize -> Int
 sizeAsInt size =
@@ -251,7 +252,7 @@ arrayKindToLowType arrayKind =
     ArrayKindVoidPtr ->
       voidPtr
 
-asArrayKindMaybe :: T.Text -> Maybe ArrayKind
+asArrayKindMaybe :: T.Text -> Maybe (ArrayKind, Char, Int)
 asArrayKindMaybe s =
   case T.uncons s of
     Nothing ->
@@ -259,17 +260,15 @@ asArrayKindMaybe s =
     Just (c, rest) ->
       case c of
         'i'
-          | Just n <- readMaybe $ T.unpack rest,
-            0 < n && n <= 64 ->
-            Just $ ArrayKindIntS n
+          | Just n <- readMaybe $ T.unpack rest ->
+            Just (ArrayKindIntS n, c, n)
         'u'
-          | Just n <- readMaybe $ T.unpack rest,
-            0 < n && n <= 64 ->
-            Just $ ArrayKindIntU n
+          | Just n <- readMaybe $ T.unpack rest ->
+            Just (ArrayKindIntU n, c, n)
         'f'
           | Just n <- readMaybe $ T.unpack rest,
             Just size <- asFloatSize n ->
-            Just $ ArrayKindFloat size
+            Just (ArrayKindFloat size, c, n)
         _ ->
           Nothing
 
