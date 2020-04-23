@@ -1,0 +1,32 @@
+;; (let (_ u0) 0)
+
+;; (let (_ i1) -2) ;; error
+(let (_ i1) -1)
+(let (_ i1) 0)
+
+;; (let (x i1) 1) ;; error
+
+;; (let (x i2) -3)
+(let (_ i2) -2)
+(let (_ i2) -1)
+(let (_ i2) 0)
+(let (_ i2) 1)
+
+;; (let (_ u2) -1)
+(let (_ u2) 0)
+(let (_ u2) 1)
+(let (_ u2) 2)
+(let (_ u2) 3)
+;; (let (_ u2) 4)
+;; (let (x i2) 2) ;; raise error
+;; (let (x i2) 3)
+;; (let (x i2) 4)
+
+(let (_ i33) 10)
+
+(let (_ i63) 10)
+(let (x i0000000064) 10)
+
+?x
+
+;; (let (_ i65) 10) ;; should raise error
