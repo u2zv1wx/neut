@@ -140,11 +140,11 @@ elaborate' term =
       case t' of
         (_, TermEnum (EnumTypeIntS size))
           | (-1) * (2 ^ (size - 1)) <= x,
-            x < 2 ^ size ->
+            x < 2 ^ (size - 1) ->
             return (m, TermEnumIntro (EnumValueIntS size x))
           | otherwise ->
             raiseError m $
-              "the signed integer "
+              "the integer "
                 <> T.pack (show x)
                 <> " is inferred to be of type i"
                 <> T.pack (show size)
@@ -156,7 +156,7 @@ elaborate' term =
             return (m, TermEnumIntro (EnumValueIntU size x))
           | otherwise ->
             raiseError m $
-              "the unsigned integer "
+              "the integer "
                 <> T.pack (show x)
                 <> " is inferred to be of type u"
                 <> T.pack (show size)
