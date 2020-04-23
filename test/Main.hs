@@ -22,10 +22,16 @@ main = do
 test :: Path Abs File -> IO Bool
 test srcPath = do
   (binaryPath, _) <- splitExtension srcPath
+  (code, out, _) <- readProcessWithExitCode "neut" ["build", toFilePath srcPath, "-o", toFilePath binaryPath] []
+  result <-
+    case code of
+      ExitSuccess -> do
+        result <- readProcess (toFilePath binaryPath) [] []
+        removeFile binaryPath
+        return result
+      ExitFailure _ ->
+        return out
   answerPath <- addExtension ".answer" binaryPath
-  callProcess "neut" ["build", toFilePath srcPath, "-o", toFilePath binaryPath]
-  result <- readProcess (toFilePath binaryPath) [] []
-  removeFile binaryPath
   expectedResult <- readFile $ toFilePath answerPath
   (basename, _) <- splitExtension $ filename srcPath
   if result == expectedResult
@@ -34,9 +40,17 @@ test srcPath = do
       return True
     else do
       outputFail $ toFilePath basename
-      putStrLn $ "  expected: " <> stylize expectedResult
-      putStrLn $ "     found: " <> stylize result
+      putStrLn $ prefixExpected <> stylize expectedResult
+      putStrLn $ prefixFound <> stylize result
       return False
+
+prefixExpected :: String
+prefixExpected =
+  "  expected: "
+
+prefixFound :: String
+prefixFound =
+  "     found: "
 
 stylize :: String -> String
 stylize str =
@@ -44,7 +58,13 @@ stylize str =
     "" ->
       "(empty)"
     _ ->
-      str
+      stylize' (length prefixExpected) str
+
+stylize' :: Int -> String -> String
+stylize' pad str = do
+  let ls = lines str
+  let ls' = head ls : map (\s -> replicate pad ' ' ++ s) (tail ls)
+  unlines ls'
 
 getDataDir :: IO (Path Abs Dir)
 getDataDir = do
