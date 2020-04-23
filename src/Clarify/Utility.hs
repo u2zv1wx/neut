@@ -111,15 +111,13 @@ relevantImmediate :: DataPlus -> WithEnv CodePlus
 relevantImmediate argVar@(m, _) =
   return (m, CodeUpIntro (m, sigmaIntro [argVar, argVar]))
 
-cartStructName :: T.Text
-cartStructName =
-  "cartesian-struct"
-
 cartesianStruct :: Meta -> [ArrayKind] -> WithEnv DataPlus
-cartesianStruct m ks =
-  tryCache m cartStructName $ do
-    (args, e) <- makeSwitcher m (affineStruct ks) (relevantStruct ks)
-    insCodeEnv cartStructName args e
+cartesianStruct m ks = do
+  (args, e) <- makeSwitcher m (affineStruct ks) (relevantStruct ks)
+  i <- newCount
+  let name = "cartesian-struct-" <> T.pack (show i)
+  insCodeEnv name args e
+  return (m, DataConst name)
 
 affineStruct :: [ArrayKind] -> DataPlus -> WithEnv CodePlus
 affineStruct ks argVar@(m, _) = do
