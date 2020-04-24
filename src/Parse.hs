@@ -144,16 +144,16 @@ parse' stmtTreeList =
               | [(_, TreeLeaf pkg), (mUrl, TreeLeaf urlStr)] <- rest -> do
                 libDir <- getLibraryDirPath
                 pkg' <- parseRelDir $ T.unpack pkg
-                let path = libDir </> pkg'
-                isAlreadyInstalled <- doesDirExist path
+                let pkgDirPath = libDir </> pkg'
+                isAlreadyInstalled <- doesDirExist pkgDirPath
                 when (not isAlreadyInstalled) $ do
                   urlStr' <- readStrOrThrow mUrl urlStr
                   note' $ "downloading " <> pkg <> " from " <> TE.decodeUtf8 urlStr'
                   item <- liftIO $ get urlStr' $ \_ i1 -> do
                     i2 <- Streams.map byteString i1
                     toLazyByteString <$> Streams.fold mappend mempty i2
-                  note' $ "extracting " <> pkg <> " into " <> T.pack (toFilePath path)
-                  extract item path
+                  note' $ "extracting " <> pkg <> " into " <> T.pack (toFilePath pkgDirPath)
+                  extract item pkgDirPath
                 parse' restStmtList
               | otherwise ->
                 raiseSyntaxError m "(ensure LEAF LEAF)"
