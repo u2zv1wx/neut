@@ -1,0 +1,26 @@
+;; simple coinductive typea
+(coinductive stream ((A tau))
+  (head
+    ((_ (stream A)))
+    A)
+  (tail
+    ((_ (stream A)))
+    (stream A)))
+
+;; nested coinductive type
+(coinductive foo ((A tau))
+  (elim0
+    ((_ (foo A)))
+    A)
+  (elim1
+    ((_ (foo A)))
+    (stream (list (stream (foo A))))))
+
+;; mutually coinductive type
+;; (coinductive
+;;   (buz ((x i64))
+;;     (elim0 ((_ (buz x)))
+;;       (qux x)))
+;;   (qux ((x i64))
+;;     (elim1 ((_ (qux x)))
+;;       (buz x))))
