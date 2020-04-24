@@ -28,7 +28,7 @@
 (keyword admit)
 
 (notation admit
-  (admit-internal *))
+  (admit-internal hole))
 
 (keyword ?admit)
 
