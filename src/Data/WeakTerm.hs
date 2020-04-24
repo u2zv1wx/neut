@@ -98,6 +98,7 @@ data WeakStmt
   | WeakStmtLetWT Meta WeakIdentPlus WeakTermPlus
   | WeakStmtConstDecl WeakTextPlus
   | WeakStmtVerify Meta WeakTermPlus
+  | WeakStmtImplicit Ident [Int]
   deriving (Show)
 
 weakTermPi :: [WeakIdentPlus] -> WeakTermPlus -> WeakTerm

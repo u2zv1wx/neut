@@ -51,7 +51,8 @@ infer' ctx term =
               (m, WeakTermPi (Just $ asText indName) xts' t')
             )
     (m, WeakTermPiElim e es) -> do
-      etls <- mapM (infer' ctx) es
+      es' <- insertImplicits e es
+      etls <- mapM (infer' ctx) es'
       etl <- infer' ctx e
       inferPiElim ctx m etl etls
     (m, WeakTermIter (mx, x, t) xts e) -> do
@@ -475,3 +476,35 @@ lookupKind m name = do
       raiseError m $ "no such enum-intro is defined: " <> name
     Just (j, _) ->
       return j
+
+insertImplicits :: WeakTermPlus -> [WeakTermPlus] -> WithEnv [WeakTermPlus]
+insertImplicits e es =
+  case e of
+    (m, WeakTermUpsilon x)
+      | not (metaIsExplicit m) ->
+        insertImplicits' m x es
+    _ ->
+      return es
+
+insertImplicits' :: Meta -> Ident -> [WeakTermPlus] -> WithEnv [WeakTermPlus]
+insertImplicits' m x es = do
+  ienv <- gets impEnv
+  case IntMap.lookup (asInt x) ienv of
+    Nothing ->
+      return es
+    Just is ->
+      supplyHole m is 0 es
+
+supplyHole :: Meta -> [Int] -> Int -> [WeakTermPlus] -> WithEnv [WeakTermPlus]
+supplyHole m is idx es =
+  if idx `elem` is
+    then do
+      h <- newHole m
+      es' <- supplyHole m is (idx + 1) es
+      return $ h : es'
+    else case es of
+      [] ->
+        return []
+      headTerm : rest -> do
+        rest' <- supplyHole m is (idx + 1) rest
+        return $ headTerm : rest'

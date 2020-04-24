@@ -70,6 +70,10 @@ elaborateStmt stmt =
         note m $
           "verification succeeded (" <> T.pack (showFloat' sec) <> " seconds)"
       elaborateStmt cont
+    WeakStmtImplicit x is : cont -> do
+      ienv <- gets impEnv
+      modify (\env -> env {impEnv = IntMap.insertWith (++) (asInt x) is ienv})
+      elaborateStmt cont
 
 cleanup :: WithEnv ()
 cleanup =

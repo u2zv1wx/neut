@@ -74,8 +74,9 @@ parse' stmtTreeList =
           case headAtom of
             "attribute"
               | (mx, TreeLeaf x) : attrList <- rest -> do
-                mapM_ (parseAttr mx x) attrList
-                parse' restStmtList
+                impList <- mapM (parseAttr mx x) attrList
+                cont <- parse' restStmtList
+                return $ impList ++ cont
               | otherwise ->
                 raiseSyntaxError m "(attribute LEAF TREE ... TREE)"
             "notation"
@@ -237,7 +238,7 @@ unuse :: T.Text -> WithEnv ()
 unuse s =
   modify (\e -> e {prefixEnv = filter (/= s) (prefixEnv e)})
 
-parseAttr :: Meta -> T.Text -> TreePlus -> WithEnv ()
+parseAttr :: Meta -> T.Text -> TreePlus -> WithEnv WeakStmt
 parseAttr mx x tree =
   case tree of
     (m, TreeNode ((_, TreeLeaf headAtom) : rest)) ->
@@ -248,7 +249,7 @@ parseAttr mx x tree =
               Nothing ->
                 raiseError m "the argument of `implicit` must be an integer"
               Just is ->
-                updateImplicit mx x is
+                toStmtImplicit mx x is
           | otherwise ->
             raiseSyntaxError (fst tree) "(implicit LEAF ... LEAF)"
         _ ->

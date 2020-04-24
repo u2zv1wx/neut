@@ -6,7 +6,7 @@ module Parse.Rule
     internalize,
     registerLabelInfo,
     generateProjections,
-    updateImplicit,
+    toStmtImplicit,
   )
 where
 
@@ -121,16 +121,15 @@ generateProjections ts = do
                 )
             )
         bt <- discernIdentPlus (mb, asIdent b', (mb, weakTermPi (xts ++ [dom]) cod))
-        updateImplicit mb b' [0 .. length xts - 1]
-        updateImplicit mb (a <> ":unfold") [0 .. length xts - 1]
-        return [WeakStmtLetWT mb bt e]
+        imp1 <- toStmtImplicit mb b' [0 .. length xts - 1]
+        imp2 <- toStmtImplicit mb (a <> ":unfold") [0 .. length xts - 1]
+        return [WeakStmtLetWT mb bt e, imp1, imp2]
   return $ concat $ concat stmtListList
 
-updateImplicit :: Meta -> T.Text -> [Int] -> WithEnv ()
-updateImplicit mx x is = do
-  ienv <- gets impEnv
+toStmtImplicit :: Meta -> T.Text -> [Int] -> WithEnv WeakStmt
+toStmtImplicit mx x is = do
   x' <- discernText mx x
-  modify (\env -> env {impEnv = IntMap.insertWith (++) (asInt x') is ienv})
+  return $ WeakStmtImplicit x' is
 
 separate :: WeakTermPlus -> WithEnv (WeakIdentPlus, WeakTermPlus)
 separate e =
@@ -187,10 +186,11 @@ toInductive ats bts connective@(m, ai, xts, _) = do
   foldIdent <-
     discernIdentPlus
       (m, asIdent $ ai <> ":fold", (m, weakTermPi indArgs cod))
-  updateImplicit m (ai <> ":fold") [0 .. length xts - 1]
+  imp <- toStmtImplicit m (ai <> ":fold") [0 .. length xts - 1]
   return
     [ WeakStmtLetWT m at' indType,
-      WeakStmtLetWT m foldIdent fold
+      WeakStmtLetWT m foldIdent fold,
+      imp
     ]
 
 toInductiveIntroList :: [WeakTextPlus] -> Connective -> WithEnv [WeakStmt]
@@ -229,7 +229,7 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
     constructorIdent <-
       discernIdentPlus
         (mb, asIdent bi, (m, weakTermPi (xts' ++ yts) cod))
-    updateImplicit m bi [0 .. length xts' - 1]
+    imp <- toStmtImplicit m bi [0 .. length xts' - 1]
     case constructor of
       (_, WeakTermPiIntro _ xtsyts (_, WeakTermPiIntro indInfo@(Just (ai', _, _)) atsbts (_, WeakTermPiElim b _))) -> do
         let as = take (length ats) $ map (\(_, x, _) -> asInt x) atsbts
@@ -246,7 +246,8 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
                   ( m,
                     WeakTermPiIntro indInfo atsbts (m, WeakTermPiElim b yts')
                   )
-              )
+              ),
+            imp
           ]
       _ ->
         raiseCritical m "inductive-intro"

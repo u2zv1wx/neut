@@ -11,7 +11,6 @@ import Control.Monad.State.Lazy
 import Data.Basic
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
-import qualified Data.IntMap as IntMap
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.WeakTerm
@@ -80,8 +79,7 @@ discern' nenv term =
     (m, WeakTermPiElim e es) -> do
       es' <- mapM (discern' nenv) es
       e' <- discern' nenv e
-      es'' <- insertImplicits e' es'
-      return (m, WeakTermPiElim e' es'')
+      return (m, WeakTermPiElim e' es')
     (m, WeakTermIter (mx, x, t) xts e) -> do
       (xt', xts', e') <- discernIter nenv (mx, x, t) xts e
       return (m, WeakTermIter xt' xts' e')
@@ -346,35 +344,3 @@ isDefinedEnumType :: T.Text -> WithEnv Bool
 isDefinedEnumType name = do
   eenv <- gets enumEnv
   return $ name `Map.member` eenv
-
-insertImplicits :: WeakTermPlus -> [WeakTermPlus] -> WithEnv [WeakTermPlus]
-insertImplicits e es =
-  case e of
-    (m, WeakTermUpsilon x)
-      | not (metaIsExplicit m) ->
-        insertImplicits' m x es
-    _ ->
-      return es
-
-insertImplicits' :: Meta -> Ident -> [WeakTermPlus] -> WithEnv [WeakTermPlus]
-insertImplicits' m x es = do
-  ienv <- gets impEnv
-  case IntMap.lookup (asInt x) ienv of
-    Nothing ->
-      return es
-    Just is ->
-      supplyHole m is 0 es
-
-supplyHole :: Meta -> [Int] -> Int -> [WeakTermPlus] -> WithEnv [WeakTermPlus]
-supplyHole m is idx es =
-  if idx `elem` is
-    then do
-      h <- newHole m
-      es' <- supplyHole m is (idx + 1) es
-      return $ h : es'
-    else case es of
-      [] ->
-        return []
-      headTerm : rest -> do
-        rest' <- supplyHole m is (idx + 1) rest
-        return $ headTerm : rest'
