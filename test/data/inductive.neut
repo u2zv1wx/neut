@@ -1,0 +1,85 @@
+(no-implicit-core)
+
+;; simple inductive
+(inductive nat ()
+  (zero
+    ()
+    (nat))
+  (succ
+    ((_ (nat)))
+    (nat)))
+
+;; simple inductive (2)
+(inductive list ((A tau))
+  (nil
+    ()
+    (list A))
+  (cons
+    ((_ A)
+     (_ (list A)))
+    (list A)))
+
+(inductive list2 ((A tau))
+  (nil
+    ()
+    (list2 A))
+  (cons
+    ((_ A)
+     (_ (list2 A)))
+    (list2 A)))
+
+;; dependent inductive type with GADT
+(inductive vec ((A tau) (_ (nat)))
+  (nil
+    ()
+    (vec A (nat:zero)))
+  (cons
+    ((m (nat))
+     (_ A)
+     (_ (vec A m)))
+    (vec A (nat:succ m))))
+
+;; nested inductive type
+(inductive item ((A tau))
+  (cons ()
+    (item A))
+  (cons0
+    ((_ (item A))
+     (_ (list (list2 (list (item A))))))
+    (item A))
+  (cons1
+    ((_ (item A))
+     (_ (list (item A))))
+    (item A))
+  (cons2
+    ((_ (item A))
+     (_ (list (list (list2 (item A))))))
+    (item A))
+  (cons3
+    ((_ (item A))
+     (_ (list (list (item A)))))
+    (item A))
+  (cons4
+    ((_ (item A))
+     (_ (list2 (list (item A)))))
+    (item A))
+  (cons5
+    ((_ A)
+     (_ (item A)))
+    (item A)))
+
+;; mutually inductive type
+(inductive
+  (even ((_ (nat)))
+    (zero-is-even
+      ()
+      (even (nat:zero)))
+    (succ-of-odd-is-even
+      ((n (nat))
+       (_ (odd n)))
+      (even (nat:succ n))))
+  (odd ((_ (nat)))
+    (succ-of-even-is-odd
+      ((n (nat))
+       (_ (even n)))
+      (odd (nat:succ n)))))
