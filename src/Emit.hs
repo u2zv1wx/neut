@@ -118,21 +118,8 @@ emitLLVM retType llvm =
         forM [(onTrueLabel, onTrue), (onFalseLabel, onFalse)] $
           uncurry (emitBlock retType)
       return $ op <> concat xs
-    -- LLVMCont (LLVMOpFree d _ j) cont -> do
-    --   nenv <- gets nopFreeSet
-    --   if S.member j nenv
-    --     then emitLLVM retType cont
-    --     else do
-    --       str <-
-    --         emitOp $
-    --           unwordsL ["call fastcc", "void", "@free(i8* " <> showLLVMData d <> ")"]
-    --       a <- emitLLVM retType cont
-    --       return $ str <> a
     LLVMCont op cont -> do
       s <- emitLLVMOp op
-      -- case null s of
-      --   "" -> emitLLVM retType cont
-      --   _ -> do
       str <- emitOp s
       a <- emitLLVM retType cont
       return $ str <> a
