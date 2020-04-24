@@ -329,11 +329,13 @@ asInductive' :: TreePlus -> WithEnv ((T.Text, T.Text), TreePlus)
 asInductive' t =
   case t of
     (m, TreeNode ((_, TreeLeaf a) : (_, TreeNode xts) : rules)) -> do
-      let a' = "(" <> a <> ")"
+      -- let a' = "(" <> a <> ")"
+      -- a' <- newTextWith a
+      let a' = a
       let sub = (a, a')
       let xts' = map (substTree sub) xts
       rules'' <- mapM styleRule $ map (substTree sub) rules
-      let hole = "(_)"
+      h <- newTextWith "_"
       argList <- mapM extractArg xts
       return
         ( (a, a'),
@@ -362,7 +364,7 @@ asInductive' t =
                               ++ rules''
                               ++ [ ( m,
                                      TreeNode
-                                       [ (m, TreeLeaf hole),
+                                       [ (m, TreeLeaf h),
                                          (m, TreeNode ((m, TreeLeaf a') : argList))
                                        ]
                                    )

@@ -17,10 +17,32 @@
     (stream (list (stream (foo A))))))
 
 ;; mutually coinductive type
-;; (coinductive
-;;   (buz ((x i64))
-;;     (elim0 ((_ (buz x)))
-;;       (qux x)))
-;;   (qux ((x i64))
-;;     (elim1 ((_ (qux x)))
-;;       (buz x))))
+(coinductive
+  (buz ((x i64))
+    (elim0 ((_ (buz x)))
+      (qux x)))
+  (qux ((x i64))
+    (elim1 ((_ (qux x)))
+      (buz x))))
+
+(coinductive my-record ((a tau))
+  (item-1
+    ((_ (my-record a)))
+    a)
+  (item-2
+    ((_ (my-record a)))
+    i64)
+  (item-3
+    ((_ (my-record a)))
+    top))
+
+
+(let item
+  (record (my-record i64)
+    (item-1 10)
+    (item-3 top:unit)
+    (item-2 20)))
+
+(i64:print (my-record:item-1 item))
+
+(i64:print (my-record:item-2 item))
