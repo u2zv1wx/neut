@@ -34,16 +34,15 @@ clarifyStmt sub stmt =
     -- let x := box-intro CONST e1 in
     -- e2{x := box-elim CONST}
     StmtLet m (_, x, t) e cont -> do
-      -- ここは非同期でコンパイルできそう（というか、StmtVisitでファイル単位で非同期、とかでよさそう？）
       tenv <- gets typeEnv
       e' <- clarify' tenv $ substTermPlus sub e
       t' <- clarify' tenv $ substTermPlus sub t
       constName <- newNameWith x
-      insCodeEnv (asText'' constName) [] e' -- box-introduction
       let sub' = IntMap.insert (asInt x) (m, TermBoxElim constName) sub
       cont' <- clarifyStmt sub' cont
       h <- newNameWith'' "_"
       cont'' <- withHeaderAffine h t' cont' -- free the result of e'
+      insCodeEnv (asText'' constName) [] e' -- box-introduction
       return (m, CodeUpElim h e' cont'')
 
 clarify' :: TypeEnv -> TermPlus -> WithEnv CodePlus
