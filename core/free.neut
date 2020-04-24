@@ -39,7 +39,7 @@
         ((node (p tau) val (cont (hom p ((free g) a))))
           (with let-bind
             (let f' (lambda (x) ((map g) a b f x)))
-            (node p val (compose cont f'))))))))
+            (node p val (compose hole hole hole cont f'))))))))
 
 (define witness-functor ((g (hom tau tau)))
   (witness (functor (free g))
