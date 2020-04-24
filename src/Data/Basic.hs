@@ -281,7 +281,7 @@ asArrayKindMaybe s =
           Nothing
 
 data UnaryOp
-  = UnaryOpNeg LowType -- fneg : X -> X
+  = UnaryOpFNeg LowType -- fneg : X -> X
   | UnaryOpTrunc LowType LowType -- trunc, fptrunc : X -> Y
   | UnaryOpZext LowType LowType -- zext
   | UnaryOpSext LowType LowType -- sext
@@ -289,13 +289,13 @@ data UnaryOp
   | UnaryOpTo LowType LowType -- fp-to-ui, fp-to-si, ui-to-fp, si-to-fp (f32.to.i32, i32.to.f64, etc.)
   deriving (Eq, Show)
 
--- neg-f16, llvm-uitofp-u32-f64, etc.
+-- fneg-f16, uitofp-u32-f64, etc.
 -- <OP_NAME_IN_LLVM>-<TYPE-1>-(...)-<TYPE-N>
 asUnaryOpMaybe :: T.Text -> Maybe UnaryOp
 asUnaryOpMaybe name
-  | Just (typeStr, "neg") <- breakOnMaybe "-" name,
+  | Just ("fneg", typeStr) <- breakOnMaybe "-" name,
     Just lowType@(LowTypeFloat _) <- asLowTypeMaybe' typeStr =
-    Just $ UnaryOpNeg lowType
+    Just $ UnaryOpFNeg lowType
   | Just (convOpStr, rest) <- breakOnMaybe "-" name,
     Just (domTypeStr, codTypeStr) <- breakOnMaybe "-" rest,
     Just domType <- asLowTypeMaybe' domTypeStr,
@@ -308,7 +308,7 @@ asUnaryOpMaybe name
 unaryOpToDomCod :: UnaryOp -> (LowType, LowType)
 unaryOpToDomCod unaryOp =
   case unaryOp of
-    UnaryOpNeg t ->
+    UnaryOpFNeg t ->
       (t, t)
     UnaryOpTrunc dom cod ->
       (dom, cod)
@@ -385,7 +385,7 @@ data BinaryOp
   | BinaryOpFMul LowType -- (X, X) -> X
   | BinaryOpUDiv LowType -- (X, X) -> X
   | BinaryOpSDiv LowType -- (X, X) -> X
-  | BinaryOpDivF LowType -- (X, X) -> X
+  | BinaryOpFDiv LowType -- (X, X) -> X
   | BinaryOpURem LowType -- (X, X) -> X
   | BinaryOpSRem LowType -- (X, X) -> X
   | BinaryOpFRem LowType
@@ -395,12 +395,6 @@ data BinaryOp
   | BinaryOpAnd LowType -- (X, X) -> X
   | BinaryOpOr LowType -- (X, X) -> X
   | BinaryOpXor LowType -- (X, X) -> X
-  | BinaryOpEQ LowType -- (X, X) -> bool
-  | BinaryOpNE LowType -- (X, X) -> bool
-  | BinaryOpGT LowType -- (X, X) -> bool
-  | BinaryOpGE LowType -- (X, X) -> bool
-  | BinaryOpLT LowType -- (X, X) -> bool
-  | BinaryOpLE LowType -- (X, X) -> bool
   | BinaryOpICmpEQ LowType -- (X, X) -> bool
   | BinaryOpICmpNE LowType -- (X, X) -> bool
   | BinaryOpICmpUGT LowType -- (X, X) -> bool
@@ -459,16 +453,6 @@ isLowTypeInt (LowTypeIntS _) = True
 isLowTypeInt (LowTypeIntU _) = True
 isLowTypeInt _ = False
 
---   Just (opStr, typeStr) <- breakOnMaybe "-" name,
---   Just lowType <- asLowTypeMaybe' typeStr,
---   Just f <- asBinaryOpMaybe' opStr lowType =
---   Just $ f lowType
-
---  Just (typeStr, opStr) <- breakOnMaybe ":" name, -- e.g. name == "i8.add"
---   Just lowType <- asLowTypeMaybe typeStr,
---   Just f <- asBinaryOpMaybe' opStr =
---   Just $ f lowType
-
 asBinaryOpMaybe' :: T.Text -> LowType -> Maybe (LowType -> BinaryOp)
 asBinaryOpMaybe' name lowType =
   case name of
@@ -508,7 +492,7 @@ asBinaryOpMaybe' name lowType =
         Just BinaryOpSDiv
     "fdiv"
       | LowTypeFloat _ <- lowType ->
-        Just BinaryOpDivF
+        Just BinaryOpFDiv
     "urem"
       | LowTypeIntS _ <- lowType ->
         Just BinaryOpURem
@@ -624,26 +608,28 @@ binaryOpToDomCod binaryOp =
   case binaryOp of
     BinaryOpAdd t ->
       (t, t)
+    BinaryOpFAdd t ->
+      (t, t)
     BinaryOpSub t ->
+      (t, t)
+    BinaryOpFSub t ->
       (t, t)
     BinaryOpMul t ->
       (t, t)
+    BinaryOpFMul t ->
+      (t, t)
+    BinaryOpUDiv t ->
+      (t, t)
     BinaryOpSDiv t ->
+      (t, t)
+    BinaryOpFDiv t ->
+      (t, t)
+    BinaryOpURem t ->
       (t, t)
     BinaryOpSRem t ->
       (t, t)
-    BinaryOpEQ t ->
-      (t, LowTypeIntS 1)
-    BinaryOpNE t ->
-      (t, LowTypeIntS 1)
-    BinaryOpGT t ->
-      (t, LowTypeIntS 1)
-    BinaryOpGE t ->
-      (t, LowTypeIntS 1)
-    BinaryOpLT t ->
-      (t, LowTypeIntS 1)
-    BinaryOpLE t ->
-      (t, LowTypeIntS 1)
+    BinaryOpFRem t ->
+      (t, t)
     BinaryOpShl t ->
       (t, t)
     BinaryOpLshr t ->
@@ -656,6 +642,58 @@ binaryOpToDomCod binaryOp =
       (t, t)
     BinaryOpXor t ->
       (t, t)
+    BinaryOpICmpEQ t ->
+      (t, LowTypeIntS 1)
+    BinaryOpICmpNE t ->
+      (t, LowTypeIntS 1)
+    BinaryOpICmpUGT t ->
+      (t, LowTypeIntS 1)
+    BinaryOpICmpUGE t ->
+      (t, LowTypeIntS 1)
+    BinaryOpICmpULT t ->
+      (t, LowTypeIntS 1)
+    BinaryOpICmpULE t ->
+      (t, LowTypeIntS 1)
+    BinaryOpICmpSGT t ->
+      (t, LowTypeIntS 1)
+    BinaryOpICmpSGE t ->
+      (t, LowTypeIntS 1)
+    BinaryOpICmpSLT t ->
+      (t, LowTypeIntS 1)
+    BinaryOpICmpSLE t ->
+      (t, LowTypeIntS 1)
+    BinaryOpFCmpFALSE t ->
+      (t, LowTypeIntS 1)
+    BinaryOpFCmpOEQ t ->
+      (t, LowTypeIntS 1)
+    BinaryOpFCmpOGT t ->
+      (t, LowTypeIntS 1)
+    BinaryOpFCmpOGE t ->
+      (t, LowTypeIntS 1)
+    BinaryOpFCmpOLT t ->
+      (t, LowTypeIntS 1)
+    BinaryOpFCmpOLE t ->
+      (t, LowTypeIntS 1)
+    BinaryOpFCmpONE t ->
+      (t, LowTypeIntS 1)
+    BinaryOpFCmpORD t ->
+      (t, LowTypeIntS 1)
+    BinaryOpFCmpUEQ t ->
+      (t, LowTypeIntS 1)
+    BinaryOpFCmpUGT t ->
+      (t, LowTypeIntS 1)
+    BinaryOpFCmpUGE t ->
+      (t, LowTypeIntS 1)
+    BinaryOpFCmpULT t ->
+      (t, LowTypeIntS 1)
+    BinaryOpFCmpULE t ->
+      (t, LowTypeIntS 1)
+    BinaryOpFCmpUNE t ->
+      (t, LowTypeIntS 1)
+    BinaryOpFCmpUNO t ->
+      (t, LowTypeIntS 1)
+    BinaryOpFCmpTRUE t ->
+      (t, LowTypeIntS 1)
 
 type Target =
   (OS, Arch)
