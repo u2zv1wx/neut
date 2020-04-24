@@ -1,4 +1,4 @@
-;; simple coinductive typea
+;; simple coinductive type
 (coinductive stream ((A tau))
   (head
     ((_ (stream A)))
