@@ -366,8 +366,6 @@ parseDef xds = do
 defToName :: Def -> (Meta, Ident)
 defToName (_, (m, x, _), _, _) = (m, x)
 
--- return (toLetList $ zip3 nameList typeList bodyList)
-
 prefixFunName :: TreePlus -> WithEnv TreePlus
 prefixFunName tree =
   case tree of
@@ -410,19 +408,8 @@ toLetList defList =
     [] ->
       return []
     ((x, (m, t), e) : rest) -> do
-      t' <- discern t
-      e' <- discern e
-      (_, x') <- discernIdent m x
       rest' <- toLetList rest
-      return $ WeakStmtLet m (m, x', t') e' : rest'
-
--- toLetList :: [(Ident, (Meta, WeakTermPlus), WeakTermPlus)] -> [WeakStmt]
--- toLetList defList =
---   case defList of
---     [] ->
---       []
---     ((x, (m, t), e) : rest) ->
---       WeakStmtLet m (m, x, t) e : toLetList rest
+      return $ WeakStmtLet m (m, x, t) e : rest'
 
 defToSub :: (Ident, Def) -> (Int, WeakTermPlus)
 defToSub (dom, (m, xt, xts, e)) =

@@ -383,7 +383,7 @@ toText term =
     (_, WeakTermTau) ->
       "tau"
     (_, WeakTermUpsilon x) ->
-      asText x
+      asText' x
     (_, WeakTermPi Nothing xts cod) ->
       case extractSigmaArg term of
         Just yts ->
@@ -412,7 +412,7 @@ toText term =
       showCons $ map toText $ e : es
     (_, WeakTermIter (_, x, _) xts e) -> do
       let argStr = inParen $ showItems $ map showArg xts
-      showCons ["μ", asText x, argStr, toText e]
+      showCons ["μ", asText' x, argStr, toText e]
     (_, WeakTermConst x) ->
       x
     (_, WeakTermBoxElim x) ->

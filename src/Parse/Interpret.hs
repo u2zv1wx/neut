@@ -761,8 +761,7 @@ interpretWith tree =
           e' <- interpretWith (m, TreeNode (with : bind : es'))
           xt' <- interpretWeakIdentPlus xt
           rest' <- interpretWith (m, TreeNode (with : bind : rest))
-          let lam = (m, weakTermPiIntro [xt'] rest')
-          return (m, WeakTermPiElim bind' [h1, h2, e', lam])
+          return (m, WeakTermPiElim bind' [h1, h2, e', (m, weakTermPiIntro [xt'] rest')])
     (m, TreeNode (with@(_, TreeLeaf "with") : bind : (_, TreeNode ((_, TreeLeaf "erase") : xs)) : rest)) ->
       case mapM asLeaf xs of
         Nothing ->
