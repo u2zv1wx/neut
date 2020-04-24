@@ -57,7 +57,7 @@
       ((nil)
         0)
       ((cons _ ys)
-        (u64:add 1 (length a ys))))))
+        (add-u64 1 (length a ys))))))
 
 (attribute length (implicit 0))
 

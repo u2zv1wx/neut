@@ -8,9 +8,9 @@
   (true 1)
   (false 0))
 
-(define and i1:and)
+(define and and-i1)
 
-(define or i1:or)
+(define or or-i1)
 
 (define not ((b bool))
   (if b

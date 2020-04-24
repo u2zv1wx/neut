@@ -1,9 +1,13 @@
 ;; "bypass" the variable binding using `constant`
 (let _
-  (lambda ((i64:add tau))
-    ((constant i64:add) 1 2)))
+  (lambda ((add-i64 tau))
+    ((constant add-i64) 1 2)))
 
 ;; variable with the same name of a constant
 (let _
   (lambda ((i64:add (pi ((_ i64) (_ i64)) i64)))
     (i64:add 1 2)))
+
+;; ?i64:trunc:i32
+
+;; (i64:print (fptosi-f64-i64 (fadd-f64 31.288 2.99)))

@@ -281,12 +281,16 @@ asArrayKindMaybe s =
           Nothing
 
 data UnaryOp
-  = UnaryOpFNeg LowType -- fneg : X -> X
-  | UnaryOpTrunc LowType LowType -- trunc, fptrunc : X -> Y
-  | UnaryOpZext LowType LowType -- zext
-  | UnaryOpSext LowType LowType -- sext
-  | UnaryOpFpExt LowType LowType -- fpext
-  | UnaryOpTo LowType LowType -- fp-to-ui, fp-to-si, ui-to-fp, si-to-fp (f32.to.i32, i32.to.f64, etc.)
+  = UnaryOpFNeg LowType
+  | UnaryOpTrunc LowType LowType
+  | UnaryOpZext LowType LowType
+  | UnaryOpSext LowType LowType
+  | UnaryOpFpTrunc LowType LowType
+  | UnaryOpFpExt LowType LowType
+  | UnaryOpFU LowType LowType
+  | UnaryOpFS LowType LowType
+  | UnaryOpUF LowType LowType
+  | UnaryOpSF LowType LowType
   deriving (Eq, Show)
 
 -- fneg-f16, uitofp-u32-f64, etc.
@@ -316,9 +320,17 @@ unaryOpToDomCod unaryOp =
       (dom, cod)
     UnaryOpSext dom cod ->
       (dom, cod)
+    UnaryOpFpTrunc dom cod ->
+      (dom, cod)
     UnaryOpFpExt dom cod ->
       (dom, cod)
-    UnaryOpTo dom cod ->
+    UnaryOpFU dom cod ->
+      (dom, cod)
+    UnaryOpFS dom cod ->
+      (dom, cod)
+    UnaryOpUF dom cod ->
+      (dom, cod)
+    UnaryOpSF dom cod ->
       (dom, cod)
 
 asConvOpMaybe :: LowType -> LowType -> T.Text -> Maybe UnaryOp
@@ -333,10 +345,11 @@ asConvOpMaybe domType codType name =
         LowTypeIntU i2 <- codType,
         i1 > i2 ->
         Just $ UnaryOpTrunc domType codType
+    "fptrunc"
       | LowTypeFloat size1 <- domType,
         LowTypeFloat size2 <- codType,
         sizeAsInt size1 > sizeAsInt size2 ->
-        Just $ UnaryOpTrunc domType codType
+        Just $ UnaryOpFpTrunc domType codType
     "zext"
       | LowTypeIntS i1 <- domType,
         LowTypeIntS i2 <- codType,
@@ -355,24 +368,27 @@ asConvOpMaybe domType codType name =
         LowTypeIntU i2 <- codType,
         i1 < i2 ->
         Just $ UnaryOpSext domType codType
-    "ext"
+    "fpext"
       | LowTypeFloat size1 <- domType,
         LowTypeFloat size2 <- codType,
         sizeAsInt size1 < sizeAsInt size2 ->
         Just $ UnaryOpFpExt domType codType
-    "to"
-      | LowTypeFloat _ <- domType,
-        LowTypeIntS _ <- codType ->
-        Just $ UnaryOpTo domType codType
+    "fptoui"
       | LowTypeFloat _ <- domType,
         LowTypeIntU _ <- codType ->
-        Just $ UnaryOpTo domType codType
-      | LowTypeIntS _ <- domType,
-        LowTypeFloat _ <- codType ->
-        Just $ UnaryOpTo domType codType
+        Just $ UnaryOpFU domType codType
+    "fptosi"
+      | LowTypeFloat _ <- domType,
+        LowTypeIntS _ <- codType ->
+        Just $ UnaryOpFS domType codType
+    "uitofp"
       | LowTypeIntU _ <- domType,
         LowTypeFloat _ <- codType ->
-        Just $ UnaryOpTo domType codType
+        Just $ UnaryOpUF domType codType
+    "sitofp"
+      | LowTypeIntS _ <- domType,
+        LowTypeFloat _ <- codType ->
+        Just $ UnaryOpSF domType codType
     _ ->
       Nothing
 

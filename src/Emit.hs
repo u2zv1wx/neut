@@ -116,18 +116,21 @@ emitLLVM retType llvm =
         forM [(onTrueLabel, onTrue), (onFalseLabel, onFalse)] $
           uncurry (emitBlock retType)
       return $ op <> concat xs
-    LLVMCont (LLVMOpFree d _ j) cont -> do
-      nenv <- gets nopFreeSet
-      if S.member j nenv
-        then emitLLVM retType cont
-        else do
-          str <-
-            emitOp $
-              unwordsL ["call fastcc", "void", "@free(i8* " <> showLLVMData d <> ")"]
-          a <- emitLLVM retType cont
-          return $ str <> a
+    -- LLVMCont (LLVMOpFree d _ j) cont -> do
+    --   nenv <- gets nopFreeSet
+    --   if S.member j nenv
+    --     then emitLLVM retType cont
+    --     else do
+    --       str <-
+    --         emitOp $
+    --           unwordsL ["call fastcc", "void", "@free(i8* " <> showLLVMData d <> ")"]
+    --       a <- emitLLVM retType cont
+    --       return $ str <> a
     LLVMCont op cont -> do
       s <- emitLLVMOp op
+      -- case null s of
+      --   "" -> emitLLVM retType cont
+      --   _ -> do
       str <- emitOp s
       a <- emitLLVM retType cont
       return $ str <> a
@@ -178,131 +181,121 @@ emitLLVMOp llvmOp =
           ]
     LLVMOpAlloc d _ ->
       return $ unwordsL ["call fastcc", "i8*", "@malloc(i64 " <> showLLVMData d <> ")"]
+    LLVMOpFree d _ j -> do
+      nenv <- gets nopFreeSet
+      if S.member j nenv
+        then return "bitcast i8* null to i8*" -- nop
+        else return $ unwordsL ["call fastcc", "void", "@free(i8* " <> showLLVMData d <> ")"]
     LLVMOpSysCall num ds ->
       emitSysCallOp num ds
-    LLVMOpUnaryOp (UnaryOpNeg t@(LowTypeFloat _)) d ->
+    LLVMOpUnaryOp (UnaryOpFNeg t) d ->
       emitUnaryOp t "fneg" d
-    LLVMOpUnaryOp (UnaryOpTrunc t1@(LowTypeIntS i1) t2@(LowTypeIntS i2)) d
-      | i1 > i2 -> emitLLVMConvOp "trunc" d t1 t2
-    LLVMOpUnaryOp (UnaryOpTrunc t1@(LowTypeIntU i1) t2@(LowTypeIntU i2)) d
-      | i1 > i2 -> emitLLVMConvOp "trunc" d t1 t2
-    LLVMOpUnaryOp (UnaryOpTrunc t1@(LowTypeFloat i1) t2@(LowTypeFloat i2)) d
-      | sizeAsInt i1 > sizeAsInt i2 -> emitLLVMConvOp "fptrunc" d t1 t2
-    LLVMOpUnaryOp (UnaryOpZext t1@(LowTypeIntS i1) t2@(LowTypeIntS i2)) d
-      | i1 < i2 -> emitLLVMConvOp "zext" d t1 t2
-    LLVMOpUnaryOp (UnaryOpZext t1@(LowTypeIntU i1) t2@(LowTypeIntU i2)) d
-      | i1 < i2 -> emitLLVMConvOp "zext" d t1 t2
-    LLVMOpUnaryOp (UnaryOpSext t1@(LowTypeIntS i1) t2@(LowTypeIntS i2)) d
-      | i1 < i2 -> emitLLVMConvOp "sext" d t1 t2
-    LLVMOpUnaryOp (UnaryOpSext t1@(LowTypeIntU i1) t2@(LowTypeIntU i2)) d
-      | i1 < i2 -> emitLLVMConvOp "sext" d t1 t2
-    LLVMOpUnaryOp (UnaryOpFpExt t1@(LowTypeFloat i1) t2@(LowTypeFloat i2)) d
-      | sizeAsInt i1 < sizeAsInt i2 -> emitLLVMConvOp "fpext" d t1 t2
-    LLVMOpUnaryOp (UnaryOpTo t1@(LowTypeIntS _) t2@(LowTypeFloat _)) d ->
-      emitLLVMConvOp "sitofp" d t1 t2
-    LLVMOpUnaryOp (UnaryOpTo t1@(LowTypeIntU _) t2@(LowTypeFloat _)) d ->
+    LLVMOpUnaryOp (UnaryOpTrunc t1 t2) d ->
+      emitLLVMConvOp "trunc" d t1 t2
+    LLVMOpUnaryOp (UnaryOpFpTrunc t1 t2) d ->
+      emitLLVMConvOp "fptrunc" d t1 t2
+    LLVMOpUnaryOp (UnaryOpZext t1 t2) d ->
+      emitLLVMConvOp "zext" d t1 t2
+    LLVMOpUnaryOp (UnaryOpSext t1 t2) d ->
+      emitLLVMConvOp "sext" d t1 t2
+    LLVMOpUnaryOp (UnaryOpFpExt t1 t2) d ->
+      emitLLVMConvOp "fpext" d t1 t2
+    LLVMOpUnaryOp (UnaryOpUF t1 t2) d ->
       emitLLVMConvOp "uitofp" d t1 t2
-    LLVMOpUnaryOp (UnaryOpTo t1@(LowTypeFloat _) t2@(LowTypeIntS _)) d ->
-      emitLLVMConvOp "fptosi" d t1 t2
-    LLVMOpUnaryOp (UnaryOpTo t1@(LowTypeFloat _) t2@(LowTypeIntU _)) d ->
+    LLVMOpUnaryOp (UnaryOpSF t1 t2) d ->
+      emitLLVMConvOp "sitofp" d t1 t2
+    LLVMOpUnaryOp (UnaryOpFU t1 t2) d ->
       emitLLVMConvOp "fptoui" d t1 t2
-    LLVMOpBinaryOp (BinaryOpAdd t@(LowTypeIntS _)) d1 d2 ->
+    LLVMOpUnaryOp (UnaryOpFS t1 t2) d ->
+      emitLLVMConvOp "fptosi" d t1 t2
+    LLVMOpBinaryOp (BinaryOpAdd t) d1 d2 ->
       emitBinaryOp t "add" d1 d2
-    LLVMOpBinaryOp (BinaryOpAdd t@(LowTypeIntU _)) d1 d2 ->
-      emitBinaryOp t "add" d1 d2
-    LLVMOpBinaryOp (BinaryOpAdd t@(LowTypeFloat _)) d1 d2 ->
+    LLVMOpBinaryOp (BinaryOpFAdd t) d1 d2 ->
       emitBinaryOp t "fadd" d1 d2
-    LLVMOpBinaryOp (BinaryOpSub t@(LowTypeIntS _)) d1 d2 ->
+    LLVMOpBinaryOp (BinaryOpSub t) d1 d2 ->
       emitBinaryOp t "sub" d1 d2
-    LLVMOpBinaryOp (BinaryOpSub t@(LowTypeIntU _)) d1 d2 ->
-      emitBinaryOp t "sub" d1 d2
-    LLVMOpBinaryOp (BinaryOpSub t@(LowTypeFloat _)) d1 d2 ->
+    LLVMOpBinaryOp (BinaryOpFSub t) d1 d2 ->
       emitBinaryOp t "fsub" d1 d2
-    LLVMOpBinaryOp (BinaryOpMul t@(LowTypeIntS _)) d1 d2 ->
+    LLVMOpBinaryOp (BinaryOpMul t) d1 d2 ->
       emitBinaryOp t "mul" d1 d2
-    LLVMOpBinaryOp (BinaryOpMul t@(LowTypeIntU _)) d1 d2 ->
-      emitBinaryOp t "mul" d1 d2
-    LLVMOpBinaryOp (BinaryOpMul t@(LowTypeFloat _)) d1 d2 ->
+    LLVMOpBinaryOp (BinaryOpFMul t) d1 d2 ->
       emitBinaryOp t "fmul" d1 d2
-    LLVMOpBinaryOp (BinaryOpDiv t@(LowTypeIntS _)) d1 d2 ->
+    LLVMOpBinaryOp (BinaryOpSDiv t) d1 d2 ->
       emitBinaryOp t "sdiv" d1 d2
-    LLVMOpBinaryOp (BinaryOpDiv t@(LowTypeIntU _)) d1 d2 ->
+    LLVMOpBinaryOp (BinaryOpUDiv t) d1 d2 ->
       emitBinaryOp t "udiv" d1 d2
-    LLVMOpBinaryOp (BinaryOpDiv t@(LowTypeFloat _)) d1 d2 ->
+    LLVMOpBinaryOp (BinaryOpFDiv t) d1 d2 ->
       emitBinaryOp t "fdiv" d1 d2
-    LLVMOpBinaryOp (BinaryOpRem t@(LowTypeIntS _)) d1 d2 ->
+    LLVMOpBinaryOp (BinaryOpSRem t) d1 d2 ->
       emitBinaryOp t "srem" d1 d2
-    LLVMOpBinaryOp (BinaryOpRem t@(LowTypeIntU _)) d1 d2 ->
+    LLVMOpBinaryOp (BinaryOpURem t) d1 d2 ->
       emitBinaryOp t "urem" d1 d2
-    LLVMOpBinaryOp (BinaryOpRem t@(LowTypeFloat _)) d1 d2 ->
+    LLVMOpBinaryOp (BinaryOpFRem t) d1 d2 ->
       emitBinaryOp t "frem" d1 d2
-    LLVMOpBinaryOp (BinaryOpEQ t@(LowTypeIntS _)) d1 d2 ->
+    LLVMOpBinaryOp (BinaryOpShl t) d1 d2 ->
+      emitBinaryOp t "shl" d1 d2
+    LLVMOpBinaryOp (BinaryOpLshr t) d1 d2 ->
+      emitBinaryOp t "lshr" d1 d2
+    LLVMOpBinaryOp (BinaryOpAshr t) d1 d2 ->
+      emitBinaryOp t "ashr" d1 d2
+    LLVMOpBinaryOp (BinaryOpAnd t) d1 d2 ->
+      emitBinaryOp t "and" d1 d2
+    LLVMOpBinaryOp (BinaryOpOr t) d1 d2 ->
+      emitBinaryOp t "or" d1 d2
+    LLVMOpBinaryOp (BinaryOpXor t) d1 d2 ->
+      emitBinaryOp t "xor" d1 d2
+    LLVMOpBinaryOp (BinaryOpICmpEQ t) d1 d2 ->
       emitBinaryOp t "icmp eq" d1 d2
-    LLVMOpBinaryOp (BinaryOpEQ t@(LowTypeIntU _)) d1 d2 ->
-      emitBinaryOp t "icmp eq" d1 d2
-    LLVMOpBinaryOp (BinaryOpEQ t@(LowTypePtr (LowTypeIntS 8))) d1 d2 ->
-      emitBinaryOp t "icmp eq" d1 d2
-    LLVMOpBinaryOp (BinaryOpEQ t@(LowTypeFloat _)) d1 d2 ->
-      emitBinaryOp t "fcmp oeq" d1 d2
-    LLVMOpBinaryOp (BinaryOpNE t@(LowTypeIntS _)) d1 d2 ->
+    LLVMOpBinaryOp (BinaryOpICmpNE t) d1 d2 ->
       emitBinaryOp t "icmp ne" d1 d2
-    LLVMOpBinaryOp (BinaryOpNE t@(LowTypeIntU _)) d1 d2 ->
-      emitBinaryOp t "icmp ne" d1 d2
-    LLVMOpBinaryOp (BinaryOpNE t@(LowTypePtr (LowTypeIntS 8))) d1 d2 ->
-      emitBinaryOp t "icmp ne" d1 d2
-    LLVMOpBinaryOp (BinaryOpNE t@(LowTypeFloat _)) d1 d2 ->
-      emitBinaryOp t "fcmp one" d1 d2
-    LLVMOpBinaryOp (BinaryOpGT t@(LowTypeIntS _)) d1 d2 ->
-      emitBinaryOp t "icmp sgt" d1 d2
-    LLVMOpBinaryOp (BinaryOpGT t@(LowTypeIntU _)) d1 d2 ->
+    LLVMOpBinaryOp (BinaryOpICmpUGT t) d1 d2 ->
       emitBinaryOp t "icmp ugt" d1 d2
-    LLVMOpBinaryOp (BinaryOpGT t@(LowTypeFloat _)) d1 d2 ->
-      emitBinaryOp t "fcmp ogt" d1 d2
-    LLVMOpBinaryOp (BinaryOpGE t@(LowTypeIntS _)) d1 d2 ->
-      emitBinaryOp t "icmp sge" d1 d2
-    LLVMOpBinaryOp (BinaryOpGE t@(LowTypeIntU _)) d1 d2 ->
+    LLVMOpBinaryOp (BinaryOpICmpUGE t) d1 d2 ->
       emitBinaryOp t "icmp uge" d1 d2
-    LLVMOpBinaryOp (BinaryOpGE t@(LowTypeFloat _)) d1 d2 ->
-      emitBinaryOp t "fcmp oge" d1 d2
-    LLVMOpBinaryOp (BinaryOpLT t@(LowTypeIntS _)) d1 d2 ->
-      emitBinaryOp t "icmp slt" d1 d2
-    LLVMOpBinaryOp (BinaryOpLT t@(LowTypeIntU _)) d1 d2 ->
+    LLVMOpBinaryOp (BinaryOpICmpULT t) d1 d2 ->
       emitBinaryOp t "icmp ult" d1 d2
-    LLVMOpBinaryOp (BinaryOpLT t@(LowTypeFloat _)) d1 d2 ->
-      emitBinaryOp t "fcmp olt" d1 d2
-    LLVMOpBinaryOp (BinaryOpLE t@(LowTypeIntS _)) d1 d2 ->
-      emitBinaryOp t "icmp sle" d1 d2
-    LLVMOpBinaryOp (BinaryOpLE t@(LowTypeIntU _)) d1 d2 ->
+    LLVMOpBinaryOp (BinaryOpICmpULE t) d1 d2 ->
       emitBinaryOp t "icmp ule" d1 d2
-    LLVMOpBinaryOp (BinaryOpLE t@(LowTypeFloat _)) d1 d2 ->
+    LLVMOpBinaryOp (BinaryOpICmpSGT t) d1 d2 ->
+      emitBinaryOp t "icmp sgt" d1 d2
+    LLVMOpBinaryOp (BinaryOpICmpSGE t) d1 d2 ->
+      emitBinaryOp t "icmp sge" d1 d2
+    LLVMOpBinaryOp (BinaryOpICmpSLT t) d1 d2 ->
+      emitBinaryOp t "icmp slt" d1 d2
+    LLVMOpBinaryOp (BinaryOpICmpSLE t) d1 d2 ->
+      emitBinaryOp t "icmp sle" d1 d2
+    LLVMOpBinaryOp (BinaryOpFCmpFALSE t) d1 d2 ->
+      emitBinaryOp t "fcmp false" d1 d2
+    LLVMOpBinaryOp (BinaryOpFCmpOEQ t) d1 d2 ->
+      emitBinaryOp t "fcmp oeq" d1 d2
+    LLVMOpBinaryOp (BinaryOpFCmpOGT t) d1 d2 ->
+      emitBinaryOp t "fcmp ogt" d1 d2
+    LLVMOpBinaryOp (BinaryOpFCmpOGE t) d1 d2 ->
+      emitBinaryOp t "fcmp oge" d1 d2
+    LLVMOpBinaryOp (BinaryOpFCmpOLT t) d1 d2 ->
+      emitBinaryOp t "fcmp olt" d1 d2
+    LLVMOpBinaryOp (BinaryOpFCmpOLE t) d1 d2 ->
       emitBinaryOp t "fcmp ole" d1 d2
-    LLVMOpBinaryOp (BinaryOpShl t@(LowTypeIntS _)) d1 d2 ->
-      emitBinaryOp t "shl" d1 d2
-    LLVMOpBinaryOp (BinaryOpShl t@(LowTypeIntU _)) d1 d2 ->
-      emitBinaryOp t "shl" d1 d2
-    LLVMOpBinaryOp (BinaryOpLshr t@(LowTypeIntS _)) d1 d2 ->
-      emitBinaryOp t "lshr" d1 d2
-    LLVMOpBinaryOp (BinaryOpLshr t@(LowTypeIntU _)) d1 d2 ->
-      emitBinaryOp t "lshr" d1 d2
-    LLVMOpBinaryOp (BinaryOpAshr t@(LowTypeIntS _)) d1 d2 ->
-      emitBinaryOp t "ashr" d1 d2
-    LLVMOpBinaryOp (BinaryOpAshr t@(LowTypeIntU _)) d1 d2 ->
-      emitBinaryOp t "ashr" d1 d2
-    LLVMOpBinaryOp (BinaryOpAnd t@(LowTypeIntS _)) d1 d2 ->
-      emitBinaryOp t "and" d1 d2
-    LLVMOpBinaryOp (BinaryOpAnd t@(LowTypeIntU _)) d1 d2 ->
-      emitBinaryOp t "and" d1 d2
-    LLVMOpBinaryOp (BinaryOpOr t@(LowTypeIntS _)) d1 d2 ->
-      emitBinaryOp t "or" d1 d2
-    LLVMOpBinaryOp (BinaryOpOr t@(LowTypeIntU _)) d1 d2 ->
-      emitBinaryOp t "or" d1 d2
-    LLVMOpBinaryOp (BinaryOpXor t@(LowTypeIntS _)) d1 d2 ->
-      emitBinaryOp t "xor" d1 d2
-    LLVMOpBinaryOp (BinaryOpXor t@(LowTypeIntU _)) d1 d2 ->
-      emitBinaryOp t "xor" d1 d2
-    foo -> do
-      p' foo
-      raiseCritical' "ill-typed LLVMOp"
+    LLVMOpBinaryOp (BinaryOpFCmpONE t) d1 d2 ->
+      emitBinaryOp t "fcmp one" d1 d2
+    LLVMOpBinaryOp (BinaryOpFCmpORD t) d1 d2 ->
+      emitBinaryOp t "fcmp ord" d1 d2
+    LLVMOpBinaryOp (BinaryOpFCmpUEQ t) d1 d2 ->
+      emitBinaryOp t "fcmp ueq" d1 d2
+    LLVMOpBinaryOp (BinaryOpFCmpUGT t) d1 d2 ->
+      emitBinaryOp t "fcmp ugt" d1 d2
+    LLVMOpBinaryOp (BinaryOpFCmpUGE t) d1 d2 ->
+      emitBinaryOp t "fcmp uge" d1 d2
+    LLVMOpBinaryOp (BinaryOpFCmpULT t) d1 d2 ->
+      emitBinaryOp t "fcmp ult" d1 d2
+    LLVMOpBinaryOp (BinaryOpFCmpULE t) d1 d2 ->
+      emitBinaryOp t "fcmp ule" d1 d2
+    LLVMOpBinaryOp (BinaryOpFCmpUNE t) d1 d2 ->
+      emitBinaryOp t "fcmp une" d1 d2
+    LLVMOpBinaryOp (BinaryOpFCmpUNO t) d1 d2 ->
+      emitBinaryOp t "fcmp uno" d1 d2
+    LLVMOpBinaryOp (BinaryOpFCmpTRUE t) d1 d2 ->
+      emitBinaryOp t "fcmp true" d1 d2
 
 emitUnaryOp :: LowType -> Builder -> LLVMData -> WithEnv Builder
 emitUnaryOp t inst d =

@@ -16,13 +16,13 @@
 ;; 2-mutual definition
 (define
   (even (n)
-    (if (eq n 0)
+    (if (icmp-eq-i64 n 0)
       true
-      (odd (sub n 1))))
+      (odd (sub-i64 n 1))))
   (odd (n)
-    (if (eq n 0)
+    (if (icmp-eq-i64 n 0)
       false
-      (even (sub n 1)))))
+      (even (sub-i64 n 1)))))
 
 (print
   (if (even 10)

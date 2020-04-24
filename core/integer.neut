@@ -14,26 +14,28 @@
 
 (define negate ((x i64))
   (witness i64
-    (mul x -1)))
+    (mul-i64 x -1)))
 
 (define print-digit ((x i64))
   (witness top
     (with let-bind
-      (print-character (unsafe:cast i64 u8 (add x 48))))))
+      (print-character (unsafe:cast i64 u8 (add-i64 x 48))))))
 
 ;; とりあえず直接printする。ホントはbufferをつかって実装するべき。
 (define print ((x i64))
   (witness top
-    (if (< x 0)
+    (if (icmp-slt-i64 x 0)
       (with let-bind
         (string:print "-")
         (print (negate x)))
-      (if (< x 10)
+      (if (icmp-slt-i64 x 10)
         (print-digit x)
         (with let-bind
-          (let q (div x 10))
-          (let r (rem x 10))
+          (let q (sdiv-i64 x 10))
+          (let r (srem-i64 x 10))
           (print q)
           (print-digit r))))))
+
+(define add add-i64)
 
 (end i64)
