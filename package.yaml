@@ -22,6 +22,8 @@ dependencies:
 - half
 - http-streams
 - io-streams
+- lifted-async
+- monad-control
 - mtl
 - optparse-applicative
 - path
