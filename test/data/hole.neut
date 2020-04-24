@@ -1,8 +1,8 @@
 (let (x hole) (u64 1))
 
-(let (y *)
+(let (y hole)
   (with let-bind
-    (let (z *) x)
+    (let (z hole) x)
     z))
 
 ?y

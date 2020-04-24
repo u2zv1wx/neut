@@ -23,9 +23,9 @@
 
 (notation switch enum-elimination)
 
-(keyword *)
+;; (keyword *)
 
-(notation * hole)
+;; (notation * hole)
 
 (keyword lambda)
 
