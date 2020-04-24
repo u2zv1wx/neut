@@ -439,7 +439,7 @@ llvmCodeCase m v mces =
         Just (Definition _ args _) -> do
           uncastThenCmpThenBranch <-
             llvmUncastLet tmp (LLVMDataGlobal c) (toFunPtrType args)
-              $ LLVMLet isEq (LLVMOpBinaryOp (BinaryOpEQ voidPtr) tmpVar baseVar)
+              $ LLVMLet isEq (LLVMOpBinaryOp (BinaryOpICmpEQ voidPtr) tmpVar baseVar)
               $ LLVMBranch isEqVar code' cont
           llvmDataLet base v uncastThenCmpThenBranch
 
