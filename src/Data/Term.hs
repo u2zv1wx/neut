@@ -250,7 +250,7 @@ weaken term =
     (m, TermBoxElim x) ->
       (m, WeakTermBoxElim x)
     (m, TermFloat size x) ->
-      (m, WeakTermFloat (m, WeakTermConst ("f" <> showFloatSize size)) x)
+      (m, WeakTermFloat (m, WeakTermConst (showFloatSize size)) x)
     (m, TermEnum x) ->
       (m, WeakTermEnum x)
     (m, TermEnumIntro l) ->
