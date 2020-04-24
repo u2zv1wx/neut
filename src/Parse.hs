@@ -114,7 +114,8 @@ parse' stmtTreeList =
               | [(_, TreeLeaf s)] <- rest -> do
                 ns <- gets sectionEnv
                 case ns of
-                  [] -> raiseError m "there is no section to end"
+                  [] ->
+                    raiseError m "there is no section to end"
                   (s' : ns')
                     | s == s' -> do
                       getCurrentSection >>= unuse
@@ -164,8 +165,10 @@ parse' stmtTreeList =
                 val <- retrieveCompileTimeVarValue mx x
                 stmtClauseList' <- mapM parseStmtClause stmtClauseList
                 case lookup val stmtClauseList' of
-                  Nothing -> parse' restStmtList
-                  Just as1 -> parse' $ as1 ++ restStmtList
+                  Nothing ->
+                    parse' restStmtList
+                  Just as1 ->
+                    parse' $ as1 ++ restStmtList
               | otherwise ->
                 raiseSyntaxError m "(introspect LEAF TREE*)"
             "constant"
