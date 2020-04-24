@@ -321,61 +321,57 @@ asInductive treeList =
     [] ->
       return []
     (t : ts) -> do
-      (sub, t') <- asInductive' t
-      ts' <- asInductive $ map (substTree sub) ts
+      t' <- asInductive' t
+      ts' <- asInductive ts
       return $ t' : ts'
 
-asInductive' :: TreePlus -> WithEnv ((T.Text, T.Text), TreePlus)
+asInductive' :: TreePlus -> WithEnv TreePlus
 asInductive' t =
   case t of
     (m, TreeNode ((_, TreeLeaf a) : (_, TreeNode xts) : rules)) -> do
-      -- let a' = "(" <> a <> ")"
-      -- a' <- newTextWith a
-      let a' = a
+      a' <- newTextWith a
       let sub = (a, a')
       let xts' = map (substTree sub) xts
-      rules'' <- mapM styleRule $ map (substTree sub) rules
+      rules' <- mapM styleRule $ map (substTree sub) rules
       h <- newTextWith "_"
       argList <- mapM extractArg xts
       return
-        ( (a, a'),
-          ( m,
-            TreeNode
-              [ (m, TreeLeaf a),
-                (m, TreeNode xts'),
-                ( m,
-                  TreeNode
-                    [ (m, TreeLeaf "unfold"),
-                      ( m,
-                        TreeNode
-                          ( [ ( m,
-                                TreeNode
-                                  [ (m, TreeLeaf a'),
-                                    ( m,
-                                      TreeNode
-                                        [ (m, TreeLeaf "pi"),
-                                          (m, TreeNode xts'),
-                                          (m, TreeLeaf "tau")
-                                        ]
-                                    )
-                                  ]
-                              )
-                            ]
-                              ++ rules''
-                              ++ [ ( m,
-                                     TreeNode
-                                       [ (m, TreeLeaf h),
-                                         (m, TreeNode ((m, TreeLeaf a') : argList))
-                                       ]
-                                   )
-                                 ]
-                          )
-                      ),
-                      (m, TreeNode ((m, TreeLeaf a) : argList))
-                    ]
-                )
-              ]
-          )
+        ( m,
+          TreeNode
+            [ (m, TreeLeaf a),
+              (m, TreeNode xts'),
+              ( m,
+                TreeNode
+                  [ (m, TreeLeaf "unfold"),
+                    ( m,
+                      TreeNode
+                        ( [ ( m,
+                              TreeNode
+                                [ (m, TreeLeaf a'),
+                                  ( m,
+                                    TreeNode
+                                      [ (m, TreeLeaf "pi"),
+                                        (m, TreeNode xts'),
+                                        (m, TreeLeaf "tau")
+                                      ]
+                                  )
+                                ]
+                            )
+                          ]
+                            ++ rules'
+                            ++ [ ( m,
+                                   TreeNode
+                                     [ (m, TreeLeaf h),
+                                       (m, TreeNode ((m, TreeLeaf a') : argList))
+                                     ]
+                                 )
+                               ]
+                        )
+                    ),
+                    (m, TreeNode ((m, TreeLeaf a) : argList))
+                  ]
+              )
+            ]
         )
     _ ->
       raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) ...)"
