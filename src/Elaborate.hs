@@ -66,9 +66,8 @@ elaborateStmt stmt =
         start <- liftIO getCurrentTime
         _ <- normalize e''
         stop <- liftIO getCurrentTime
-        let sec = realToFrac $ diffUTCTime stop start :: Float
-        note m $
-          "verification succeeded (" <> T.pack (showFloat' sec) <> " seconds)"
+        let sec = realToFrac $ diffUTCTime stop start
+        note m $ "verification succeeded (" <> T.pack (showFloat' sec) <> " seconds)"
       elaborateStmt cont
     WeakStmtImplicit x is : cont -> do
       ienv <- gets impEnv
