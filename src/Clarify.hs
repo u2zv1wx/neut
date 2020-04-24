@@ -29,10 +29,6 @@ clarifyStmt sub stmt =
   case stmt of
     StmtReturn m ->
       return (m, CodeUpIntro (m, DataEnumIntro (EnumValueIntS 64 0)))
-    -- let x := e1 in e2
-    --   ~>
-    -- let x := box-intro CONST e1 in
-    -- e2{x := box-elim CONST}
     StmtLet m (_, x, t) e cont -> do
       tenv <- gets typeEnv
       e' <- clarify' tenv $ substTermPlus sub e
