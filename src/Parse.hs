@@ -278,7 +278,7 @@ parseAttr mx x tree =
 withSectionPrefix :: T.Text -> WithEnv T.Text
 withSectionPrefix x = do
   ns <- gets sectionEnv
-  return $ foldl (\acc n -> n <> ":" <> acc) x ns
+  return $ foldl (\acc n -> n <> nsSep <> acc) x ns
 
 getCurrentSection :: WithEnv T.Text
 getCurrentSection = do
@@ -293,7 +293,7 @@ getCurrentSection' nameStack =
     [n] ->
       n
     (n : ns) ->
-      getCurrentSection' ns <> ":" <> n
+      getCurrentSection' ns <> nsSep <> n
 
 readStrOrThrow :: (Read a) => Meta -> T.Text -> WithEnv a
 readStrOrThrow m quotedStr =

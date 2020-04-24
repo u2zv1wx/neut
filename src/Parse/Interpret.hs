@@ -649,11 +649,11 @@ interpretEnumItem' name treeList =
       return []
     [t] -> do
       (s, mj) <- interpretEnumItem'' t
-      return [(name <> ":" <> s, fromMaybe 0 mj)]
+      return [(name <> nsSep <> s, fromMaybe 0 mj)]
     (t : ts) -> do
       ts' <- interpretEnumItem' name ts
       (s, mj) <- interpretEnumItem'' t
-      return $ (name <> ":" <> s, fromMaybe (1 + headDiscriminantOf ts') mj) : ts'
+      return $ (name <> nsSep <> s, fromMaybe (1 + headDiscriminantOf ts') mj) : ts'
 
 interpretEnumItem'' :: TreePlus -> WithEnv (T.Text, Maybe Int)
 interpretEnumItem'' tree =

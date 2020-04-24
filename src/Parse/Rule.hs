@@ -40,7 +40,7 @@ setupIndPrefix' :: T.Text -> TreePlus -> WithEnv TreePlus
 setupIndPrefix' a inputTree =
   case inputTree of
     (m, TreeNode ((mb, TreeLeaf b) : rest)) ->
-      return (m, TreeNode ((mb, TreeLeaf (a <> ":" <> b)) : rest))
+      return (m, TreeNode ((mb, TreeLeaf (a <> nsSep <> b)) : rest))
     _ ->
       raiseSyntaxError (fst inputTree) "(LEAF (TREE ... TREE) TREE)"
 
@@ -100,7 +100,7 @@ generateProjections ts = do
         xts <- takeXTS ta
         (dom@(my, y, ty), cod) <- separate tb
         v <- newNameWith'' "base"
-        let b' = a <> ":" <> b
+        let b' = a <> nsSep <> b
         e <-
           discern
             ( mb,
@@ -110,7 +110,7 @@ generateProjections ts = do
                   WeakTermCase
                     (Just $ asIdent a)
                     (my, WeakTermUpsilon y)
-                    [ ( ( (mb, asIdent (a <> ":unfold")),
+                    [ ( ( (mb, asIdent (a <> nsSep <> "unfold")),
                           xts ++ [(ma, asIdent a, ta)] ++ bts' ++ [(mb, v, ty)] -- `xts ++` is required since LetWT bypasses `infer`
                         ),
                         ( mb,
@@ -122,7 +122,7 @@ generateProjections ts = do
             )
         bt <- discernIdentPlus (mb, asIdent b', (mb, weakTermPi (xts ++ [dom]) cod))
         imp1 <- toStmtImplicit mb b' [0 .. length xts - 1]
-        imp2 <- toStmtImplicit mb (a <> ":unfold") [0 .. length xts - 1]
+        imp2 <- toStmtImplicit mb (a <> nsSep <> "unfold") [0 .. length xts - 1]
         return [WeakStmtLetWT mb bt e, imp1, imp2]
   return $ concat $ concat stmtListList
 

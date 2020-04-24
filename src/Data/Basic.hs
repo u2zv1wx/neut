@@ -38,6 +38,10 @@ instance Show Ident where
   show (I (s, i)) =
     T.unpack s ++ "-" ++ show i
 
+nsSep :: T.Text
+nsSep =
+  ":"
+
 type Phase =
   Int
 
@@ -453,7 +457,7 @@ asBinaryOpMaybe name
       "fcmp"
         | Just (condStr, typeStr) <- breakOnMaybe "-" rest,
           Just lowType@(LowTypeFloat _) <- asLowTypeMaybe' typeStr,
-          Just f <- undefined condStr lowType ->
+          Just f <- asFCmpMaybe condStr ->
           Just $ f lowType
       _
         | Just lowType <- asLowTypeMaybe' rest,

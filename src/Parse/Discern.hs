@@ -266,7 +266,7 @@ lookupName' m penv nenv x =
     [] ->
       return Nothing
     prefix : prefixList -> do
-      let query = prefix <> ":" <> asText x
+      let query = prefix <> nsSep <> asText x
       case Map.lookup query nenv of
         Nothing ->
           lookupName' m prefixList nenv x
@@ -298,7 +298,7 @@ lookupConstantMaybe' m penv x =
     [] ->
       return Nothing
     prefix : prefixList -> do
-      let query = prefix <> ":" <> x
+      let query = prefix <> nsSep <> x
       b <- isConstant query
       if b
         then do
@@ -321,7 +321,7 @@ lookupEnum' f penv name =
     [] ->
       return Nothing
     prefix : prefixList -> do
-      let name' = prefix <> ":" <> name
+      let name' = prefix <> nsSep <> name
       b <- f name'
       if b
         then return $ Just name'
