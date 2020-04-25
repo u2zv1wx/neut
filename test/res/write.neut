@@ -1,7 +1,7 @@
 ;; (define test ()
 ;;   "あ")
 
-;; (os:write os:stdout (test) 3)
+;; (os.write os.stdout (test) 3)
 
 ;; (no-implicit-core)
 
@@ -45,7 +45,7 @@
 ;; こっちだとmalloc/freeがめっちゃ発生する。
 ;; (begin
 ;;   (let len (write stdout test 3))
-;;   (let len (@os:write 3 stdout test 3))
+;;   (let len (@os.write 3 stdout test 3))
 ;;   (let len (write stdout test 3))
 ;;   len)
 
@@ -60,19 +60,19 @@
 (with let-bind
   (let _
     (let _ (i64 100))
-    (string:print &test) ;; これは「内側」のwithについてのborrowとして処理される
-    (string:print &test)) ;; 末尾でのみborrowが許される（途中では別な場所でのborrowになる）（というか途中のborrowも自動で実装されてるわ、これ）
-  (let _ (string:print &test))
-  (let len (string:print &test)) ;; ここの "defined but not used" はfreeを具体的に行うことを要求しているとみなせる。「せっかく借用したのに」というわけ。
+    (string.print &test) ;; これは「内側」のwithについてのborrowとして処理される
+    (string.print &test)) ;; 末尾でのみborrowが許される（途中では別な場所でのborrowになる）（というか途中のborrowも自動で実装されてるわ、これ）
+  (let _ (string.print &test))
+  (let len (string.print &test)) ;; ここの "defined but not used" はfreeを具体的に行うことを要求しているとみなせる。「せっかく借用したのに」というわけ。
   (erase test)
   len) ;; ここでtestがfreeされる（直前のwriteでborrowされているので）
   ;; 末尾でのborrowをここでもし許可しようとするなら、トップレベルのborrowが必要になってくる、というわけ。
 
 
 ;; (begin
-;;   (let len (os:write os:stdout &test 3))
-;;   (let len (os:write os:stdout &test 3))
-;;   (let len (os:write os:stdout &test 3))
+;;   (let len (os.write os.stdout &test 3))
+;;   (let len (os.write os.stdout &test 3))
+;;   (let len (os.write os.stdout &test 3))
 ;;   len) ;; ここでtestがfreeされる（直前のwriteでborrowされているので）
 
 (theorem some-theorem
@@ -83,12 +83,12 @@
 
 (verify ((λ ((x tau)) x) top))
 
-(string:print "\n")
+(string.print "\n")
 
 (verify some-theorem)
 
 ;; (define my-verify ((A tau) (p A))
-;;   ((irreducible (lambda ((x A)) (string:print "verified"))) p))
+;;   ((irreducible (lambda ((x A)) (string.print "verified"))) p))
 
 (define loop ((x i64))
   (witness i64
@@ -99,63 +99,63 @@
 
 ;; (let _ (loop 3))
 
-;; (@os:write 3 os:stdout "あ" 3)
-;; (@os:write 3 os:stdout "あ" 3)
-;; (@os:write 3 os:stdout "あ" 3)
+;; (@os.write 3 os.stdout "あ" 3)
+;; (@os.write 3 os.stdout "あ" 3)
+;; (@os.write 3 os.stdout "あ" 3)
 
-;; (i64:add tau 10)
+;; (i64.add tau 10)
 
-;; (let a (os:write os:stdout &test 3))
-;; (let a (os:write os:stdout &test 3))
-;; (let a (os:write os:stdout &test 3))
-;; (let a (os:write os:stdout &test 3))
+;; (let a (os.write os.stdout &test 3))
+;; (let a (os.write os.stdout &test 3))
+;; (let a (os.write os.stdout &test 3))
+;; (let a (os.write os.stdout &test 3))
 
 (with let-bind
-  (let _ (string:print &test))
-  (let _ (string:print &test))
+  (let _ (string.print &test))
+  (let _ (string.print &test))
   (i64 10)
-  (let _ (string:print &test))
-  (let len (string:print &test))
+  (let _ (string.print &test))
+  (let len (string.print &test))
   (erase test)
   len)
 
 
-;; (let _ (string:print &test))
-;; (let hoge (string:print &test))
+;; (let _ (string.print &test))
+;; (let hoge (string.print &test))
 ;; (i64 10)
-;; (let _ (string:print &test))
-;; (let len (string:print &test))
+;; (let _ (string.print &test))
+;; (let len (string.print &test))
 
 
-(string:print test)
+(string.print test)
 
 (let _ (i64 10))
 
-(string:print test)
+(string.print test)
 
 
 ;; (print-character 45)
-;; (string:print test)
+;; (string.print test)
 
-(i64:print -1234321)
+(i64.print -1234321)
 
 (define fact ((n i64))
   (witness i64
     (if (icmp-sle-i64 n 0)
       1
       (with let-bind
-        (string:print "looping with (もちろん日本語も出力できるよ): ")
-        (i64:print ?n)
-        (let _ (i64:add 10 10))
+        (string.print "looping with (もちろん日本語も出力できるよ). ")
+        (i64.print ?n)
+        (let _ (i64.add 10 10))
         (let hogehoge (i64 10))
-        (let _ (i64:add hogehoge 1))
-        (string:print "\n")
+        (let _ (i64.add hogehoge 1))
+        (string.print "\n")
         (?mul-i64 n (fact (?sub-i64 n 1)))))))
 
 
 
 (let xs (list i64)
-  (list:new 1 2 3 4 5))
+  (list.new 1 2 3 4 5))
 
 (inductive equal ((A tau) (x A) (y A))
   (refl ((z A)) (equal A z z)))
@@ -166,15 +166,15 @@
 
 ?equal
 
-?equal:fold
+?equal.fold
 
 
 
-;; ?@@@equal:refl
+;; ?@@@equal.refl
 
-?equal:refl
+?equal.refl
 
-;; @?equal:refl
+;; @?equal.refl
 
 
 (define my-id ((a tau) (_ tau) (_ tau) (x a)) x)
@@ -191,7 +191,7 @@
 
 ;; (constant something i64)
 
-;; (i64:add 10 something)
+;; (i64.add 10 something)
 
 
 
@@ -214,7 +214,7 @@
 
 (id i64 (i64 3)) ;; これでよくね？
 ;; (equal * 10 20)とかって書けるわけだし。
-;; (list:nil *)とか(cons * 10 (cons * 20 (nil *)))とかはめんどくさいだろうか？
+;; (list.nil *)とか(cons * 10 (cons * 20 (nil *)))とかはめんどくさいだろうか？
 ;; でも真実じゃん？
 ;; さらに言えば、機能としてはべつにnotationで同じことが実現できるわけで。
 
@@ -227,12 +227,12 @@
 
 
 (let p
-  (equal:refl (i64 3)))
+  (equal.refl (i64 3)))
 
 (let p
-  (@equal:refl i64 3))
+  (@equal.refl i64 3))
 
-;; (i64:add top tau)
+;; (i64.add top tau)
 
 ?p
 
@@ -244,24 +244,24 @@
 (define hoge-func ((x i64)) x)
 
 
-?choice:fold
-;; (choice:fold (choice:item-1) (lambda () i64) ?admit ?admit)
+?choice.fold
+;; (choice.fold (choice.item-1) (lambda () i64) ?admit ?admit)
 
 
 (define flip ((c (choice)))
   (witness (choice)
     (case c
-      ((choice:item-1)
-        (choice:item-2))
-      ((choice:item-2)
-        (choice:item-1)))))
+      ((choice.item-1)
+        (choice.item-2))
+      ((choice.item-2)
+        (choice.item-1)))))
 
 ?flip
 
-(define 日本語でもべつにいい ((x i64)) (i64:add x 10))
+(define 日本語でもべつにいい ((x i64)) (i64.add x 10))
 
 
-(define sample ((x i64)) (i64:add x 10))
+(define sample ((x i64)) (i64.add x 10))
 
 (define sample tau)
 
@@ -273,21 +273,21 @@
       (flip (flip c))))
   (assume ((c (choice)))
     (case c
-      ((choice:item-1)
-        admit) ;; (F @ c) {c := (choice:item-1)}
-      ((choice:item-2)
-        ?admit) ;; (F @ c) {c := (choice:item-2)}
+      ((choice.item-1)
+        admit) ;; (F @ c) {c .= (choice.item-1)}
+      ((choice.item-2)
+        ?admit) ;; (F @ c) {c .= (choice.item-2)}
         ))) ;; F @ c
 
 ?double-flip-is-identity
 
 ;; (verify double-flip-is-identity)
 
-(string:print "\n")
+(string.print "\n")
 
-;; (i64:print (fact 10))
+;; (i64.print (fact 10))
 
-(i64:print (fact (unsafe:cast i64 i64 (list:length xs))))
+(i64.print (fact (unsafe.cast i64 i64 (list.length xs))))
 
 
 
@@ -304,17 +304,17 @@
 
 
 ;; (provide unused-function)
-(?string:print "\n")
+(?string.print "\n")
 
-;; (string:print (pi-introduction (x) x))
+;; (string.print (pi-introduction (x) x))
 
-;; (string:print (100 tau))
+;; (string.print (100 tau))
 
 
-(string:print "hello, world!\n")
+(string.print "hello, world!\n")
 
-;; (let a1 (os:write os:stdout test 3))
-;; (let a2 (os:write os:stdout test 3))
-;; (let a3 (os:write os:stdout test 3))
+;; (let a1 (os.write os.stdout test 3))
+;; (let a2 (os.write os.stdout test 3))
+;; (let a3 (os.write os.stdout test 3))
 
 ;; (i64 0)
