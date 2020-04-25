@@ -45,21 +45,21 @@
   (witness (functor (state s))
     (record (functor (state s))
       (map
-        (state:map s)))))
+        (state.map s)))))
 
 (define witness-monad ((s tau))
   (witness (monad (state s))
     (record (monad (state s))
       (witness-functor
-        (state:witness-functor s))
+        (state.witness-functor s))
       (return
-        (state:return s))
+        (state.return s))
       (bind
-        (state:bind s)))))
+        (state.bind s)))))
 
 (end state)
 
 
 ;; (@admit i64 1)
 
-;; (os:exit i64 ((@state:foo i64 10)))
+;; (os.exit i64 ((@state.foo i64 10)))
