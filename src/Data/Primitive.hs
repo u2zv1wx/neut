@@ -389,3 +389,10 @@ binaryOpToDomCod binaryOp =
       (t, LowTypeBool)
     BinaryOpFCmpTRUE t ->
       (t, LowTypeBool)
+
+asArrayAccessMaybe :: T.Text -> Maybe LowType
+asArrayAccessMaybe name
+  | Just (typeStr, "array-access") <- breakOnMaybe nsSep name =
+    asLowTypeMaybe typeStr
+  | otherwise =
+    Nothing

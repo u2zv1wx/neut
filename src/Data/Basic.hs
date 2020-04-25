@@ -227,13 +227,6 @@ arrVoidPtr :: ArrayKind
 arrVoidPtr =
   ArrayKindVoidPtr
 
-asArrayAccessMaybe :: T.Text -> Maybe LowType
-asArrayAccessMaybe name
-  | Just (typeStr, "array-access") <- breakOnMaybe nsSep name =
-    asLowTypeMaybe typeStr
-  | otherwise =
-    Nothing
-
 lowTypeToArrayKindMaybe :: LowType -> Maybe ArrayKind
 lowTypeToArrayKindMaybe lowType =
   case lowType of
