@@ -21,7 +21,7 @@
 
 (use free-internal)
 
-?free-internal:fold
+?free-internal.fold
 
 (define free ((g (hom tau tau)))
   (witness (hom tau tau)
@@ -45,7 +45,7 @@
   (witness (functor (free g))
     (record (functor (free g))
       (map
-        (free:map g)))))
+        (free.map g)))))
 
 (define return ((g (hom tau tau)))
   (witness (return-type (free g))
@@ -73,11 +73,11 @@
   (witness (monad (free g))
     (record (monad (free g))
       (witness-functor
-        (free:witness-functor g))
+        (free.witness-functor g))
       (return
-        (free:return g))
+        (free.return g))
       (bind
-        (free:bind g)))))
+        (free.bind g)))))
 
 (provide map)
 
