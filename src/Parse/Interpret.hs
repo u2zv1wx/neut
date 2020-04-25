@@ -14,6 +14,7 @@ import Data.Basic
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import Data.List (elemIndex, sortOn)
+import Data.LowType
 import Data.Maybe (catMaybes, fromMaybe)
 import qualified Data.Text as T
 import Data.Tree

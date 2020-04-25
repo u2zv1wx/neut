@@ -8,6 +8,7 @@ import Data.Basic
 import Data.Env
 import qualified Data.IntMap as IntMap
 import Data.LLVM
+import Data.LowType
 import qualified Data.Map as Map
 import qualified Data.Set as S
 

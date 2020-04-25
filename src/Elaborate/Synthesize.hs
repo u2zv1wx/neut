@@ -328,9 +328,9 @@ unravelCaseList caseList = do
   return $ zip ls es'
 
 unravelStruct ::
-  [(Meta, Ident, ArrayKind)] ->
+  [(Meta, Ident, a)] ->
   WeakTermPlus ->
-  WithEnv ([(Meta, Ident, ArrayKind)], WeakTermPlus)
+  WithEnv ([(Meta, Ident, a)], WeakTermPlus)
 unravelStruct binder e =
   case binder of
     [] -> do

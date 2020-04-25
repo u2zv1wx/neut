@@ -218,9 +218,9 @@ discernEnumCase m weakCase =
 
 discernStruct ::
   NameEnv ->
-  [(Meta, Ident, ArrayKind)] ->
+  [(Meta, Ident, a)] ->
   WeakTermPlus ->
-  WithEnv ([(Meta, Ident, ArrayKind)], WeakTermPlus)
+  WithEnv ([(Meta, Ident, a)], WeakTermPlus)
 discernStruct nenv binder e =
   case binder of
     [] -> do

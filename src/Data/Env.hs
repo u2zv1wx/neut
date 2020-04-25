@@ -10,6 +10,7 @@ import qualified Data.IntMap as IntMap
 import Data.LLVM
 import Data.List (find)
 import Data.Log
+import Data.LowType
 import qualified Data.PQueue.Min as Q
 import Data.Primitive
 import qualified Data.Set as S

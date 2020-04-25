@@ -11,6 +11,7 @@ import Data.Env
 import qualified Data.HashMap.Lazy as HashMap
 import qualified Data.IntMap as IntMap
 import Data.LLVM
+import Data.LowType
 import qualified Data.Map as Map
 import Data.Primitive
 import qualified Data.Set as S

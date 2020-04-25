@@ -2,6 +2,7 @@ module Data.WeakTerm where
 
 import Data.Basic
 import qualified Data.IntMap as IntMap
+import Data.LowType
 import qualified Data.Set as S
 import qualified Data.Text as T
 

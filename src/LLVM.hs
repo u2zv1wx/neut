@@ -10,6 +10,7 @@ import Data.Code
 import Data.Env hiding (newNameWith'')
 import qualified Data.HashMap.Lazy as Map
 import Data.LLVM
+import Data.LowType
 import Data.Primitive
 import qualified Data.Set as S
 import Data.Term

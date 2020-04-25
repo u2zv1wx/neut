@@ -188,7 +188,7 @@ compInfoBinder s info binder e =
 compInfoArrayElim ::
   CursorName ->
   CompInfo ->
-  [(Meta, Ident, ArrayKind)] ->
+  [(Meta, Ident, a)] ->
   WeakTermPlus ->
   Either CompInfo ()
 compInfoArrayElim s info binder e =

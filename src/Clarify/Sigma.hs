@@ -11,6 +11,7 @@ import Control.Monad.State.Lazy
 import Data.Basic
 import Data.Code
 import Data.Env
+import Data.LowType
 import qualified Data.Text as T
 
 cartesianSigma ::
