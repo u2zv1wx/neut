@@ -50,12 +50,12 @@ discern' nenv term =
           b1 <- lookupEnumValueNameWithPrefix s
           case b1 of
             Just s' ->
-              return (m, WeakTermEnumIntro (EnumValueLabel s'))
+              return (m, WeakTermEnumIntro s')
             Nothing -> do
               b2 <- lookupEnumTypeNameWithPrefix s
               case b2 of
                 Just s' ->
-                  return (m, WeakTermEnum (EnumTypeLabel s'))
+                  return (m, WeakTermEnum s')
                 Nothing -> do
                   mc <- lookupConstantMaybe m penv s
                   case mc of
@@ -104,7 +104,7 @@ discern' nenv term =
       t' <- discern' nenv t
       caseList' <-
         forM caseList $ \((mCase, l), body) -> do
-          l' <- discernWeakCase mCase nenv l
+          l' <- discernEnumCase mCase l
           body' <- discern' nenv body
           return ((mCase, l'), body')
       return (m, WeakTermEnumElim (e', t') caseList')
@@ -200,17 +200,17 @@ discernIter nenv self binder e = do
   (binder', e') <- discernBinder nenv (self : binder) e
   return (head binder', tail binder', e')
 
-discernWeakCase :: Meta -> NameEnv -> WeakCase -> WithEnv WeakCase
-discernWeakCase m nenv weakCase =
+discernEnumCase :: Meta -> EnumCase -> WithEnv EnumCase
+discernEnumCase m weakCase =
   case weakCase of
-    WeakCaseInt t a -> do
-      t' <- discern' nenv t
-      return (WeakCaseInt t' a)
-    WeakCaseLabel l -> do
+    -- EnumCaseInt t a -> do
+    --   t' <- discern' nenv t
+    --   return (EnumCaseInt t' a)
+    EnumCaseLabel l -> do
       ml <- lookupEnumValueNameWithPrefix l
       case ml of
         Just l' ->
-          return (WeakCaseLabel l')
+          return (EnumCaseLabel l')
         Nothing ->
           raiseError m $ "no such enum-value is defined: " <> l
     _ ->

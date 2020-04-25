@@ -55,11 +55,11 @@ reduceTermPlus term =
       let les'' = zip (map snd ls) es
       case e' of
         (_, TermEnumIntro l) ->
-          case lookup (CaseValue l) les'' of
+          case lookup (EnumCaseLabel l) les'' of
             Just body ->
               reduceTermPlus body
             Nothing ->
-              case lookup CaseDefault les'' of
+              case lookup EnumCaseDefault les'' of
                 Just body ->
                   reduceTermPlus body
                 Nothing -> do
@@ -213,6 +213,8 @@ normalize term =
       return (m, TermConst x)
     (m, TermBoxElim x) ->
       return (m, TermBoxElim x)
+    (m, TermInt size x) ->
+      return (m, TermInt size x)
     (m, TermFloat size x) ->
       return (m, TermFloat size x)
     (m, TermEnum enumType) ->
@@ -226,11 +228,11 @@ normalize term =
       let les'' = zip (map snd ls) es
       case e' of
         (_, TermEnumIntro l) ->
-          case lookup (CaseValue l) les'' of
+          case lookup (EnumCaseLabel l) les'' of
             Just body ->
               normalize body
             Nothing ->
-              case lookup CaseDefault les'' of
+              case lookup EnumCaseDefault les'' of
                 Just body ->
                   normalize body
                 Nothing -> do

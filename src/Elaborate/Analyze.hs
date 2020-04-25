@@ -76,24 +76,15 @@ simp' constraintList =
             yt2 <- asWeakIdentPlus m2 e2
             simpBinder (xt1 : xts1 ++ [yt1]) (xt2 : xts2 ++ [yt2])
             simp cs
-        ((_, WeakTermInt t1 l1), (m, WeakTermEnumIntro (EnumValueInt s2 l2)))
-          | l1 == l2 ->
-            simp $ (t1, toIntS m s2) : cs
-        ((m, WeakTermEnumIntro (EnumValueInt s1 l1)), (_, WeakTermInt t2 l2))
-          | l1 == l2 ->
-            simp $ (toIntS m s1, t2) : cs
         ((_, WeakTermInt t1 l1), (_, WeakTermInt t2 l2))
           | l1 == l2 ->
             simp $ (t1, t2) : cs
         ((_, WeakTermFloat t1 l1), (_, WeakTermFloat t2 l2))
           | l1 == l2 ->
             simp $ (t1, t2) : cs
-        ((_, WeakTermEnum (EnumTypeInt 1)), (_, WeakTermEnum (EnumTypeLabel "bool"))) ->
-          simp cs
-        ((_, WeakTermEnum (EnumTypeLabel "bool")), (_, WeakTermEnum (EnumTypeInt 1))) ->
-          simp cs
         ((_, WeakTermArray dom1 k1), (_, WeakTermArray dom2 k2))
-          | k1 == k2 -> simp $ (dom1, dom2) : cs
+          | k1 == k2 ->
+            simp $ (dom1, dom2) : cs
         ((_, WeakTermArrayIntro k1 es1), (_, WeakTermArrayIntro k2 es2))
           | k1 == k2,
             length es1 == length es2 ->
@@ -106,7 +97,6 @@ simp' constraintList =
         ((_, WeakTermQuestion e1 t1), (_, WeakTermQuestion e2 t2)) ->
           simp $ (e1, e2) : (t1, t2) : cs
         (e1@(m1, _), e2@(m2, _)) -> do
-          -- simp' ((e1@(m1, _), e2@(m2, _)) : cs) = do
           let ms1 = asStuckedTerm e1
           let ms2 = asStuckedTerm e2
           -- list of stuck reasons (fmvs: free meta-variables)
@@ -188,12 +178,12 @@ simp' constraintList =
                       _ -> do
                         let s = IntMap.fromList $ zip (map asInt zs) es
                         simp $ (substWeakTermPlus s e1', e2') : cs
-                (Just (StuckPiElimHole h1 ies1), Nothing)
+                (Just (StuckPiElimHole h1 ies1), _) -- nothingだとi64みたいなconstがきたときにこまる
                   | xs1 <- concatMap getVarList ies1,
                     occurCheck h1 hs2,
                     [] <- includeCheck xs1 fvs2 ->
                     simpFlexRigid h1 ies1 e1' e2' fmvs cs
-                (Nothing, Just (StuckPiElimHole h2 ies2))
+                (_, Just (StuckPiElimHole h2 ies2))
                   | xs2 <- concatMap getVarList ies2,
                     occurCheck h2 hs1,
                     [] <- includeCheck xs2 fvs1 ->
@@ -401,10 +391,6 @@ lookupAll is sub =
       v <- IntMap.lookup (asInt j) sub
       vs <- lookupAll js sub
       return $ v : vs
-
-toIntS :: Meta -> IntSize -> WeakTermPlus
-toIntS m size =
-  (m, WeakTermEnum $ EnumTypeInt size)
 
 throwArityError :: Meta -> Int -> Int -> WithEnv a
 throwArityError m i1 i2 =

@@ -97,15 +97,10 @@ infer' ctx term =
       return ((m, WeakTermFloat t' f), t')
     (m, WeakTermEnum name) ->
       return ((m, WeakTermEnum name), (m, WeakTermTau))
-    (m, WeakTermEnumIntro v) ->
-      case v of
-        EnumValueInt size _ -> do
-          let t = (m, WeakTermEnum (EnumTypeInt size))
-          return ((m, WeakTermEnumIntro v), t)
-        EnumValueLabel l -> do
-          k <- lookupKind m l
-          let t = (m, WeakTermEnum $ EnumTypeLabel k)
-          return ((m, WeakTermEnumIntro v), t)
+    (m, WeakTermEnumIntro l) -> do
+      k <- lookupKind m l
+      let t = (m, WeakTermEnum k)
+      return ((m, WeakTermEnumIntro l), t)
     (m, WeakTermEnumElim (e, t) ces) -> do
       tEnum <- inferType' ctx t
       (e', t') <- infer' ctx e
@@ -116,14 +111,15 @@ infer' ctx term =
           return ((m, WeakTermEnumElim (e', t') []), h) -- ex falso quodlibet
         else do
           let (cs, es) = unzip ces
-          (cs', tcs) <- unzip <$> mapM (inferWeakCase ctx) cs
+          (cs', tcs) <- unzip <$> mapM (inferEnumCase ctx) cs
           forM_ (zip (repeat t') tcs) $ uncurry insConstraintEnv
           (es', ts) <- unzip <$> mapM (infer' ctx) es
           constrainList ts
           return ((m, WeakTermEnumElim (e', t') $ zip cs' es'), head ts)
     (m, WeakTermArray dom k) -> do
       (dom', tDom) <- infer' ctx dom
-      let tDom' = (m, WeakTermEnum (EnumTypeInt 64))
+      let tDom' = i64 m
+      -- let tDom' = (m, WeakTermEnum (EnumTypeInt 64))
       insConstraintEnv tDom tDom'
       return ((m, WeakTermArray dom' k), (m, WeakTermTau))
     (m, WeakTermArrayIntro k es) -> do
@@ -131,14 +127,16 @@ infer' ctx term =
       (es', ts) <- unzip <$> mapM (infer' ctx) es
       forM_ (zip ts (repeat tCod)) $ uncurry insConstraintEnv
       let len = toInteger $ length es
-      let dom = (m, WeakTermEnumIntro (EnumValueInt 64 len))
+      let dom = (m, WeakTermInt (i64 m) len)
+      -- let dom = (m, WeakTermEnumIntro (EnumValueInt 64 len))
       let t = (m, WeakTermArray dom k)
       return ((m, WeakTermArrayIntro k es'), t)
     (m, WeakTermArrayElim k xts e1 e2) -> do
       (e1', t1) <- infer' ctx e1
       (xts', (e2', t2)) <- inferBinder ctx xts e2
       let len = toInteger $ length xts
-      let dom = (m, WeakTermEnumIntro (EnumValueInt 64 len))
+      let dom = (m, WeakTermInt (i64 m) len)
+      -- let dom = (m, WeakTermEnumIntro (EnumValueInt 64 len))
       insConstraintEnv t1 (fst e1', WeakTermArray dom k)
       let ts = map (\(_, _, t) -> t) xts'
       tCod <- inferKind m k
@@ -293,10 +291,10 @@ inferType' ctx t = do
 inferKind :: Meta -> ArrayKind -> WithEnv WeakTermPlus
 inferKind m kind =
   case kind of
-    ArrayKindInt i ->
-      return (m, WeakTermEnum (EnumTypeInt i))
+    ArrayKindInt size ->
+      return (m, WeakTermConst (showIntSize size))
     ArrayKindFloat size ->
-      return (m, WeakTermConst ("f" <> T.pack (show (sizeAsInt size))))
+      return (m, WeakTermConst (showFloatSize size))
     _ ->
       raiseCritical m "inferKind for void-pointer"
 
@@ -408,20 +406,15 @@ newTypeHoleListInCtx ctx ids =
       ts <- newTypeHoleListInCtx (ctx ++ [(m, x, t)]) rest
       return $ (m, x, t) : ts
 
-inferWeakCase :: Context -> WeakCasePlus -> WithEnv (WeakCasePlus, WeakTermPlus)
-inferWeakCase ctx weakCase =
+inferEnumCase :: Context -> EnumCasePlus -> WithEnv (EnumCasePlus, WeakTermPlus)
+inferEnumCase ctx weakCase =
   case weakCase of
-    (m, WeakCaseLabel name) -> do
+    (m, EnumCaseLabel name) -> do
       k <- lookupKind m name
-      return (weakCase, (m, WeakTermEnum $ EnumTypeLabel k))
-    -- (m, WeakCaseInt size _) ->
-    --   return (weakCase, (m, WeakTermEnum (EnumTypeInt size)))
-    (m, WeakCaseInt t a) -> do
-      t' <- inferType' ctx t
-      return ((m, WeakCaseInt t' a), t')
-    (m, WeakCaseDefault) -> do
+      return (weakCase, (m, WeakTermEnum k))
+    (m, EnumCaseDefault) -> do
       h <- newTypeHoleInCtx ctx m
-      return ((m, WeakCaseDefault), h)
+      return ((m, EnumCaseDefault), h)
 
 constrainList :: [WeakTermPlus] -> WithEnv ()
 constrainList typeList =

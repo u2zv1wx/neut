@@ -71,8 +71,13 @@
 
 (notation (if b e1 e2)
   (switch b
-    (1 e1)
-    (default e2)))
+    (bool:true e1)
+    (bool:false e2)))
+
+;; (notation (if b e1 e2)
+;;   (switch b
+;;     (1 e1)
+;;     (default e2)))
 
 (keyword provide)
 

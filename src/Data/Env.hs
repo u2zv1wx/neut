@@ -306,9 +306,12 @@ lowTypeToType :: Meta -> LowType -> WithEnv TermPlus
 lowTypeToType m lowType =
   case lowType of
     LowTypeInt s ->
-      return (m, TermEnum (EnumTypeInt s))
+      return (m, TermConst (showIntSize s))
     LowTypeFloat s ->
-      return (m, TermConst $ "f" <> T.pack (show (sizeAsInt s)))
+      return (m, TermConst (showFloatSize s))
+    LowTypeBool ->
+      return (m, TermEnum "bool")
+    -- return (m, TermConst $ "f" <> T.pack (show (sizeAsInt s)))
     _ ->
       raiseCritical m "invalid argument passed to lowTypeToType"
 
@@ -338,10 +341,10 @@ arrayAccessToType m lowType = do
   x1 <- newNameWith' "arg"
   x2 <- newNameWith' "arg"
   x3 <- newNameWith' "arg"
-  let i64 = (m, TermEnum (EnumTypeInt 64))
+  let int64 = (m, TermConst (showIntSize 64))
   let idx = (m, TermUpsilon x2)
   let arr = (m, TermArray idx k)
-  let xts = [(m, x1, i64), (m, x2, i64), (m, x3, arr)]
+  let xts = [(m, x1, int64), (m, x2, int64), (m, x3, arr)]
   x4 <- newNameWith' "arg"
   x5 <- newNameWith' "arg"
   cod <- termSigma m [(m, x4, arr), (m, x5, t)]
@@ -388,6 +391,8 @@ isConstant name
   | name == "f32" =
     return True
   | name == "f64" =
+    return True
+  | Just _ <- asIntMaybe name =
     return True
   | Just _ <- asUnaryOpMaybe name =
     return True

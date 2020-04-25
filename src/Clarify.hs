@@ -28,7 +28,7 @@ clarifyStmt :: SubstTerm -> Stmt -> WithEnv CodePlus
 clarifyStmt sub stmt =
   case stmt of
     StmtReturn m ->
-      return (m, CodeUpIntro (m, DataEnumIntro (EnumValueInt 64 0)))
+      return (m, CodeUpIntro (m, DataInt 64 0))
     StmtLet m (_, x, t) e cont -> do
       tenv <- gets typeEnv
       e' <- clarify' tenv $ substTermPlus sub e
@@ -71,6 +71,8 @@ clarify' tenv term =
       clarifyConst tenv m x
     (m, TermBoxElim x) ->
       return (m, CodePiElimDownElim (m, DataConst $ asText'' x) []) -- box-elimination
+    (m, TermInt size l) ->
+      return (m, CodeUpIntro (m, DataInt size l))
     (m, TermFloat size l) ->
       return (m, CodeUpIntro (m, DataFloat size l))
     (m, TermEnum _) ->
@@ -203,17 +205,17 @@ clarifyConst tenv m x
   | Just op <- asBinaryOpMaybe x =
     clarifyBinaryOp tenv x op m
   | Just _ <- asLowTypeMaybe x =
-    clarify' tenv $ immType m
+    returnCartesianImmediate m
   | Just lowType <- asArrayAccessMaybe x =
     clarifyArrayAccess tenv m x lowType
   | x == "os:file-descriptor" =
-    clarify' tenv $ immType m
+    returnCartesianImmediate m
   | x == "os:stdin" =
-    clarify' tenv (m, TermEnumIntro (EnumValueInt 64 0))
+    clarify' tenv (m, TermInt 64 0)
   | x == "os:stdout" =
-    clarify' tenv (m, TermEnumIntro (EnumValueInt 64 1))
+    clarify' tenv (m, TermInt 64 1)
   | x == "os:stderr" =
-    clarify' tenv (m, TermEnumIntro (EnumValueInt 64 2))
+    clarify' tenv (m, TermInt 64 2)
   | x == "unsafe:cast" =
     clarifyCast tenv m
   | otherwise = do
@@ -223,10 +225,6 @@ clarifyConst tenv m x
         clarifySysCall tenv x syscall argInfo m
       _ ->
         return (m, CodeUpIntro (m, DataConst x)) -- external constant
-
-immType :: Meta -> TermPlus
-immType m =
-  (m, TermEnum (EnumTypeInt 64))
 
 clarifyCast :: TypeEnv -> Meta -> WithEnv CodePlus
 clarifyCast tenv m = do
@@ -529,11 +527,10 @@ retWithBorrowedVars tenv m cod xts resultVarName =
 inferKind :: Meta -> ArrayKind -> WithEnv TermPlus
 inferKind m arrayKind =
   case arrayKind of
-    ArrayKindInt i ->
-      return (m, TermEnum (EnumTypeInt i))
-    ArrayKindFloat size -> do
-      let constName = "f" <> T.pack (show (sizeAsInt size))
-      return (m, TermConst constName)
+    ArrayKindInt size ->
+      return (m, TermConst (showIntSize size))
+    ArrayKindFloat size ->
+      return (m, TermConst (showFloatSize size))
     _ ->
       raiseCritical m "inferKind for void-pointer"
 
@@ -685,6 +682,8 @@ chainTermPlus tenv term =
     (_, TermConst _) ->
       return []
     (_, TermBoxElim _) ->
+      return []
+    (_, TermInt _ _) ->
       return []
     (_, TermFloat _ _) ->
       return []

@@ -20,9 +20,9 @@ data WeakTerm
   | WeakTermBoxElim Ident
   | WeakTermInt WeakTermPlus Integer
   | WeakTermFloat WeakTermPlus Double
-  | WeakTermEnum EnumType
-  | WeakTermEnumIntro EnumValue
-  | WeakTermEnumElim (WeakTermPlus, WeakTermPlus) [(WeakCasePlus, WeakTermPlus)]
+  | WeakTermEnum T.Text
+  | WeakTermEnumIntro T.Text
+  | WeakTermEnumElim (WeakTermPlus, WeakTermPlus) [(EnumCasePlus, WeakTermPlus)]
   | WeakTermArray WeakTermPlus ArrayKind -- array n3 u8 ~= n3 -> u8
   | WeakTermArrayIntro ArrayKind [WeakTermPlus]
   | WeakTermArrayElim
@@ -43,15 +43,6 @@ data WeakTerm
 
 type WeakTermPlus =
   (Meta, WeakTerm)
-
-data WeakCase
-  = WeakCaseInt WeakTermPlus Integer
-  | WeakCaseLabel T.Text
-  | WeakCaseDefault
-  deriving (Show, Eq)
-
-type WeakCasePlus =
-  (Meta, WeakCase)
 
 type SubstWeakTerm =
   IntMap.IntMap WeakTermPlus
@@ -75,6 +66,14 @@ weakTermPiIntro =
 toVar :: Meta -> Ident -> WeakTermPlus
 toVar m x =
   (m, WeakTermUpsilon x)
+
+i8 :: Meta -> WeakTermPlus
+i8 m =
+  (m, WeakTermConst (showIntSize 8))
+
+i64 :: Meta -> WeakTermPlus
+i64 m =
+  (m, WeakTermConst (showIntSize 64))
 
 type Rule = -- inference rule
   ( Meta, -- location of the name
@@ -422,12 +421,10 @@ toText term =
       T.pack $ show a
     (_, WeakTermFloat _ a) ->
       T.pack $ show a
-    (_, WeakTermEnum enumType) ->
-      case enumType of
-        EnumTypeLabel l -> l
-        EnumTypeInt size -> "i" <> T.pack (show size)
+    (_, WeakTermEnum l) ->
+      l
     (_, WeakTermEnumIntro v) ->
-      showEnumValue v
+      v
     (_, WeakTermEnumElim (e, _) mles) -> do
       let (mls, es) = unzip mles
       let les = zip (map snd mls) es
@@ -514,35 +511,17 @@ isDependent binder cod =
       | otherwise ->
         isDependent xts cod
 
-showClause :: (WeakCase, WeakTermPlus) -> T.Text
+showClause :: (EnumCase, WeakTermPlus) -> T.Text
 showClause (c, e) =
-  inParen $ showWeakCase c <> " " <> toText e
+  inParen $ showCase c <> " " <> toText e
 
-showWeakCase :: WeakCase -> T.Text
-showWeakCase weakCase =
-  case weakCase of
-    WeakCaseLabel l ->
+showCase :: EnumCase -> T.Text
+showCase c =
+  case c of
+    EnumCaseLabel l ->
       l
-    WeakCaseInt _ a ->
-      T.pack $ show a
-    WeakCaseDefault ->
+    EnumCaseDefault ->
       "default"
-
-weakenEnumValue :: Meta -> EnumValue -> WeakCase
-weakenEnumValue m enumValue =
-  case enumValue of
-    EnumValueLabel l ->
-      WeakCaseLabel l
-    EnumValueInt size a ->
-      WeakCaseInt (m, WeakTermEnum (EnumTypeInt size)) a
-
-showEnumValue :: EnumValue -> T.Text
-showEnumValue enumValue =
-  case enumValue of
-    EnumValueLabel l ->
-      l
-    EnumValueInt _ a ->
-      T.pack $ show a
 
 showArrayKind :: ArrayKind -> T.Text
 showArrayKind arrayKind =

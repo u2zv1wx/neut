@@ -13,7 +13,7 @@ import Data.LLVM
 import qualified Data.Set as S
 import Data.Term
 import qualified Data.Text as T
-import Data.WeakTerm
+import Data.WeakTerm hiding (i64)
 import Reduce.Code
 
 toLLVM :: CodePlus -> WithEnv LLVM
@@ -94,14 +94,14 @@ takeBaseName term =
       s
     (_, DataSigmaIntro _ ds) ->
       "array" <> T.pack (show (length ds))
+    (_, DataInt size _) ->
+      "i" <> T.pack (show size)
     (_, DataFloat FloatSize16 _) ->
       "half"
     (_, DataFloat FloatSize32 _) ->
       "float"
     (_, DataFloat FloatSize64 _) ->
       "double"
-    (_, DataEnumIntro (EnumValueInt size _)) ->
-      "i" <> T.pack (show size)
     (_, DataEnumIntro _) ->
       "i64"
     (_, DataStructIntro dks) ->
@@ -218,6 +218,8 @@ llvmCast mName v lowType =
   case lowType of
     LowTypeInt _ ->
       llvmCastInt mName v lowType
+    LowTypeBool ->
+      llvmCastInt mName v (LowTypeInt 1)
     LowTypeFloat i ->
       llvmCastFloat mName v i
     _ -> do
@@ -269,6 +271,8 @@ llvmUncast mName result lowType =
   case lowType of
     LowTypeInt _ ->
       llvmUncastInt mName result lowType
+    LowTypeBool ->
+      llvmUncastInt mName result (LowTypeInt 1)
     LowTypeFloat i ->
       llvmUncastFloat mName result i
     _ -> do
@@ -341,15 +345,13 @@ llvmDataLet x llvmData cont =
       let arrayType = AggPtrTypeArray (length ds) elemType
       let dts = zip ds (repeat elemType)
       storeContent m x arrayType dts cont
+    (_, DataInt size l) ->
+      llvmUncastLet x (LLVMDataInt l) (LowTypeInt size) cont
     (_, DataFloat size f) ->
       llvmUncastLet x (LLVMDataFloat size f) (LowTypeFloat size) cont
-    (m, DataEnumIntro intOrLabel) ->
-      case intOrLabel of
-        EnumValueInt size i ->
-          llvmUncastLet x (LLVMDataInt i) (LowTypeInt size) cont
-        EnumValueLabel l -> do
-          i <- toInteger <$> getEnumNum m l
-          llvmUncastLet x (LLVMDataInt i) (LowTypeInt 64) cont
+    (m, DataEnumIntro l) -> do
+      i <- toInteger <$> getEnumNum m l
+      llvmUncastLet x (LLVMDataInt i) (LowTypeInt 64) cont
     (m, DataStructIntro dks) -> do
       let (ds, ks) = unzip dks
       let ts = map arrayKindToLowType ks
@@ -382,26 +384,26 @@ llvmDataLet' binder cont =
       llvmDataLet x d cont'
 
 -- returns Nothing iff the branch list is empty
-constructSwitch :: [(Case, CodePlus)] -> WithEnv (Maybe (LLVM, [(Int, LLVM)]))
+constructSwitch :: [(EnumCase, CodePlus)] -> WithEnv (Maybe (LLVM, [(Int, LLVM)]))
 constructSwitch switch =
   case switch of
     [] ->
       return Nothing
-    [(CaseValue _, code)] -> do
+    [(EnumCaseLabel _, code)] -> do
       code' <- llvmCode code
       return $ Just (code', [])
-    (CaseValue l, code@(m, _)) : rest -> do
+    (EnumCaseLabel l, code@(m, _)) : rest -> do
       i <- fromInteger <$> enumValueToInteger m l
       code' <- llvmCode code
       mSwitch <- constructSwitch rest
       return $ do
         (defaultCase, caseList) <- mSwitch
         return (defaultCase, (i, code') : caseList)
-    (CaseDefault, code) : _ -> do
+    (EnumCaseDefault, code) : _ -> do
       code' <- llvmCode code
       return $ Just (code', [])
 
-llvmCodeEnumElim :: DataPlus -> [(Case, CodePlus)] -> WithEnv LLVM
+llvmCodeEnumElim :: DataPlus -> [(EnumCase, CodePlus)] -> WithEnv LLVM
 llvmCodeEnumElim v branchList = do
   m <- constructSwitch branchList
   case m of
@@ -540,13 +542,9 @@ newNameWith'' mName =
     Just name ->
       newNameWith' name
 
-enumValueToInteger :: Meta -> EnumValue -> WithEnv Integer
-enumValueToInteger m intOrLabel =
-  case intOrLabel of
-    EnumValueLabel l ->
-      toInteger <$> getEnumNum m l
-    EnumValueInt _ i ->
-      return i
+enumValueToInteger :: Meta -> T.Text -> WithEnv Integer
+enumValueToInteger m l =
+  toInteger <$> getEnumNum m l
 
 getEnumNum :: Meta -> T.Text -> WithEnv Int
 getEnumNum m label = do

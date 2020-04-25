@@ -9,8 +9,9 @@ data Data
   = DataConst T.Text
   | DataUpsilon Ident
   | DataSigmaIntro ArrayKind [DataPlus]
-  | DataEnumIntro EnumValue
+  | DataInt IntSize Integer
   | DataFloat FloatSize Double
+  | DataEnumIntro T.Text
   | DataStructIntro [(DataPlus, ArrayKind)]
   deriving (Show)
 
@@ -20,7 +21,7 @@ data Code
   | CodeSigmaElim ArrayKind [Ident] DataPlus CodePlus
   | CodeUpIntro DataPlus
   | CodeUpElim Ident CodePlus CodePlus
-  | CodeEnumElim SubstDataPlus DataPlus [(Case, CodePlus)]
+  | CodeEnumElim SubstDataPlus DataPlus [(EnumCase, CodePlus)]
   | CodeStructElim [(Ident, ArrayKind)] DataPlus CodePlus
   | CodeCase SubstDataPlus DataPlus [((Meta, T.Text), CodePlus)]
   deriving (Show)
@@ -75,6 +76,8 @@ substDataPlus sub term =
     (m, DataSigmaIntro mk vs) -> do
       let vs' = map (substDataPlus sub) vs
       (m, DataSigmaIntro mk vs')
+    (m, DataInt size l) ->
+      (m, DataInt size l)
     (m, DataFloat size l) ->
       (m, DataFloat size l)
     (m, DataEnumIntro l) ->

@@ -321,7 +321,7 @@ unravelBinder binder e =
       (xts', e') <- unravelBinder xts e
       return ((mx, x', t') : xts', e')
 
-unravelCaseList :: [(WeakCasePlus, WeakTermPlus)] -> WithEnv [(WeakCasePlus, WeakTermPlus)]
+unravelCaseList :: [(EnumCasePlus, WeakTermPlus)] -> WithEnv [(EnumCasePlus, WeakTermPlus)]
 unravelCaseList caseList = do
   let (ls, es) = unzip caseList
   es' <- mapM unravel es

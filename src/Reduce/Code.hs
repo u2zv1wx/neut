@@ -76,10 +76,10 @@ reduceCodePlus term =
     (m, CodeEnumElim varInfo v les) ->
       case v of
         (_, DataEnumIntro l) ->
-          case lookup (CaseValue l) les of
+          case lookup (EnumCaseLabel l) les of
             Just body -> reduceCodePlus $ substCodePlus varInfo body
             Nothing ->
-              case lookup CaseDefault les of
+              case lookup EnumCaseDefault les of
                 Just body -> reduceCodePlus $ substCodePlus varInfo body
                 Nothing -> return (m, CodeEnumElim varInfo v les)
         _ -> return (m, CodeEnumElim varInfo v les)

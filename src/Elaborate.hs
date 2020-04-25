@@ -145,8 +145,9 @@ elaborate' term =
     (m, WeakTermInt t x) -> do
       t' <- reduceTermPlus <$> elaborate' t
       case t' of
-        (_, TermEnum (EnumTypeInt size)) ->
-          return (m, TermEnumIntro (EnumValueInt size x))
+        (_, TermConst intTypeStr)
+          | Just (LowTypeInt size) <- asLowTypeMaybe intTypeStr ->
+            return (m, TermInt size x)
         _ ->
           raiseError m $
             "the term `"
@@ -156,8 +157,8 @@ elaborate' term =
     (m, WeakTermFloat t x) -> do
       t' <- reduceTermPlus <$> elaborate' t
       case t' of
-        (_, TermConst floatType)
-          | Just (LowTypeFloat size) <- asLowTypeMaybe floatType ->
+        (_, TermConst floatTypeStr)
+          | Just (LowTypeFloat size) <- asLowTypeMaybe floatTypeStr ->
             return (m, TermFloat size x)
         _ ->
           raiseError m $
@@ -172,13 +173,12 @@ elaborate' term =
     (m, WeakTermEnumElim (e, t) les) -> do
       e' <- elaborate' e
       let (ls, es) = unzip les
-      ls' <- mapM elaborateWeakCase ls
       es' <- mapM elaborate' es
       t' <- reduceTermPlus <$> elaborate' t
       case t' of
         (_, TermEnum x) -> do
-          caseCheckEnumIdent m x $ map snd ls'
-          return (m, TermEnumElim (e', t') (zip ls' es'))
+          caseCheckEnumIdent m x $ map snd ls
+          return (m, TermEnumElim (e', t') (zip ls es'))
         _ ->
           raiseError m $
             "the type of `"
@@ -305,47 +305,20 @@ showFormArgs k impList idxList =
       | otherwise ->
         "#" <> T.pack (show k) : showFormArgs (k + 1) impList is
 
-elaborateWeakCase :: WeakCasePlus -> WithEnv CasePlus
-elaborateWeakCase weakCase =
-  case weakCase of
-    (m, WeakCaseInt t x) -> do
-      t' <- reduceTermPlus <$> elaborate' t
-      case t' of
-        (_, TermEnum (EnumTypeInt size)) ->
-          return (m, CaseValue (EnumValueInt size x))
-        (_, TermEnum (EnumTypeLabel "bool")) ->
-          return (m, CaseValue (EnumValueInt 1 x))
-        _ ->
-          raiseError m $
-            "the type of `"
-              <> T.pack (show x)
-              <> "` must be an integer type, but is: "
-              <> toText (weaken t')
-    (m, WeakCaseLabel l) ->
-      return (m, CaseValue $ EnumValueLabel l)
-    -- (m, WeakCaseIntS t a) ->
-    --   return (m, CaseValue $ EnumValueIntS t a)
-    (m, WeakCaseDefault) ->
-      return (m, CaseDefault)
-
 elaboratePlus :: (Meta, a, WeakTermPlus) -> WithEnv (Meta, a, TermPlus)
 elaboratePlus (m, x, t) = do
   t' <- elaborate' t
   return (m, x, t')
 
-caseCheckEnumIdent :: Meta -> EnumType -> [Case] -> WithEnv ()
-caseCheckEnumIdent m enumtype ls =
-  case enumtype of
-    EnumTypeLabel x -> do
-      es <- lookupEnumSet m x
-      caseCheckEnumIdent' m (length es) ls
-    EnumTypeInt _ ->
-      throwIfFalse m $ CaseDefault `elem` ls
+caseCheckEnumIdent :: Meta -> T.Text -> [EnumCase] -> WithEnv ()
+caseCheckEnumIdent m x ls = do
+  es <- lookupEnumSet m x
+  caseCheckEnumIdent' m (length es) ls
 
-caseCheckEnumIdent' :: Meta -> Int -> [Case] -> WithEnv ()
+caseCheckEnumIdent' :: Meta -> Int -> [EnumCase] -> WithEnv ()
 caseCheckEnumIdent' m i labelList = do
   let len = length (nub labelList)
-  throwIfFalse m $ i <= len || CaseDefault `elem` labelList
+  throwIfFalse m $ i <= len || EnumCaseDefault `elem` labelList
 
 throwIfFalse :: Meta -> Bool -> WithEnv ()
 throwIfFalse m b =

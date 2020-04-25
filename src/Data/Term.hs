@@ -16,10 +16,11 @@ data Term
   | TermIter IdentPlus [IdentPlus] TermPlus
   | TermConst T.Text
   | TermBoxElim Ident -- S4 necessity
+  | TermInt IntSize Integer
   | TermFloat FloatSize Double
-  | TermEnum EnumType
-  | TermEnumIntro EnumValue
-  | TermEnumElim (TermPlus, TermPlus) [(CasePlus, TermPlus)]
+  | TermEnum T.Text
+  | TermEnumIntro T.Text
+  | TermEnumElim (TermPlus, TermPlus) [(EnumCasePlus, TermPlus)]
   | TermArray TermPlus ArrayKind -- array n3 u8 ~= n3 -> u8
   | TermArrayIntro ArrayKind [TermPlus]
   | TermArrayElim
@@ -93,6 +94,8 @@ varTermPlus term =
       []
     (_, TermBoxElim _) ->
       []
+    (_, TermInt _ _) ->
+      []
     (_, TermFloat _ _) ->
       []
     (_, TermEnum _) ->
@@ -159,6 +162,8 @@ substTermPlus sub term =
     e@(_, TermConst _) ->
       e
     e@(_, TermBoxElim _) ->
+      e
+    e@(_, TermInt _ _) ->
       e
     e@(_, TermFloat _ _) ->
       e
@@ -249,6 +254,8 @@ weaken term =
       (m, WeakTermConst x)
     (m, TermBoxElim x) ->
       (m, WeakTermBoxElim x)
+    (m, TermInt size x) ->
+      (m, WeakTermInt (m, WeakTermConst (showIntSize size)) x)
     (m, TermFloat size x) ->
       (m, WeakTermFloat (m, WeakTermConst (showFloatSize size)) x)
     (m, TermEnum x) ->
@@ -259,9 +266,8 @@ weaken term =
       let t' = weaken t
       let e' = weaken e
       let (caseList, es) = unzip branchList
-      let caseList' = map weakenCase caseList
       let es' = map weaken es
-      (m, WeakTermEnumElim (e', t') (zip caseList' es'))
+      (m, WeakTermEnumElim (e', t') (zip caseList es'))
     (m, TermArray dom k) -> do
       let dom' = weaken dom
       (m, WeakTermArray dom' k)
@@ -291,14 +297,6 @@ weaken term =
               let body' = weaken body
               ((c, xts'), body')
       (m, WeakTermCase indName e' cxtes')
-
-weakenCase :: CasePlus -> WeakCasePlus
-weakenCase weakCase =
-  case weakCase of
-    (m, CaseValue v) ->
-      (m, weakenEnumValue m v)
-    (m, CaseDefault) ->
-      (m, WeakCaseDefault)
 
 weakenArgs :: [(Meta, Ident, TermPlus)] -> [(Meta, Ident, WeakTermPlus)]
 weakenArgs xts = do

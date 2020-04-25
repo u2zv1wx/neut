@@ -154,6 +154,10 @@ asFloatSize size =
     _ ->
       Nothing
 
+showIntSize :: IntSize -> T.Text
+showIntSize size =
+  "i" <> T.pack (show size)
+
 showFloatSize :: FloatSize -> T.Text
 showFloatSize size =
   case size of
@@ -164,26 +168,17 @@ showFloatSize size =
     FloatSize64 ->
       "f64"
 
-data EnumType
-  = EnumTypeLabel T.Text
-  | EnumTypeInt Int -- i{k}
-  deriving (Show, Eq, Generic)
-
-data EnumValue
-  = EnumValueInt IntSize Integer
-  | EnumValueLabel T.Text
+data EnumCase
+  = EnumCaseLabel T.Text
+  | EnumCaseDefault
   deriving (Show, Eq, Ord, Generic)
 
-data Case
-  = CaseValue EnumValue
-  | CaseDefault
-  deriving (Show, Eq, Ord, Generic)
-
-type CasePlus =
-  (Meta, Case)
+type EnumCasePlus =
+  (Meta, EnumCase)
 
 data LowType
   = LowTypeInt IntSize
+  | LowTypeBool -- synonym for i1
   | LowTypeFloat FloatSize
   | LowTypeVoid -- to represent the cod of free
   | LowTypeFunctionPtr [LowType] LowType
@@ -266,6 +261,17 @@ asArrayKindMaybe s =
             Just $ ArrayKindFloat size
         _ ->
           Nothing
+
+asIntMaybe :: T.Text -> Maybe Int
+asIntMaybe str
+  | T.length str >= 2,
+    T.head str == 'i',
+    Just i <- readMaybe $ T.unpack $ T.tail str :: Maybe Int,
+    1 <= i,
+    i <= 64 =
+    Just i
+  | otherwise =
+    Nothing
 
 data UnaryOp
   = UnaryOpFNeg LowType
@@ -602,57 +608,57 @@ binaryOpToDomCod binaryOp =
     BinaryOpXor t ->
       (t, t)
     BinaryOpICmpEQ t ->
-      (t, LowTypeInt 1)
+      (t, LowTypeBool)
     BinaryOpICmpNE t ->
-      (t, LowTypeInt 1)
+      (t, LowTypeBool)
     BinaryOpICmpUGT t ->
-      (t, LowTypeInt 1)
+      (t, LowTypeBool)
     BinaryOpICmpUGE t ->
-      (t, LowTypeInt 1)
+      (t, LowTypeBool)
     BinaryOpICmpULT t ->
-      (t, LowTypeInt 1)
+      (t, LowTypeBool)
     BinaryOpICmpULE t ->
-      (t, LowTypeInt 1)
+      (t, LowTypeBool)
     BinaryOpICmpSGT t ->
-      (t, LowTypeInt 1)
+      (t, LowTypeBool)
     BinaryOpICmpSGE t ->
-      (t, LowTypeInt 1)
+      (t, LowTypeBool)
     BinaryOpICmpSLT t ->
-      (t, LowTypeInt 1)
+      (t, LowTypeBool)
     BinaryOpICmpSLE t ->
-      (t, LowTypeInt 1)
+      (t, LowTypeBool)
     BinaryOpFCmpFALSE t ->
-      (t, LowTypeInt 1)
+      (t, LowTypeBool)
     BinaryOpFCmpOEQ t ->
-      (t, LowTypeInt 1)
+      (t, LowTypeBool)
     BinaryOpFCmpOGT t ->
-      (t, LowTypeInt 1)
+      (t, LowTypeBool)
     BinaryOpFCmpOGE t ->
-      (t, LowTypeInt 1)
+      (t, LowTypeBool)
     BinaryOpFCmpOLT t ->
-      (t, LowTypeInt 1)
+      (t, LowTypeBool)
     BinaryOpFCmpOLE t ->
-      (t, LowTypeInt 1)
+      (t, LowTypeBool)
     BinaryOpFCmpONE t ->
-      (t, LowTypeInt 1)
+      (t, LowTypeBool)
     BinaryOpFCmpORD t ->
-      (t, LowTypeInt 1)
+      (t, LowTypeBool)
     BinaryOpFCmpUEQ t ->
-      (t, LowTypeInt 1)
+      (t, LowTypeBool)
     BinaryOpFCmpUGT t ->
-      (t, LowTypeInt 1)
+      (t, LowTypeBool)
     BinaryOpFCmpUGE t ->
-      (t, LowTypeInt 1)
+      (t, LowTypeBool)
     BinaryOpFCmpULT t ->
-      (t, LowTypeInt 1)
+      (t, LowTypeBool)
     BinaryOpFCmpULE t ->
-      (t, LowTypeInt 1)
+      (t, LowTypeBool)
     BinaryOpFCmpUNE t ->
-      (t, LowTypeInt 1)
+      (t, LowTypeBool)
     BinaryOpFCmpUNO t ->
-      (t, LowTypeInt 1)
+      (t, LowTypeBool)
     BinaryOpFCmpTRUE t ->
-      (t, LowTypeInt 1)
+      (t, LowTypeBool)
 
 type Target =
   (OS, Arch)

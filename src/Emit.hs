@@ -389,6 +389,8 @@ showLowTypeAsIfNonPtr lowType =
   case lowType of
     LowTypeInt i ->
       "i" <> intDec i
+    LowTypeBool ->
+      "i1"
     LowTypeFloat FloatSize16 ->
       "half"
     LowTypeFloat FloatSize32 ->
@@ -421,6 +423,8 @@ showLowType lowType =
   case lowType of
     LowTypeInt i ->
       "i" <> intDec i
+    LowTypeBool ->
+      "i1"
     LowTypeFloat FloatSize16 ->
       "half"
     LowTypeFloat FloatSize32 ->

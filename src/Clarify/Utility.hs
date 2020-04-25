@@ -27,7 +27,8 @@ toAffineApp m x t = do
         ( m,
           CodePiElimDownElim
             expVar
-            [(m, DataEnumIntro (EnumValueInt 64 0)), (m, DataUpsilon x)]
+            -- [(m, DataEnumIntro (EnumValueInt 64 0)), (m, DataUpsilon x)]
+            [(m, DataEnumIntro "bool:false"), (m, DataUpsilon x)]
         )
     )
 
@@ -46,7 +47,8 @@ toRelevantApp m x t = do
         ( m,
           CodePiElimDownElim
             expVar
-            [(m, DataEnumIntro (EnumValueInt 64 1)), (m, DataUpsilon x)]
+            -- [(m, DataEnumIntro (EnumValueInt 64 1)), (m, DataUpsilon x)]
+            [(m, DataEnumIntro "bool:true"), (m, DataUpsilon x)]
         )
     )
 
@@ -63,9 +65,11 @@ returnCartesianImmediate m = do
   v <- cartesianImmediate m
   return (m, CodeUpIntro v)
 
-switch :: CodePlus -> CodePlus -> [(Case, CodePlus)]
+switch :: CodePlus -> CodePlus -> [(EnumCase, CodePlus)]
 switch e1 e2 =
-  [(CaseValue (EnumValueInt 64 0), e1), (CaseDefault, e2)]
+  [(EnumCaseLabel "bool:false", e1), (EnumCaseDefault, e2)]
+
+-- [(CaseValue (EnumValueInt 64 0), e1), (EnumCaseDefault, e2)]
 
 cartImmName :: T.Text
 cartImmName =

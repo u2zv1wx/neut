@@ -34,10 +34,10 @@ interpret inputTree =
       | Just x' <- readMaybe $ T.unpack atom -> do
         h <- newHole m
         return (m, WeakTermFloat h x')
-      | Just i <- readEnumTypeInt atom ->
-        return (m, WeakTermEnum $ EnumTypeInt i)
       | Just str <- readMaybe $ T.unpack atom -> do
-        u8s <- forM (encode str) $ \u -> return (m, WeakTermEnumIntro $ EnumValueInt 8 (toInteger u))
+        u8s <- forM (encode str) $ \u ->
+          -- return (m, WeakTermEnumIntro $ EnumValueInt 8 (toInteger u))
+          return (m, WeakTermInt (i8 m) (toInteger u))
         sigmaIntroString m u8s
       | otherwise ->
         case T.uncons atom of
@@ -143,17 +143,17 @@ interpret inputTree =
             raiseSyntaxError m "(f64 LEAF)"
         "enum"
           | [(_, TreeLeaf x)] <- rest ->
-            case readEnumTypeInt x of
-              Just i ->
-                return (m, WeakTermEnum $ EnumTypeInt i)
-              _ ->
-                return (m, WeakTermEnum $ EnumTypeLabel x)
+            return (m, WeakTermEnum x)
+          -- case readEnumTypeInt x of
+          --   Just i ->
+          --     return (m, WeakTermEnum $ EnumTypeInt i)
+          --   _ ->
+          --     return (m, WeakTermEnum $ EnumTypeLabel x)
           | otherwise ->
             raiseSyntaxError m "(enum LEAF)"
         "enum-introduction"
-          | [l] <- rest -> do
-            l' <- interpretEnumValue l
-            return (m, WeakTermEnumIntro l')
+          | [(_, TreeLeaf l)] <- rest ->
+            return (m, WeakTermEnumIntro l)
           | otherwise ->
             raiseSyntaxError m "(enum-introduction TREE)"
         "enum-elimination"
@@ -259,22 +259,29 @@ interpret inputTree =
             raiseSyntaxError m "(record TREE TREE*)"
         "with" ->
           interpretWith inputTree
-        _ ->
-          interpretAux m $ leaf : rest
+        _
+          | [(_, TreeLeaf value)] <- rest,
+            Just (intSize, v) <- readValueInt headAtom value ->
+            return (m, WeakTermInt (m, WeakTermConst (showIntSize intSize)) v)
+          | otherwise ->
+            interpretAux m $ leaf : rest
+    -- _ ->
+    --   interpretAux m $ leaf : rest
     (m, TreeNode es) ->
       interpretAux m es
 
 interpretAux :: Meta -> [TreePlus] -> WithEnv WeakTermPlus
 interpretAux m es =
-  if isEnumValue es
-    then do
-      enumValue <- interpretEnumValue (m, TreeNode es)
-      return (m, WeakTermEnumIntro enumValue)
-    else case es of
-      [] ->
-        raiseSyntaxError m "(TREE TREE*)"
-      f : args ->
-        interpretPiElim m f args
+  -- if isEnumValue es
+  --   then do
+  --     enumValue <- interpretEnumValue (m, TreeNode es)
+  --     return (m, WeakTermEnumIntro enumValue)
+  --   else
+  case es of
+    [] ->
+      raiseSyntaxError m "(TREE TREE*)"
+    f : args ->
+      interpretPiElim m f args
 
 interpretPiElim :: Meta -> TreePlus -> [TreePlus] -> WithEnv WeakTermPlus
 interpretPiElim m f args = do
@@ -316,7 +323,7 @@ sigmaIntroString m u8s = do
             k,
             ( m,
               weakTermPi
-                [ (m, lenVar, (m, WeakTermEnum (EnumTypeInt 64))),
+                [ (m, lenVar, (m, WeakTermConst (showIntSize 64))),
                   ( m,
                     arrVar,
                     ( m,
@@ -333,7 +340,8 @@ sigmaIntroString m u8s = do
         ( m,
           WeakTermPiElim
             (m, WeakTermUpsilon k)
-            [ (m, WeakTermEnumIntro (EnumValueInt 64 (toInteger $ length u8s))),
+            [ (m, WeakTermInt (i64 m) (toInteger $ length u8s)),
+              -- (m, WeakTermEnumIntro (EnumValueInt 64 (toInteger $ length u8s))),
               (m, WeakTermArrayIntro (ArrayKindInt 8) u8s)
             ]
         )
@@ -409,31 +417,31 @@ interpretLeafText tree =
     t ->
       raiseSyntaxError (fst t) "LEAF"
 
-isEnumValue :: [TreePlus] -> Bool
-isEnumValue tree =
-  case tree of
-    [(_, TreeLeaf t), (_, TreeLeaf x)] ->
-      case readEnumValueInt t x of
-        Just _ ->
-          True
-        _ ->
-          False
-    _ ->
-      False
+-- isEnumValue :: [TreePlus] -> Bool
+-- isEnumValue tree =
+--   case tree of
+--     [(_, TreeLeaf t), (_, TreeLeaf x)] ->
+--       case readEnumValueInt t x of
+--         Just _ ->
+--           True
+--         _ ->
+--           False
+--     _ ->
+--       False
 
-interpretEnumValue :: TreePlus -> WithEnv EnumValue
-interpretEnumValue tree =
-  case tree of
-    (_, TreeLeaf x) ->
-      return $ EnumValueLabel x
-    e@(_, TreeNode [(_, TreeLeaf t), (_, TreeLeaf x)]) ->
-      case readEnumValueInt t x of
-        Just v ->
-          return v
-        _ ->
-          raiseSyntaxError (fst e) "(SINT-TYPE INT) | (UINT-TYPE INT)"
-    _ ->
-      raiseSyntaxError (fst tree) "LEAF | (LEAF LEAF)"
+-- interpretEnumValue :: TreePlus -> WithEnv EnumValue
+-- interpretEnumValue tree =
+--   case tree of
+--     (_, TreeLeaf x) ->
+--       return $ EnumValueLabel x
+--     e@(_, TreeNode [(_, TreeLeaf t), (_, TreeLeaf x)]) ->
+--       case readEnumValueInt t x of
+--         Just v ->
+--           return v
+--         _ ->
+--           raiseSyntaxError (fst e) "(SINT-TYPE INT) | (UINT-TYPE INT)"
+--     _ ->
+--       raiseSyntaxError (fst tree) "LEAF | (LEAF LEAF)"
 
 interpretBinder :: [TreePlus] -> TreePlus -> WithEnv ([WeakIdentPlus], WeakTermPlus)
 interpretBinder xts t = do
@@ -441,27 +449,32 @@ interpretBinder xts t = do
   t' <- interpret t
   return (xts', t')
 
-interpretWeakCase :: TreePlus -> WithEnv WeakCasePlus
-interpretWeakCase tree =
+interpretEnumCase :: TreePlus -> WithEnv EnumCasePlus
+interpretEnumCase tree =
   case tree of
-    (m, TreeNode [(_, TreeLeaf "enum-introduction"), l]) -> do
-      v <- weakenEnumValue m <$> interpretEnumValue l
-      return (m, v)
+    (m, TreeNode [(_, TreeLeaf "enum-introduction"), (_, TreeLeaf l)]) ->
+      -- v <- weakenEnumValue m <$> interpretEnumValue l
+      return (m, EnumCaseLabel l)
     (m, TreeLeaf "default") ->
-      return (m, WeakCaseDefault)
-    (m, TreeLeaf i)
-      | Just i' <- readMaybe $ T.unpack i -> do
-        h <- newHole m
-        return (m, WeakCaseInt h i')
-    c -> do
-      v <- weakenEnumValue (fst c) <$> interpretEnumValue c
-      return (fst c, v)
+      return (m, EnumCaseDefault)
+    -- (m, TreeLeaf i)
+    --   | Just i' <- readMaybe $ T.unpack i -> do
+    --     h <- newHole m
+    --     return (m, EnumCaseInt h i')
+    (m, TreeLeaf l) ->
+      return (m, EnumCaseLabel l)
+    (m, _) ->
+      raiseSyntaxError m "(enum-introduction LEAF) | default | LEAF"
 
-interpretClause :: TreePlus -> WithEnv (WeakCasePlus, WeakTermPlus)
+-- c -> do
+--   v <- weakenEnumValue (fst c) <$> interpretEnumValue c
+--   return (fst c, v)
+
+interpretClause :: TreePlus -> WithEnv (EnumCasePlus, WeakTermPlus)
 interpretClause tree =
   case tree of
     (_, TreeNode [c, e]) -> do
-      c' <- interpretWeakCase c
+      c' <- interpretEnumCase c
       e' <- interpret e
       return (c', e')
     e ->
@@ -597,9 +610,9 @@ cocaseBaseValue m codType =
   ( m,
     WeakTermPiElim
       (m, WeakTermUpsilon $ asIdent "unsafe:cast")
-      [ (m, weakTermPi [] (m, WeakTermEnum (EnumTypeInt 64))),
+      [ (m, weakTermPi [] (i64 m)),
         codType,
-        (m, weakTermPiIntro [] (m, WeakTermEnumIntro (EnumValueInt 64 0)))
+        (m, weakTermPiIntro [] (m, WeakTermInt (i64 m) 0))
       ]
   )
 
@@ -642,22 +655,12 @@ headDiscriminantOf labelNumList =
     ((_, i) : _) ->
       i
 
-readEnumTypeInt :: T.Text -> Maybe Int
-readEnumTypeInt str
-  | T.length str >= 2,
-    T.head str == 'i',
-    Just i <- readMaybe $ T.unpack $ T.tail str :: Maybe Int,
-    1 <= i,
-    i <= 64 =
-    Just i
-  | otherwise =
-    Nothing
-
-readEnumValueInt :: T.Text -> T.Text -> Maybe EnumValue
-readEnumValueInt t x
+-- readEnumValueInt :: T.Text -> T.Text -> Maybe EnumValue
+readValueInt :: T.Text -> T.Text -> Maybe (IntSize, Integer)
+readValueInt t x
   | Just (LowTypeInt i) <- asLowTypeMaybe t,
     Just x' <- readMaybe $ T.unpack x =
-    Just $ EnumValueInt i x'
+    Just (i, x')
   | otherwise =
     Nothing
 
