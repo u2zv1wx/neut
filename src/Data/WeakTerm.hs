@@ -1,6 +1,5 @@
 module Data.WeakTerm where
 
-import Data.Basic
 import Data.EnumCase
 import Data.Ident
 import qualified Data.IntMap as IntMap
@@ -324,7 +323,7 @@ substWeakTermPlus sub term =
     (m, WeakTermStructElim xts v e) -> do
       let v' = substWeakTermPlus sub v
       let xs = map (\(_, x, _) -> x) xts
-      let sub' = deleteKeys sub (map asInt xs)
+      let sub' = foldr IntMap.delete sub (map asInt xs)
       let e' = substWeakTermPlus sub' e
       (m, WeakTermStructElim xts v' e')
     (m, WeakTermCase indName e cxtes) -> do

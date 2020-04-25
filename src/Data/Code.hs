@@ -1,6 +1,5 @@
 module Data.Code where
 
-import Data.Basic
 import Data.EnumCase
 import Data.Ident
 import qualified Data.IntMap as IntMap
@@ -106,7 +105,7 @@ substCodePlus sub term =
       (m, CodePiElimDownElim v' ds')
     (m, CodeSigmaElim mk xs v e) -> do
       let v' = substDataPlus sub v
-      let sub' = deleteKeys sub (map asInt xs)
+      let sub' = foldr IntMap.delete sub (map asInt xs)
       let e' = substCodePlus sub' e
       (m, CodeSigmaElim mk xs v' e')
     (m, CodeUpIntro v) -> do
@@ -123,7 +122,7 @@ substCodePlus sub term =
       (m, CodeEnumElim fvInfo' v' branchList)
     (m, CodeStructElim xks v e) -> do
       let v' = substDataPlus sub v
-      let sub' = deleteKeys sub (map (asInt . fst) xks)
+      let sub' = foldr IntMap.delete sub (map (asInt . fst) xks)
       let e' = substCodePlus sub' e
       (m, CodeStructElim xks v' e')
     (m, CodeCase fvInfo v branchList) -> do

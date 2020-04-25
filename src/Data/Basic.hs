@@ -1,6 +1,5 @@
 module Data.Basic where
 
-import qualified Data.IntMap as IntMap
 import qualified Data.Set as S
 
 linearCheck :: (Eq a, Ord a) => [a] -> Bool
@@ -17,7 +16,3 @@ linearCheck' found input =
         False
       | otherwise ->
         linearCheck' (S.insert x found) xs
-
-deleteKeys :: IntMap.IntMap a -> [Int] -> IntMap.IntMap a
-deleteKeys =
-  foldr IntMap.delete

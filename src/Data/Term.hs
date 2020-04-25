@@ -1,6 +1,5 @@
 module Data.Term where
 
-import Data.Basic
 import Data.EnumCase
 import Data.Ident
 import qualified Data.IntMap as IntMap
@@ -201,7 +200,7 @@ substTermPlus sub term =
     (m, TermStructElim xts v e) -> do
       let v' = substTermPlus sub v
       let xs = map (\(_, x, _) -> asInt x) xts
-      let sub' = deleteKeys sub xs
+      let sub' = foldr IntMap.delete sub xs
       let e' = substTermPlus sub' e
       (m, TermStructElim xts v' e')
     (m, TermCase indName e cxtes) -> do
