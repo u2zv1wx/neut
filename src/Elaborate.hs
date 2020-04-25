@@ -4,7 +4,6 @@ module Elaborate
 where
 
 import Control.Monad.State.Lazy
-import Data.Basic
 import Data.EnumCase
 import Data.Env
 import qualified Data.HashMap.Lazy as Map

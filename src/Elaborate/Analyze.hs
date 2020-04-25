@@ -8,7 +8,6 @@ module Elaborate.Analyze
 where
 
 import Control.Monad.State.Lazy
-import Data.Basic
 import Data.Constraint
 import Data.Env
 import Data.Ident

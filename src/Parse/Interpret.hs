@@ -10,7 +10,6 @@ where
 
 import Codec.Binary.UTF8.String
 import Control.Monad.State.Lazy
-import Data.Basic
 import Data.EnumCase
 import Data.Env
 import qualified Data.HashMap.Lazy as Map

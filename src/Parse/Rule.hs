@@ -11,7 +11,6 @@ module Parse.Rule
 where
 
 import Control.Monad.State.Lazy
-import Data.Basic
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import Data.Ident
