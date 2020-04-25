@@ -185,8 +185,8 @@ toInductive ats bts connective@(m, ai, xts, _) = do
       (m, weakTermPiIntro indArgs (m, WeakTermPiElim (toVar' zt) (map toVar' atsbts)))
   foldIdent <-
     discernIdentPlus
-      (m, asIdent $ ai <> ":fold", (m, weakTermPi indArgs cod))
-  imp <- toStmtImplicit m (ai <> ":fold") [0 .. length xts - 1]
+      (m, asIdent $ ai <> nsSep <> "fold", (m, weakTermPi indArgs cod))
+  imp <- toStmtImplicit m (ai <> nsSep <> "fold") [0 .. length xts - 1]
   return
     [ WeakStmtLetWT m at' indType,
       WeakStmtLetWT m foldIdent fold,
