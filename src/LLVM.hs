@@ -14,6 +14,7 @@ import Data.LowType
 import Data.Meta
 import Data.Primitive
 import qualified Data.Set as S
+import Data.Syscall
 import Data.Term
 import qualified Data.Text as T
 import Data.WeakTerm hiding (i64)

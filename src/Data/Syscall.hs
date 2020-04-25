@@ -1,7 +1,14 @@
 module Data.Syscall where
 
 import Data.Basic
+import Data.Platform
 import qualified Data.Text as T
+
+-- Left name-of-interface-function | Right (name-of-syscall, number-of-syscall)
+-- the `Left` here is required since direct use of syscall in macOS is deprecated since 10.12, and thus we need to
+-- use corresponding interface functions.
+type Syscall =
+  Either T.Text (T.Text, Integer)
 
 data Arg
   = ArgImm
