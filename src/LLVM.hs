@@ -311,7 +311,7 @@ llvmDataLet x llvmData cont =
   case llvmData of
     (m, DataConst y) -> do
       cenv <- gets codeEnv
-      ns <- gets nameSet
+      lenv <- gets llvmEnv
       case Map.lookup y cenv of
         Nothing -> do
           mt <- lookupTypeEnvMaybe m y
@@ -331,8 +331,8 @@ llvmDataLet x llvmData cont =
             Nothing ->
               raiseCritical m $ "no such global label defined: " <> y
         Just (Definition _ args e)
-          | not (y `S.member` ns) -> do
-            modify (\env -> env {nameSet = S.insert y ns})
+          | not (Map.member y lenv) -> do
+            insLLVMEnv y args LLVMUnreachable
             llvm <- llvmCode e
             insLLVMEnv y args llvm
             llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
