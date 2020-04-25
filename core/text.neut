@@ -2,12 +2,12 @@
 
 (include library "core/foundation.neut")
 
-(definition text-internal ((length u64))
-  (array length u64))
+(define text-internal ((length i64))
+  (array length i64))
 
-(definition text
+(define text
   (sigma
-    ((length u64))
+    ((length i64))
     (text-internal length)))
 
 (section text)
