@@ -200,11 +200,8 @@ compInfoArrayElim s info binder e =
       compInfoArrayElim s info' xts e
 
 filterCompInfo :: Prefix -> (Ident, Meta) -> Bool
-filterCompInfo prefix (I (x, _), _)
-  | "private:" `T.isPrefixOf` x =
-    False
-  | otherwise =
-    prefix `T.isPrefixOf` x && T.all (`S.notMember` S.fromList "()") x
+filterCompInfo prefix (I (x, _), _) =
+  prefix `T.isPrefixOf` x && T.all (`S.notMember` S.fromList "()") x
 
 enrich :: (Ident, Meta) -> [(Ident, Meta)]
 enrich (x, m) =
