@@ -532,10 +532,8 @@ showArrayKind arrayKind =
   case arrayKind of
     ArrayKindInt size ->
       showIntSize size
-    -- T.pack $ "i" ++ show size
     ArrayKindFloat size ->
       showFloatSize size
-    -- T.pack $ "f" ++ show (sizeAsInt size)
     ArrayKindVoidPtr ->
       "void*"
 
