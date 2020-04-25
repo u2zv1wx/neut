@@ -398,3 +398,14 @@ asArrayAccessMaybe name
     asLowTypeMaybe typeStr
   | otherwise =
     Nothing
+
+{-# INLINE breakOnMaybe #-}
+breakOnMaybe :: T.Text -> T.Text -> Maybe (T.Text, T.Text)
+breakOnMaybe needle text =
+  if T.null text
+    then Nothing
+    else do
+      let (h, t) = T.breakOn needle text
+      if T.null t
+        then Nothing
+        else return (h, T.tail t)

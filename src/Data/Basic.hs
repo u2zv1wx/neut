@@ -36,17 +36,6 @@ linearCheck' found input =
       | otherwise ->
         linearCheck' (S.insert x found) xs
 
-{-# INLINE breakOnMaybe #-}
-breakOnMaybe :: T.Text -> T.Text -> Maybe (T.Text, T.Text)
-breakOnMaybe needle text =
-  if T.null text
-    then Nothing
-    else do
-      let (h, t) = T.breakOn needle text
-      if T.null t
-        then Nothing
-        else return (h, T.tail t)
-
 deleteKeys :: IntMap.IntMap a -> [Int] -> IntMap.IntMap a
 deleteKeys =
   foldr IntMap.delete
