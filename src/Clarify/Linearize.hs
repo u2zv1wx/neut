@@ -5,7 +5,6 @@ module Clarify.Linearize
 where
 
 import Clarify.Utility
-import Data.Basic
 import Data.Code
 import Data.Env
 import Data.Ident

@@ -4,7 +4,6 @@ module Reduce.WeakTerm
   )
 where
 
-import Data.Basic
 import Data.EnumCase
 import Data.Ident
 import qualified Data.IntMap as IntMap
@@ -24,7 +23,7 @@ reduceWeakTermPlus term =
         ys == map (\(_, x, _) -> x) xts ->
         e
     (m, WeakTermPiIntro info xts e) -> do
-      let info' = fmap2 (map reduceWeakTermWeakIdentPlus) info
+      let info' = fmap (fmap (map reduceWeakTermWeakIdentPlus)) info
       let (ms, xs, ts) = unzip3 xts
       let ts' = map reduceWeakTermPlus ts
       let e' = reduceWeakTermPlus e

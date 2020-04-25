@@ -269,7 +269,7 @@ substWeakTermPlus sub term =
       let (xts', t') = substWeakTermPlus'' sub xts t
       (m, WeakTermPi mName xts' t')
     (m, WeakTermPiIntro info xts body) -> do
-      let info' = fmap2 (substWeakTermPlus' sub) info
+      let info' = fmap (fmap (substWeakTermPlus' sub)) info
       let (xts', body') = substWeakTermPlus'' sub xts body
       (m, WeakTermPiIntro info' xts' body')
     (m, WeakTermPiElim e es) -> do

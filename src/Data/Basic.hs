@@ -27,7 +27,3 @@ linearCheck' found input =
 deleteKeys :: IntMap.IntMap a -> [Int] -> IntMap.IntMap a
 deleteKeys =
   foldr IntMap.delete
-
-fmap2 :: (Functor f, Functor g) => (a -> b) -> f (g a) -> f (g b)
-fmap2 f =
-  fmap (fmap f)

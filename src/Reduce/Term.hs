@@ -5,7 +5,6 @@ module Reduce.Term
 where
 
 import Control.Monad.State
-import Data.Basic
 import Data.EnumCase
 import Data.Env
 import Data.Ident
@@ -24,7 +23,7 @@ reduceTermPlus term =
       let cod' = reduceTermPlus cod
       (m, TermPi mName (zip3 ms xs ts') cod')
     (m, TermPiIntro info xts e) -> do
-      let info' = fmap2 (map reduceIdentPlus) info
+      let info' = fmap (fmap (map reduceIdentPlus)) info
       let (ms, xs, ts) = unzip3 xts
       let ts' = map reduceTermPlus ts
       let e' = reduceTermPlus e
