@@ -233,9 +233,9 @@ elaborate' term =
                 Nothing -> raiseError m $ "no such inductive type defined: " <> asText indName
                 Just bis -> do
                   let bs' = map (snd . fst . fst) cxtes
-                  let isLinear = linearCheck bs'
-                  let isExhaustive = length bis == length bs'
-                  case (isLinear, isExhaustive) of
+                  let b1 = isLinear bs'
+                  let b2 = length bis == length bs'
+                  case (b1, b2) of
                     (False, _) ->
                       raiseError m "found a non-linear pattern"
                     (_, False) ->

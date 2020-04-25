@@ -32,12 +32,12 @@ instance Show Ident where
   show (I (s, i)) =
     T.unpack s ++ "-" ++ show i
 
-linearCheck :: (Eq a, Ord a) => [a] -> Bool
-linearCheck =
-  linearCheck' S.empty
+isLinear :: (Eq a, Ord a) => [a] -> Bool
+isLinear =
+  isLinear' S.empty
 
-linearCheck' :: (Eq a, Ord a) => S.Set a -> [a] -> Bool
-linearCheck' found input =
+isLinear' :: (Eq a, Ord a) => S.Set a -> [a] -> Bool
+isLinear' found input =
   case input of
     [] ->
       True
@@ -45,4 +45,4 @@ linearCheck' found input =
       | x `S.member` found ->
         False
       | otherwise ->
-        linearCheck' (S.insert x found) xs
+        isLinear' (S.insert x found) xs

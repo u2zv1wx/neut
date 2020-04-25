@@ -130,7 +130,7 @@ simp' constraintList =
                 (Just (StuckPiElimHoleStrict h1 ies1), _)
                   | xs1 <- concatMap getVarList ies1,
                     occurCheck h1 hs2,
-                    linearCheck $ filter (`S.member` fvs2) xs1,
+                    isLinear $ filter (`S.member` fvs2) xs1,
                     zs <- includeCheck xs1 fvs2,
                     Just es <- lookupAll zs sub ->
                     case es of
@@ -142,7 +142,7 @@ simp' constraintList =
                 (_, Just (StuckPiElimHoleStrict h2 ies2))
                   | xs2 <- concatMap getVarList ies2,
                     occurCheck h2 hs1,
-                    linearCheck $ filter (`S.member` fvs1) xs2,
+                    isLinear $ filter (`S.member` fvs1) xs2,
                     zs <- includeCheck xs2 fvs1,
                     Just es <- lookupAll zs sub ->
                     case es of

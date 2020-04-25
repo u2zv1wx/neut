@@ -517,9 +517,9 @@ cocaseAsSigmaIntro m name codType cocaseClauseList = do
       raiseError m $ "no such coinductive type defined: " <> name
     Just labelList -> do
       iesjes <- labelToIndex m labelList $ aes ++ bes
-      let isLinear = linearCheck $ map fst iesjes
-      let isExhaustive = length iesjes == length labelList
-      case (isLinear, isExhaustive) of
+      let b1 = isLinear $ map fst iesjes
+      let b2 = length iesjes == length labelList
+      case (b1, b2) of
         (False, _) ->
           raiseError m "found a non-linear copattern"
         (_, False) ->
@@ -575,7 +575,7 @@ cocaseBaseValue m codType =
 interpretEnumItem :: Meta -> T.Text -> [TreePlus] -> WithEnv [(T.Text, Int)]
 interpretEnumItem m name ts = do
   xis <- interpretEnumItem' name $ reverse ts
-  if linearCheck (map snd xis)
+  if isLinear (map snd xis)
     then return $ reverse xis
     else raiseError m "found a collision of discriminant"
 

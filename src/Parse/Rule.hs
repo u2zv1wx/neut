@@ -162,7 +162,7 @@ parseRule inputTree =
 checkNameSanity :: Meta -> [WeakTextPlus] -> WithEnv ()
 checkNameSanity m atsbts = do
   let asbs = map (\(_, x, _) -> x) atsbts
-  when (not $ linearCheck asbs) $
+  when (not $ isLinear asbs) $
     raiseError
       m
       "the names of the rules of inductive/coinductive type must be distinct"
