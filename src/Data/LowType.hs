@@ -1,6 +1,6 @@
 module Data.LowType where
 
-import Data.Basic
+import Data.Size
 import qualified Data.Text as T
 import GHC.Generics
 import Text.Read hiding (get)

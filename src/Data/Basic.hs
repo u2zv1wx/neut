@@ -50,51 +50,6 @@ boolFalse :: T.Text
 boolFalse =
   "bool" <> nsSep <> "false"
 
-type IntSize =
-  Int
-
-data FloatSize
-  = FloatSize16
-  | FloatSize32
-  | FloatSize64
-  deriving (Eq, Ord, Show, Generic)
-
-asFloatSize :: Int -> Maybe FloatSize
-asFloatSize size =
-  case size of
-    16 ->
-      Just FloatSize16
-    32 ->
-      Just FloatSize32
-    64 ->
-      Just FloatSize64
-    _ ->
-      Nothing
-
-showIntSize :: IntSize -> T.Text
-showIntSize size =
-  "i" <> T.pack (show size)
-
-showFloatSize :: FloatSize -> T.Text
-showFloatSize size =
-  case size of
-    FloatSize16 ->
-      "f16"
-    FloatSize32 ->
-      "f32"
-    FloatSize64 ->
-      "f64"
-
-sizeAsInt :: FloatSize -> Int
-sizeAsInt size =
-  case size of
-    FloatSize16 ->
-      16
-    FloatSize32 ->
-      32
-    FloatSize64 ->
-      64
-
 data EnumCase
   = EnumCaseLabel T.Text
   | EnumCaseDefault

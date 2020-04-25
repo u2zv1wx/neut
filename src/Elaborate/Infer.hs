@@ -17,6 +17,7 @@ import qualified Data.IntMap as IntMap
 import Data.LowType
 import Data.Meta
 import Data.Primitive
+import Data.Size
 import Data.Term
 import qualified Data.Text as T
 import Data.WeakTerm

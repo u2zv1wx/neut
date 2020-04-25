@@ -4,6 +4,7 @@ import Data.Basic
 import qualified Data.IntMap as IntMap
 import Data.LowType
 import Data.Primitive
+import Data.Size
 import qualified Data.Text as T
 
 data LLVMData

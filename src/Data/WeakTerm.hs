@@ -5,6 +5,7 @@ import qualified Data.IntMap as IntMap
 import Data.LowType
 import Data.Meta
 import qualified Data.Set as S
+import Data.Size
 import qualified Data.Text as T
 
 data WeakTerm
@@ -529,9 +530,11 @@ showArrayKind :: ArrayKind -> T.Text
 showArrayKind arrayKind =
   case arrayKind of
     ArrayKindInt size ->
-      T.pack $ "i" ++ show size
+      showIntSize size
+    -- T.pack $ "i" ++ show size
     ArrayKindFloat size ->
-      T.pack $ "f" ++ show (sizeAsInt size)
+      showFloatSize size
+    -- T.pack $ "f" ++ show (sizeAsInt size)
     ArrayKindVoidPtr ->
       "void*"
 

@@ -2,6 +2,7 @@ module Data.Primitive where
 
 import Data.Basic
 import Data.LowType
+import Data.Size
 import qualified Data.Text as T
 
 data UnaryOp

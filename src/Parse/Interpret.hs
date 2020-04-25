@@ -17,6 +17,7 @@ import Data.List (elemIndex, sortOn)
 import Data.LowType
 import Data.Maybe (catMaybes, fromMaybe)
 import Data.Meta
+import Data.Size
 import qualified Data.Text as T
 import Data.Tree
 import Data.WeakTerm

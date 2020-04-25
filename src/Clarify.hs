@@ -19,6 +19,7 @@ import Data.List (nubBy)
 import Data.LowType
 import Data.Meta
 import Data.Primitive
+import Data.Size
 import Data.Syscall
 import Data.Term
 import qualified Data.Text as T

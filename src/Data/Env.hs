@@ -16,6 +16,7 @@ import qualified Data.PQueue.Min as Q
 import Data.Platform
 import Data.Primitive
 import qualified Data.Set as S
+import Data.Size
 import Data.Term
 import qualified Data.Text as T
 import Data.Tree

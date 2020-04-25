@@ -14,6 +14,7 @@ import Data.LowType
 import Data.Meta
 import Data.Primitive
 import qualified Data.Set as S
+import Data.Size
 import Data.Syscall
 import Data.Term
 import qualified Data.Text as T
