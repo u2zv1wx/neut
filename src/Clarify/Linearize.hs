@@ -143,7 +143,7 @@ withHeaderRelevant' t expVar ch cont@(m, _) =
             ( m,
               CodePiElimDownElim
                 expVar
-                [(m, DataEnumIntro (EnumValueIntS 64 1)), (m, DataUpsilon x)]
+                [(m, DataEnumIntro (EnumValueInt 64 1)), (m, DataUpsilon x)]
             )
             (m, sigmaElim [x1, x2] sigVar cont')
         )

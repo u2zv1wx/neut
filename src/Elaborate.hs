@@ -145,8 +145,8 @@ elaborate' term =
     (m, WeakTermInt t x) -> do
       t' <- reduceTermPlus <$> elaborate' t
       case t' of
-        (_, TermEnum (EnumTypeIntS size)) ->
-          return (m, TermEnumIntro (EnumValueIntS size x))
+        (_, TermEnum (EnumTypeInt size)) ->
+          return (m, TermEnumIntro (EnumValueInt size x))
         _ ->
           raiseError m $
             "the term `"
@@ -311,10 +311,10 @@ elaborateWeakCase weakCase =
     (m, WeakCaseInt t x) -> do
       t' <- reduceTermPlus <$> elaborate' t
       case t' of
-        (_, TermEnum (EnumTypeIntS size)) ->
-          return (m, CaseValue (EnumValueIntS size x))
+        (_, TermEnum (EnumTypeInt size)) ->
+          return (m, CaseValue (EnumValueInt size x))
         (_, TermEnum (EnumTypeLabel "bool")) ->
-          return (m, CaseValue (EnumValueIntS 1 x))
+          return (m, CaseValue (EnumValueInt 1 x))
         _ ->
           raiseError m $
             "the type of `"
@@ -323,8 +323,8 @@ elaborateWeakCase weakCase =
               <> toText (weaken t')
     (m, WeakCaseLabel l) ->
       return (m, CaseValue $ EnumValueLabel l)
-    (m, WeakCaseIntS t a) ->
-      return (m, CaseValue $ EnumValueIntS t a)
+    -- (m, WeakCaseIntS t a) ->
+    --   return (m, CaseValue $ EnumValueIntS t a)
     (m, WeakCaseDefault) ->
       return (m, CaseDefault)
 
@@ -339,7 +339,7 @@ caseCheckEnumIdent m enumtype ls =
     EnumTypeLabel x -> do
       es <- lookupEnumSet m x
       caseCheckEnumIdent' m (length es) ls
-    EnumTypeIntS _ ->
+    EnumTypeInt _ ->
       throwIfFalse m $ CaseDefault `elem` ls
 
 caseCheckEnumIdent' :: Meta -> Int -> [Case] -> WithEnv ()

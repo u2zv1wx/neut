@@ -136,7 +136,7 @@ initialEnv =
       llvmEnv = Map.empty,
       declEnv =
         Map.fromList
-          [ ("malloc", ([LowTypeIntS 64], voidPtr)),
+          [ ("malloc", ([LowTypeInt 64], voidPtr)),
             ("free", ([voidPtr], LowTypeVoid))
           ],
       constraintEnv = [],
@@ -305,8 +305,8 @@ lookupConstTypeEnv m x
 lowTypeToType :: Meta -> LowType -> WithEnv TermPlus
 lowTypeToType m lowType =
   case lowType of
-    LowTypeIntS s ->
-      return (m, TermEnum (EnumTypeIntS s))
+    LowTypeInt s ->
+      return (m, TermEnum (EnumTypeInt s))
     LowTypeFloat s ->
       return (m, TermConst $ "f" <> T.pack (show (sizeAsInt s)))
     _ ->
@@ -338,7 +338,7 @@ arrayAccessToType m lowType = do
   x1 <- newNameWith' "arg"
   x2 <- newNameWith' "arg"
   x3 <- newNameWith' "arg"
-  let i64 = (m, TermEnum (EnumTypeIntS 64))
+  let i64 = (m, TermEnum (EnumTypeInt 64))
   let idx = (m, TermUpsilon x2)
   let arr = (m, TermArray idx k)
   let xts = [(m, x1, i64), (m, x2, i64), (m, x3, arr)]

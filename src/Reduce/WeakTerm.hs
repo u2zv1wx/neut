@@ -57,7 +57,7 @@ reduceWeakTermPlus term =
       let t' = reduceWeakTermPlus t
       case e' of
         (_, WeakTermEnumIntro l) ->
-          case lookup (weakenEnumValue l) les'' of
+          case lookup (weakenEnumValue m l) les'' of
             Just body ->
               reduceWeakTermPlus body
             Nothing ->

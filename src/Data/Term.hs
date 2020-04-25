@@ -296,7 +296,7 @@ weakenCase :: CasePlus -> WeakCasePlus
 weakenCase weakCase =
   case weakCase of
     (m, CaseValue v) ->
-      (m, weakenEnumValue v)
+      (m, weakenEnumValue m v)
     (m, CaseDefault) ->
       (m, WeakCaseDefault)
 

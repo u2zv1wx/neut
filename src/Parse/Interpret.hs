@@ -34,10 +34,10 @@ interpret inputTree =
       | Just x' <- readMaybe $ T.unpack atom -> do
         h <- newHole m
         return (m, WeakTermFloat h x')
-      | Just i <- readEnumTypeIntS atom ->
-        return (m, WeakTermEnum $ EnumTypeIntS i)
+      | Just i <- readEnumTypeInt atom ->
+        return (m, WeakTermEnum $ EnumTypeInt i)
       | Just str <- readMaybe $ T.unpack atom -> do
-        u8s <- forM (encode str) $ \u -> return (m, WeakTermEnumIntro $ EnumValueIntS 8 (toInteger u))
+        u8s <- forM (encode str) $ \u -> return (m, WeakTermEnumIntro $ EnumValueInt 8 (toInteger u))
         sigmaIntroString m u8s
       | otherwise ->
         case T.uncons atom of
@@ -143,9 +143,9 @@ interpret inputTree =
             raiseSyntaxError m "(f64 LEAF)"
         "enum"
           | [(_, TreeLeaf x)] <- rest ->
-            case readEnumTypeIntS x of
+            case readEnumTypeInt x of
               Just i ->
-                return (m, WeakTermEnum $ EnumTypeIntS i)
+                return (m, WeakTermEnum $ EnumTypeInt i)
               _ ->
                 return (m, WeakTermEnum $ EnumTypeLabel x)
           | otherwise ->
@@ -316,13 +316,13 @@ sigmaIntroString m u8s = do
             k,
             ( m,
               weakTermPi
-                [ (m, lenVar, (m, WeakTermEnum (EnumTypeIntS 64))),
+                [ (m, lenVar, (m, WeakTermEnum (EnumTypeInt 64))),
                   ( m,
                     arrVar,
                     ( m,
                       WeakTermArray
                         (m, WeakTermUpsilon lenVar)
-                        (ArrayKindIntS 8)
+                        (ArrayKindInt 8)
                     )
                   )
                 ]
@@ -333,8 +333,8 @@ sigmaIntroString m u8s = do
         ( m,
           WeakTermPiElim
             (m, WeakTermUpsilon k)
-            [ (m, WeakTermEnumIntro (EnumValueIntS 64 (toInteger $ length u8s))),
-              (m, WeakTermArrayIntro (ArrayKindIntS 8) u8s)
+            [ (m, WeakTermEnumIntro (EnumValueInt 64 (toInteger $ length u8s))),
+              (m, WeakTermArrayIntro (ArrayKindInt 8) u8s)
             ]
         )
     )
@@ -413,7 +413,7 @@ isEnumValue :: [TreePlus] -> Bool
 isEnumValue tree =
   case tree of
     [(_, TreeLeaf t), (_, TreeLeaf x)] ->
-      case readEnumValueIntS t x of
+      case readEnumValueInt t x of
         Just _ ->
           True
         _ ->
@@ -427,8 +427,8 @@ interpretEnumValue tree =
     (_, TreeLeaf x) ->
       return $ EnumValueLabel x
     e@(_, TreeNode [(_, TreeLeaf t), (_, TreeLeaf x)]) ->
-      case readEnumValueIntS t x of
-        Just v@(EnumValueIntS _ _) ->
+      case readEnumValueInt t x of
+        Just v ->
           return v
         _ ->
           raiseSyntaxError (fst e) "(SINT-TYPE INT) | (UINT-TYPE INT)"
@@ -445,7 +445,7 @@ interpretWeakCase :: TreePlus -> WithEnv WeakCasePlus
 interpretWeakCase tree =
   case tree of
     (m, TreeNode [(_, TreeLeaf "enum-introduction"), l]) -> do
-      v <- weakenEnumValue <$> interpretEnumValue l
+      v <- weakenEnumValue m <$> interpretEnumValue l
       return (m, v)
     (m, TreeLeaf "default") ->
       return (m, WeakCaseDefault)
@@ -454,7 +454,7 @@ interpretWeakCase tree =
         h <- newHole m
         return (m, WeakCaseInt h i')
     c -> do
-      v <- weakenEnumValue <$> interpretEnumValue c
+      v <- weakenEnumValue (fst c) <$> interpretEnumValue c
       return (fst c, v)
 
 interpretClause :: TreePlus -> WithEnv (WeakCasePlus, WeakTermPlus)
@@ -597,9 +597,9 @@ cocaseBaseValue m codType =
   ( m,
     WeakTermPiElim
       (m, WeakTermUpsilon $ asIdent "unsafe:cast")
-      [ (m, weakTermPi [] (m, WeakTermEnum (EnumTypeIntS 64))),
+      [ (m, weakTermPi [] (m, WeakTermEnum (EnumTypeInt 64))),
         codType,
-        (m, weakTermPiIntro [] (m, WeakTermEnumIntro (EnumValueIntS 64 0)))
+        (m, weakTermPiIntro [] (m, WeakTermEnumIntro (EnumValueInt 64 0)))
       ]
   )
 
@@ -642,10 +642,10 @@ headDiscriminantOf labelNumList =
     ((_, i) : _) ->
       i
 
-readEnumType :: Char -> T.Text -> Maybe Int
-readEnumType c str
+readEnumTypeInt :: T.Text -> Maybe Int
+readEnumTypeInt str
   | T.length str >= 2,
-    T.head str == c,
+    T.head str == 'i',
     Just i <- readMaybe $ T.unpack $ T.tail str :: Maybe Int,
     1 <= i,
     i <= 64 =
@@ -653,15 +653,11 @@ readEnumType c str
   | otherwise =
     Nothing
 
-readEnumTypeIntS :: T.Text -> Maybe Int
-readEnumTypeIntS =
-  readEnumType 'i'
-
-readEnumValueIntS :: T.Text -> T.Text -> Maybe EnumValue
-readEnumValueIntS t x
-  | Just (LowTypeIntS i) <- asLowTypeMaybe t,
+readEnumValueInt :: T.Text -> T.Text -> Maybe EnumValue
+readEnumValueInt t x
+  | Just (LowTypeInt i) <- asLowTypeMaybe t,
     Just x' <- readMaybe $ T.unpack x =
-    Just $ EnumValueIntS i x'
+    Just $ EnumValueInt i x'
   | otherwise =
     Nothing
 

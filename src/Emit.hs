@@ -306,7 +306,7 @@ emitSysCallOp num ds = do
   currentArch <- getArch
   case currentArch of
     Arch64 -> do
-      let args = (LLVMDataInt num, LowTypeIntS 64) : zip ds (repeat voidPtr)
+      let args = (LLVMDataInt num, LowTypeInt 64) : zip ds (repeat voidPtr)
       let argStr = "(" <> showIndex args <> ")"
       let regStr = "\"=r" <> showRegList (take (length args) regList) <> "\""
       return $
@@ -387,7 +387,7 @@ showLowTypeAsIfPtr t =
 showLowTypeAsIfNonPtr :: LowType -> Builder
 showLowTypeAsIfNonPtr lowType =
   case lowType of
-    LowTypeIntS i ->
+    LowTypeInt i ->
       "i" <> intDec i
     LowTypeFloat FloatSize16 ->
       "half"
@@ -419,7 +419,7 @@ getRegList = do
 showLowType :: LowType -> Builder
 showLowType lowType =
   case lowType of
-    LowTypeIntS i ->
+    LowTypeInt i ->
       "i" <> intDec i
     LowTypeFloat FloatSize16 ->
       "half"

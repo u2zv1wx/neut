@@ -28,7 +28,7 @@ clarifyStmt :: SubstTerm -> Stmt -> WithEnv CodePlus
 clarifyStmt sub stmt =
   case stmt of
     StmtReturn m ->
-      return (m, CodeUpIntro (m, DataEnumIntro (EnumValueIntS 64 0)))
+      return (m, CodeUpIntro (m, DataEnumIntro (EnumValueInt 64 0)))
     StmtLet m (_, x, t) e cont -> do
       tenv <- gets typeEnv
       e' <- clarify' tenv $ substTermPlus sub e
@@ -209,11 +209,11 @@ clarifyConst tenv m x
   | x == "os:file-descriptor" =
     clarify' tenv $ immType m
   | x == "os:stdin" =
-    clarify' tenv (m, TermEnumIntro (EnumValueIntS 64 0))
+    clarify' tenv (m, TermEnumIntro (EnumValueInt 64 0))
   | x == "os:stdout" =
-    clarify' tenv (m, TermEnumIntro (EnumValueIntS 64 1))
+    clarify' tenv (m, TermEnumIntro (EnumValueInt 64 1))
   | x == "os:stderr" =
-    clarify' tenv (m, TermEnumIntro (EnumValueIntS 64 2))
+    clarify' tenv (m, TermEnumIntro (EnumValueInt 64 2))
   | x == "unsafe:cast" =
     clarifyCast tenv m
   | otherwise = do
@@ -226,7 +226,7 @@ clarifyConst tenv m x
 
 immType :: Meta -> TermPlus
 immType m =
-  (m, TermEnum (EnumTypeIntS 64))
+  (m, TermEnum (EnumTypeInt 64))
 
 clarifyCast :: TypeEnv -> Meta -> WithEnv CodePlus
 clarifyCast tenv m = do
@@ -529,8 +529,8 @@ retWithBorrowedVars tenv m cod xts resultVarName =
 inferKind :: Meta -> ArrayKind -> WithEnv TermPlus
 inferKind m arrayKind =
   case arrayKind of
-    ArrayKindIntS i ->
-      return (m, TermEnum (EnumTypeIntS i))
+    ArrayKindInt i ->
+      return (m, TermEnum (EnumTypeInt i))
     ArrayKindFloat size -> do
       let constName = "f" <> T.pack (show (sizeAsInt size))
       return (m, TermConst constName)

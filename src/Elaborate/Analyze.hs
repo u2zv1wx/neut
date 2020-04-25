@@ -76,10 +76,10 @@ simp' constraintList =
             yt2 <- asWeakIdentPlus m2 e2
             simpBinder (xt1 : xts1 ++ [yt1]) (xt2 : xts2 ++ [yt2])
             simp cs
-        ((_, WeakTermInt t1 l1), (m, WeakTermEnumIntro (EnumValueIntS s2 l2)))
+        ((_, WeakTermInt t1 l1), (m, WeakTermEnumIntro (EnumValueInt s2 l2)))
           | l1 == l2 ->
             simp $ (t1, toIntS m s2) : cs
-        ((m, WeakTermEnumIntro (EnumValueIntS s1 l1)), (_, WeakTermInt t2 l2))
+        ((m, WeakTermEnumIntro (EnumValueInt s1 l1)), (_, WeakTermInt t2 l2))
           | l1 == l2 ->
             simp $ (toIntS m s1, t2) : cs
         ((_, WeakTermInt t1 l1), (_, WeakTermInt t2 l2))
@@ -88,9 +88,9 @@ simp' constraintList =
         ((_, WeakTermFloat t1 l1), (_, WeakTermFloat t2 l2))
           | l1 == l2 ->
             simp $ (t1, t2) : cs
-        ((_, WeakTermEnum (EnumTypeIntS 1)), (_, WeakTermEnum (EnumTypeLabel "bool"))) ->
+        ((_, WeakTermEnum (EnumTypeInt 1)), (_, WeakTermEnum (EnumTypeLabel "bool"))) ->
           simp cs
-        ((_, WeakTermEnum (EnumTypeLabel "bool")), (_, WeakTermEnum (EnumTypeIntS 1))) ->
+        ((_, WeakTermEnum (EnumTypeLabel "bool")), (_, WeakTermEnum (EnumTypeInt 1))) ->
           simp cs
         ((_, WeakTermArray dom1 k1), (_, WeakTermArray dom2 k2))
           | k1 == k2 -> simp $ (dom1, dom2) : cs
@@ -404,7 +404,7 @@ lookupAll is sub =
 
 toIntS :: Meta -> IntSize -> WeakTermPlus
 toIntS m size =
-  (m, WeakTermEnum $ EnumTypeIntS size)
+  (m, WeakTermEnum $ EnumTypeInt size)
 
 throwArityError :: Meta -> Int -> Int -> WithEnv a
 throwArityError m i1 i2 =

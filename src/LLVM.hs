@@ -24,7 +24,7 @@ toLLVM mainTerm@(m, _) = do
   mainTerm'' <- llvmCode mainTerm'
   -- the result of "main" must be i64, not i8*
   (result, resultVar) <- newDataUpsilonWith m "result"
-  (cast, castThen) <- llvmCast (Just "cast") resultVar (LowTypeIntS 64)
+  (cast, castThen) <- llvmCast (Just "cast") resultVar (LowTypeInt 64)
   castResult <- castThen (LLVMReturn cast)
   -- let result: i8* := (main-term) in {cast result to i64}
   commConv result mainTerm'' castResult
@@ -100,7 +100,7 @@ takeBaseName term =
       "float"
     (_, DataFloat FloatSize64 _) ->
       "double"
-    (_, DataEnumIntro (EnumValueIntS size _)) ->
+    (_, DataEnumIntro (EnumValueInt size _)) ->
       "i" <> T.pack (show size)
     (_, DataEnumIntro _) ->
       "i64"
@@ -162,7 +162,7 @@ loadContent' bp bt values cont =
       return
         $ LLVMLet
           posName
-          (LLVMOpGetElementPtr (bp, bt) [(LLVMDataInt 0, LowTypeIntS 32), i])
+          (LLVMOpGetElementPtr (bp, bt) [(LLVMDataInt 0, LowTypeInt 32), i])
         $ LLVMLet x (LLVMOpLoad pos et) cont'
 
 llvmCodeConst :: Meta -> Const -> WithEnv LLVM
@@ -216,7 +216,7 @@ llvmCast ::
   WithEnv (LLVMData, LLVM -> WithEnv LLVM)
 llvmCast mName v lowType =
   case lowType of
-    LowTypeIntS _ ->
+    LowTypeInt _ ->
       llvmCastInt mName v lowType
     LowTypeFloat i ->
       llvmCastFloat mName v i
@@ -252,7 +252,7 @@ llvmCastFloat ::
   WithEnv (LLVMData, LLVM -> WithEnv LLVM)
 llvmCastFloat mName v size = do
   let floatType = LowTypeFloat size
-  let intType = LowTypeIntS $ sizeAsInt size
+  let intType = LowTypeInt $ sizeAsInt size
   (xName, x) <- newDataLocal' mName
   (yName, y) <- newDataLocal' mName
   z <- newNameWith'' mName
@@ -267,7 +267,7 @@ llvmCastFloat mName v size = do
 llvmUncast :: Maybe T.Text -> LLVMData -> LowType -> WithEnv LLVM
 llvmUncast mName result lowType =
   case lowType of
-    LowTypeIntS _ ->
+    LowTypeInt _ ->
       llvmUncastInt mName result lowType
     LowTypeFloat i ->
       llvmUncastFloat mName result i
@@ -287,7 +287,7 @@ llvmUncastInt mName result lowType = do
 llvmUncastFloat :: Maybe T.Text -> LLVMData -> FloatSize -> WithEnv LLVM
 llvmUncastFloat mName floatResult i = do
   let floatType = LowTypeFloat i
-  let intType = LowTypeIntS $ sizeAsInt i
+  let intType = LowTypeInt $ sizeAsInt i
   tmp <- newNameWith'' mName
   x <- newNameWith'' mName
   return
@@ -345,11 +345,11 @@ llvmDataLet x llvmData cont =
       llvmUncastLet x (LLVMDataFloat size f) (LowTypeFloat size) cont
     (m, DataEnumIntro intOrLabel) ->
       case intOrLabel of
-        EnumValueIntS size i ->
-          llvmUncastLet x (LLVMDataInt i) (LowTypeIntS size) cont
+        EnumValueInt size i ->
+          llvmUncastLet x (LLVMDataInt i) (LowTypeInt size) cont
         EnumValueLabel l -> do
           i <- toInteger <$> getEnumNum m l
-          llvmUncastLet x (LLVMDataInt i) (LowTypeIntS 64) cont
+          llvmUncastLet x (LLVMDataInt i) (LowTypeInt 64) cont
     (m, DataStructIntro dks) -> do
       let (ds, ks) = unzip dks
       let ts = map arrayKindToLowType ks
@@ -408,7 +408,7 @@ llvmCodeEnumElim v branchList = do
     Nothing ->
       return LLVMUnreachable
     Just (defaultCase, caseList) -> do
-      let t = LowTypeIntS 64
+      let t = LowTypeInt 64
       (cast, castThen) <- llvmCast (Just "enum-base") v t
       castThen $ LLVMSwitch (cast, t) defaultCase caseList
 
@@ -499,16 +499,16 @@ storeContent'' reg elemType sizeInfo len cont = do
           (LLVMDataNull, LowTypePtr elemType)
           [(LLVMDataInt (toInteger len), i64)]
       )
-    $ LLVMLet i (LLVMOpPointerToInt cVar (LowTypePtr elemType) (LowTypeIntS 64))
+    $ LLVMLet i (LLVMOpPointerToInt cVar (LowTypePtr elemType) (LowTypeInt 64))
     $ LLVMLet reg (LLVMOpAlloc iVar sizeInfo) cont
 
 indexTypeOf :: LowType -> LowType
 indexTypeOf lowType =
   case lowType of
     LowTypePtr (LowTypeStruct _) ->
-      LowTypeIntS 32
+      LowTypeInt 32
     _ ->
-      LowTypeIntS 64
+      LowTypeInt 64
 
 toFunPtrType :: [a] -> LowType
 toFunPtrType xs =
@@ -526,11 +526,11 @@ newDataLocal' mName = do
 
 i64 :: LowType
 i64 =
-  LowTypeIntS 64
+  LowTypeInt 64
 
 i32 :: LowType
 i32 =
-  LowTypeIntS 32
+  LowTypeInt 32
 
 newNameWith'' :: Maybe T.Text -> WithEnv Ident
 newNameWith'' mName =
@@ -545,7 +545,7 @@ enumValueToInteger m intOrLabel =
   case intOrLabel of
     EnumValueLabel l ->
       toInteger <$> getEnumNum m l
-    EnumValueIntS _ i ->
+    EnumValueInt _ i ->
       return i
 
 getEnumNum :: Meta -> T.Text -> WithEnv Int
