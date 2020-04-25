@@ -21,61 +21,56 @@ asSyscallMaybe :: OS -> T.Text -> Maybe (Syscall, [Arg])
 asSyscallMaybe os name =
   case os of
     OSLinux
-      | name == syscallPrefix <> "read" ->
+      | name == nsOS <> "read" ->
         return (Right ("read", 0), [ArgUnused, ArgImm, ArgArray, ArgImm])
-      | name == syscallPrefix <> "write" ->
+      | name == nsOS <> "write" ->
         return (Right ("write", 1), [ArgUnused, ArgImm, ArgArray, ArgImm])
-      | name == syscallPrefix <> "open" ->
+      | name == nsOS <> "open" ->
         return (Right ("open", 2), [ArgUnused, ArgArray, ArgImm, ArgImm])
-      | name == syscallPrefix <> "close" ->
+      | name == nsOS <> "close" ->
         return (Right ("close", 3), [ArgImm])
-      | name == syscallPrefix <> "socket" ->
+      | name == nsOS <> "socket" ->
         return (Right ("socket", 41), [ArgImm, ArgImm, ArgImm])
-      | name == syscallPrefix <> "connect" ->
+      | name == nsOS <> "connect" ->
         return (Right ("connect", 42), [ArgImm, ArgStruct, ArgImm])
-      | name == syscallPrefix <> "accept" ->
+      | name == nsOS <> "accept" ->
         return (Right ("accept", 43), [ArgImm, ArgStruct, ArgArray])
-      | name == syscallPrefix <> "bind" ->
+      | name == nsOS <> "bind" ->
         return (Right ("bind", 49), [ArgImm, ArgStruct, ArgImm])
-      | name == syscallPrefix <> "listen" ->
+      | name == nsOS <> "listen" ->
         return (Right ("listen", 50), [ArgImm, ArgImm])
-      | name == syscallPrefix <> "fork" ->
+      | name == nsOS <> "fork" ->
         return (Right ("fork", 57), [])
-      | name == syscallPrefix <> "exit" ->
+      | name == nsOS <> "exit" ->
         return (Right ("exit", 60), [ArgUnused, ArgImm])
-      | name == syscallPrefix <> "wait4" ->
+      | name == nsOS <> "wait4" ->
         return (Right ("wait4", 61), [ArgImm, ArgArray, ArgImm, ArgStruct])
       | otherwise ->
         Nothing
     OSDarwin
-      | name == syscallPrefix <> "exit" ->
+      | name == nsOS <> "exit" ->
         return (Left "exit", [ArgUnused, ArgImm]) -- 0x2000001
-      | name == syscallPrefix <> "fork" ->
+      | name == nsOS <> "fork" ->
         return (Left "fork", []) -- 0x2000002
-      | name == syscallPrefix <> "read" ->
+      | name == nsOS <> "read" ->
         return (Left "read", [ArgUnused, ArgImm, ArgArray, ArgImm]) -- 0x2000003
-      | name == syscallPrefix <> "write" ->
+      | name == nsOS <> "write" ->
         return (Left "write", [ArgUnused, ArgImm, ArgArray, ArgImm]) -- 0x2000004
-      | name == syscallPrefix <> "open" ->
+      | name == nsOS <> "open" ->
         return (Left "open", [ArgUnused, ArgArray, ArgImm, ArgImm]) -- 0x2000005
-      | name == syscallPrefix <> "close" ->
+      | name == nsOS <> "close" ->
         return (Left "close", [ArgImm]) -- 0x2000006
-      | name == syscallPrefix <> "wait4" ->
+      | name == nsOS <> "wait4" ->
         return (Left "wait4", [ArgImm, ArgArray, ArgImm, ArgStruct]) -- 0x2000007
-      | name == syscallPrefix <> "accept" ->
+      | name == nsOS <> "accept" ->
         return (Left "accept", [ArgImm, ArgStruct, ArgArray]) -- 0x2000030
-      | name == syscallPrefix <> "socket" ->
+      | name == nsOS <> "socket" ->
         return (Left "socket", [ArgImm, ArgImm, ArgImm]) -- 0x2000097
-      | name == syscallPrefix <> "connect" ->
+      | name == nsOS <> "connect" ->
         return (Left "connect", [ArgImm, ArgStruct, ArgImm]) -- 0x2000098
-      | name == syscallPrefix <> "bind" ->
+      | name == nsOS <> "bind" ->
         return (Left "bind", [ArgImm, ArgStruct, ArgImm]) -- 0x2000104
-      | name == syscallPrefix <> "listen" ->
+      | name == nsOS <> "listen" ->
         return (Left "listen", [ArgImm, ArgImm]) -- 0x2000106
       | otherwise ->
         Nothing
-
-{-# INLINE syscallPrefix #-}
-syscallPrefix :: T.Text
-syscallPrefix =
-  "os" <> nsSep

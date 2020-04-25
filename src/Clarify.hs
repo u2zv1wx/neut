@@ -216,15 +216,15 @@ clarifyConst tenv m x
     returnCartesianImmediate m
   | Just lowType <- asArrayAccessMaybe x =
     clarifyArrayAccess tenv m x lowType
-  | x == "os" <> nsSep <> "file-descriptor" =
+  | x == nsOS <> "file-descriptor" =
     returnCartesianImmediate m
-  | x == "os" <> nsSep <> "stdin" =
+  | x == nsOS <> "stdin" =
     clarify' tenv (m, TermInt 64 0)
-  | x == "os" <> nsSep <> "stdout" =
+  | x == nsOS <> "stdout" =
     clarify' tenv (m, TermInt 64 1)
-  | x == "os" <> nsSep <> "stderr" =
+  | x == nsOS <> "stderr" =
     clarify' tenv (m, TermInt 64 2)
-  | x == "unsafe" <> nsSep <> "cast" =
+  | x == nsUnsafe <> "cast" =
     clarifyCast tenv m
   | otherwise = do
     os <- getOS
