@@ -262,17 +262,6 @@ asArrayKindMaybe s =
         _ ->
           Nothing
 
-asIntMaybe :: T.Text -> Maybe Int
-asIntMaybe str
-  | T.length str >= 2,
-    T.head str == 'i',
-    Just i <- readMaybe $ T.unpack $ T.tail str :: Maybe Int,
-    1 <= i,
-    i <= 64 =
-    Just i
-  | otherwise =
-    Nothing
-
 data UnaryOp
   = UnaryOpFNeg LowType
   | UnaryOpTrunc LowType LowType

@@ -311,7 +311,6 @@ lowTypeToType m lowType =
       return (m, TermConst (showFloatSize s))
     LowTypeBool ->
       return (m, TermEnum "bool")
-    -- return (m, TermConst $ "f" <> T.pack (show (sizeAsInt s)))
     _ ->
       raiseCritical m "invalid argument passed to lowTypeToType"
 
@@ -386,13 +385,9 @@ insEnumEnv m name xis = do
 
 isConstant :: T.Text -> WithEnv Bool
 isConstant name
-  | name == "f16" =
+  | Just (LowTypeInt _) <- asLowTypeMaybe name =
     return True
-  | name == "f32" =
-    return True
-  | name == "f64" =
-    return True
-  | Just _ <- asIntMaybe name =
+  | Just (LowTypeFloat _) <- asLowTypeMaybe name =
     return True
   | Just _ <- asUnaryOpMaybe name =
     return True

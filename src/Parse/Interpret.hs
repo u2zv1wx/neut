@@ -36,7 +36,6 @@ interpret inputTree =
         return (m, WeakTermFloat h x')
       | Just str <- readMaybe $ T.unpack atom -> do
         u8s <- forM (encode str) $ \u ->
-          -- return (m, WeakTermEnumIntro $ EnumValueInt 8 (toInteger u))
           return (m, WeakTermInt (i8 m) (toInteger u))
         sigmaIntroString m u8s
       | otherwise ->
@@ -144,11 +143,6 @@ interpret inputTree =
         "enum"
           | [(_, TreeLeaf x)] <- rest ->
             return (m, WeakTermEnum x)
-          -- case readEnumTypeInt x of
-          --   Just i ->
-          --     return (m, WeakTermEnum $ EnumTypeInt i)
-          --   _ ->
-          --     return (m, WeakTermEnum $ EnumTypeLabel x)
           | otherwise ->
             raiseSyntaxError m "(enum LEAF)"
         "enum-introduction"
@@ -265,18 +259,11 @@ interpret inputTree =
             return (m, WeakTermInt (m, WeakTermConst (showIntSize intSize)) v)
           | otherwise ->
             interpretAux m $ leaf : rest
-    -- _ ->
-    --   interpretAux m $ leaf : rest
     (m, TreeNode es) ->
       interpretAux m es
 
 interpretAux :: Meta -> [TreePlus] -> WithEnv WeakTermPlus
 interpretAux m es =
-  -- if isEnumValue es
-  --   then do
-  --     enumValue <- interpretEnumValue (m, TreeNode es)
-  --     return (m, WeakTermEnumIntro enumValue)
-  --   else
   case es of
     [] ->
       raiseSyntaxError m "(TREE TREE*)"
@@ -417,32 +404,6 @@ interpretLeafText tree =
     t ->
       raiseSyntaxError (fst t) "LEAF"
 
--- isEnumValue :: [TreePlus] -> Bool
--- isEnumValue tree =
---   case tree of
---     [(_, TreeLeaf t), (_, TreeLeaf x)] ->
---       case readEnumValueInt t x of
---         Just _ ->
---           True
---         _ ->
---           False
---     _ ->
---       False
-
--- interpretEnumValue :: TreePlus -> WithEnv EnumValue
--- interpretEnumValue tree =
---   case tree of
---     (_, TreeLeaf x) ->
---       return $ EnumValueLabel x
---     e@(_, TreeNode [(_, TreeLeaf t), (_, TreeLeaf x)]) ->
---       case readEnumValueInt t x of
---         Just v ->
---           return v
---         _ ->
---           raiseSyntaxError (fst e) "(SINT-TYPE INT) | (UINT-TYPE INT)"
---     _ ->
---       raiseSyntaxError (fst tree) "LEAF | (LEAF LEAF)"
-
 interpretBinder :: [TreePlus] -> TreePlus -> WithEnv ([WeakIdentPlus], WeakTermPlus)
 interpretBinder xts t = do
   xts' <- mapM interpretWeakIdentPlus xts
@@ -453,22 +414,13 @@ interpretEnumCase :: TreePlus -> WithEnv EnumCasePlus
 interpretEnumCase tree =
   case tree of
     (m, TreeNode [(_, TreeLeaf "enum-introduction"), (_, TreeLeaf l)]) ->
-      -- v <- weakenEnumValue m <$> interpretEnumValue l
       return (m, EnumCaseLabel l)
     (m, TreeLeaf "default") ->
       return (m, EnumCaseDefault)
-    -- (m, TreeLeaf i)
-    --   | Just i' <- readMaybe $ T.unpack i -> do
-    --     h <- newHole m
-    --     return (m, EnumCaseInt h i')
     (m, TreeLeaf l) ->
       return (m, EnumCaseLabel l)
     (m, _) ->
       raiseSyntaxError m "(enum-introduction LEAF) | default | LEAF"
-
--- c -> do
---   v <- weakenEnumValue (fst c) <$> interpretEnumValue c
---   return (fst c, v)
 
 interpretClause :: TreePlus -> WithEnv (EnumCasePlus, WeakTermPlus)
 interpretClause tree =
@@ -495,7 +447,6 @@ interpretStructElim tree =
   case tree of
     (_, TreeNode [leaf, k]) -> do
       (m, x) <- interpretLeaf leaf
-      -- interpretLeaf :: TreePlus -> WithEnv (Meta, Ident) --;
       k' <- asArrayKind k
       return (m, x, k')
     e ->
@@ -655,7 +606,6 @@ headDiscriminantOf labelNumList =
     ((_, i) : _) ->
       i
 
--- readEnumValueInt :: T.Text -> T.Text -> Maybe EnumValue
 readValueInt :: T.Text -> T.Text -> Maybe (IntSize, Integer)
 readValueInt t x
   | Just (LowTypeInt i) <- asLowTypeMaybe t,
