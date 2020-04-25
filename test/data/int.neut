@@ -12,12 +12,12 @@
 (let (_ i2) 0)
 (let (_ i2) 1)
 
-;; (let (_ u2) -1)
-(let (_ u2) 0)
-(let (_ u2) 1)
-(let (_ u2) 2)
-(let (_ u2) 3)
-;; (let (_ u2) 4)
+;; (let (_ i2) -1)
+(let (_ i2) 0)
+(let (_ i2) 1)
+(let (_ i2) 2)
+(let (_ i2) 3)
+;; (let (_ i2) 4)
 ;; (let (x i2) 2) ;; raise error
 ;; (let (x i2) 3)
 ;; (let (x i2) 4)

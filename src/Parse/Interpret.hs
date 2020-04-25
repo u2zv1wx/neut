@@ -37,11 +37,8 @@ interpret inputTree =
       | Just i <- readEnumTypeIntS atom -> do
         rangeCheck m 'i' i
         return (m, WeakTermEnum $ EnumTypeIntS i)
-      | Just i <- readEnumTypeIntU atom -> do
-        rangeCheck m 'u' i
-        return (m, WeakTermEnum $ EnumTypeIntU i)
       | Just str <- readMaybe $ T.unpack atom -> do
-        u8s <- forM (encode str) $ \u -> return (m, WeakTermEnumIntro $ EnumValueIntU 8 (toInteger u))
+        u8s <- forM (encode str) $ \u -> return (m, WeakTermEnumIntro $ EnumValueIntS 8 (toInteger u))
         sigmaIntroString m u8s
       | otherwise ->
         case T.uncons atom of
@@ -147,13 +144,10 @@ interpret inputTree =
             raiseSyntaxError m "(f64 LEAF)"
         "enum"
           | [(_, TreeLeaf x)] <- rest ->
-            case (readEnumTypeIntS x, readEnumTypeIntU x) of
+            case (readEnumTypeIntS x, readEnumTypeIntS x) of
               (Just i, _) -> do
                 rangeCheck m 'i' i
                 return (m, WeakTermEnum $ EnumTypeIntS i)
-              (_, Just i) -> do
-                rangeCheck m 'u' i
-                return (m, WeakTermEnum $ EnumTypeIntU i)
               _ ->
                 return (m, WeakTermEnum $ EnumTypeLabel x)
           | otherwise ->
@@ -324,13 +318,13 @@ sigmaIntroString m u8s = do
             k,
             ( m,
               weakTermPi
-                [ (m, lenVar, (m, WeakTermEnum (EnumTypeIntU 64))),
+                [ (m, lenVar, (m, WeakTermEnum (EnumTypeIntS 64))),
                   ( m,
                     arrVar,
                     ( m,
                       WeakTermArray
                         (m, WeakTermUpsilon lenVar)
-                        (ArrayKindIntU 8)
+                        (ArrayKindIntS 8)
                     )
                   )
                 ]
@@ -341,8 +335,8 @@ sigmaIntroString m u8s = do
         ( m,
           WeakTermPiElim
             (m, WeakTermUpsilon k)
-            [ (m, WeakTermEnumIntro (EnumValueIntU 64 (toInteger $ length u8s))),
-              (m, WeakTermArrayIntro (ArrayKindIntU 8) u8s)
+            [ (m, WeakTermEnumIntro (EnumValueIntS 64 (toInteger $ length u8s))),
+              (m, WeakTermArrayIntro (ArrayKindIntS 8) u8s)
             ]
         )
     )
@@ -421,10 +415,8 @@ isEnumValue :: [TreePlus] -> Bool
 isEnumValue tree =
   case tree of
     [(_, TreeLeaf t), (_, TreeLeaf x)] ->
-      case (readEnumValueIntS t x, readEnumValueIntU t x) of
-        (Just _, _) ->
-          True
-        (_, Just _) ->
+      case readEnumValueIntS t x of
+        Just _ ->
           True
         _ ->
           False
@@ -437,9 +429,9 @@ interpretEnumValue tree =
     (_, TreeLeaf x) ->
       return $ EnumValueLabel x
     e@(m, TreeNode [(_, TreeLeaf t), (_, TreeLeaf x)]) ->
-      case (readEnumValueIntS t x, readEnumValueIntU t x) of
-        (Just v@(EnumValueIntS size x'), _) -> do
-          rangeCheck (fst tree) 'i' size
+      case readEnumValueIntS t x of
+        Just v@(EnumValueIntS size x') -> do
+          rangeCheck (fst tree) 'i' size -- LLVMの仕様に合わせればrangecheckはmoduloで落ちる
           if (-1) * (2 ^ (size - 1)) <= x' && x' < 2 ^ (size - 1)
             then return v
             else
@@ -449,18 +441,6 @@ interpretEnumValue tree =
                   <> " is supposed to be of type i"
                   <> T.pack (show size)
                   <> ", but is out of range of i"
-                  <> T.pack (show size)
-        (_, Just v@(EnumValueIntU size x')) -> do
-          rangeCheck (fst tree) 'u' size
-          if 0 <= x' && x' < 2 ^ size
-            then return v
-            else
-              raiseError m $
-                "the integer "
-                  <> T.pack (show x')
-                  <> " is supposed to be of type u"
-                  <> T.pack (show size)
-                  <> ", but is out of range of u"
                   <> T.pack (show size)
         _ ->
           raiseSyntaxError (fst e) "(SINT-TYPE INT) | (UINT-TYPE INT)"
@@ -693,23 +673,11 @@ rangeCheck m prefix i =
     then return ()
     else raiseError m $ "the `x` of `" <> T.singleton prefix <> "{x}` must satisfy 1 <= x <= 64"
 
-readEnumTypeIntU :: T.Text -> Maybe Int
-readEnumTypeIntU =
-  readEnumType 'u'
-
 readEnumValueIntS :: T.Text -> T.Text -> Maybe EnumValue
 readEnumValueIntS t x
   | Just (LowTypeIntS i) <- asLowTypeMaybe t,
     Just x' <- readMaybe $ T.unpack x =
     Just $ EnumValueIntS i x'
-  | otherwise =
-    Nothing
-
-readEnumValueIntU :: T.Text -> T.Text -> Maybe EnumValue
-readEnumValueIntU t x
-  | Just (LowTypeIntU i) <- asLowTypeMaybe t,
-    Just x' <- readMaybe $ T.unpack x =
-    Just $ EnumValueIntU i x'
   | otherwise =
     Nothing
 

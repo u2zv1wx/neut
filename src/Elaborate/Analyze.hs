@@ -82,12 +82,6 @@ simp' constraintList =
         ((m, WeakTermEnumIntro (EnumValueIntS s1 l1)), (_, WeakTermInt t2 l2))
           | l1 == l2 ->
             simp $ (toIntS m s1, t2) : cs
-        ((_, WeakTermInt t1 l1), (m, WeakTermEnumIntro (EnumValueIntU s2 l2)))
-          | l1 == l2 ->
-            simp $ (t1, toIntU m s2) : cs
-        ((m, WeakTermEnumIntro (EnumValueIntU s1 l1)), (_, WeakTermInt t2 l2))
-          | l1 == l2 ->
-            simp $ (toIntU m s1, t2) : cs
         ((_, WeakTermInt t1 l1), (_, WeakTermInt t2 l2))
           | l1 == l2 ->
             simp $ (t1, t2) : cs
@@ -411,10 +405,6 @@ lookupAll is sub =
 toIntS :: Meta -> IntSize -> WeakTermPlus
 toIntS m size =
   (m, WeakTermEnum $ EnumTypeIntS size)
-
-toIntU :: Meta -> IntSize -> WeakTermPlus
-toIntU m size =
-  (m, WeakTermEnum $ EnumTypeIntU size)
 
 throwArityError :: Meta -> Int -> Int -> WithEnv a
 throwArityError m i1 i2 =

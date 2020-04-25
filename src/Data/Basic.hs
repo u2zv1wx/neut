@@ -167,12 +167,10 @@ showFloatSize size =
 data EnumType
   = EnumTypeLabel T.Text
   | EnumTypeIntS Int -- i{k}
-  | EnumTypeIntU Int -- u{k}
   deriving (Show, Eq, Generic)
 
 data EnumValue
   = EnumValueIntS IntSize Integer
-  | EnumValueIntU IntSize Integer
   | EnumValueLabel T.Text
   deriving (Show, Eq, Ord, Generic)
 
@@ -186,7 +184,6 @@ type CasePlus =
 
 data LowType
   = LowTypeIntS IntSize
-  | LowTypeIntU IntSize
   | LowTypeFloat FloatSize
   | LowTypeVoid -- to represent the cod of free
   | LowTypeFunctionPtr [LowType] LowType
@@ -220,7 +217,6 @@ sizeAsInt size =
 
 data ArrayKind
   = ArrayKindIntS Int
-  | ArrayKindIntU Int
   | ArrayKindFloat FloatSize
   | ArrayKindVoidPtr
   deriving (Show, Eq, Generic)
@@ -245,8 +241,6 @@ lowTypeToArrayKindMaybe lowType =
   case lowType of
     LowTypeIntS i ->
       Just $ ArrayKindIntS i
-    LowTypeIntU i ->
-      Just $ ArrayKindIntU i
     LowTypeFloat size ->
       Just $ ArrayKindFloat size
     _ ->
@@ -257,8 +251,6 @@ arrayKindToLowType arrayKind =
   case arrayKind of
     ArrayKindIntS i ->
       LowTypeIntS i
-    ArrayKindIntU i ->
-      LowTypeIntU i
     ArrayKindFloat size ->
       LowTypeFloat size
     ArrayKindVoidPtr ->
@@ -274,9 +266,6 @@ asArrayKindMaybe s =
         'i'
           | Just n <- readMaybe $ T.unpack rest ->
             Just (ArrayKindIntS n, c, n)
-        'u'
-          | Just n <- readMaybe $ T.unpack rest ->
-            Just (ArrayKindIntU n, c, n)
         'f'
           | Just n <- readMaybe $ T.unpack rest,
             Just size <- asFloatSize n ->
@@ -345,10 +334,6 @@ asConvOpMaybe domType codType name =
         LowTypeIntS i2 <- codType,
         i1 > i2 ->
         Just $ UnaryOpTrunc domType codType
-      | LowTypeIntU i1 <- domType,
-        LowTypeIntU i2 <- codType,
-        i1 > i2 ->
-        Just $ UnaryOpTrunc domType codType
     "fptrunc"
       | LowTypeFloat size1 <- domType,
         LowTypeFloat size2 <- codType,
@@ -359,17 +344,9 @@ asConvOpMaybe domType codType name =
         LowTypeIntS i2 <- codType,
         i1 < i2 ->
         Just $ UnaryOpZext domType codType
-      | LowTypeIntU i1 <- domType,
-        LowTypeIntU i2 <- codType,
-        i1 < i2 ->
-        Just $ UnaryOpZext domType codType
     "sext"
       | LowTypeIntS i1 <- domType,
         LowTypeIntS i2 <- codType,
-        i1 < i2 ->
-        Just $ UnaryOpSext domType codType
-      | LowTypeIntU i1 <- domType,
-        LowTypeIntU i2 <- codType,
         i1 < i2 ->
         Just $ UnaryOpSext domType codType
     "fpext"
@@ -379,14 +356,14 @@ asConvOpMaybe domType codType name =
         Just $ UnaryOpFpExt domType codType
     "fptoui"
       | LowTypeFloat _ <- domType,
-        LowTypeIntU _ <- codType ->
+        LowTypeIntS _ <- codType ->
         Just $ UnaryOpFU domType codType
     "fptosi"
       | LowTypeFloat _ <- domType,
         LowTypeIntS _ <- codType ->
         Just $ UnaryOpFS domType codType
     "uitofp"
-      | LowTypeIntU _ <- domType,
+      | LowTypeIntS _ <- domType,
         LowTypeFloat _ <- codType ->
         Just $ UnaryOpUF domType codType
     "sitofp"
@@ -450,8 +427,7 @@ asBinaryOpMaybe name
     case opStr of
       "icmp"
         | Just (condStr, typeStr) <- breakOnMaybe "-" rest,
-          Just lowType <- asLowTypeMaybe' typeStr,
-          isLowTypeInt lowType,
+          Just lowType@(LowTypeIntS _) <- asLowTypeMaybe' typeStr,
           Just f <- asICmpMaybe condStr ->
           Just $ f lowType
       "fcmp"
@@ -468,18 +444,11 @@ asBinaryOpMaybe name
   | otherwise =
     Nothing
 
-isLowTypeInt :: LowType -> Bool
-isLowTypeInt (LowTypeIntS _) = True
-isLowTypeInt (LowTypeIntU _) = True
-isLowTypeInt _ = False
-
 asBinaryOpMaybe' :: T.Text -> LowType -> Maybe (LowType -> BinaryOp)
 asBinaryOpMaybe' name lowType =
   case name of
     "add"
       | LowTypeIntS _ <- lowType ->
-        Just BinaryOpAdd
-      | LowTypeIntU _ <- lowType ->
         Just BinaryOpAdd
     "fadd"
       | LowTypeFloat _ <- lowType ->
@@ -487,15 +456,11 @@ asBinaryOpMaybe' name lowType =
     "sub"
       | LowTypeIntS _ <- lowType ->
         Just BinaryOpSub
-      | LowTypeIntU _ <- lowType ->
-        Just BinaryOpSub
     "fsub"
       | LowTypeFloat _ <- lowType ->
         Just BinaryOpFSub
     "mul"
       | LowTypeIntS _ <- lowType ->
-        Just BinaryOpMul
-      | LowTypeIntU _ <- lowType ->
         Just BinaryOpMul
     "fmul"
       | LowTypeFloat _ <- lowType ->
@@ -503,12 +468,8 @@ asBinaryOpMaybe' name lowType =
     "udiv"
       | LowTypeIntS _ <- lowType ->
         Just BinaryOpUDiv
-      | LowTypeIntU _ <- lowType ->
-        Just BinaryOpUDiv
     "sdiv"
       | LowTypeIntS _ <- lowType ->
-        Just BinaryOpSDiv
-      | LowTypeIntU _ <- lowType ->
         Just BinaryOpSDiv
     "fdiv"
       | LowTypeFloat _ <- lowType ->
@@ -516,12 +477,8 @@ asBinaryOpMaybe' name lowType =
     "urem"
       | LowTypeIntS _ <- lowType ->
         Just BinaryOpURem
-      | LowTypeIntU _ <- lowType ->
-        Just BinaryOpURem
     "srem"
       | LowTypeIntS _ <- lowType ->
-        Just BinaryOpSRem
-      | LowTypeIntU _ <- lowType ->
         Just BinaryOpSRem
     "frem"
       | LowTypeFloat _ <- lowType ->
@@ -529,32 +486,20 @@ asBinaryOpMaybe' name lowType =
     "shl"
       | LowTypeIntS _ <- lowType ->
         Just BinaryOpShl
-      | LowTypeIntU _ <- lowType ->
-        Just BinaryOpShl
     "lshr"
       | LowTypeIntS _ <- lowType ->
-        Just BinaryOpLshr
-      | LowTypeIntU _ <- lowType ->
         Just BinaryOpLshr
     "ashr"
       | LowTypeIntS _ <- lowType ->
         Just BinaryOpAshr
-      | LowTypeIntU _ <- lowType ->
-        Just BinaryOpAshr
     "and"
       | LowTypeIntS _ <- lowType ->
-        Just BinaryOpAnd
-      | LowTypeIntU _ <- lowType ->
         Just BinaryOpAnd
     "or"
       | LowTypeIntS _ <- lowType ->
         Just BinaryOpOr
-      | LowTypeIntU _ <- lowType ->
-        Just BinaryOpOr
     "xor"
       | LowTypeIntS _ <- lowType ->
-        Just BinaryOpXor
-      | LowTypeIntU _ <- lowType ->
         Just BinaryOpXor
     _ ->
       Nothing

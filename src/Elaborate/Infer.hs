@@ -102,9 +102,6 @@ infer' ctx term =
         EnumValueIntS size _ -> do
           let t = (m, WeakTermEnum (EnumTypeIntS size))
           return ((m, WeakTermEnumIntro v), t)
-        EnumValueIntU size _ -> do
-          let t = (m, WeakTermEnum (EnumTypeIntU size))
-          return ((m, WeakTermEnumIntro v), t)
         EnumValueLabel l -> do
           k <- lookupKind m l
           let t = (m, WeakTermEnum $ EnumTypeLabel k)
@@ -126,7 +123,7 @@ infer' ctx term =
           return ((m, WeakTermEnumElim (e', t') $ zip cs' es'), head ts)
     (m, WeakTermArray dom k) -> do
       (dom', tDom) <- infer' ctx dom
-      let tDom' = (m, WeakTermEnum (EnumTypeIntU 64))
+      let tDom' = (m, WeakTermEnum (EnumTypeIntS 64))
       insConstraintEnv tDom tDom'
       return ((m, WeakTermArray dom' k), (m, WeakTermTau))
     (m, WeakTermArrayIntro k es) -> do
@@ -134,14 +131,14 @@ infer' ctx term =
       (es', ts) <- unzip <$> mapM (infer' ctx) es
       forM_ (zip ts (repeat tCod)) $ uncurry insConstraintEnv
       let len = toInteger $ length es
-      let dom = (m, WeakTermEnumIntro (EnumValueIntU 64 len))
+      let dom = (m, WeakTermEnumIntro (EnumValueIntS 64 len))
       let t = (m, WeakTermArray dom k)
       return ((m, WeakTermArrayIntro k es'), t)
     (m, WeakTermArrayElim k xts e1 e2) -> do
       (e1', t1) <- infer' ctx e1
       (xts', (e2', t2)) <- inferBinder ctx xts e2
       let len = toInteger $ length xts
-      let dom = (m, WeakTermEnumIntro (EnumValueIntU 64 len))
+      let dom = (m, WeakTermEnumIntro (EnumValueIntS 64 len))
       insConstraintEnv t1 (fst e1', WeakTermArray dom k)
       let ts = map (\(_, _, t) -> t) xts'
       tCod <- inferKind m k
@@ -298,8 +295,6 @@ inferKind m kind =
   case kind of
     ArrayKindIntS i ->
       return (m, WeakTermEnum (EnumTypeIntS i))
-    ArrayKindIntU i ->
-      return (m, WeakTermEnum (EnumTypeIntU i))
     ArrayKindFloat size ->
       return (m, WeakTermConst ("f" <> T.pack (show (sizeAsInt size))))
     _ ->
@@ -421,8 +416,6 @@ inferWeakCase ctx weakCase =
       return (weakCase, (m, WeakTermEnum $ EnumTypeLabel k))
     (m, WeakCaseIntS size _) ->
       return (weakCase, (m, WeakTermEnum (EnumTypeIntS size)))
-    (m, WeakCaseIntU size _) ->
-      return (weakCase, (m, WeakTermEnum (EnumTypeIntU size)))
     (m, WeakCaseInt t a) -> do
       t' <- inferType' ctx t
       return ((m, WeakCaseInt t' a), t')

@@ -102,8 +102,6 @@ takeBaseName term =
       "double"
     (_, DataEnumIntro (EnumValueIntS size _)) ->
       "i" <> T.pack (show size)
-    (_, DataEnumIntro (EnumValueIntU size _)) ->
-      "u" <> T.pack (show size)
     (_, DataEnumIntro _) ->
       "i64"
     (_, DataStructIntro dks) ->
@@ -220,8 +218,6 @@ llvmCast mName v lowType =
   case lowType of
     LowTypeIntS _ ->
       llvmCastInt mName v lowType
-    LowTypeIntU _ ->
-      llvmCastInt mName v lowType
     LowTypeFloat i ->
       llvmCastFloat mName v i
     _ -> do
@@ -272,8 +268,6 @@ llvmUncast :: Maybe T.Text -> LLVMData -> LowType -> WithEnv LLVM
 llvmUncast mName result lowType =
   case lowType of
     LowTypeIntS _ ->
-      llvmUncastInt mName result lowType
-    LowTypeIntU _ ->
       llvmUncastInt mName result lowType
     LowTypeFloat i ->
       llvmUncastFloat mName result i
@@ -353,8 +347,6 @@ llvmDataLet x llvmData cont =
       case intOrLabel of
         EnumValueIntS size i ->
           llvmUncastLet x (LLVMDataInt i) (LowTypeIntS size) cont
-        EnumValueIntU size i ->
-          llvmUncastLet x (LLVMDataInt i) (LowTypeIntU size) cont
         EnumValueLabel l -> do
           i <- toInteger <$> getEnumNum m l
           llvmUncastLet x (LLVMDataInt i) (LowTypeIntS 64) cont
@@ -554,8 +546,6 @@ enumValueToInteger m intOrLabel =
     EnumValueLabel l ->
       toInteger <$> getEnumNum m l
     EnumValueIntS _ i ->
-      return i
-    EnumValueIntU _ i ->
       return i
 
 getEnumNum :: Meta -> T.Text -> WithEnv Int

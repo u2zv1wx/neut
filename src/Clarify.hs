@@ -531,8 +531,6 @@ inferKind m arrayKind =
   case arrayKind of
     ArrayKindIntS i ->
       return (m, TermEnum (EnumTypeIntS i))
-    ArrayKindIntU i ->
-      return (m, TermEnum (EnumTypeIntU i))
     ArrayKindFloat size -> do
       let constName = "f" <> T.pack (show (sizeAsInt size))
       return (m, TermConst constName)

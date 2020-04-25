@@ -307,8 +307,6 @@ lowTypeToType m lowType =
   case lowType of
     LowTypeIntS s ->
       return (m, TermEnum (EnumTypeIntS s))
-    LowTypeIntU s ->
-      return (m, TermEnum (EnumTypeIntU s))
     LowTypeFloat s ->
       return (m, TermConst $ "f" <> T.pack (show (sizeAsInt s)))
     _ ->
@@ -340,10 +338,10 @@ arrayAccessToType m lowType = do
   x1 <- newNameWith' "arg"
   x2 <- newNameWith' "arg"
   x3 <- newNameWith' "arg"
-  let u64 = (m, TermEnum (EnumTypeIntU 64))
+  let i64 = (m, TermEnum (EnumTypeIntS 64))
   let idx = (m, TermUpsilon x2)
   let arr = (m, TermArray idx k)
-  let xts = [(m, x1, u64), (m, x2, u64), (m, x3, arr)]
+  let xts = [(m, x1, i64), (m, x2, i64), (m, x3, arr)]
   x4 <- newNameWith' "arg"
   x5 <- newNameWith' "arg"
   cod <- termSigma m [(m, x4, arr), (m, x5, t)]

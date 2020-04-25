@@ -157,18 +157,6 @@ elaborate' term =
                 <> T.pack (show size)
                 <> ", but is out of range of i"
                 <> T.pack (show size)
-        (_, TermEnum (EnumTypeIntU size))
-          | 0 <= x,
-            x < 2 ^ size ->
-            return (m, TermEnumIntro (EnumValueIntU size x))
-          | otherwise ->
-            raiseError m $
-              "the integer "
-                <> T.pack (show x)
-                <> " is inferred to be of type u"
-                <> T.pack (show size)
-                <> ", but is out of range of u"
-                <> T.pack (show size)
         _ ->
           raiseError m $
             "the term `"
@@ -335,8 +323,6 @@ elaborateWeakCase weakCase =
       case t' of
         (_, TermEnum (EnumTypeIntS size)) ->
           return (m, CaseValue (EnumValueIntS size x))
-        (_, TermEnum (EnumTypeIntU size)) ->
-          return (m, CaseValue (EnumValueIntU size x))
         (_, TermEnum (EnumTypeLabel "bool")) ->
           return (m, CaseValue (EnumValueIntS 1 x))
         _ ->
@@ -349,8 +335,6 @@ elaborateWeakCase weakCase =
       return (m, CaseValue $ EnumValueLabel l)
     (m, WeakCaseIntS t a) ->
       return (m, CaseValue $ EnumValueIntS t a)
-    (m, WeakCaseIntU t a) ->
-      return (m, CaseValue $ EnumValueIntU t a)
     (m, WeakCaseDefault) ->
       return (m, CaseDefault)
 
@@ -366,8 +350,6 @@ caseCheckEnumIdent m enumtype ls =
       es <- lookupEnumSet m x
       caseCheckEnumIdent' m (length es) ls
     EnumTypeIntS _ ->
-      throwIfFalse m $ CaseDefault `elem` ls
-    EnumTypeIntU _ ->
       throwIfFalse m $ CaseDefault `elem` ls
 
 caseCheckEnumIdent' :: Meta -> Int -> [Case] -> WithEnv ()

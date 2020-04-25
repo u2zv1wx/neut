@@ -52,12 +52,12 @@
 (define length
   ((a tau)
    (xs (list a)))
-  (witness u64
+  (witness i64
     (case xs
       ((nil)
         0)
       ((cons _ ys)
-        (add-u64 1 (length a ys))))))
+        (add-i64 1 (length a ys))))))
 
 (attribute length (implicit 0))
 

@@ -46,7 +46,6 @@ type WeakTermPlus =
 
 data WeakCase
   = WeakCaseIntS IntSize Integer
-  | WeakCaseIntU IntSize Integer
   | WeakCaseInt WeakTermPlus Integer
   | WeakCaseLabel T.Text
   | WeakCaseDefault
@@ -428,7 +427,6 @@ toText term =
       case enumType of
         EnumTypeLabel l -> l
         EnumTypeIntS size -> "i" <> T.pack (show size)
-        EnumTypeIntU size -> "u" <> T.pack (show size)
     (_, WeakTermEnumIntro v) ->
       showEnumValue v
     (_, WeakTermEnumElim (e, _) mles) -> do
@@ -528,8 +526,6 @@ showWeakCase weakCase =
       l
     WeakCaseIntS _ a ->
       T.pack $ show a
-    WeakCaseIntU _ a ->
-      T.pack $ show a
     WeakCaseInt _ a ->
       T.pack $ show a
     WeakCaseDefault ->
@@ -542,8 +538,6 @@ weakenEnumValue enumValue =
       WeakCaseLabel l
     EnumValueIntS t a ->
       WeakCaseIntS t a
-    EnumValueIntU t a ->
-      WeakCaseIntU t a
 
 showEnumValue :: EnumValue -> T.Text
 showEnumValue enumValue =
@@ -552,16 +546,12 @@ showEnumValue enumValue =
       l
     EnumValueIntS _ a ->
       T.pack $ show a
-    EnumValueIntU _ a ->
-      T.pack $ show a
 
 showArrayKind :: ArrayKind -> T.Text
 showArrayKind arrayKind =
   case arrayKind of
     ArrayKindIntS size ->
       T.pack $ "i" ++ show size
-    ArrayKindIntU size ->
-      T.pack $ "u" ++ show size
     ArrayKindFloat size ->
       T.pack $ "f" ++ show (sizeAsInt size)
     ArrayKindVoidPtr ->

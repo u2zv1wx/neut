@@ -389,8 +389,6 @@ showLowTypeAsIfNonPtr lowType =
   case lowType of
     LowTypeIntS i ->
       "i" <> intDec i
-    LowTypeIntU i ->
-      "i" <> intDec i
     LowTypeFloat FloatSize16 ->
       "half"
     LowTypeFloat FloatSize32 ->
@@ -422,9 +420,6 @@ showLowType :: LowType -> Builder
 showLowType lowType =
   case lowType of
     LowTypeIntS i ->
-      "i" <> intDec i
-    -- LLVM doesn't distinguish unsigned integers from signed ones
-    LowTypeIntU i ->
       "i" <> intDec i
     LowTypeFloat FloatSize16 ->
       "half"

@@ -3,7 +3,7 @@
   (array-introduction i64))
 
 (let _
-  (array-introduction u8 1 2 3 2 1 2 4))
+  (array-introduction i8 1 2 3 2 1 2 4))
 
 (let xs
   (array-introduction i64 1 2 -30 20))

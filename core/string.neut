@@ -6,20 +6,20 @@
 
 (define string
   (sigma
-    ((len u64))
-    (array len u8)))
+    ((len i64))
+    (array len i8)))
 
 (use os)
 
-(define print-character ((value u8))
+(define print-character ((value i8))
   (witness top
     (with let-bind
-      (let char (array-introduction u8 value))
+      (let char (array-introduction i8 value))
       (os:write hole os:stdout char 1)
       top:unit)))
 
 (define string:print ((str string))
-  (witness (product string u64)
+  (witness (product string i64)
     ;; (let (tuple n content) str) ← こんなふうに書けると嬉しい？
     ;; (...)
     (destruct str (n content)

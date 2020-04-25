@@ -1,6 +1,6 @@
 (define p
   ((str string))
-  (witness u64
+  (witness i64
     (with let-bind
       (let _
         (let _ (i64 100))

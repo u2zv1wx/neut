@@ -12,22 +12,22 @@
 
 (constant read
   (pi
-    ((A u64)
+    ((A i64)
      (in file-descriptor)
-     (buf (array A u8))
-     (len u64))
-    (product (array A u8) i64)))
+     (buf (array A i8))
+     (len i64))
+    (product (array A i8) i64)))
 
 
 ;; (attribute read (implicit 0))
 
 (constant write
   (pi
-    ((A u64)
+    ((A i64)
      (out file-descriptor)
-     (str (array A u8))
-     (len u64))
-    (product (array A u8) u64)))
+     (str (array A i8))
+     (len i64))
+    (product (array A i8) i64)))
 
 ;; (attribute write (implicit 0))
 
@@ -39,11 +39,11 @@
 
 (constant open
   (pi
-    ((A u64)
-     (path (array A u8))
+    ((A i64)
+     (path (array A i8))
      (flags i64)
      (mode i64))
-    (product (array A u8) file-descriptor)))
+    (product (array A i8) file-descriptor)))
 
 ;; (attribute open (implicit 0))
 
@@ -88,28 +88,28 @@
 
 (define sockaddr
   (struct
-    u8    ;; total length
-    u8    ;; address family
-    u16   ;; empty (4 byte so far)
-    u32   ;; empty (8 byte so far)
-    u64)) ;; empty (16 byte so far)
+    i8    ;; total length
+    i8    ;; address family
+    i16   ;; empty (4 byte so far)
+    i32   ;; empty (8 byte so far)
+    i64)) ;; empty (16 byte so far)
 
 (define sockaddr-in
   (struct
-    u8    ;; total length
-    u8    ;; address family
-    u16   ;; ipv4 port
-    u32   ;; ipv4 addr
-    u64)) ;; empty
+    i8    ;; total length
+    i8    ;; address family
+    i16   ;; ipv4 port
+    i32   ;; ipv4 addr
+    i64)) ;; empty
 
 (define sockaddr-in6
   (struct
-    u8    ;; length of this struct
-    u8    ;; AF_INET6
-    u16   ;; Transport layer port
-    u32   ;; IP6 flow information
-    u32   ;; IP6 address
-    u32)) ;; scope zone index
+    i8    ;; length of this struct
+    i8    ;; AF_INET6
+    i16   ;; Transport layer port
+    i32   ;; IP6 flow information
+    i32   ;; IP6 address
+s    i32)) ;; scope zone index
 
 (constant bind
   (pi

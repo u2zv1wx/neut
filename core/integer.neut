@@ -19,7 +19,7 @@
 (define print-digit ((x i64))
   (witness top
     (with let-bind
-      (print-character (unsafe:cast i64 u8 (add-i64 x 48))))))
+      (print-character (unsafe:cast i64 i8 (add-i64 x 48))))))
 
 ;; とりあえず直接printする。ホントはbufferをつかって実装するべき。
 (define print ((x i64))

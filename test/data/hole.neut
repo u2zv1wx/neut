@@ -1,4 +1,4 @@
-(let (x hole) (u64 1))
+(let (x hole) (i64 1))
 
 (let (y hole)
   (with let-bind

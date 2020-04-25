@@ -32,7 +32,7 @@
 
 ;; 4-ary sigma-intro
 (let a4
-  (witness (product u8 u64 i64 u3)
+  (witness (product i8 i64 i64 i3)
     (tuple 4 4 4 4)))
 
 ;; 4-ary sigma-elim
