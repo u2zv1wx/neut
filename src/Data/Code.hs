@@ -36,7 +36,7 @@ data Primitive
   = PrimitiveUnaryOp UnaryOp DataPlus
   | PrimitiveBinaryOp BinaryOp DataPlus DataPlus
   | PrimitiveArrayAccess LowType DataPlus DataPlus
-  | PrimitiveSysCall Syscall [DataPlus]
+  | PrimitiveSyscall Syscall [DataPlus]
   deriving (Show)
 
 newtype IsFixed
@@ -144,6 +144,6 @@ substPrimitive sub c =
       let d1' = substDataPlus sub d1
       let d2' = substDataPlus sub d2
       PrimitiveArrayAccess t d1' d2'
-    PrimitiveSysCall sysCall ds -> do
+    PrimitiveSyscall syscall ds -> do
       let ds' = map (substDataPlus sub) ds
-      PrimitiveSysCall sysCall ds'
+      PrimitiveSyscall syscall ds'

@@ -17,8 +17,8 @@ data Arg
   | ArgUnused
   deriving (Show)
 
-asSysCallMaybe :: OS -> T.Text -> Maybe (Syscall, [Arg])
-asSysCallMaybe os name =
+asSyscallMaybe :: OS -> T.Text -> Maybe (Syscall, [Arg])
+asSyscallMaybe os name =
   case os of
     OSLinux
       | name == "os" <> nsSep <> "read" ->

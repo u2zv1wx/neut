@@ -193,7 +193,7 @@ llvmCodePrimitive _ codeOp =
               [(LLVMDataInt 0, i32), (idxVar, i64)]
           )
           (LLVMLet resName (LLVMOpLoad resPtr lowType) uncast)
-    PrimitiveSysCall syscall args -> do
+    PrimitiveSyscall syscall args -> do
       (xs, vs) <- unzip <$> mapM (const $ newDataLocal "sys-call-arg") args
       call <- syscallToLLVM syscall vs
       llvmDataLet' (zip xs args) call
@@ -377,7 +377,7 @@ syscallToLLVM syscall ds =
     Right (_, num) -> do
       res <- newNameWith' "result"
       return
-        $ LLVMLet res (LLVMOpSysCall num ds)
+        $ LLVMLet res (LLVMOpSyscall num ds)
         $ LLVMReturn (LLVMDataLocal res)
 
 llvmDataLet' :: [(Ident, DataPlus)] -> LLVM -> WithEnv LLVM

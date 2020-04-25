@@ -179,8 +179,8 @@ emitLLVMOp llvmOp =
       if S.member j nenv
         then return "bitcast i8* null to i8*" -- nop
         else return $ unwordsL ["call fastcc", "void", "@free(i8* " <> showLLVMData d <> ")"]
-    LLVMOpSysCall num ds ->
-      emitSysCallOp num ds
+    LLVMOpSyscall num ds ->
+      emitSyscallOp num ds
     LLVMOpUnaryOp (UnaryOpFNeg t) d ->
       emitUnaryOp t "fneg" d
     LLVMOpUnaryOp (UnaryOpTrunc t1 t2) d ->
@@ -304,8 +304,8 @@ emitLLVMConvOp cast d dom cod =
   return $
     unwordsL [cast, showLowType dom, showLLVMData d, "to", showLowType cod]
 
-emitSysCallOp :: Integer -> [LLVMData] -> WithEnv Builder
-emitSysCallOp num ds = do
+emitSyscallOp :: Integer -> [LLVMData] -> WithEnv Builder
+emitSyscallOp num ds = do
   regList <- getRegList
   currentArch <- getArch
   case currentArch of

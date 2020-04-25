@@ -42,7 +42,7 @@ data LLVMOp
   | LLVMOpFree LLVMData SizeInfo Int -- (var, size-of-var, name-of-free)   (name-of-free is only for optimization)
   | LLVMOpUnaryOp UnaryOp LLVMData
   | LLVMOpBinaryOp BinaryOp LLVMData LLVMData
-  | LLVMOpSysCall
+  | LLVMOpSyscall
       Integer -- syscall number
       [LLVMData] -- arguments
   deriving (Show)
@@ -106,6 +106,6 @@ substLLVMOp sub llvmOp =
       let d1' = substLLVMData sub d1
       let d2' = substLLVMData sub d2
       LLVMOpBinaryOp op d1' d2'
-    LLVMOpSysCall i ds -> do
+    LLVMOpSyscall i ds -> do
       let ds' = map (substLLVMData sub) ds
-      LLVMOpSysCall i ds'
+      LLVMOpSyscall i ds'

@@ -228,9 +228,9 @@ clarifyConst tenv m x
     clarifyCast tenv m
   | otherwise = do
     os <- getOS
-    case asSysCallMaybe os x of
+    case asSyscallMaybe os x of
       Just (syscall, argInfo) ->
-        clarifySysCall tenv x syscall argInfo m
+        clarifySyscall tenv x syscall argInfo m
       _ ->
         return (m, CodeUpIntro (m, DataConst x)) -- external constant
 
@@ -300,22 +300,22 @@ clarifyArrayAccess tenv m name lowType = do
       raiseCritical m "the type of array-access is wrong"
 
 -- ここでclsをつくる計算は省略できる (tryCache的に)
-clarifySysCall ::
+clarifySyscall ::
   TypeEnv ->
   T.Text -> -- the name of theta
   Syscall ->
   [Arg] -> -- the length of the arguments of the theta
   Meta -> -- the meta of the theta
   WithEnv CodePlus
-clarifySysCall tenv name syscall args m = do
-  sysCallType <- lookupConstTypeEnv m name
-  let sysCallType' = reduceTermPlus sysCallType
-  case sysCallType' of
+clarifySyscall tenv name syscall args m = do
+  syscallType <- lookupConstTypeEnv m name
+  let syscallType' = reduceTermPlus syscallType
+  case syscallType' of
     (_, TermPi _ xts cod)
       | length xts == length args -> do
         (xs, ds, headerList) <- computeHeader m xts args
         let tenv' = insTypeEnv1 xts tenv
-        callThenReturn <- toSysCallTail tenv' m cod syscall ds xs
+        callThenReturn <- toSyscallTail tenv' m cod syscall ds xs
         let body = iterativeApp headerList callThenReturn
         retClosure tenv Nothing [] m xts body
     _ ->
@@ -408,7 +408,7 @@ computeHeader m xts argInfoList = do
     unzip3 <$> mapM (\((_, x, t), a) -> toHeaderInfo m x t a) xtas
   return (concat xss, concat dss, headerList)
 
-toSysCallTail ::
+toSyscallTail ::
   TypeEnv ->
   Meta ->
   TermPlus -> -- cod type
@@ -416,12 +416,12 @@ toSysCallTail ::
   [DataPlus] -> -- args of syscall
   [IdentPlus] -> -- borrowed variables
   WithEnv CodePlus
-toSysCallTail tenv m cod syscall args xs = do
+toSyscallTail tenv m cod syscall args xs = do
   resultVarName <- newNameWith' "result"
   result <- retWithBorrowedVars tenv m cod xs resultVarName
   return
     ( m,
-      CodeUpElim resultVarName (m, CodePrimitive (PrimitiveSysCall syscall args)) result
+      CodeUpElim resultVarName (m, CodePrimitive (PrimitiveSyscall syscall args)) result
     )
 
 toArrayAccessTail ::

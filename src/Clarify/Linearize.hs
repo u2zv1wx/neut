@@ -230,6 +230,6 @@ distinguishPrimitive zs term =
       (vs1, d1') <- distinguishData zs d1
       (vs2, d2') <- distinguishData zs d2
       return (merge [vs1, vs2], PrimitiveArrayAccess lowType d1' d2')
-    PrimitiveSysCall num ds -> do
+    PrimitiveSyscall num ds -> do
       (vss, ds') <- unzip <$> mapM (distinguishData zs) ds
-      return (merge vss, PrimitiveSysCall num ds')
+      return (merge vss, PrimitiveSyscall num ds')
