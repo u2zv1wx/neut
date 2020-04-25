@@ -148,3 +148,13 @@ insCodeEnv :: T.Text -> [Ident] -> CodePlus -> WithEnv ()
 insCodeEnv name args e = do
   let def = Definition (IsFixed False) args e
   modify (\env -> env {codeEnv = Map.insert name def (codeEnv env)})
+
+{-# INLINE boolTrue #-}
+boolTrue :: T.Text
+boolTrue =
+  "bool" <> nsSep <> "true"
+
+{-# INLINE boolFalse #-}
+boolFalse :: T.Text
+boolFalse =
+  "bool" <> nsSep <> "false"

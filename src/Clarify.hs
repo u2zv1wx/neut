@@ -9,6 +9,7 @@ where
 import Clarify.Linearize
 import Clarify.Sigma
 import Clarify.Utility
+import Codec.Binary.UTF8.String
 import Control.Monad.State.Lazy
 import Data.Basic
 import Data.Code
@@ -24,6 +25,7 @@ import Data.Size
 import Data.Syscall
 import Data.Term
 import qualified Data.Text as T
+import Data.Word
 import Reduce.Term
 
 clarify :: Stmt -> WithEnv CodePlus
@@ -693,3 +695,16 @@ obtainChain m x tenv = do
       let chain = xts ++ [(m, x, t)]
       modify (\env -> env {chainEnv = IntMap.insert (asInt x) chain cenv})
       return chain
+
+showInHex :: T.Text -> T.Text
+showInHex x =
+  "x" <> foldr (<>) "" (map showInHex' (encode $ T.unpack x))
+
+showInHex' :: Word8 -> T.Text
+showInHex' w = do
+  let (high, low) = (fromIntegral w :: Int) `divMod` 16
+  hex high <> hex low
+
+hex :: Int -> T.Text
+hex i =
+  T.singleton $ "0123456789abcdef" !! i
