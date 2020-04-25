@@ -5,8 +5,8 @@ where
 
 import Control.Exception.Safe
 import Control.Monad.State.Lazy
-import Data.Basic
 import Data.Code
+import Data.EnumCase
 import Data.Env hiding (newNameWith'')
 import qualified Data.HashMap.Lazy as Map
 import Data.Ident

@@ -1,6 +1,7 @@
 module Data.Term where
 
 import Data.Basic
+import Data.EnumCase
 import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.LowType
@@ -24,7 +25,7 @@ data Term
   | TermFloat FloatSize Double
   | TermEnum T.Text
   | TermEnumIntro T.Text
-  | TermEnumElim (TermPlus, TermPlus) [((Meta, EnumCase), TermPlus)]
+  | TermEnumElim (TermPlus, TermPlus) [(EnumCasePlus, TermPlus)]
   | TermArray TermPlus ArrayKind -- array n3 u8 ~= n3 -> u8
   | TermArrayIntro ArrayKind [TermPlus]
   | TermArrayElim

@@ -5,8 +5,8 @@ where
 
 import Control.Exception.Safe
 import Control.Monad.State.Lazy
-import Data.Basic
 import Data.Constraint
+import Data.EnumCase
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import Data.Ident
@@ -323,7 +323,7 @@ unravelBinder binder e =
       (xts', e') <- unravelBinder xts e
       return ((mx, x', t') : xts', e')
 
-unravelCaseList :: [((Meta, EnumCase), WeakTermPlus)] -> WithEnv [((Meta, EnumCase), WeakTermPlus)]
+unravelCaseList :: [(EnumCasePlus, WeakTermPlus)] -> WithEnv [(EnumCasePlus, WeakTermPlus)]
 unravelCaseList caseList = do
   let (ls, es) = unzip caseList
   es' <- mapM unravel es

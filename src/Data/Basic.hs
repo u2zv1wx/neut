@@ -5,7 +5,6 @@ import qualified Data.IntMap as IntMap
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Word
-import GHC.Generics hiding (Meta)
 
 {-# INLINE nsSep #-}
 nsSep :: T.Text
@@ -21,14 +20,6 @@ boolTrue =
 boolFalse :: T.Text
 boolFalse =
   "bool" <> nsSep <> "false"
-
-data EnumCase
-  = EnumCaseLabel T.Text
-  | EnumCaseDefault
-  deriving (Show, Eq, Ord, Generic)
-
--- type EnumCasePlus =
---   (Meta, EnumCase)
 
 linearCheck :: (Eq a, Ord a) => [a] -> Bool
 linearCheck =

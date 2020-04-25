@@ -10,7 +10,7 @@ module Elaborate.Infer
 where
 
 import Control.Monad.State.Lazy
-import Data.Basic
+import Data.EnumCase
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import Data.Ident
@@ -411,7 +411,7 @@ newTypeHoleListInCtx ctx ids =
       ts <- newTypeHoleListInCtx (ctx ++ [(m, x, t)]) rest
       return $ (m, x, t) : ts
 
-inferEnumCase :: Context -> (Meta, EnumCase) -> WithEnv ((Meta, EnumCase), WeakTermPlus)
+inferEnumCase :: Context -> EnumCasePlus -> WithEnv (EnumCasePlus, WeakTermPlus)
 inferEnumCase ctx weakCase =
   case weakCase of
     (m, EnumCaseLabel name) -> do

@@ -9,6 +9,7 @@ where
 
 import Control.Monad.State.Lazy
 import Data.Basic
+import Data.EnumCase
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import Data.Ident
@@ -205,9 +206,6 @@ discernIter nenv self binder e = do
 discernEnumCase :: Meta -> EnumCase -> WithEnv EnumCase
 discernEnumCase m weakCase =
   case weakCase of
-    -- EnumCaseInt t a -> do
-    --   t' <- discern' nenv t
-    --   return (EnumCaseInt t' a)
     EnumCaseLabel l -> do
       ml <- lookupEnumValueNameWithPrefix l
       case ml of

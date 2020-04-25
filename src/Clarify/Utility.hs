@@ -3,6 +3,7 @@ module Clarify.Utility where
 import Control.Monad.State.Lazy
 import Data.Basic
 import Data.Code
+import Data.EnumCase
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import Data.Ident

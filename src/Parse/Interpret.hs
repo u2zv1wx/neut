@@ -11,6 +11,7 @@ where
 import Codec.Binary.UTF8.String
 import Control.Monad.State.Lazy
 import Data.Basic
+import Data.EnumCase
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import Data.Ident
@@ -414,7 +415,7 @@ interpretBinder xts t = do
   t' <- interpret t
   return (xts', t')
 
-interpretEnumCase :: TreePlus -> WithEnv (Meta, EnumCase)
+interpretEnumCase :: TreePlus -> WithEnv EnumCasePlus
 interpretEnumCase tree =
   case tree of
     (m, TreeNode [(_, TreeLeaf "enum-introduction"), (_, TreeLeaf l)]) ->
@@ -426,7 +427,7 @@ interpretEnumCase tree =
     (m, _) ->
       raiseSyntaxError m "(enum-introduction LEAF) | default | LEAF"
 
-interpretClause :: TreePlus -> WithEnv ((Meta, EnumCase), WeakTermPlus)
+interpretClause :: TreePlus -> WithEnv (EnumCasePlus, WeakTermPlus)
 interpretClause tree =
   case tree of
     (_, TreeNode [c, e]) -> do

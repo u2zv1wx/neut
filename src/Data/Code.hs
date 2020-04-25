@@ -1,6 +1,7 @@
 module Data.Code where
 
 import Data.Basic
+import Data.EnumCase
 import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.LowType
