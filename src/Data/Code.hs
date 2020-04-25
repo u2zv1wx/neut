@@ -6,6 +6,7 @@ import Data.LowType
 import Data.Maybe (fromMaybe)
 import Data.Meta
 import Data.Primitive
+import Data.Syscall
 import qualified Data.Text as T
 
 data Data

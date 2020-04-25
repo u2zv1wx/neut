@@ -13,6 +13,7 @@ import qualified Data.IntMap as IntMap
 import Data.LLVM
 import Data.LowType
 import qualified Data.Map as Map
+import Data.Platform
 import Data.Primitive
 import qualified Data.Set as S
 import qualified Data.Text as T

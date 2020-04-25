@@ -13,6 +13,7 @@ import Data.Log
 import Data.LowType
 import Data.Meta
 import qualified Data.PQueue.Min as Q
+import Data.Platform
 import Data.Primitive
 import qualified Data.Set as S
 import Data.Term
