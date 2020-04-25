@@ -12,6 +12,7 @@ import qualified Data.HashMap.Lazy as Map
 import qualified Data.IntMap as IntMap
 import Data.List (nub, sortOn)
 import Data.Log
+import Data.Meta
 import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -321,7 +322,7 @@ unravelBinder binder e =
       (xts', e') <- unravelBinder xts e
       return ((mx, x', t') : xts', e')
 
-unravelCaseList :: [(EnumCasePlus, WeakTermPlus)] -> WithEnv [(EnumCasePlus, WeakTermPlus)]
+unravelCaseList :: [((Meta, EnumCase), WeakTermPlus)] -> WithEnv [((Meta, EnumCase), WeakTermPlus)]
 unravelCaseList caseList = do
   let (ls, es) = unzip caseList
   es' <- mapM unravel es

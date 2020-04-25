@@ -10,6 +10,7 @@ import qualified Data.HashMap.Lazy as Map
 import qualified Data.IntMap as IntMap
 import Data.List (nub)
 import Data.LowType
+import Data.Meta
 import qualified Data.Set as S
 import Data.Term
 import qualified Data.Text as T

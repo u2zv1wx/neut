@@ -5,8 +5,8 @@ module Parse.MacroExpand
 where
 
 import Control.Monad.State.Lazy
-import Data.Basic
 import Data.Env
+import Data.Meta
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Tree

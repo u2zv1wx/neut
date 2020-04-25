@@ -15,6 +15,7 @@ import qualified Data.ByteString.Lazy as L
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import qualified Data.IntMap as IntMap
+import Data.Meta
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE

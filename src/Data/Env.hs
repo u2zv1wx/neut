@@ -11,6 +11,7 @@ import Data.LLVM
 import Data.List (find)
 import Data.Log
 import Data.LowType
+import Data.Meta
 import qualified Data.PQueue.Min as Q
 import Data.Primitive
 import qualified Data.Set as S

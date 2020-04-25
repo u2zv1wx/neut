@@ -3,6 +3,7 @@ module Data.WeakTerm where
 import Data.Basic
 import qualified Data.IntMap as IntMap
 import Data.LowType
+import Data.Meta
 import qualified Data.Set as S
 import qualified Data.Text as T
 
@@ -23,7 +24,7 @@ data WeakTerm
   | WeakTermFloat WeakTermPlus Double
   | WeakTermEnum T.Text
   | WeakTermEnumIntro T.Text
-  | WeakTermEnumElim (WeakTermPlus, WeakTermPlus) [(EnumCasePlus, WeakTermPlus)]
+  | WeakTermEnumElim (WeakTermPlus, WeakTermPlus) [((Meta, EnumCase), WeakTermPlus)]
   | WeakTermArray WeakTermPlus ArrayKind -- array n3 u8 ~= n3 -> u8
   | WeakTermArrayIntro ArrayKind [WeakTermPlus]
   | WeakTermArrayElim

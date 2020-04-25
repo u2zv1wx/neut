@@ -13,7 +13,7 @@ module Data.Log
   )
 where
 
-import Data.Basic
+import Data.Meta
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import System.Console.ANSI

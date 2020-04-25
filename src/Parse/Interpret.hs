@@ -16,6 +16,7 @@ import qualified Data.HashMap.Lazy as Map
 import Data.List (elemIndex, sortOn)
 import Data.LowType
 import Data.Maybe (catMaybes, fromMaybe)
+import Data.Meta
 import qualified Data.Text as T
 import Data.Tree
 import Data.WeakTerm
@@ -411,7 +412,7 @@ interpretBinder xts t = do
   t' <- interpret t
   return (xts', t')
 
-interpretEnumCase :: TreePlus -> WithEnv EnumCasePlus
+interpretEnumCase :: TreePlus -> WithEnv (Meta, EnumCase)
 interpretEnumCase tree =
   case tree of
     (m, TreeNode [(_, TreeLeaf "enum-introduction"), (_, TreeLeaf l)]) ->
@@ -423,7 +424,7 @@ interpretEnumCase tree =
     (m, _) ->
       raiseSyntaxError m "(enum-introduction LEAF) | default | LEAF"
 
-interpretClause :: TreePlus -> WithEnv (EnumCasePlus, WeakTermPlus)
+interpretClause :: TreePlus -> WithEnv ((Meta, EnumCase), WeakTermPlus)
 interpretClause tree =
   case tree of
     (_, TreeNode [c, e]) -> do

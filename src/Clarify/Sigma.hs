@@ -12,6 +12,7 @@ import Data.Basic
 import Data.Code
 import Data.Env
 import Data.LowType
+import Data.Meta
 import qualified Data.Text as T
 
 cartesianSigma ::

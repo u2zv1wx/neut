@@ -13,6 +13,7 @@ import Data.Constraint
 import Data.Env
 import qualified Data.IntMap as IntMap
 import Data.Maybe
+import Data.Meta
 import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
 import qualified Data.Text as T

@@ -15,6 +15,7 @@ import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import qualified Data.IntMap as IntMap
 import Data.LowType
+import Data.Meta
 import Data.Primitive
 import Data.Term
 import qualified Data.Text as T
@@ -408,7 +409,7 @@ newTypeHoleListInCtx ctx ids =
       ts <- newTypeHoleListInCtx (ctx ++ [(m, x, t)]) rest
       return $ (m, x, t) : ts
 
-inferEnumCase :: Context -> EnumCasePlus -> WithEnv (EnumCasePlus, WeakTermPlus)
+inferEnumCase :: Context -> (Meta, EnumCase) -> WithEnv ((Meta, EnumCase), WeakTermPlus)
 inferEnumCase ctx weakCase =
   case weakCase of
     (m, EnumCaseLabel name) -> do
