@@ -8,12 +8,12 @@ module Parse.Discern
 where
 
 import Control.Monad.State.Lazy
-import Data.Basic
 import Data.EnumCase
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import Data.Ident
 import Data.Meta
+import Data.Namespace
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.WeakTerm

@@ -9,6 +9,7 @@ import qualified Data.HashMap.Lazy as Map
 import Data.Ident
 import Data.List hiding (findIndex)
 import Data.Meta
+import Data.Namespace
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
@@ -215,7 +216,7 @@ toSuffixList (I (s, i)) =
 
 toSuffixList' :: T.Text -> [T.Text]
 toSuffixList' s =
-  case T.findIndex (== ':') s of
+  case T.findIndex (== nsSepChar) s of
     Nothing ->
       [s]
     Just i ->

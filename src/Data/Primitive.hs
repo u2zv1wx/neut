@@ -1,7 +1,7 @@
 module Data.Primitive where
 
-import Data.Basic
 import Data.LowType
+import Data.Namespace
 import Data.Size
 import qualified Data.Text as T
 

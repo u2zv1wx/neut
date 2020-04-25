@@ -1,7 +1,6 @@
 module Clarify.Utility where
 
 import Control.Monad.State.Lazy
-import Data.Basic
 import Data.Code
 import Data.EnumCase
 import Data.Env
@@ -10,6 +9,7 @@ import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.LowType
 import Data.Meta
+import Data.Namespace
 import Data.Term
 import qualified Data.Text as T
 

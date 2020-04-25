@@ -1,6 +1,6 @@
 module Data.Syscall where
 
-import Data.Basic
+import Data.Namespace
 import Data.Platform
 import qualified Data.Text as T
 

@@ -2,12 +2,6 @@ module Data.Basic where
 
 import qualified Data.IntMap as IntMap
 import qualified Data.Set as S
-import qualified Data.Text as T
-
-{-# INLINE nsSep #-}
-nsSep :: T.Text
-nsSep =
-  "."
 
 linearCheck :: (Eq a, Ord a) => [a] -> Bool
 linearCheck =

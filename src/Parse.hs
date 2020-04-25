@@ -9,7 +9,6 @@ where
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
 import Control.Monad.State.Lazy hiding (get)
-import Data.Basic
 import Data.ByteString.Builder
 import qualified Data.ByteString.Lazy as L
 import Data.Env
@@ -17,6 +16,7 @@ import qualified Data.HashMap.Lazy as Map
 import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.Meta
+import Data.Namespace
 import Data.Platform
 import qualified Data.Set as S
 import qualified Data.Text as T

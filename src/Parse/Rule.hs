@@ -17,6 +17,7 @@ import qualified Data.HashMap.Lazy as Map
 import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.Meta
+import Data.Namespace
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Tree
