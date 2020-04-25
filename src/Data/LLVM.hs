@@ -2,6 +2,7 @@ module Data.LLVM where
 
 import Data.Basic
 import qualified Data.IntMap as IntMap
+import Data.Primitive
 import qualified Data.Text as T
 
 data LLVMData

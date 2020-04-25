@@ -8,6 +8,7 @@ import Control.Monad.State
 import Data.Basic
 import Data.Env
 import qualified Data.IntMap as IntMap
+import Data.Primitive
 import Data.Term
 import qualified Data.Text as T
 

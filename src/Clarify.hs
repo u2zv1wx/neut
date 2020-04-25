@@ -16,6 +16,7 @@ import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import qualified Data.IntMap as IntMap
 import Data.List (nubBy)
+import Data.Primitive
 import Data.Syscall
 import Data.Term
 import qualified Data.Text as T

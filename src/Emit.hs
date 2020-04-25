@@ -12,6 +12,7 @@ import qualified Data.HashMap.Lazy as HashMap
 import qualified Data.IntMap as IntMap
 import Data.LLVM
 import qualified Data.Map as Map
+import Data.Primitive
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
