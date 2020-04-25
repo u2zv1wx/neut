@@ -109,7 +109,7 @@
     i16   ;; Transport layer port
     i32   ;; IP6 flow information
     i32   ;; IP6 address
-s    i32)) ;; scope zone index
+    i32)) ;; scope zone index
 
 (constant bind
   (pi

@@ -194,16 +194,8 @@ data LowType
 
 asLowTypeMaybe :: T.Text -> Maybe LowType
 asLowTypeMaybe name = do
-  (kind, _, _) <- asArrayKindMaybe name
+  kind <- asArrayKindMaybe name
   return $ arrayKindToLowType kind
-
--- サイズ範囲外だったらnothingになるバージョン
-asLowTypeMaybe' :: T.Text -> Maybe LowType
-asLowTypeMaybe' name = do
-  (kind, _, n) <- asArrayKindMaybe name
-  if 1 <= n && n <= 64
-    then return $ arrayKindToLowType kind
-    else Nothing
 
 sizeAsInt :: FloatSize -> Int
 sizeAsInt size =
@@ -256,7 +248,7 @@ arrayKindToLowType arrayKind =
     ArrayKindVoidPtr ->
       voidPtr
 
-asArrayKindMaybe :: T.Text -> Maybe (ArrayKind, Char, Int)
+asArrayKindMaybe :: T.Text -> Maybe ArrayKind
 asArrayKindMaybe s =
   case T.uncons s of
     Nothing ->
@@ -264,12 +256,14 @@ asArrayKindMaybe s =
     Just (c, rest) ->
       case c of
         'i'
-          | Just n <- readMaybe $ T.unpack rest ->
-            Just (ArrayKindIntS n, c, n)
+          | Just n <- readMaybe $ T.unpack rest,
+            1 <= n,
+            n <= 64 ->
+            Just $ ArrayKindIntS n
         'f'
           | Just n <- readMaybe $ T.unpack rest,
             Just size <- asFloatSize n ->
-            Just (ArrayKindFloat size, c, n)
+            Just $ ArrayKindFloat size
         _ ->
           Nothing
 
@@ -291,12 +285,12 @@ data UnaryOp
 asUnaryOpMaybe :: T.Text -> Maybe UnaryOp
 asUnaryOpMaybe name
   | Just ("fneg", typeStr) <- breakOnMaybe "-" name,
-    Just lowType@(LowTypeFloat _) <- asLowTypeMaybe' typeStr =
+    Just lowType@(LowTypeFloat _) <- asLowTypeMaybe typeStr =
     Just $ UnaryOpFNeg lowType
   | Just (convOpStr, rest) <- breakOnMaybe "-" name,
     Just (domTypeStr, codTypeStr) <- breakOnMaybe "-" rest,
-    Just domType <- asLowTypeMaybe' domTypeStr,
-    Just codType <- asLowTypeMaybe' codTypeStr,
+    Just domType <- asLowTypeMaybe domTypeStr,
+    Just codType <- asLowTypeMaybe codTypeStr,
     Just op <- asConvOpMaybe domType codType convOpStr =
     Just op
   | otherwise =
@@ -427,16 +421,16 @@ asBinaryOpMaybe name
     case opStr of
       "icmp"
         | Just (condStr, typeStr) <- breakOnMaybe "-" rest,
-          Just lowType@(LowTypeIntS _) <- asLowTypeMaybe' typeStr,
+          Just lowType@(LowTypeIntS _) <- asLowTypeMaybe typeStr,
           Just f <- asICmpMaybe condStr ->
           Just $ f lowType
       "fcmp"
         | Just (condStr, typeStr) <- breakOnMaybe "-" rest,
-          Just lowType@(LowTypeFloat _) <- asLowTypeMaybe' typeStr,
+          Just lowType@(LowTypeFloat _) <- asLowTypeMaybe typeStr,
           Just f <- asFCmpMaybe condStr ->
           Just $ f lowType
       _
-        | Just lowType <- asLowTypeMaybe' rest,
+        | Just lowType <- asLowTypeMaybe rest,
           Just f <- asBinaryOpMaybe' opStr lowType ->
           Just $ f lowType
       _ ->

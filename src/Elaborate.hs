@@ -145,18 +145,8 @@ elaborate' term =
     (m, WeakTermInt t x) -> do
       t' <- reduceTermPlus <$> elaborate' t
       case t' of
-        (_, TermEnum (EnumTypeIntS size))
-          | (-1) * (2 ^ (size - 1)) <= x,
-            x < 2 ^ (size - 1) ->
-            return (m, TermEnumIntro (EnumValueIntS size x))
-          | otherwise ->
-            raiseError m $
-              "the integer "
-                <> T.pack (show x)
-                <> " is inferred to be of type i"
-                <> T.pack (show size)
-                <> ", but is out of range of i"
-                <> T.pack (show size)
+        (_, TermEnum (EnumTypeIntS size)) ->
+          return (m, TermEnumIntro (EnumValueIntS size x))
         _ ->
           raiseError m $
             "the term `"

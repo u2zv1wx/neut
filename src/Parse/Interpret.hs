@@ -34,8 +34,7 @@ interpret inputTree =
       | Just x' <- readMaybe $ T.unpack atom -> do
         h <- newHole m
         return (m, WeakTermFloat h x')
-      | Just i <- readEnumTypeIntS atom -> do
-        rangeCheck m 'i' i
+      | Just i <- readEnumTypeIntS atom ->
         return (m, WeakTermEnum $ EnumTypeIntS i)
       | Just str <- readMaybe $ T.unpack atom -> do
         u8s <- forM (encode str) $ \u -> return (m, WeakTermEnumIntro $ EnumValueIntS 8 (toInteger u))
@@ -144,9 +143,8 @@ interpret inputTree =
             raiseSyntaxError m "(f64 LEAF)"
         "enum"
           | [(_, TreeLeaf x)] <- rest ->
-            case (readEnumTypeIntS x, readEnumTypeIntS x) of
-              (Just i, _) -> do
-                rangeCheck m 'i' i
+            case readEnumTypeIntS x of
+              Just i ->
                 return (m, WeakTermEnum $ EnumTypeIntS i)
               _ ->
                 return (m, WeakTermEnum $ EnumTypeLabel x)
@@ -428,20 +426,10 @@ interpretEnumValue tree =
   case tree of
     (_, TreeLeaf x) ->
       return $ EnumValueLabel x
-    e@(m, TreeNode [(_, TreeLeaf t), (_, TreeLeaf x)]) ->
+    e@(_, TreeNode [(_, TreeLeaf t), (_, TreeLeaf x)]) ->
       case readEnumValueIntS t x of
-        Just v@(EnumValueIntS size x') -> do
-          rangeCheck (fst tree) 'i' size -- LLVMの仕様に合わせればrangecheckはmoduloで落ちる
-          if (-1) * (2 ^ (size - 1)) <= x' && x' < 2 ^ (size - 1)
-            then return v
-            else
-              raiseError m $
-                "the integer "
-                  <> T.pack (show x')
-                  <> " is supposed to be of type i"
-                  <> T.pack (show size)
-                  <> ", but is out of range of i"
-                  <> T.pack (show size)
+        Just v@(EnumValueIntS _ _) ->
+          return v
         _ ->
           raiseSyntaxError (fst e) "(SINT-TYPE INT) | (UINT-TYPE INT)"
     _ ->
@@ -658,7 +646,9 @@ readEnumType :: Char -> T.Text -> Maybe Int
 readEnumType c str
   | T.length str >= 2,
     T.head str == c,
-    Just i <- readMaybe $ T.unpack $ T.tail str :: Maybe Int =
+    Just i <- readMaybe $ T.unpack $ T.tail str :: Maybe Int,
+    1 <= i,
+    i <= 64 =
     Just i
   | otherwise =
     Nothing
@@ -666,12 +656,6 @@ readEnumType c str
 readEnumTypeIntS :: T.Text -> Maybe Int
 readEnumTypeIntS =
   readEnumType 'i'
-
-rangeCheck :: Meta -> Char -> Int -> WithEnv ()
-rangeCheck m prefix i =
-  if 1 <= i && i <= 64
-    then return ()
-    else raiseError m $ "the `x` of `" <> T.singleton prefix <> "{x}` must satisfy 1 <= x <= 64"
 
 readEnumValueIntS :: T.Text -> T.Text -> Maybe EnumValue
 readEnumValueIntS t x
@@ -688,8 +672,7 @@ asArrayKind tree =
       case asArrayKindMaybe x of
         Nothing ->
           raiseSyntaxError (fst e) "SINT-TYPE | UINT-TYPE | FLOAT-TYPE"
-        Just (t, c, size) -> do
-          rangeCheck (fst tree) c size
+        Just t ->
           return t
     _ ->
       raiseSyntaxError (fst tree) "LEAF"

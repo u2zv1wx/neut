@@ -29,4 +29,6 @@
 
 ?x
 
+(i64:print (unsafe:cast i3 i64 (i3 -1)))
+
 ;; (let (_ i65) 10) ;; should raise an error
