@@ -1,6 +1,7 @@
 module Data.Term where
 
 import Data.Basic
+import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.LowType
 import Data.Maybe (fromMaybe)

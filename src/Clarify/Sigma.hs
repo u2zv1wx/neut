@@ -8,9 +8,9 @@ where
 import Clarify.Linearize
 import Clarify.Utility
 import Control.Monad.State.Lazy
-import Data.Basic
 import Data.Code
 import Data.Env
+import Data.Ident
 import Data.LowType
 import Data.Meta
 import qualified Data.Text as T

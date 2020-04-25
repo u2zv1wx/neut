@@ -11,6 +11,7 @@ import Control.Monad.State.Lazy
 import Data.Basic
 import Data.Constraint
 import Data.Env
+import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.Maybe
 import Data.Meta

@@ -2,10 +2,10 @@ module Data.Env where
 
 import Control.Exception.Safe
 import Control.Monad.State.Lazy
-import Data.Basic
 import Data.Code
 import Data.Constraint
 import qualified Data.HashMap.Lazy as Map
+import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.LLVM
 import Data.List (find)

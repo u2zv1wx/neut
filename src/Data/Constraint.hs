@@ -1,6 +1,6 @@
 module Data.Constraint where
 
-import Data.Basic
+import Data.Ident
 import Data.Meta
 import qualified Data.Set as S
 import Data.WeakTerm

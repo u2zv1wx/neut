@@ -13,6 +13,7 @@ import Control.Monad.State.Lazy
 import Data.Basic
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import Data.Ident
 import Data.List (elemIndex, sortOn)
 import Data.LowType
 import Data.Maybe (catMaybes, fromMaybe)

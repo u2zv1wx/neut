@@ -1,6 +1,6 @@
 module Data.LLVM where
 
-import Data.Basic
+import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.LowType
 import Data.Primitive

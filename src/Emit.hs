@@ -5,10 +5,10 @@ where
 
 import Control.Concurrent.Async.Lifted
 import Control.Monad.State.Lazy
-import Data.Basic
 import Data.ByteString.Builder
 import Data.Env
 import qualified Data.HashMap.Lazy as HashMap
+import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.LLVM
 import Data.LowType

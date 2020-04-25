@@ -7,6 +7,7 @@ where
 import Control.Monad.State
 import Data.Basic
 import Data.Env
+import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.LowType
 import Data.Primitive

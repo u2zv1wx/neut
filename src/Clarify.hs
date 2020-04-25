@@ -14,6 +14,7 @@ import Data.Basic
 import Data.Code
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.List (nubBy)
 import Data.LowType

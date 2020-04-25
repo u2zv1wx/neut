@@ -7,6 +7,7 @@ import Control.Monad.State.Lazy
 import Data.Basic
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.List (nub)
 import Data.LowType

@@ -9,6 +9,7 @@ import Data.Basic
 import Data.Code
 import Data.Env hiding (newNameWith'')
 import qualified Data.HashMap.Lazy as Map
+import Data.Ident
 import Data.LLVM
 import Data.LowType
 import Data.Meta

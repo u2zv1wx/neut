@@ -9,6 +9,7 @@ import Data.Basic
 import Data.Constraint
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.List (nub, sortOn)
 import Data.Log

@@ -8,6 +8,7 @@ import Clarify.Utility
 import Data.Basic
 import Data.Code
 import Data.Env
+import Data.Ident
 import qualified Data.IntMap as IntMap
 
 -- insert header for a closed chain

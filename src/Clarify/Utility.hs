@@ -5,6 +5,7 @@ import Data.Basic
 import Data.Code
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.LowType
 import Data.Meta

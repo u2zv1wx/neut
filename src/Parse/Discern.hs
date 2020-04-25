@@ -11,6 +11,7 @@ import Control.Monad.State.Lazy
 import Data.Basic
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import Data.Ident
 import Data.Meta
 import qualified Data.Set as S
 import qualified Data.Text as T

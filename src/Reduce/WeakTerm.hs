@@ -5,6 +5,7 @@ module Reduce.WeakTerm
 where
 
 import Data.Basic
+import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.Meta
 import Data.WeakTerm
