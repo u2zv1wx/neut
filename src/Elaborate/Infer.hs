@@ -75,7 +75,7 @@ infer' ctx term =
             (\env -> env {holeEnv = IntMap.insert (asInt x) (app, higherApp) zenv})
           return (app, higherApp)
     (m, WeakTermConst x)
-      -- i64, f16, u8, etc.
+      -- i64, f16, etc.
       | Just _ <- asLowTypeMaybe x ->
         return ((m, WeakTermConst x), (m, WeakTermTau))
       | Just op <- asUnaryOpMaybe x ->
