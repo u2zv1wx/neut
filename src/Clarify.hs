@@ -250,7 +250,7 @@ clarifyUnaryOp tenv name op m = do
         []
         m
         [(mx, x, tx)]
-        (m, CodeConst (ConstUnaryOp op varX))
+        (m, CodePrimitive (PrimitiveUnaryOp op varX))
     _ ->
       raiseCritical m $ "the arity of " <> name <> " is wrong"
 
@@ -268,7 +268,7 @@ clarifyBinaryOp tenv name op m = do
         []
         m
         [(mx, x, tx), (my, y, ty)]
-        (m, CodeConst (ConstBinaryOp op varX varY))
+        (m, CodePrimitive (PrimitiveBinaryOp op varX varY))
     _ ->
       raiseCritical m $ "the arity of " <> name <> " is wrong"
 
@@ -478,7 +478,7 @@ toSysCallTail tenv m cod syscall args xs = do
   result <- retWithBorrowedVars tenv m cod xs resultVarName
   return
     ( m,
-      CodeUpElim resultVarName (m, CodeConst (ConstSysCall syscall args)) result
+      CodeUpElim resultVarName (m, CodePrimitive (PrimitiveSysCall syscall args)) result
     )
 
 toArrayAccessTail ::
@@ -497,7 +497,7 @@ toArrayAccessTail tenv m lowType cod arr index xts = do
     ( m,
       CodeUpElim
         resultVarName
-        (m, CodeConst (ConstArrayAccess lowType arr index))
+        (m, CodePrimitive (PrimitiveArrayAccess lowType arr index))
         result
     )
 

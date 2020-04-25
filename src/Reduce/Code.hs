@@ -14,8 +14,8 @@ import qualified Data.Set as S
 reduceCodePlus :: CodePlus -> WithEnv CodePlus
 reduceCodePlus term =
   case term of
-    (m, CodeConst c) ->
-      return (m, CodeConst c)
+    (m, CodePrimitive c) ->
+      return (m, CodePrimitive c)
     (m, CodePiElimDownElim v ds) -> do
       cenv <- gets codeEnv
       ns <- gets nameSet

@@ -32,8 +32,8 @@ toLLVM mainTerm@(m, _) = do
 llvmCode :: CodePlus -> WithEnv LLVM
 llvmCode term =
   case term of
-    (m, CodeConst theta) ->
-      llvmCodeConst m theta
+    (m, CodePrimitive theta) ->
+      llvmCodePrimitive m theta
     (_, CodePiElimDownElim v ds) -> do
       (xs, vs) <- unzip <$> mapM (newDataLocal . takeBaseName) ds
       (fun, castThen) <- llvmCast (Just $ takeBaseName v) v $ toFunPtrType ds
@@ -165,14 +165,14 @@ loadContent' bp bt values cont =
           (LLVMOpGetElementPtr (bp, bt) [(LLVMDataInt 0, LowTypeInt 32), i])
         $ LLVMLet x (LLVMOpLoad pos et) cont'
 
-llvmCodeConst :: Meta -> Const -> WithEnv LLVM
-llvmCodeConst _ codeOp =
+llvmCodePrimitive :: Meta -> Primitive -> WithEnv LLVM
+llvmCodePrimitive _ codeOp =
   case codeOp of
-    ConstUnaryOp op v ->
+    PrimitiveUnaryOp op v ->
       llvmCodeUnaryOp op v
-    ConstBinaryOp op v1 v2 ->
+    PrimitiveBinaryOp op v1 v2 ->
       llvmCodeBinaryOp op v1 v2
-    ConstArrayAccess lowType arr idx -> do
+    PrimitiveArrayAccess lowType arr idx -> do
       let arrayType = LowTypePtr $ LowTypeArray 0 lowType
       (arrVar, castArrThen) <- llvmCast (Just $ takeBaseName arr) arr arrayType
       (idxVar, castIdxThen) <- llvmCast (Just $ takeBaseName idx) idx i64
@@ -187,7 +187,7 @@ llvmCodeConst _ codeOp =
               [(LLVMDataInt 0, i32), (idxVar, i64)]
           )
           (LLVMLet resName (LLVMOpLoad resPtr lowType) uncast)
-    ConstSysCall syscall args -> do
+    PrimitiveSysCall syscall args -> do
       (xs, vs) <- unzip <$> mapM (const $ newDataLocal "sys-call-arg") args
       call <- syscallToLLVM syscall vs
       llvmDataLet' (zip xs args) call

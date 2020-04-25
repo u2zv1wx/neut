@@ -174,9 +174,9 @@ distinguishData zs term =
 distinguishCode :: [Ident] -> CodePlus -> WithEnv (NameMap, CodePlus)
 distinguishCode zs term =
   case term of
-    (ml, CodeConst theta) -> do
-      (vs, theta') <- distinguishConst zs theta
-      return (vs, (ml, CodeConst theta'))
+    (ml, CodePrimitive theta) -> do
+      (vs, theta') <- distinguishPrimitive zs theta
+      return (vs, (ml, CodePrimitive theta'))
     (ml, CodePiElimDownElim d ds) -> do
       (vs, d') <- distinguishData zs d
       (vss, ds') <- unzip <$> mapM (distinguishData zs) ds
@@ -216,20 +216,20 @@ distinguishBranch zs varInfo d = do
   let varInfo' = IntMap.fromList $ zip from to'
   return (merge (vs : vss), varInfo', d')
 
-distinguishConst :: [Ident] -> Const -> WithEnv (NameMap, Const)
-distinguishConst zs term =
+distinguishPrimitive :: [Ident] -> Primitive -> WithEnv (NameMap, Primitive)
+distinguishPrimitive zs term =
   case term of
-    ConstUnaryOp op d -> do
+    PrimitiveUnaryOp op d -> do
       (vs, d') <- distinguishData zs d
-      return (vs, ConstUnaryOp op d')
-    ConstBinaryOp op d1 d2 -> do
+      return (vs, PrimitiveUnaryOp op d')
+    PrimitiveBinaryOp op d1 d2 -> do
       (vs1, d1') <- distinguishData zs d1
       (vs2, d2') <- distinguishData zs d2
-      return (merge [vs1, vs2], ConstBinaryOp op d1' d2')
-    ConstArrayAccess lowType d1 d2 -> do
+      return (merge [vs1, vs2], PrimitiveBinaryOp op d1' d2')
+    PrimitiveArrayAccess lowType d1 d2 -> do
       (vs1, d1') <- distinguishData zs d1
       (vs2, d2') <- distinguishData zs d2
-      return (merge [vs1, vs2], ConstArrayAccess lowType d1' d2')
-    ConstSysCall num ds -> do
+      return (merge [vs1, vs2], PrimitiveArrayAccess lowType d1' d2')
+    PrimitiveSysCall num ds -> do
       (vss, ds') <- unzip <$> mapM (distinguishData zs) ds
-      return (merge vss, ConstSysCall num ds')
+      return (merge vss, PrimitiveSysCall num ds')

@@ -16,7 +16,7 @@ data Data
   deriving (Show)
 
 data Code
-  = CodeConst Const
+  = CodePrimitive Primitive
   | CodePiElimDownElim DataPlus [DataPlus] -- ((force v) v1 ... vn)
   | CodeSigmaElim ArrayKind [Ident] DataPlus CodePlus
   | CodeUpIntro DataPlus
@@ -26,11 +26,11 @@ data Code
   | CodeCase SubstDataPlus DataPlus [((Meta, T.Text), CodePlus)]
   deriving (Show)
 
-data Const
-  = ConstUnaryOp UnaryOp DataPlus
-  | ConstBinaryOp BinaryOp DataPlus DataPlus
-  | ConstArrayAccess LowType DataPlus DataPlus
-  | ConstSysCall Syscall [DataPlus]
+data Primitive
+  = PrimitiveUnaryOp UnaryOp DataPlus
+  | PrimitiveBinaryOp BinaryOp DataPlus DataPlus
+  | PrimitiveArrayAccess LowType DataPlus DataPlus
+  | PrimitiveSysCall Syscall [DataPlus]
   deriving (Show)
 
 newtype IsFixed
@@ -90,9 +90,9 @@ substDataPlus sub term =
 substCodePlus :: SubstDataPlus -> CodePlus -> CodePlus
 substCodePlus sub term =
   case term of
-    (m, CodeConst theta) -> do
-      let theta' = substConst sub theta
-      (m, CodeConst theta')
+    (m, CodePrimitive theta) -> do
+      let theta' = substPrimitive sub theta
+      (m, CodePrimitive theta')
     (m, CodePiElimDownElim v ds) -> do
       let v' = substDataPlus sub v
       let ds' = map (substDataPlus sub) ds
@@ -124,20 +124,20 @@ substCodePlus sub term =
       let v' = substDataPlus sub v
       (m, CodeCase fvInfo' v' branchList)
 
-substConst :: SubstDataPlus -> Const -> Const
-substConst sub c =
+substPrimitive :: SubstDataPlus -> Primitive -> Primitive
+substPrimitive sub c =
   case c of
-    ConstUnaryOp a v -> do
+    PrimitiveUnaryOp a v -> do
       let v' = substDataPlus sub v
-      ConstUnaryOp a v'
-    ConstBinaryOp a v1 v2 -> do
+      PrimitiveUnaryOp a v'
+    PrimitiveBinaryOp a v1 v2 -> do
       let v1' = substDataPlus sub v1
       let v2' = substDataPlus sub v2
-      ConstBinaryOp a v1' v2'
-    ConstArrayAccess t d1 d2 -> do
+      PrimitiveBinaryOp a v1' v2'
+    PrimitiveArrayAccess t d1 d2 -> do
       let d1' = substDataPlus sub d1
       let d2' = substDataPlus sub d2
-      ConstArrayAccess t d1' d2'
-    ConstSysCall sysCall ds -> do
+      PrimitiveArrayAccess t d1' d2'
+    PrimitiveSysCall sysCall ds -> do
       let ds' = map (substDataPlus sub) ds
-      ConstSysCall sysCall ds'
+      PrimitiveSysCall sysCall ds'
