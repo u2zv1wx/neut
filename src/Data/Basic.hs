@@ -38,14 +38,17 @@ instance Show Ident where
   show (I (s, i)) =
     T.unpack s ++ "-" ++ show i
 
+{-# INLINE nsSep #-}
 nsSep :: T.Text
 nsSep =
   "."
 
+{-# INLINE boolTrue #-}
 boolTrue :: T.Text
 boolTrue =
   "bool" <> nsSep <> "true"
 
+{-# INLINE boolFalse #-}
 boolFalse :: T.Text
 boolFalse =
   "bool" <> nsSep <> "false"
