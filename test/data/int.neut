@@ -25,10 +25,11 @@
 (let (_ i33) 10)
 
 (let (_ i63) 10)
+
 (let (x i0000000064) 10)
 
 ?x
 
-(i64:print (unsafe:cast i3 i64 (i3 -1)))
+;; (i64:print (unsafe:cast i3 i64 (i3 -1)))
 
 ;; (let (_ i65) 10) ;; should raise an error
