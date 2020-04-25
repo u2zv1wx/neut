@@ -15,10 +15,10 @@
 (define my-nat-to-i64 ((n (my-nat)))
   (witness i64
     (case n
-      ((my-nat:zero)
+      ((my-nat.zero)
         0)
-      ((my-nat:succ m)
-        (i64:add 1 (my-nat-to-i64 m))))))
+      ((my-nat.succ m)
+        (i64.add 1 (my-nat-to-i64 m))))))
 
 (use my-nat)
 
@@ -28,7 +28,7 @@
     (case n
       ((zero)
         0)
-      ((my-nat:succ m)
-        (i64:add 1 (my-nat-to-i64 m))))))
+      ((my-nat.succ m)
+        (i64.add 1 (my-nat-to-i64 m))))))
 
-(i64:print (my-nat-to-i64 (succ (succ (succ (succ (zero)))))))
+(i64.print (my-nat-to-i64 (succ (succ (succ (succ (zero)))))))

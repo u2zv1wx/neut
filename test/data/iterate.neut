@@ -2,7 +2,7 @@
   (iterate _ ()
     (i64 0)))
 
-(i64:print (f0))
+(i64.print (f0))
 
 (let fact
   (iterate self ((x i64))
@@ -10,7 +10,7 @@
       1
       (mul-i64 x (self (sub-i64 x 1))))))
 
-(i64:print (fact 10)) ;; 3628800
+(i64.print (fact 10)) ;; 3628800
 
 ;; iterate with type annotation
 (let fact
@@ -19,9 +19,9 @@
       1
       (mul-i64 x (self (sub-i64 x 1))))))
 
-(i64:print (fact 5)) ;; 120
+(i64.print (fact 5)) ;; 120
 
-;; https://mathworld.wolfram.com/TAKFunction.html
+;; https.//mathworld.wolfram.com/TAKFunction.html
 (let tak
   (iterate self (x y z)
     (if (icmp-sle-i64 x y)
@@ -32,4 +32,4 @@
         (let z' (self (sub-i64 z 1) x y))
         (self x' y' z')))))
 
-(i64:print (tak 12 6 0)) ;; 12
+(i64.print (tak 12 6 0)) ;; 12

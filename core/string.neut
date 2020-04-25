@@ -15,10 +15,10 @@
   (witness top
     (with let-bind
       (let char (array-introduction i8 value))
-      (os:write hole os:stdout char 1)
-      top:unit)))
+      (os.write hole os.stdout char 1)
+      top.unit)))
 
-(define string:print ((str string))
+(define string.print ((str string))
   (witness (product string i64)
     ;; (let (tuple n content) str) ← こんなふうに書けると嬉しい？
     ;; (...)
@@ -28,6 +28,6 @@
 
 (provide print-character)
 
-(provide string:print)
+(provide string.print)
 
 (unuse os)

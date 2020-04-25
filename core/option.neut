@@ -52,7 +52,7 @@
 
 (attribute from-option (implicit 0))
 
-?functor:unfold
+?functor.unfold
 
 ;; (coinductive functor ((f (hom tau tau)))
 ;;   (map ((_ (functor f)))
@@ -62,25 +62,25 @@
 ;;   (map ((_ (functor f)))
 ;;     (functor-form f)))
 
-;; ?sample-record:unfold
+;; ?sample-record.unfold
 
-?monad:unfold
+?monad.unfold
 
 (define witness-functor
   (witness (functor option)
     (record (functor option)
       (map
-        option:map))))
+        option.map))))
 
 (define witness-monad
   (witness (monad option)
     (record (monad option)
       (witness-functor
-        option:witness-functor)
+        option.witness-functor)
       (return
-        option:return)
+        option.return)
       (bind
-        option:bind))))
+        option.bind))))
 
 (end option)
 
@@ -88,18 +88,18 @@
 ;; 射影はこういう実装になるはずだけど。推論が通ってねえ。
 ;; やっぱcaseの推論は修正する必要がある。
 ;; (let k (functor-form option)
-;;   (case option:witness-functor
-;;     ((functor:unfold f ma base-value) (ma base-value))))
+;;   (case option.witness-functor
+;;     ((functor.unfold f ma base-value) (ma base-value))))
 
 ;; (define witness-fake
 ;;   (witness (fake option)
-;;     (fake:unfold
+;;     (fake.unfold
 ;;       fake
-;;       (lambda ((_ (fake option))) option:map)
-;;       (unsafe:cast (hom tau tau) (fake option) (lambda (x) x)))))
+;;       (lambda ((_ (fake option))) option.map)
+;;       (unsafe.cast (hom tau tau) (fake option) (lambda (x) x)))))
       ;; (map
-      ;;   option:map))))
+      ;;   option.map))))
 
 ;; (let pohe (functor-form option)
 ;;   (case witness-fake
-;;     ((fake:unfold f ma base-value) (ma base-value))))
+;;     ((fake.unfold f ma base-value) (ma base-value))))

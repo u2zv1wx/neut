@@ -12,8 +12,8 @@
     (f64 -329444.4444444)
     (i8 9)))
 
-(i64:print
+(i64.print
   (struct-elimination
     ((_ f16) (_ i8) (_ i16) (_ f32) (z i64) (w i64) (_ f64) (_ i8))
     st
-    (i64:add z w)))
+    (i64.add z w)))

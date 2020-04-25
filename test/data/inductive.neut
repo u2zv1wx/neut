@@ -32,12 +32,12 @@
 (inductive vec ((A tau) (_ (nat)))
   (nil
     ()
-    (vec A (nat:zero)))
+    (vec A (nat.zero)))
   (cons
     ((m (nat))
      (_ A)
      (_ (vec A m)))
-    (vec A (nat:succ m))))
+    (vec A (nat.succ m))))
 
 ;; nested inductive type
 (inductive item ((A tau))
@@ -73,13 +73,13 @@
   (even ((_ (nat)))
     (zero-is-even
       ()
-      (even (nat:zero)))
+      (even (nat.zero)))
     (succ-of-odd-is-even
       ((n (nat))
        (_ (odd n)))
-      (even (nat:succ n))))
+      (even (nat.succ n))))
   (odd ((_ (nat)))
     (succ-of-even-is-odd
       ((n (nat))
        (_ (even n)))
-      (odd (nat:succ n)))))
+      (odd (nat.succ n)))))

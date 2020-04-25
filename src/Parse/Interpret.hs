@@ -229,7 +229,7 @@ interpret inputTree =
             let codType' = (m, WeakTermPiElim (m, WeakTermUpsilon ai) args)
             es <- cocaseAsSigmaIntro m a codType' cocaseClauseList'
             let m' = m {metaIsExplicit = True}
-            let f = (m', WeakTermUpsilon $ asIdent $ a <> ":unfold")
+            let f = (m', WeakTermUpsilon $ asIdent $ a <> nsSep <> "unfold")
             hs <- mapM (const $ newHole m) args
             return (m, WeakTermPiElim f $ hs ++ es)
           | otherwise ->
@@ -560,7 +560,7 @@ cocaseBaseValue :: Meta -> WeakTermPlus -> WeakTermPlus
 cocaseBaseValue m codType =
   ( m,
     WeakTermPiElim
-      (m, WeakTermUpsilon $ asIdent "unsafe:cast")
+      (m, WeakTermUpsilon $ asIdent $ "unsafe" <> nsSep <> "cast")
       [ (m, weakTermPi [] (i64 m)),
         codType,
         (m, weakTermPiIntro [] (m, WeakTermInt (i64 m) 0))

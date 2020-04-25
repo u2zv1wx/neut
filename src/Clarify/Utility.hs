@@ -28,7 +28,7 @@ toAffineApp m x t = do
           CodePiElimDownElim
             expVar
             -- [(m, DataEnumIntro (EnumValueInt 64 0)), (m, DataUpsilon x)]
-            [(m, DataEnumIntro "bool:false"), (m, DataUpsilon x)]
+            [(m, DataEnumIntro boolFalse), (m, DataUpsilon x)]
         )
     )
 
@@ -48,7 +48,7 @@ toRelevantApp m x t = do
           CodePiElimDownElim
             expVar
             -- [(m, DataEnumIntro (EnumValueInt 64 1)), (m, DataUpsilon x)]
-            [(m, DataEnumIntro "bool:true"), (m, DataUpsilon x)]
+            [(m, DataEnumIntro boolTrue), (m, DataUpsilon x)]
         )
     )
 
@@ -67,7 +67,7 @@ returnCartesianImmediate m = do
 
 switch :: CodePlus -> CodePlus -> [(EnumCase, CodePlus)]
 switch e1 e2 =
-  [(EnumCaseLabel "bool:false", e1), (EnumCaseDefault, e2)]
+  [(EnumCaseLabel boolFalse, e1), (EnumCaseDefault, e2)]
 
 -- [(CaseValue (EnumValueInt 64 0), e1), (EnumCaseDefault, e2)]
 

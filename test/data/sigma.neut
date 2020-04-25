@@ -3,7 +3,7 @@
 
 ;; nullary sigma-elim
 (sigma-elimination () a0
-  (string:print "0"))
+  (string.print "0"))
 
 ;; unary sigma-intro
 (let a1
@@ -11,7 +11,7 @@
 
 ;; unary sigma-elim
 (sigma-elimination (x) a1
-  (i64:print x))
+  (i64.print x))
 
 ;; binary sigma-intro without dependence
 (let a2
@@ -19,7 +19,7 @@
 
 ;; binary sigma-elim without dependence
 (sigma-elimination (x _) a2
-  (i64:print x))
+  (i64.print x))
 
 ;; binary sigma-elim with dependence
 (let a3
@@ -28,7 +28,7 @@
 
 ;; binary sigma-elim with dependence
 (sigma-elimination (_ _) a3
-  (i64:print 3))
+  (i64.print 3))
 
 ;; 4-ary sigma-intro
 (let a4
@@ -37,4 +37,4 @@
 
 ;; 4-ary sigma-elim
 (destruct a4 (_ _ i _)
-  (i64:print i))
+  (i64.print i))

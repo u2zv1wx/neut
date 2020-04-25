@@ -40,7 +40,15 @@ instance Show Ident where
 
 nsSep :: T.Text
 nsSep =
-  ":"
+  "."
+
+boolTrue :: T.Text
+boolTrue =
+  "bool" <> nsSep <> "true"
+
+boolFalse :: T.Text
+boolFalse =
+  "bool" <> nsSep <> "false"
 
 type Phase =
   Int
@@ -218,7 +226,7 @@ arrVoidPtr =
 
 asArrayAccessMaybe :: T.Text -> Maybe LowType
 asArrayAccessMaybe name
-  | Just (typeStr, "array-access") <- breakOnMaybe ":" name =
+  | Just (typeStr, "array-access") <- breakOnMaybe nsSep name =
     asLowTypeMaybe typeStr
   | otherwise =
     Nothing

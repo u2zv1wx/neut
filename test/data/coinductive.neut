@@ -40,9 +40,9 @@
 (let item
   (record (my-record i64)
     (item-1 10)
-    (item-3 top:unit)
+    (item-3 top.unit)
     (item-2 20)))
 
-(i64:print (my-record:item-1 item))
+(i64.print (my-record.item-1 item))
 
-(i64:print (my-record:item-2 item))
+(i64.print (my-record.item-2 item))

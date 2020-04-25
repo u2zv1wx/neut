@@ -1,1 +1,1 @@
-(string:print "hello, world!")
+(string.print "hello, world!")

@@ -8,6 +8,6 @@
   (witness top
     (with let-bind
       x
-      top:unit)))
+      top.unit)))
 
 ;; (attribute execute (implicit 0))

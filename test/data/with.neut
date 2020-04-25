@@ -4,10 +4,10 @@
     (with let-bind
       (let _
         (let _ (i64 100))
-        (string:print &str)
-        (string:print &str))
-      (let _ (string:print &str))
-      (let len (string:print &str))
+        (string.print &str)
+        (string.print &str))
+      (let _ (string.print &str))
+      (let len (string.print &str))
       (erase str)
       len)))
 

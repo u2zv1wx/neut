@@ -5,9 +5,9 @@
 ;; 1-mutual definition (or, "general" notation of ordinary definition)
 (define
   (f ((n i64))
-    (i64:add n 1)))
+    (i64.add n 1)))
 
-(i64:print (f 0))
+(i64.print (f 0))
 
 (use bool)
 
@@ -40,7 +40,7 @@
   (p1 ((a i64)) (p2 a))
   (p2 ((a i64)) (p3 a))
   (p3 ((a i64)) (p4 a))
-  (p4 ((a i64)) (p5 (i64:add 1 a)))
+  (p4 ((a i64)) (p5 (i64.add 1 a)))
   (p5 ((a i64)) (p6 a))
   (p6 ((a i64)) a)
   (p7 ((a i64)) (p8 a))

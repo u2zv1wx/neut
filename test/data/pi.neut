@@ -2,35 +2,35 @@
 (let f1
   (pi-introduction () (i64 1)))
 
-(i64:print (f1))
+(i64.print (f1))
 
 ;; unary lambda
 (let f2
   (lambda ((x i64)) x))
 
-(i64:print (f2 2))
+(i64.print (f2 2))
 
 ;; binary lambda
 (let f3
-  (lambda ((x i64) (y i64)) (i64:add x y)))
+  (lambda ((x i64) (y i64)) (i64.add x y)))
 
-(i64:print (f3 1 2))
+(i64.print (f3 1 2))
 
 ;; a function that takes another function as argument
 (let f4
   (lambda ((a tau) (f (hom a a)) (x a)) (f x)))
 
-(i64:print (f4 i64 (lambda (x) (i64:add x 1)) 3))
+(i64.print (f4 i64 (lambda (x) (i64.add x 1)) 3))
 
 ;; a function with a free variable
 (define f5 ((x i64))
   (with let-bind
-    (let adder (lambda (y) (i64:add x y)))
+    (let adder (lambda (y) (i64.add x y)))
     adder))
 
 (let add-3 (f5 3))
 
-(i64:print (add-3 2))
+(i64.print (add-3 2))
 
 ;; a function with a free variable of type pi
 (define f6 ((g (hom i64 i64)))
@@ -38,6 +38,6 @@
     (let app (lambda (y) (g y)))
     app))
 
-(i64:print ((f6 f2) 6))
+(i64.print ((f6 f2) 6))
 
-;; (string:print "\n")
+;; (string.print "\n")
