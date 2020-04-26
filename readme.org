@@ -12,12 +12,11 @@ Practically, nam at nisi ipsum. Suspendisse a lacus arcu. Morbi convallis felis 
 The basic characteristics of Neut can be summerized as follows:
 
 - Compiled language
-- Output: LLVM IR / assembly / object binary
+- Output: LLVM IR / assembly / object binary (the last two are via clang)
 - Type system: CoC + recursion + int + float + enum + array + struct
 - Evaluation strategy: call-by-value
-- Memory management: statically determined at compile time
-  - Can be optimized via borrowing and linearity
-- Has inductive/coinductive type
+- Memory management: statically determined at compile time (Can be optimized via borrowing and linearity)
+- Has inductive/coinductive type (despite the fact that core logic is not CoIC)
 
 * Table of Contents                                                    :TOC:
 - [[#introduction][Introduction]]
