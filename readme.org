@@ -7,42 +7,87 @@ Neut is a dependently-typed programming language based on [[https://en.wikipedia
 
 Theoretically, this is made possible by translating the source language into a dependent-and-linear variant of [[https://www.cs.bham.ac.uk/~pbl/papers/thesisqmwphd.pdf][Call-by-Push-Value]]. The crucial point of the translation is to see that knowing the type of a term is knowning how to eta-expand the term, which in turn means knowing how to copy/discard the term. In the translation, a type is not erased, but *translated into a computationally-meaningful term that copies/discards the terms of the type*. Those who are interested in these theoretical things can find further details <yet-to-be-written>.
 
+# 明日はここ埋めるところからスタート
 Practically, nam at nisi ipsum. Suspendisse a lacus arcu. Morbi convallis felis orci, sollicitudin ultricies turpis convallis id. Proin nec condimentum libero. Sed vitae ligula vitae diam ornare maximus id ut ante. Aliquam suscipit ante eget pellentesque viverra. Aliquam tincidunt tellus quis ante bibendum malesuada. Vestibulum in orci vitae neque gravida dapibus blandit ac ipsum. Nam molestie urna ut porta eleifend. Duis at nulla dignissim, elementum quam quis, pharetra eros. Sed semper mollis nisl, vel euismod velit malesuada ut. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Duis venenatis eu arcu non egestas.
 
-Here I briefly summerize the basic characteristics of Neut before diving into details:
+Here I briefly summerize the basic characteristics of Neut before diving into the details:
 
-- Compiled language
-- Output: LLVM IR / assembly / object binary (the last two are via clang)
-- Type system: CoC + recursion + int + float + enum + array + struct
-- Evaluation strategy: call-by-value
-- Memory management: statically determined at compile time (Can be optimized via borrowing and linearity)
+- Neut is a compiled language
+- The output of Neut is LLVM IR / assembly / object binary (the last two are via clang)
+- The type system is CoC + recursion + int + float + enum + array + struct
+- The evaluation strategy is call-by-value
+- The Memory management is statically determined at compile time (Can be optimized via borrowing and linearity)
 - Has inductive/coinductive type (despite the fact that core logic is not CoIC but CoC)
 
 * Table of Contents                                                    :TOC:
-- [[#introduction][Introduction]]
-- [[#examples][Examples]]
+- [[#hopefully-illuminating-examples][(Hopefully) Illuminating Examples]]
+  - [[#hello-world][Hello world]]
+  - [[#automatic-memory-management-with-resulting-x64-assembly][Automatic Memory Management (with resulting x64 assembly)]]
+  - [[#borrowing-and-its-resulting-assembly][Borrowing (and its resulting assembly)]]
+  - [[#memory-reuse-via-linearity][Memory Reuse via Linearity]]
+  - [[#summary-or-mental-model-of-memory-management-in-neut][Summary, or Mental Model of Memory Management in Neut]]
 - [[#installation][Installation]]
-- [[#syntax][Syntax]]
-- [[#semantics][Semantics]]
+- [[#syntax-and-semantics][Syntax and Semantics]]
+  - [[#universe][Universe]]
+  - [[#pi][Pi]]
+  - [[#iterate][Iterate]]
+  - [[#int][Int]]
+  - [[#float][Float]]
+  - [[#enum][Enum]]
+  - [[#array][Array]]
+  - [[#struct][Struct]]
 - [[#inductive-and-coinductive-types][Inductive and Coinductive types]]
 - [[#universe-hierarchy-and-the-weakly-normalizing-fragment][Universe Hierarchy and the Weakly-Normalizing Fragment]]
+- [[#writing-library][Writing Library]]
+- [[#where-is-][Where is ...?]]
+  - [[#where-is-typeclass][Where is typeclass?]]
 - [[#references][References]]
 
-* Introduction
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec eleifend tellus euismod erat accumsan, nec euismod sem placerat. Ut eu lacinia arcu, id imperdiet lacus. Integer feugiat lacus mattis, dictum nunc nec, interdum justo. Fusce sed dui id orci faucibus elementum. Vivamus sit amet sapien a lorem efficitur posuere suscipit in lacus. Praesent eget sagittis nisi, id vehicula elit. Vestibulum laoreet odio ex, a aliquet justo consectetur quis. Aenean laoreet vehicula libero id varius. Vivamus condimentum, sem sed sollicitudin placerat, nulla enim faucibus odio, gravida commodo velit mi ac sapien. Integer feugiat diam in lectus porttitor, sit amet viverra velit malesuada.
+* (Hopefully) Illuminating Examples
 
-* Examples
+** Hello world
+
+** Automatic Memory Management (with resulting x64 assembly)
+
+** Borrowing (and its resulting assembly)
+
+** Memory Reuse via Linearity
+
+** Summary, or Mental Model of Memory Management in Neut
 
 * Installation
 Duis nec quam id ex pharetra tincidunt. Sed viverra lorem magna, vitae posuere nibh pharetra quis. Phasellus placerat, diam placerat rhoncus tincidunt, purus mi accumsan purus, et pretium enim risus id risus. Aliquam ultrices odio vitae augue dignissim, viverra tristique purus aliquet. Aenean non sollicitudin massa. Suspendisse potenti. Curabitur id euismod sapien. Nullam luctus vitae nisi eu tempor. Integer cursus efficitur nisi, nec placerat justo blandit maximus. In dictum nibh arcu, in ullamcorper augue aliquet ut. Suspendisse ullamcorper lorem vulputate, ultricies quam id, tincidunt neque. Duis et sem id tortor semper lobortis.
 
-* Syntax
+* Syntax and Semantics
 
-* Semantics
+** Universe
+
+** Pi
+
+** Iterate
+
+** Int
+
+** Float
+
+** Enum
+
+** Array
+
+** Struct
+
 
 * Inductive and Coinductive types
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec eleifend tellus euismod erat accumsan, nec euismod sem placerat. Ut eu lacinia arcu, id imperdiet lacus. Integer feugiat lacus mattis, dictum nunc nec, interdum justo. Fusce sed dui id orci faucibus elementum. Vivamus sit amet sapien a lorem efficitur posuere suscipit in lacus. Praesent eget sagittis nisi, id vehicula elit. Vestibulum laoreet odio ex, a aliquet justo consectetur quis. Aenean laoreet vehicula libero id varius. Vivamus condimentum, sem sed sollicitudin placerat, nulla enim faucibus odio, gravida commodo velit mi ac sapien. Integer feugiat diam in lectus porttitor, sit amet viverra velit malesuada.
+
 
 * Universe Hierarchy and the Weakly-Normalizing Fragment
+
+* Writing Library
+
+* Where is ...?
+
+** Where is typeclass?
 
 * References
 - L. de Moura, J. Avigad, S. Kong, and C. Roux, Elaboration in Dependent Type Theory, [[https://arxiv.org/abs/1505.04324]], 2015.
