@@ -340,7 +340,6 @@ foobaraoaeuaeou日本語入力ホゲホゲ。このへんの色ってどうに�
 
 ;; (string.print (100 tau))
 
-
 (string.print "hello, world!\n")
 
 ;; (let a1 (os.write os.stdout test 3))

@@ -105,20 +105,6 @@ char c = do
             <> T.singleton c
             <> "'"
 
-skip :: Tokenizer ()
-skip = do
-  s <- gets text
-  case T.uncons s of
-    Just (c, rest)
-      | c == ';' ->
-        comment
-      | c `S.member` spaceSet ->
-        updateStreamC 1 rest >> skip
-      | c `S.member` newlineSet ->
-        updateStreamL rest >> skip'
-    _ ->
-      return ()
-
 switchByHyphen :: Tokenizer () -> Tokenizer () -> Tokenizer ()
 switchByHyphen f g = do
   s <- gets text
@@ -141,25 +127,39 @@ switchBySep :: Tokenizer () -> Tokenizer () -> Tokenizer ()
 switchBySep f g =
   switchByHyphen (switchByNewline f g) g
 
-skip' :: Tokenizer ()
-skip' =
-  switchBySep doc skip
+skip :: Tokenizer ()
+skip = do
+  s <- gets text
+  case T.uncons s of
+    Just (c, rest)
+      | c == ';' ->
+        comment
+      | c `S.member` spaceSet ->
+        updateStreamC 1 rest >> skip
+      | c `S.member` newlineSet ->
+        updateStreamL rest >> skip'
+    _ ->
+      return ()
 
 doc :: Tokenizer ()
-doc =
-  switchBySep skip doc''
-
-doc'' :: Tokenizer ()
-doc'' = do
+doc = do
   s <- gets text
   case T.uncons s of
     Just (c, rest)
       | c `S.member` newlineSet ->
-        updateStreamL rest >> doc
+        updateStreamL rest >> doc'
       | otherwise ->
-        updateStreamC 1 rest >> doc''
-    Nothing ->
+        updateStreamC 1 rest >> doc
+    _ ->
       return ()
+
+skip' :: Tokenizer ()
+skip' =
+  switchBySep doc skip
+
+doc' :: Tokenizer ()
+doc' =
+  switchBySep skip doc
 
 comment :: Tokenizer ()
 comment = do
