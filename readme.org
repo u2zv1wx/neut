@@ -9,14 +9,14 @@ Theoretically, this is made possible by translating the source language into a d
 
 Practically, nam at nisi ipsum. Suspendisse a lacus arcu. Morbi convallis felis orci, sollicitudin ultricies turpis convallis id. Proin nec condimentum libero. Sed vitae ligula vitae diam ornare maximus id ut ante. Aliquam suscipit ante eget pellentesque viverra. Aliquam tincidunt tellus quis ante bibendum malesuada. Vestibulum in orci vitae neque gravida dapibus blandit ac ipsum. Nam molestie urna ut porta eleifend. Duis at nulla dignissim, elementum quam quis, pharetra eros. Sed semper mollis nisl, vel euismod velit malesuada ut. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Duis venenatis eu arcu non egestas.
 
-The basic characteristics of Neut can be summerized as follows:
+Here I briefly summerize the basic characteristics of Neut before diving into details:
 
 - Compiled language
 - Output: LLVM IR / assembly / object binary (the last two are via clang)
 - Type system: CoC + recursion + int + float + enum + array + struct
 - Evaluation strategy: call-by-value
 - Memory management: statically determined at compile time (Can be optimized via borrowing and linearity)
-- Has inductive/coinductive type (despite the fact that core logic is not CoIC)
+- Has inductive/coinductive type (despite the fact that core logic is not CoIC but CoC)
 
 * Table of Contents                                                    :TOC:
 - [[#introduction][Introduction]]
