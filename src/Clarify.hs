@@ -45,7 +45,7 @@ clarifyStmt sub stmt =
       cont' <- clarifyStmt sub' cont
       h <- newNameWith'' "_"
       cont'' <- withHeaderAffine h t' cont' -- free the result of e'
-      insCodeEnv (asText'' constName) [] e' -- box-introduction
+      insCodeEnv (asText'' constName) [] e'
       return (m, CodeUpElim h e' cont'')
 
 clarify' :: TypeEnv -> TermPlus -> WithEnv CodePlus
@@ -77,7 +77,7 @@ clarify' tenv term =
     (m, TermConst x) ->
       clarifyConst tenv m x
     (m, TermBoxElim x) ->
-      return (m, CodePiElimDownElim (m, DataConst $ asText'' x) []) -- box-elimination
+      return (m, CodePiElimDownElim (m, DataConst $ asText'' x) [])
     (m, TermInt size l) ->
       return (m, CodeUpIntro (m, DataInt size l))
     (m, TermFloat size l) ->
