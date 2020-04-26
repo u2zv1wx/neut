@@ -107,23 +107,15 @@ char c = do
 
 skip :: Tokenizer ()
 skip = do
-  space
-  s <- gets text
-  case T.uncons s of
-    Just (';', _) ->
-      comment
-    _ ->
-      space
-
-space :: Tokenizer ()
-space = do
   s <- gets text
   case T.uncons s of
     Just (c, rest)
+      | c == ';' ->
+        comment
       | c `S.member` spaceSet ->
-        updateStreamC 1 rest >> space
+        updateStreamC 1 rest >> skip
       | c `S.member` newlineSet ->
-        updateStreamL rest >> space
+        updateStreamL rest >> skip
     _ ->
       return ()
 
