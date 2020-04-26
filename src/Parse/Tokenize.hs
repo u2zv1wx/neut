@@ -29,7 +29,7 @@ tokenize input = do
   modify (\env -> env {count = 1 + count env})
   path <- getCurrentFilePath
   let env = TEnv {text = input, line = 1, column = 1, filePath = path}
-  resultOrError <- liftIO $ try $ runStateT (program []) env
+  resultOrError <- liftIO $ try $ runStateT (skip' >> program []) env
   case resultOrError of
     Left (Error err) ->
       throw $ Error err
@@ -115,8 +115,56 @@ skip = do
       | c `S.member` spaceSet ->
         updateStreamC 1 rest >> skip
       | c `S.member` newlineSet ->
-        updateStreamL rest >> skip
+        updateStreamL rest >> skip'
     _ ->
+      return ()
+
+skip' :: Tokenizer ()
+skip' = do
+  s <- gets text
+  case T.uncons s of
+    Just ('-', rest) ->
+      updateStreamC 1 rest >> skip''
+    _ ->
+      skip
+
+skip'' :: Tokenizer ()
+skip'' = do
+  s <- gets text
+  case T.uncons s of
+    Just ('\n', rest) ->
+      updateStreamL rest >> doc
+    _ ->
+      skip
+
+doc :: Tokenizer ()
+doc = do
+  s <- gets text
+  case T.uncons s of
+    Just ('-', rest) ->
+      updateStreamC 1 rest >> doc'
+    _ ->
+      doc''
+
+doc' :: Tokenizer ()
+doc' = do
+  s <- gets text
+  case T.uncons s of
+    Just ('\n', rest) ->
+      updateStreamL rest >> skip
+    _ ->
+      doc''
+
+doc'' :: Tokenizer ()
+doc'' = do
+  s <- gets text
+  case T.uncons s of
+    Just (c, rest)
+      | c `S.member` newlineSet ->
+        updateStreamL rest >> doc
+      | otherwise ->
+        updateStreamC 1 rest >> doc''
+    Nothing ->
       return ()
 
 comment :: Tokenizer ()
@@ -125,7 +173,7 @@ comment = do
   case T.uncons s of
     Just (c, rest)
       | c `S.member` newlineSet ->
-        updateStreamL rest >> skip
+        updateStreamL rest >> skip'
       | otherwise ->
         updateStreamC 1 rest >> comment
     Nothing ->
