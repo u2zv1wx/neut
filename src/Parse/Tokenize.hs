@@ -94,7 +94,7 @@ char c = do
         "unexpected end of input\nexpecting: '" <> T.singleton c <> "'"
     Just (c', rest)
       | c == c' ->
-        if c == '\n'
+        if c `S.member` newlineSet
           then updateStreamL rest
           else updateStreamC 1 rest
       | otherwise ->
@@ -131,12 +131,13 @@ comment :: Tokenizer ()
 comment = do
   s <- gets text
   case T.uncons s of
-    Just ('\n', rest) ->
-      updateStreamL rest >> skip
-    Just (_, rest) ->
-      updateStreamC 1 rest >> comment
+    Just (c, rest)
+      | c `S.member` newlineSet ->
+        updateStreamL rest >> skip
+      | otherwise ->
+        updateStreamC 1 rest >> comment
     Nothing ->
-      return () -- no newline at the end of file
+      return ()
 
 many :: Tokenizer a -> Tokenizer [a]
 many f =
@@ -190,7 +191,7 @@ headStringLengthOf flag s i =
       | c == '\\' -> do
         incrementColumn
         headStringLengthOf (not flag) rest (i + 1)
-      | c == '\n' -> do
+      | c `S.member` newlineSet -> do
         incrementLine
         headStringLengthOf False rest (i + 1)
       | otherwise -> do
