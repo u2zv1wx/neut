@@ -2,7 +2,6 @@ module Data.LowType where
 
 import Data.Size
 import qualified Data.Text as T
-import GHC.Generics
 import Text.Read hiding (get)
 
 data LowType
@@ -25,7 +24,7 @@ data ArrayKind
   = ArrayKindInt Int
   | ArrayKindFloat FloatSize
   | ArrayKindVoidPtr
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq)
 
 voidPtr :: LowType
 voidPtr =

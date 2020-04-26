@@ -1,6 +1,5 @@
 module Data.Meta where
 
-import GHC.Generics hiding (Meta)
 import Path
 
 type Phase =
@@ -22,7 +21,6 @@ data Meta
         metaIsReducible :: Bool,
         metaIsExplicit :: Bool
       }
-  deriving (Generic)
 
 -- required to derive the eqality on WeakTerm
 instance Eq Meta where

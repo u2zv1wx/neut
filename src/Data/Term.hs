@@ -9,7 +9,6 @@ import Data.Meta
 import Data.Size
 import qualified Data.Text as T
 import Data.WeakTerm
-import GHC.Generics (Generic)
 
 data Term
   = TermTau
@@ -39,7 +38,7 @@ data Term
       (Maybe Ident)
       TermPlus -- (the `e` in `case e of (...)`, the type of `e`)
       [Clause] -- ((cons x xs) e), ((nil) e), ((succ n) e).  (not ((cons A x xs) e).)
-  deriving (Show, Generic)
+  deriving (Show)
 
 type TextPlus =
   (Meta, T.Text, TermPlus)

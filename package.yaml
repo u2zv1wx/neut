@@ -10,7 +10,6 @@ extra-source-files:
 
 default-extensions:
 - OverloadedStrings
-- DeriveGeneric
 - ScopedTypeVariables
 
 dependencies:

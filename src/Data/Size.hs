@@ -1,7 +1,6 @@
 module Data.Size where
 
 import qualified Data.Text as T
-import GHC.Generics
 
 type IntSize =
   Int
@@ -10,7 +9,7 @@ data FloatSize
   = FloatSize16
   | FloatSize32
   | FloatSize64
-  deriving (Eq, Ord, Show, Generic)
+  deriving (Eq, Ord, Show)
 
 asFloatSize :: Int -> Maybe FloatSize
 asFloatSize size =

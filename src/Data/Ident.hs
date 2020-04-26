@@ -2,11 +2,10 @@ module Data.Ident where
 
 import qualified Data.Set as S
 import qualified Data.Text as T
-import GHC.Generics hiding (Meta)
 
 newtype Ident
   = I (T.Text, Int)
-  deriving (Eq, Ord, Generic)
+  deriving (Eq, Ord)
 
 asText :: Ident -> T.Text
 asText (I (s, _)) =
