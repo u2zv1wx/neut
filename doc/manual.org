@@ -1,6 +1,6 @@
 #+TITLE: Neut Language Manual
 
-* Table of Contents                                                    :TOC_10:
+* Table of Contents                                                    :TOC:
 - [[#abstract][Abstract]]
 - [[#introduction][Introduction]]
 - [[#syntax][Syntax]]
@@ -8,7 +8,6 @@
   - [[#sigma-related-syntax][Sigma-related Syntax]]
   - [[#foo][Foo]]
   - [[#bar][Bar]]
-    - [[#buz][Buz]]
 - [[#semantics][Semantics]]
 - [[#package-management][Package Management]]
 - [[#references][References]]
@@ -34,7 +33,6 @@ Mauris sagittis dignissim dolor id posuere. Integer pellentesque commodo elit ti
 ** Sigma-related Syntax
 ** Foo
 ** Bar
-*** Buz
 
 * Semantics
 
