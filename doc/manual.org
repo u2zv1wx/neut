@@ -1,9 +1,9 @@
 #+TITLE: Neut Language Manual
 
-* Table of Contents :TOC:
+* Table of Contents                                                    :TOC:
 - [[#abstract][Abstract]]
 - [[#introduction][Introduction]]
-- [[#syntaxhoge][Syntaxhoge]]
+- [[#syntax][Syntax]]
 - [[#semantics][Semantics]]
 - [[#package-management][Package Management]]
 - [[#references][References]]
@@ -20,9 +20,14 @@ Nam at nisi ipsum. Suspendisse a lacus arcu. Morbi convallis felis orci, sollici
 
 [[https://orgmode.org/manual/External-Links.html]] のようにしてリンクも書ける？
 
-* Syntaxhoge
+Mauris sagittis dignissim dolor id posuere. Integer pellentesque commodo elit tincidunt ultricies. In ut leo nulla. Maecenas quis magna quis erat elementum condimentum ac vitae metus. Duis condimentum sit amet magna sit amet mollis. Duis bibendum tellus ex, nec vestibulum risus porttitor et. Aliquam luctus purus quis laoreet malesuada. Suspendisse finibus efficitur faucibus. Phasellus non condimentum lectus. Aliquam pulvinar dui tincidunt mi semper vehicula. In hac habitasse platea dictumst. Fusce sed lectus tincidunt, tincidunt neque viverra, ullamcorper justo. Donec id ligula id nisl pellentesque porta. Sed metus nisi, pretium et nulla id, ullamcorper tincidunt tortor. Suspendisse quis eros dapibus orci sollicitudin commodo vel vitae ex.
+
+* Syntax
+
 * Semantics
+
 * Package Management
+
 * References
 - L. de Moura, J. Avigad, S. Kong, and C. Roux, Elaboration in Dependent Type Theory, [[https://arxiv.org/abs/1505.04324]], 2015.
 - P. Levy, Call-by-Push-Value: A Subsuming Paradigm, Ph. D. thesis, Queen Mary College, 2001.
