@@ -1,9 +1,14 @@
 #+TITLE: Neut Language Manual
 
-* Table of Contents                                                    :TOC:
+* Table of Contents                                                    :TOC_10:
 - [[#abstract][Abstract]]
 - [[#introduction][Introduction]]
 - [[#syntax][Syntax]]
+  - [[#pi-related-syntax][Pi-related Syntax]]
+  - [[#sigma-related-syntax][Sigma-related Syntax]]
+  - [[#foo][Foo]]
+  - [[#bar][Bar]]
+    - [[#buz][Buz]]
 - [[#semantics][Semantics]]
 - [[#package-management][Package Management]]
 - [[#references][References]]
@@ -23,6 +28,13 @@ Nam at nisi ipsum. Suspendisse a lacus arcu. Morbi convallis felis orci, sollici
 Mauris sagittis dignissim dolor id posuere. Integer pellentesque commodo elit tincidunt ultricies. In ut leo nulla. Maecenas quis magna quis erat elementum condimentum ac vitae metus. Duis condimentum sit amet magna sit amet mollis. Duis bibendum tellus ex, nec vestibulum risus porttitor et. Aliquam luctus purus quis laoreet malesuada. Suspendisse finibus efficitur faucibus. Phasellus non condimentum lectus. Aliquam pulvinar dui tincidunt mi semper vehicula. In hac habitasse platea dictumst. Fusce sed lectus tincidunt, tincidunt neque viverra, ullamcorper justo. Donec id ligula id nisl pellentesque porta. Sed metus nisi, pretium et nulla id, ullamcorper tincidunt tortor. Suspendisse quis eros dapibus orci sollicitudin commodo vel vitae ex.
 
 * Syntax
+
+** Pi-related Syntax
+
+** Sigma-related Syntax
+** Foo
+** Bar
+*** Buz
 
 * Semantics
 
