@@ -1,11 +1,16 @@
 #+TITLE: Neut
-Neut is a dependently-typed programming language based on Calculus of Constructions. The interesting point I believe is that this language determines how to allocate/free memory at compile-time, without extra annotations to the source language. This language manages memory without using (1) explicit malloc/free, (2) garbage collection, or (3) region-based memory management.
+Neut is a dependently-typed programming language based on [[https://en.wikipedia.org/wiki/Calculus_of_constructions][the Calculus of Constructions (CoC)]]. The interesting point I believe is that this language determines how to allocate/free memory at compile-time, without extra annotations to the source language. In other words, Neut manages memory without using:
+
+- explicit malloc/free,
+- garbage collection,
+- region-based memory management.
 
 Theoretically, this is made possible by translating the source language into a dependent-and-linear variant of [[https://www.cs.bham.ac.uk/~pbl/papers/thesisqmwphd.pdf][Call-by-Push-Value]]. The crucial point of the translation is to see that knowing the type of a term is knowning how to eta-expand the term, which in turn means knowing how to copy/discard the term. In the translation, a type is not erased, but *translated into a computationally-meaningful term that copies/discards the terms of the type*. Those who are interested in these theoretical things can find further details <yet-to-be-written>.
 
 Practically, nam at nisi ipsum. Suspendisse a lacus arcu. Morbi convallis felis orci, sollicitudin ultricies turpis convallis id. Proin nec condimentum libero. Sed vitae ligula vitae diam ornare maximus id ut ante. Aliquam suscipit ante eget pellentesque viverra. Aliquam tincidunt tellus quis ante bibendum malesuada. Vestibulum in orci vitae neque gravida dapibus blandit ac ipsum. Nam molestie urna ut porta eleifend. Duis at nulla dignissim, elementum quam quis, pharetra eros. Sed semper mollis nisl, vel euismod velit malesuada ut. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Duis venenatis eu arcu non egestas.
 
 * Table of Contents                                                    :TOC:
+- [[#characteristics-in-short][Characteristics in Short]]
 - [[#introduction][Introduction]]
 - [[#examples][Examples]]
 - [[#installation][Installation]]
@@ -14,6 +19,18 @@ Practically, nam at nisi ipsum. Suspendisse a lacus arcu. Morbi convallis felis 
 - [[#inductive-and-coinductive-types][Inductive and Coinductive types]]
 - [[#universe-hierarchy-and-the-weakly-normalizing-fragment][Universe Hierarchy and the Weakly-Normalizing Fragment]]
 - [[#references][References]]
+
+* Characteristics in Short
+- compiler input: Lisp-like source code
+- compiler output: LLVM IR / assembly / object code
+- type system: CoC + recursion + int + float + enum + array + struct
+- evaluation strategy: call-by-value
+- memory management: determined at compile time without extra annotation
+- other features:
+  - borrowing
+  - linearity-based memory reuse
+  - inductive type, nested inductive type, mutually inductive type
+  - coinductive type, nested coinductive type, mutual coinductive type
 
 * Introduction
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec eleifend tellus euismod erat accumsan, nec euismod sem placerat. Ut eu lacinia arcu, id imperdiet lacus. Integer feugiat lacus mattis, dictum nunc nec, interdum justo. Fusce sed dui id orci faucibus elementum. Vivamus sit amet sapien a lorem efficitur posuere suscipit in lacus. Praesent eget sagittis nisi, id vehicula elit. Vestibulum laoreet odio ex, a aliquet justo consectetur quis. Aenean laoreet vehicula libero id varius. Vivamus condimentum, sem sed sollicitudin placerat, nulla enim faucibus odio, gravida commodo velit mi ac sapien. Integer feugiat diam in lectus porttitor, sit amet viverra velit malesuada.
