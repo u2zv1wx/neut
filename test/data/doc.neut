@@ -1,0 +1,43 @@
+-
+documentational comment at the beginning of a file.
+-
+
+;; ordinary comment
+-
+aoeu
+-
+
+(let x (i64 1))
+
+
+-
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce id nibh nulla. Duis mollis nec est id tempor. Donec nunc neque, tempor vitae tempor sit amet, rhoncus sed justo. Morbi et tortor et velit feugiat commodo eget in ligula. Proin sit amet suscipit dui, quis vulputate lacus. Morbi ornare vulputate tellus, a pretium urna laoreet et. Sed iaculis justo vitae libero posuere, vitae laoreet nisi imperdiet. Sed rutrum purus eu mi molestie, id tincidunt augue accumsan. In in odio nec tellus cursus venenatis.
+
+;; ordinary comment in documentational comment
+
+Vestibulum tempus et ante sit amet posuere. Aenean et efficitur enim. Nam sodales diam in ante sagittis, vitae venenatis risus varius. Nam molestie ut diam ac elementum. Nullam quis neque at mauris tristique tristique. In quam sapien, pretium ac viverra sed, facilisis sed ipsum. Praesent dictum ipsum quis dolor feugiat congue. Nullam tincidunt efficitur est et auctor. Cras pellentesque purus ac mattis molestie. In hac habitasse platea dictumst.
+-
+
+-
+これは時分できるだけこのろか方というものの中がしべきです。同時に昔に変化院は現にその活動らしんかもと信ずるているなをは関係思っますたて、始終にはしたたたなく。状態にしですのは同時に当時にどうもなでしょう。
+
+ひょろひょろ大森さんを尊重がたそれほど尊敬に次ぐた大学その長靴私か答弁をというご留学だないたですて、そんな晩もそれか大名例外を出て、向君のものの去就の彼らが断然ご思案となるてそれ霧がお懊悩へ重んずるように最もご落第をついなますて、何しろつい自覚に行っうていでしょのがさましべき。
+
+そこでまた不下でしのはこう自由と駈けでが、その程度からも思わですととして権力が減っでみるうまし。
+
+その以上徳義心の時そんな権利はそこごろと生きですかと嘉納さんであっですです、後れの昔あるというお周旋なないたて、兄の限りを自分に昔じゃの威力が前違って行っと、あいにくのほかが折っからそのうちが無論したなけれと暮らしだ事まして、好いなありし一応お権力掴むたのなたた。それで語学か大切か始末がもたらすたが、当時中精神に考えてくるますためが肝病気の次第にしうです。ほかをもざっとありがしなませたですて、もし近頃しから努力も全く悪いたものませ。または実使用がしばはならないのたて、豆腐でも、すでに私かなさいでいうられでだろ畳んれるたたらとするが、目は聴きて行っましない。ほとんどもしはできるだけ浮華というもらったて、これには場合ごろまで私のご盲動はない抜かしいるませます。
+-
+
+(let y (i64 2))
+
+-
+追加コメント。 Suspendisse convallis quam at lobortis maximus. Quisque a sem dolor. Praesent in elit dignissim, viverra tellus in, consequat mauris. Morbi sit amet venenatis erat, sed faucibus tellus. Maecenas sit amet vestibulum velit. In venenatis pharetra diam ac venenatis. In justo tellus, molestie non velit blandit, dignissim tempus eros. Nunc justo velit, finibus sed tristique sed, tempor et ligula. Cras et lobortis diam. Morbi sed sem id nisl iaculis fringilla non a augue. Aliquam sit amet imperdiet neque. Sed et fermentum tellus, vitae interdum purus.
+
+--  Ut tristique dapibus sem, vel congue metus commodo nec. Phasellus dignissim convallis pretium. Integer sagittis ultrices turpis, eget pellentesque augue maximus sed. Suspendisse consectetur in dui nec tristique. Nam eu dignissim dolor. Integer sed sapien vel ipsum aliquam semper. Maecenas a nulla at leo tempus porta id et ex. Proin nisl ligula, feugiat et felis at, facilisis tincidunt quam. Phasellus mollis nisl vel leo dictum sagittis.
+
+;; aoeuaeu
+
+ Maecenas rutrum ultrices augue. Interdum et malesuada fames ac ante ipsum primis in faucibus. Vestibulum est urna, consequat eu condimentum ut, ultricies id leo. Nulla feugiat ipsum vitae tristique blandit. Praesent ultricies orci neque, consequat consectetur dui consequat sed. Nam ullamcorper sem ac finibus condimentum. Suspendisse fringilla semper turpis ut sollicitudin. Suspendisse semper laoreet feugiat. Pellentesque lobortis nisi sed nisi ornare posuere. Duis ut felis ipsum. Integer quis malesuada purus, vitae condimentum turpis. Quisque congue turpis quis metus fermentum luctus. Fusce id sem euismod, rutrum enim ac, tempus velit.
+-
+
+(i64.print (add-i64 x y))
