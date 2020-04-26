@@ -18,7 +18,7 @@ data Term
   | TermPiElim TermPlus [TermPlus]
   | TermIter IdentPlus [IdentPlus] TermPlus
   | TermConst T.Text
-  | TermBoxElim Ident -- S4 necessity
+  | TermCall Ident -- S4 necessity
   | TermInt IntSize Integer
   | TermFloat FloatSize Double
   | TermEnum T.Text
@@ -95,7 +95,7 @@ varTermPlus term =
       varTermPlus t ++ filter (/= x) (varTermPlus' xts [e])
     (_, TermConst _) ->
       []
-    (_, TermBoxElim _) ->
+    (_, TermCall _) ->
       []
     (_, TermInt _ _) ->
       []
@@ -164,7 +164,7 @@ substTermPlus sub term =
       (m, TermIter (mx, x, t') xts' e')
     e@(_, TermConst _) ->
       e
-    e@(_, TermBoxElim _) ->
+    e@(_, TermCall _) ->
       e
     e@(_, TermInt _ _) ->
       e
@@ -255,8 +255,8 @@ weaken term =
       (m, WeakTermIter (mx, x, t') xts' e')
     (m, TermConst x) ->
       (m, WeakTermConst x)
-    (m, TermBoxElim x) ->
-      (m, WeakTermBoxElim x)
+    (m, TermCall x) ->
+      (m, WeakTermCall x)
     (m, TermInt size x) ->
       (m, WeakTermInt (m, WeakTermConst (showIntSize size)) x)
     (m, TermFloat size x) ->

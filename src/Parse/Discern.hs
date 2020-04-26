@@ -88,8 +88,8 @@ discern' nenv term =
       return (m, WeakTermIter xt' xts' e')
     (m, WeakTermConst x) ->
       return (m, WeakTermConst x)
-    (m, WeakTermBoxElim x) ->
-      return (m, WeakTermBoxElim x)
+    (m, WeakTermCall x) ->
+      return (m, WeakTermCall x)
     (m, WeakTermHole h) ->
       return (m, WeakTermHole h)
     (m, WeakTermInt t x) -> do

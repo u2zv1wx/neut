@@ -41,7 +41,7 @@ clarifyStmt sub stmt =
       e' <- clarify' tenv $ substTermPlus sub e
       t' <- clarify' tenv $ substTermPlus sub t
       constName <- newNameWith x
-      let sub' = IntMap.insert (asInt x) (m, TermBoxElim constName) sub
+      let sub' = IntMap.insert (asInt x) (m, TermCall constName) sub
       cont' <- clarifyStmt sub' cont
       h <- newNameWith'' "_"
       cont'' <- withHeaderAffine h t' cont' -- free the result of e'
@@ -76,7 +76,7 @@ clarify' tenv term =
       retClosureFix tenv x fvs m mxts e'
     (m, TermConst x) ->
       clarifyConst tenv m x
-    (m, TermBoxElim x) ->
+    (m, TermCall x) ->
       return (m, CodePiElimDownElim (m, DataConst $ asText'' x) [])
     (m, TermInt size l) ->
       return (m, CodeUpIntro (m, DataInt size l))
@@ -611,7 +611,7 @@ chainTermPlus tenv term =
       return $ xs1 ++ filter (\(_, y, _) -> y /= x) xs2
     (_, TermConst _) ->
       return []
-    (_, TermBoxElim _) ->
+    (_, TermCall _) ->
       return []
     (_, TermInt _ _) ->
       return []

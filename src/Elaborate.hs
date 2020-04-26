@@ -143,8 +143,8 @@ elaborate' term =
         "every meta-variable must be of the form (?M e1 ... en) where n >= 0, but found the meta-variable here that doesn't fit this pattern"
     (m, WeakTermConst x) ->
       return (m, TermConst x)
-    (m, WeakTermBoxElim x) ->
-      return (m, TermBoxElim x)
+    (m, WeakTermCall x) ->
+      return (m, TermCall x)
     (m, WeakTermInt t x) -> do
       t' <- reduceTermPlus <$> elaborate' t
       case t' of

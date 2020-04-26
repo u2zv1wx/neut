@@ -21,7 +21,7 @@ data WeakTerm
   | WeakTermIter WeakIdentPlus [WeakIdentPlus] WeakTermPlus
   | WeakTermHole Ident
   | WeakTermConst T.Text
-  | WeakTermBoxElim Ident
+  | WeakTermCall Ident
   | WeakTermInt WeakTermPlus Integer
   | WeakTermFloat WeakTermPlus Double
   | WeakTermEnum T.Text
@@ -127,7 +127,7 @@ varWeakTermPlus term =
       S.union set1 set2
     (_, WeakTermConst _) ->
       S.empty
-    (_, WeakTermBoxElim _) ->
+    (_, WeakTermCall _) ->
       S.empty
     (_, WeakTermHole _) ->
       S.empty
@@ -203,7 +203,7 @@ holeWeakTermPlus term =
       S.singleton h
     (_, WeakTermConst _) ->
       S.empty
-    (_, WeakTermBoxElim _) ->
+    (_, WeakTermCall _) ->
       S.empty
     (_, WeakTermInt t _) ->
       holeWeakTermPlus t
@@ -282,7 +282,7 @@ substWeakTermPlus sub term =
       (m, WeakTermIter (mx, x, t') xts' e')
     (_, WeakTermConst _) ->
       term
-    (_, WeakTermBoxElim _) ->
+    (_, WeakTermCall _) ->
       term
     e1@(_, WeakTermHole x) ->
       case IntMap.lookup (asInt x) sub of
@@ -417,7 +417,7 @@ toText term =
       showCons ["μ", asText' x, argStr, toText e]
     (_, WeakTermConst x) ->
       x
-    (_, WeakTermBoxElim x) ->
+    (_, WeakTermCall x) ->
       asText x
     (_, WeakTermHole (I (_, i))) ->
       "?M" <> T.pack (show i)

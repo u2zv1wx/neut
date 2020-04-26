@@ -214,8 +214,8 @@ normalize term =
       return (m, TermIter (mx, x, t') (zip3 ms xs ts') e')
     (m, TermConst x) ->
       return (m, TermConst x)
-    (m, TermBoxElim x) ->
-      return (m, TermBoxElim x)
+    (m, TermCall x) ->
+      return (m, TermCall x)
     (m, TermInt size x) ->
       return (m, TermInt size x)
     (m, TermFloat size x) ->

@@ -134,7 +134,7 @@ compInfoWeakTermPlus c info term =
       return ()
     (_, WeakTermConst _) ->
       return ()
-    (_, WeakTermBoxElim _) ->
+    (_, WeakTermCall _) ->
       return ()
     (_, WeakTermInt t _) ->
       compInfoWeakTermPlus c info t
