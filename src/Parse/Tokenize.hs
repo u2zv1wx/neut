@@ -119,41 +119,35 @@ skip = do
     _ ->
       return ()
 
-skip' :: Tokenizer ()
-skip' = do
+switchByHyphen :: Tokenizer () -> Tokenizer () -> Tokenizer ()
+switchByHyphen f g = do
   s <- gets text
   case T.uncons s of
     Just ('-', rest) ->
-      updateStreamC 1 rest >> skip''
+      updateStreamC 1 rest >> f
     _ ->
-      skip
+      g
 
-skip'' :: Tokenizer ()
-skip'' = do
+switchByNewline :: Tokenizer () -> Tokenizer () -> Tokenizer ()
+switchByNewline f g = do
   s <- gets text
   case T.uncons s of
     Just ('\n', rest) ->
-      updateStreamL rest >> doc
+      updateStreamL rest >> f
     _ ->
-      skip
+      g
+
+switchBySep :: Tokenizer () -> Tokenizer () -> Tokenizer ()
+switchBySep f g =
+  switchByHyphen (switchByNewline f g) g
+
+skip' :: Tokenizer ()
+skip' =
+  switchBySep doc skip
 
 doc :: Tokenizer ()
-doc = do
-  s <- gets text
-  case T.uncons s of
-    Just ('-', rest) ->
-      updateStreamC 1 rest >> doc'
-    _ ->
-      doc''
-
-doc' :: Tokenizer ()
-doc' = do
-  s <- gets text
-  case T.uncons s of
-    Just ('\n', rest) ->
-      updateStreamL rest >> skip
-    _ ->
-      doc''
+doc =
+  switchBySep skip doc''
 
 doc'' :: Tokenizer ()
 doc'' = do
