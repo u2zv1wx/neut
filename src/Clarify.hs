@@ -21,7 +21,6 @@ import Data.LowType
 import Data.Meta
 import Data.Namespace
 import Data.Primitive
-import Data.Size
 import Data.Syscall
 import Data.Term
 import qualified Data.Text as T
@@ -464,16 +463,6 @@ retWithBorrowedVars tenv m cod xts resultVarName =
       clarify'
         tenv'
         (m, termPiIntro [zu, kp] (m, TermPiElim (mk, TermUpsilon k) vs))
-
-inferKind :: Meta -> ArrayKind -> WithEnv TermPlus
-inferKind m arrayKind =
-  case arrayKind of
-    ArrayKindInt size ->
-      return (m, TermConst (showIntSize size))
-    ArrayKindFloat size ->
-      return (m, TermConst (showFloatSize size))
-    _ ->
-      raiseCritical m "inferKind for void-pointer"
 
 rightmostOf :: TermPlus -> WithEnv (Meta, TermPlus)
 rightmostOf term =

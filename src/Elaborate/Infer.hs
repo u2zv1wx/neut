@@ -18,7 +18,6 @@ import qualified Data.IntMap as IntMap
 import Data.LowType
 import Data.Meta
 import Data.Primitive
-import Data.Size
 import Data.Term
 import qualified Data.Text as T
 import Data.WeakTerm
@@ -128,7 +127,7 @@ infer' ctx term =
       insConstraintEnv tDom tDom'
       return ((m, WeakTermArray dom' k), (m, WeakTermTau))
     (m, WeakTermArrayIntro k es) -> do
-      tCod <- inferKind m k
+      tCod <- inferWeakKind m k
       (es', ts) <- unzip <$> mapM (infer' ctx) es
       forM_ (zip ts (repeat tCod)) $ uncurry insConstraintEnv
       let len = toInteger $ length es
@@ -144,14 +143,14 @@ infer' ctx term =
       -- let dom = (m, WeakTermEnumIntro (EnumValueInt 64 len))
       insConstraintEnv t1 (fst e1', WeakTermArray dom k)
       let ts = map (\(_, _, t) -> t) xts'
-      tCod <- inferKind m k
+      tCod <- inferWeakKind m k
       forM_ (zip ts (repeat tCod)) $ uncurry insConstraintEnv
       return ((m, WeakTermArrayElim k xts' e1' e2'), t2)
     (m, WeakTermStruct ts) ->
       return ((m, WeakTermStruct ts), (m, WeakTermTau))
     (m, WeakTermStructIntro eks) -> do
       let (es, ks) = unzip eks
-      ts <- mapM (inferKind m) ks
+      ts <- mapM (inferWeakKind m) ks
       let structType = (m, WeakTermStruct ks)
       (es', ts') <- unzip <$> mapM (infer' ctx) es
       forM_ (zip ts' ts) $ uncurry insConstraintEnv
@@ -159,7 +158,7 @@ infer' ctx term =
     (m, WeakTermStructElim xks e1 e2) -> do
       (e1', t1) <- infer' ctx e1
       let (ms, xs, ks) = unzip3 xks
-      ts <- mapM (inferKind m) ks
+      ts <- mapM (inferWeakKind m) ks
       let structType = (fst e1', WeakTermStruct ks)
       insConstraintEnv t1 structType
       forM_ (zip xs ts) $ uncurry insWeakTypeEnv
@@ -293,15 +292,9 @@ inferType' ctx t = do
   insConstraintEnv u (metaOf t, WeakTermTau)
   return t'
 
-inferKind :: Meta -> ArrayKind -> WithEnv WeakTermPlus
-inferKind m kind =
-  case kind of
-    ArrayKindInt size ->
-      return (m, WeakTermConst (showIntSize size))
-    ArrayKindFloat size ->
-      return (m, WeakTermConst (showFloatSize size))
-    _ ->
-      raiseCritical m "inferKind for void-pointer"
+inferWeakKind :: Meta -> ArrayKind -> WithEnv WeakTermPlus
+inferWeakKind m kind =
+  weaken <$> inferKind m kind
 
 inferPi ::
   Context ->

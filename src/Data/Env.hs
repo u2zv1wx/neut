@@ -354,6 +354,16 @@ arrayAccessToType m lowType = do
   cod <- termSigma m [(m, x4, arr), (m, x5, t)]
   return (m, termPi xts cod)
 
+inferKind :: Meta -> ArrayKind -> WithEnv TermPlus
+inferKind m arrayKind =
+  case arrayKind of
+    ArrayKindInt size ->
+      return (m, TermConst (showIntSize size))
+    ArrayKindFloat size ->
+      return (m, TermConst (showFloatSize size))
+    _ ->
+      raiseCritical m "inferKind for void-pointer"
+
 weakTermSigma :: Meta -> [WeakIdentPlus] -> WithEnv WeakTermPlus
 weakTermSigma m xts = do
   z <- newNameWith'' "sigma"
