@@ -134,32 +134,32 @@ skip = do
     Just (c, rest)
       | c == ';' ->
         comment
-      | c `S.member` spaceSet ->
-        updateStreamC 1 rest >> skip
       | c `S.member` newlineSet ->
         updateStreamL rest >> skip'
+      | c `S.member` spaceSet ->
+        updateStreamC 1 rest >> skip
     _ ->
       return ()
 
-doc :: Tokenizer ()
-doc = do
+skipDoc :: Tokenizer ()
+skipDoc = do
   s <- gets text
   case T.uncons s of
     Just (c, rest)
       | c `S.member` newlineSet ->
-        updateStreamL rest >> doc'
+        updateStreamL rest >> skipDoc'
       | otherwise ->
-        updateStreamC 1 rest >> doc
+        updateStreamC 1 rest >> skipDoc
     _ ->
       return ()
 
 skip' :: Tokenizer ()
 skip' =
-  switchBySep doc skip
+  switchBySep skipDoc skip
 
-doc' :: Tokenizer ()
-doc' =
-  switchBySep skip doc
+skipDoc' :: Tokenizer ()
+skipDoc' =
+  switchBySep skip skipDoc
 
 comment :: Tokenizer ()
 comment = do
