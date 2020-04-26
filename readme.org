@@ -1,4 +1,4 @@
-#+TITLE: Neut Language Reference
+#+TITLE: Neut Programming Language
 
 * Table of Contents                                                    :TOC:
 - [[#introduction][Introduction]]
