@@ -17,6 +17,7 @@ Here I briefly summerize the basic characteristics of Neut before diving into th
 - The evaluation strategy is call-by-value
 - The memory management is statically determined at compile time (Can be optimized via borrowing and linearity)
 - Has inductive/coinductive type (despite the fact that core logic is not CoIC but CoC)
+- Every tail call is optimized into a loop
 
 * Table of Contents                                                    :TOC:
 - [[#hopefully-illuminating-examples][Hopefully Illuminating Examples]]
