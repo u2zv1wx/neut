@@ -5,7 +5,7 @@ Neut is a dependently-typed programming language based on [[https://en.wikipedia
 - garbage collection,
 - region-based memory management.
 
-Theoretically, this is made possible by translating the source language into a dependent-and-linear variant of [[https://www.cs.bham.ac.uk/~pbl/papers/thesisqmwphd.pdf][Call-by-Push-Value]]. The crucial point of the translation is to see that knowing the type of a term is knowning how to eta-expand the term, which in turn means knowing how to copy/discard the term. In the translation, a type is not erased, but *translated into a computationally-meaningful term that copies/discards the terms of the type*. Those who are interested in these theoretical things can find further details in the [[#theory][theory section]].
+Theoretically, this is made possible by translating the source language into a dependent-and-linear variant of [[https://www.cs.bham.ac.uk/~pbl/papers/thesisqmwphd.pdf][Call-by-Push-Value]]. The crucial point of the translation is to see that knowing the type of a term is knowning how to eta-expand the term, which in turn means knowing how to copy/discard the term. In the translation, a type is not erased, but *translated into a computationally-meaningful term that copies/discards the terms of the type*. Those who are interested in these theoretical things can find further details in the [[#theory][section about the theory of Neut]].
 
 Practically, this means that you can write your program in the ordinary lambda calculus without any extra restrictions/annotations, and at the same time are allowed to pursue performance in the language via e.g. borrowing or linearity. The source code doesn't need esoteric annotations for the compiler to infer how to use resources. Nor does the world stop all of a sudden by GC. You have full control over resource allocation.
 
@@ -41,11 +41,16 @@ Here I briefly summerize the basic characteristics of Neut before diving into th
 - [[#writing-library][Writing Library]]
 - [[#where-is-][Where is ...?]]
   - [[#where-is-typeclass][Where is typeclass?]]
+  - [[#proof-related-stuff][Proof-related stuff?]]
 - [[#theory][Theory]]
   - [[#compile-time-memory-usage-determination][Compile-Time Memory Usage Determination]]
+  - [[#box-modality-polarity-and-closure-conversion][Box Modality, Polarity, and Closure Conversion]]
   - [[#realizing-inductivecoinductive-types-within-coc][Realizing Inductive/Coinductive Types within CoC]]
   - [[#universe-hierarchy-and-the-weakly-normalizing-fragment][Universe Hierarchy and the Weakly-Normalizing Fragment]]
-- [[#hacking-the-compiler][Hacking the Compiler]]
+  - [[#a-simple-implementation-of-mutually-recursive-functions][A Simple Implementation of Mutually-Recursive Functions]]
+- [[#contribution][Contribution]]
+  - [[#on-implementation][On Implementation]]
+  - [[#on-documentation][On Documentation]]
 - [[#references][References]]
 
 * Hopefully Illuminating Examples
@@ -225,15 +230,25 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec eleifend tellus e
 
 ** Where is typeclass?
 
+** Proof-related stuff?
+
 * Theory
 
 ** Compile-Time Memory Usage Determination
+
+** Box Modality, Polarity, and Closure Conversion
 
 ** Realizing Inductive/Coinductive Types within CoC
 
 ** Universe Hierarchy and the Weakly-Normalizing Fragment
 
-* Hacking the Compiler
+** A Simple Implementation of Mutually-Recursive Functions
+
+* Contribution
+
+** On Implementation
+
+** On Documentation
 
 * References
 - L. de Moura, J. Avigad, S. Kong, and C. Roux, Elaboration in Dependent Type Theory, [[https://arxiv.org/abs/1505.04324]], 2015.
