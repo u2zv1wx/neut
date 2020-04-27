@@ -167,7 +167,7 @@ You can then pattern match on the term of the type:
     ((nil)
       0)
     ((cons _ ys)
-      (add-i64 1 (length a ys))))) ;; this `add-i64` is lowered to LLVM's instruction 'add` over i64
+      (add-i64 1 (length a ys))))) ;; this `add-i64` is lowered to the LLVM's instruction 'add' over i64
 #+END_SRC
 and use it as in the expected way:
 #+BEGIN_SRC scheme
