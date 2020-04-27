@@ -1,4 +1,4 @@
-module Main where
+module Main (main) where
 
 import Clarify
 import qualified Codec.Archive.Tar as Tar
@@ -31,6 +31,9 @@ type OutputPath =
 type CheckOptEndOfEntry =
   String
 
+type ShouldCancelAlloc =
+  Bool
+
 type ShouldColorize =
   Bool
 
@@ -57,7 +60,7 @@ instance Read OutputKind where
     []
 
 data Command
-  = Build InputPath (Maybe OutputPath) OutputKind
+  = Build InputPath (Maybe OutputPath) OutputKind ShouldCancelAlloc
   | Check InputPath ShouldColorize CheckOptEndOfEntry
   | Archive InputPath (Maybe OutputPath)
   | Complete InputPath Line Column
@@ -112,6 +115,14 @@ parseBuildOpt =
             metavar "KIND",
             value OutputKindObject,
             help "The type of output file"
+          ]
+      )
+    <*> flag
+      True
+      False
+      ( mconcat
+          [ long "no-alloc-cancellation",
+            help "Set this to disable optimization for redundant alloc"
           ]
       )
 
@@ -190,11 +201,11 @@ parseCompleteOpt =
 run :: Command -> IO ()
 run cmd =
   case cmd of
-    Build inputPathStr mOutputPathStr outputKind -> do
+    Build inputPathStr mOutputPathStr outputKind cancelAllocFlag -> do
       inputPath <- resolveFile' inputPathStr
       resultOrErr <-
         evalWithEnv (runBuild inputPath) $
-          initialEnv {shouldColorize = True, endOfEntry = ""}
+          initialEnv {shouldColorize = True, shouldCancelAlloc = cancelAllocFlag, endOfEntry = ""}
       (basename, _) <- splitExtension $ filename inputPath
       mOutputPath <- mapM resolveFile' mOutputPathStr
       outputPath <- constructOutputPath basename mOutputPath outputKind
@@ -217,11 +228,7 @@ run cmd =
       inputPath <- resolveFile' inputPathStr
       resultOrErr <-
         evalWithEnv (runCheck inputPath) $
-          initialEnv
-            { shouldColorize = colorizeFlag,
-              endOfEntry = eoe,
-              isCheck = True
-            }
+          initialEnv {shouldColorize = colorizeFlag, endOfEntry = eoe, isCheck = True}
       case resultOrErr of
         Right _ ->
           return ()

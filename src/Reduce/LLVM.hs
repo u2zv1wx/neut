@@ -16,7 +16,8 @@ type SizeMap =
   Map.Map SizeInfo [(Int, LLVMData)]
 
 reduceLLVM :: SubstLLVM -> SizeMap -> LLVM -> WithEnv LLVM
-reduceLLVM sub sizeMap llvm =
+reduceLLVM sub sizeMap llvm = do
+  cancelAllocFlag <- gets shouldCancelAlloc
   case llvm of
     LLVMReturn d ->
       return $ LLVMReturn $ substLLVMData sub d
@@ -33,7 +34,8 @@ reduceLLVM sub sizeMap llvm =
           let sub' = IntMap.insert (asInt x) LLVMDataNull sub
           reduceLLVM sub' sizeMap cont
         LLVMOpAlloc _ size
-          | Just ((j, d) : rest) <- Map.lookup size sizeMap -> do
+          | cancelAllocFlag,
+            Just ((j, d) : rest) <- Map.lookup size sizeMap -> do
             modify (\env -> env {nopFreeSet = S.insert j (nopFreeSet env)})
             let sizeMap' = Map.insert size rest sizeMap
             let sub' = IntMap.insert (asInt x) (substLLVMData sub d) sub

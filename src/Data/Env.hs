@@ -44,6 +44,7 @@ data Env
       { count :: Int,
         ppCount :: Int, -- count used only for pretty printing
         shouldColorize :: Bool,
+        shouldCancelAlloc :: Bool,
         endOfEntry :: String,
         isCheck :: Bool,
         --
@@ -111,6 +112,7 @@ initialEnv =
     { count = 0,
       ppCount = 0,
       shouldColorize = False,
+      shouldCancelAlloc = True,
       isCheck = False,
       endOfEntry = "",
       phase = 0,
