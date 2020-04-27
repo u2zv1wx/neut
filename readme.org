@@ -15,7 +15,7 @@ Here I briefly summerize the basic characteristics of Neut before diving into th
 - The output of Neut is LLVM IR / assembly / object binary (the last two are via clang)
 - The type system is CoC + recursion + int + float + enum + array + struct
 - The evaluation strategy is call-by-value
-- The Memory management is statically determined at compile time (Can be optimized via borrowing and linearity)
+- The memory management is statically determined at compile time (Can be optimized via borrowing and linearity)
 - Has inductive/coinductive type (despite the fact that core logic is not CoIC but CoC)
 
 * Table of Contents                                                    :TOC:
@@ -49,15 +49,15 @@ Here I briefly summerize the basic characteristics of Neut before diving into th
 ** Automatic Memory Management (with resulting x64 assembly)
 Let us move on to the interesting part. Here we will see an "inefficient" version of string printing. After that, we will see an efficient version of that code, and compare resulting assembly code.
 
-The `with identity:bind` is the same as so-called do-notation specilized to the identity monad.
-#+BEGIN_SRC scheme
-(use string)
+Here I will write code in a rather verbose way to make things as explicit as possible to the readers. You don't have to be that verbose in the actual code, of course.
 
-(with let-bind
-  (let str "hello")
-  (print str) ;; equivalent to: `(string.print str)`
-  (print str)
-  (print str))
+The `with identity.bind` is the same as so-called do-notation specilized to the identity monad.
+#+BEGIN_SRC scheme
+(with identity.bind
+  (let str "hello")          ;; define a variable `str : string` with content `"hello"`
+  (let _ (string.print str)) ;; you can also write just `(print str)` instead of `(let _ (print str))`
+  (let _ (string.print str))
+  (let _ (string.print str)))
 #+END_SRC
 You may note that the language doesn't require the IO monad. This is because the evaluation strategy of Neut is CBV.
 
@@ -65,9 +65,17 @@ You may note that the language doesn't require the IO monad. This is because the
 #+BEGIN_SRC scheme
 (with let-bind
   (let str "hello")
-  (string.print &str)
-  (string.print &str)
-  (string.print &str))
+  (let (tuple _ str) (string.print str))
+  (let (tuple _ str) (string.print str))
+  (let (tuple _ str) (string.print str)))
+#+END_SRC
+
+#+BEGIN_SRC scheme
+(with let-bind
+  (let str "hello")
+  (let _ (string.print &str))
+  (let _ (string.print &str))
+  (let _ (string.print &str)))
 #+END_SRC
 
 ** Memory Reuse via Linearity
@@ -105,7 +113,7 @@ You can then pattern match on the term of the type:
 #+END_SRC
 and use it as in the expected way:
 #+BEGIN_SRC scheme
-(let xs (list.cons (i64 1) (list.cons 2 (list.cons 3))))
+(let xs (list.cons 1 (list.cons 2 (list.cons 3 (@list.nil i64)))))
 
 (i64.print (length i64 xs)) ;; ~> 3
 #+END_SRC
