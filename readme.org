@@ -7,8 +7,7 @@ Neut is a dependently-typed programming language based on [[https://en.wikipedia
 
 Theoretically, this is made possible by translating the source language into a dependent-and-linear variant of [[https://www.cs.bham.ac.uk/~pbl/papers/thesisqmwphd.pdf][Call-by-Push-Value]]. The crucial point of the translation is to see that knowing the type of a term is knowning how to eta-expand the term, which in turn means knowing how to copy/discard the term. In the translation, a type is not erased, but *translated into a computationally-meaningful term that copies/discards the terms of the type*. Those who are interested in these theoretical things can find further details <yet-to-be-written>.
 
-# 明日はここ埋めるところからスタート
-Practically, nam at nisi ipsum. Suspendisse a lacus arcu. Morbi convallis felis orci, sollicitudin ultricies turpis convallis id. Proin nec condimentum libero. Sed vitae ligula vitae diam ornare maximus id ut ante. Aliquam suscipit ante eget pellentesque viverra. Aliquam tincidunt tellus quis ante bibendum malesuada. Vestibulum in orci vitae neque gravida dapibus blandit ac ipsum. Nam molestie urna ut porta eleifend. Duis at nulla dignissim, elementum quam quis, pharetra eros. Sed semper mollis nisl, vel euismod velit malesuada ut. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Duis venenatis eu arcu non egestas.
+Practically, this means that you can write your program in the ordinary lambda calculus without any extra restrictions/annotations, and at the same time are allowed to pursue performance in the language via e.g. borrowing or linearity. The source code doesn't need esoteric annotations for the compiler to infer how to use resources. Nor does the world stop all of a sudden by GC. You have full control over resource allocation.
 
 Here I briefly summerize the basic characteristics of Neut before diving into the details:
 
@@ -20,17 +19,18 @@ Here I briefly summerize the basic characteristics of Neut before diving into th
 - Has inductive/coinductive type (despite the fact that core logic is not CoIC but CoC)
 
 * Table of Contents                                                    :TOC:
-- [[#hopefully-illuminating-examples][(Hopefully) Illuminating Examples]]
-  - [[#hello-world][Hello world]]
+- [[#hopefully-illuminating-examples][Hopefully Illuminating Examples]]
+  - [[#hello-world][Hello World]]
+  - [[#inductive-type-algebraic-data-type][Inductive type (algebraic data type)]]
   - [[#automatic-memory-management-with-resulting-x64-assembly][Automatic Memory Management (with resulting x64 assembly)]]
   - [[#borrowing-and-its-resulting-assembly][Borrowing (and its resulting assembly)]]
   - [[#memory-reuse-via-linearity][Memory Reuse via Linearity]]
   - [[#summary-or-mental-model-of-memory-management-in-neut][Summary, or Mental Model of Memory Management in Neut]]
 - [[#installation][Installation]]
 - [[#syntax-and-semantics][Syntax and Semantics]]
-  - [[#universe][Universe]]
-  - [[#pi][Pi]]
-  - [[#iterate][Iterate]]
+  - [[#tau][tau]]
+  - [[#pi-forall--lambda--apply][Pi (forall / lambda / apply)]]
+  - [[#iterate-recursion][Iterate (recursion)]]
   - [[#int][Int]]
   - [[#float][Float]]
   - [[#enum][Enum]]
@@ -41,15 +41,73 @@ Here I briefly summerize the basic characteristics of Neut before diving into th
 - [[#writing-library][Writing Library]]
 - [[#where-is-][Where is ...?]]
   - [[#where-is-typeclass][Where is typeclass?]]
+- [[#hacking-the-compiler][Hacking the Compiler]]
 - [[#references][References]]
 
-* (Hopefully) Illuminating Examples
+* Hopefully Illuminating Examples
 
-** Hello world
+** Hello World
+#+BEGIN_SRC neut
+(string.print "Hello, world!\n")
+#+END_SRC
+
+** Inductive type (algebraic data type)
+You can declare an inductive type as follows:
+#+BEGIN_SRC neut
+(inductive list ((a type))
+  (nil ()
+    (list a))
+  (cons ((_ a) (_ (list a)))
+    (list a)))
+#+END_SRC
+where the haskell equivalent of the code above is:
+#+BEGIN_SRC haskell
+data List a where
+  Nil  :: () -> List a
+  Cons :: (A, List a) -> List a
+#+END_SRC
+You can then pattern match on the term of the type:
+#+BEGIN_SRC neut
+(define length
+  ((a tau)
+   (xs (list a)))
+  (witness i64
+    (case xs
+      ((nil)
+        0)
+      ((cons _ ys)
+        (add-i64 1 (length a ys)))))) ;; this `add-i64` is lowered to LLVM's instruction 'add` over i64
+#+END_SRC
+and use it as in the expected way:
+#+BEGIN_SRC neut
+(let xs (list.cons (i64 1) (list.cons 2 (list.cons 3))))
+
+(i64.print (length i64 xs)) ;; ~> 3
+#+END_SRC
+In actual code, you don't have to be that verbose as in the example above, thanks to implicit terms and notations (like Coq, Agda, and Lean). We will see it later.
 
 ** Automatic Memory Management (with resulting x64 assembly)
+Let us move on to the interesting part. Here we will see an "inefficient" version of string printing. After that, we will see an efficient version of that code, and compare resulting assembly code.
+
+The `with identity:bind` is the same as so-called do-notation specilized to the identity monad.
+#+BEGIN_SRC neut
+(use string)
+
+(with let-bind
+  (let str "hello")
+  (print str) ;; equivalent to: `(string.print str)`
+  (print str)
+  (print str))
+#+END_SRC
 
 ** Borrowing (and its resulting assembly)
+#+BEGIN_SRC neut
+(with let-bind
+  (let str "hello")
+  (string.print &str)
+  (string.print &str)
+  (string.print &str))
+#+END_SRC
 
 ** Memory Reuse via Linearity
 
@@ -60,11 +118,11 @@ Duis nec quam id ex pharetra tincidunt. Sed viverra lorem magna, vitae posuere n
 
 * Syntax and Semantics
 
-** Universe
+** tau
 
-** Pi
+** Pi (forall / lambda / apply)
 
-** Iterate
+** Iterate (recursion)
 
 ** Int
 
@@ -88,6 +146,8 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec eleifend tellus e
 * Where is ...?
 
 ** Where is typeclass?
+
+* Hacking the Compiler
 
 * References
 - L. de Moura, J. Avigad, S. Kong, and C. Roux, Elaboration in Dependent Type Theory, [[https://arxiv.org/abs/1505.04324]], 2015.
