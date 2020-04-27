@@ -117,7 +117,20 @@ define i64 @main() {
   ret i64 %_12056
 }
 #+END_SRC
-This is the actual output except for the comments like ";; memory allocation", which are inserted after compilation for explanatory purposes. The important point here is that the string stored at =%12036= (the second argument of =@write=) is reused without copying.
+or more schematically:
+#+BEGIN_SRC llvm
+declare void @free(i8*)
+declare i8* @write(i8*, i8*, i8*)
+declare i8* @malloc(i64)
+define i64 @main() {
+  ;; <memory allocation for the string>
+  ;; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
+  ;; <write the string into stdout for the three times>
+  ;; <memory deallocation for the string>
+  ;; <return 0>
+}
+#+END_SRC
+The former LLVM IR is the actual output except for the comments like ";; memory allocation", which are inserted after compilation for explanatory purposes. The important point here is that the string stored at =%12036= (the second argument of =@write=) is reused without copying.
 
 ** Memory Reuse via Linearity
 
