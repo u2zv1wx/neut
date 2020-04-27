@@ -83,16 +83,19 @@ declare void @free(i8*)
 declare i8* @write(i8*, i8*, i8*)
 declare i8* @malloc(i64)
 define i64 @main() {
+  ;; memory allocation
   %_12034 = getelementptr i8, i8* null, i64 1
   %_12035 = ptrtoint i8* %_12034 to i64
   %_12036 = call fastcc i8* @malloc(i64 %_12035)
+  ;; create the string "a" (i.e. write the character 'a' to the allocated memory)
   %_12037 = bitcast i8* %_12036 to [1 x i8]*
-  %_12038 = inttoptr i8 97 to i8*
+  %_12038 = inttoptr i8 97 to i8* ;; a = 97
   %_12039 = ptrtoint i8* %_12038 to i8
   %_12040 = getelementptr [1 x i8], [1 x i8]* %_12037, i32 0, i64 0
   store i8 %_12039, i8* %_12040
-  %_12041 = inttoptr i64 1 to i8*
-  %_12042 = inttoptr i64 1 to i8*
+  ;; write the string into stdout for the three times
+  %_12041 = inttoptr i64 1 to i8* ;; write to stdout (= 1)
+  %_12042 = inttoptr i64 1 to i8* ;; the length of the string
   %_12043 = call fastcc i8* @write(i8* %_12041, i8* %_12036, i8* %_12042)
   %_12044 = inttoptr i64 1 to i8*
   %_12045 = inttoptr i64 1 to i8*
@@ -100,12 +103,14 @@ define i64 @main() {
   %_12047 = inttoptr i64 1 to i8*
   %_12048 = inttoptr i64 1 to i8*
   %_12049 = call fastcc i8* @write(i8* %_12047, i8* %_12036, i8* %_12048)
+  ;; deallocation of the memory
   %_12050 = bitcast i8* %_12036 to [1 x i8]*
   %_12051 = getelementptr [1 x i8], [1 x i8]* %_12050, i32 0, i32 0
   %_12052 = load i8, i8* %_12051
   %_12053 = bitcast [1 x i8]* %_12050 to i8*
   call fastcc void @free(i8* %_12053)
   %_12054 = inttoptr i8 %_12052 to i8*
+  ;; returning 0
   %_12055 = inttoptr i64 0 to i8*
   %_12056 = ptrtoint i8* %_12055 to i64
   ret i64 %_12056
