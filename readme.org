@@ -20,11 +20,11 @@ Here I briefly summerize the basic characteristics of Neut before diving into th
 
 * Table of Contents                                                    :TOC:
 - [[#hopefully-illuminating-examples][Hopefully Illuminating Examples]]
-  - [[#hello-world][Hello World]]
-  - [[#inductive-type-algebraic-data-type][Inductive type (algebraic data type)]]
   - [[#automatic-memory-management-with-resulting-x64-assembly][Automatic Memory Management (with resulting x64 assembly)]]
   - [[#borrowing-and-its-resulting-assembly][Borrowing (and its resulting assembly)]]
   - [[#memory-reuse-via-linearity][Memory Reuse via Linearity]]
+  - [[#hello-world][Hello World]]
+  - [[#inductive-type-algebraic-data-type][Inductive type (algebraic data type)]]
   - [[#summary-or-mental-model-of-memory-management-in-neut][Summary, or Mental Model of Memory Management in Neut]]
 - [[#installation][Installation]]
 - [[#syntax-and-semantics][Syntax and Semantics]]
@@ -46,6 +46,31 @@ Here I briefly summerize the basic characteristics of Neut before diving into th
 
 * Hopefully Illuminating Examples
 
+** Automatic Memory Management (with resulting x64 assembly)
+Let us move on to the interesting part. Here we will see an "inefficient" version of string printing. After that, we will see an efficient version of that code, and compare resulting assembly code.
+
+The `with identity:bind` is the same as so-called do-notation specilized to the identity monad.
+#+BEGIN_SRC scheme
+(use string)
+
+(with let-bind
+  (let str "hello")
+  (print str) ;; equivalent to: `(string.print str)`
+  (print str)
+  (print str))
+#+END_SRC
+
+** Borrowing (and its resulting assembly)
+#+BEGIN_SRC scheme
+(with let-bind
+  (let str "hello")
+  (string.print &str)
+  (string.print &str)
+  (string.print &str))
+#+END_SRC
+
+** Memory Reuse via Linearity
+
 ** Hello World
 #+BEGIN_SRC neut
 (string.print "Hello, world!\n")
@@ -53,7 +78,7 @@ Here I briefly summerize the basic characteristics of Neut before diving into th
 
 ** Inductive type (algebraic data type)
 You can declare an inductive type as follows:
-#+BEGIN_SRC neut
+#+BEGIN_SRC scheme
 (inductive list ((a type))
   (nil ()
     (list a))
@@ -67,49 +92,23 @@ data List a where
   Cons :: (A, List a) -> List a
 #+END_SRC
 You can then pattern match on the term of the type:
-#+BEGIN_SRC neut
+#+BEGIN_SRC scheme
 (define length
   ((a tau)
    (xs (list a)))
-  (witness i64
-    (case xs
-      ((nil)
-        0)
-      ((cons _ ys)
-        (add-i64 1 (length a ys)))))) ;; this `add-i64` is lowered to LLVM's instruction 'add` over i64
+  (case xs
+    ((nil)
+      0)
+    ((cons _ ys)
+      (add-i64 1 (length a ys))))) ;; this `add-i64` is lowered to LLVM's instruction 'add` over i64
 #+END_SRC
 and use it as in the expected way:
-#+BEGIN_SRC neut
+#+BEGIN_SRC scheme
 (let xs (list.cons (i64 1) (list.cons 2 (list.cons 3))))
 
 (i64.print (length i64 xs)) ;; ~> 3
 #+END_SRC
 In actual code, you don't have to be that verbose as in the example above, thanks to implicit terms and notations (like Coq, Agda, and Lean). We will see it later.
-
-** Automatic Memory Management (with resulting x64 assembly)
-Let us move on to the interesting part. Here we will see an "inefficient" version of string printing. After that, we will see an efficient version of that code, and compare resulting assembly code.
-
-The `with identity:bind` is the same as so-called do-notation specilized to the identity monad.
-#+BEGIN_SRC neut
-(use string)
-
-(with let-bind
-  (let str "hello")
-  (print str) ;; equivalent to: `(string.print str)`
-  (print str)
-  (print str))
-#+END_SRC
-
-** Borrowing (and its resulting assembly)
-#+BEGIN_SRC neut
-(with let-bind
-  (let str "hello")
-  (string.print &str)
-  (string.print &str)
-  (string.print &str))
-#+END_SRC
-
-** Memory Reuse via Linearity
 
 ** Summary, or Mental Model of Memory Management in Neut
 
