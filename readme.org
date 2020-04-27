@@ -15,9 +15,9 @@ Here I briefly summerize the basic characteristics of Neut before diving into th
 - The output of Neut is LLVM IR / assembly / object binary (the last two are via clang)
 - The type system is CoC + recursion + int + float + enum + array + struct
 - The evaluation strategy is call-by-value
+- Every tail call is optimized into a loop
 - The memory management is statically determined at compile time (Can be optimized via borrowing and linearity)
 - Has inductive/coinductive type (despite the fact that core logic is not CoIC but CoC)
-- Every tail call is optimized into a loop
 
 * Table of Contents                                                    :TOC:
 - [[#hopefully-illuminating-examples][Hopefully Illuminating Examples]]
@@ -49,8 +49,9 @@ Here I briefly summerize the basic characteristics of Neut before diving into th
   - [[#universe-hierarchy-and-the-weakly-normalizing-fragment][Universe Hierarchy and the Weakly-Normalizing Fragment]]
   - [[#a-simple-implementation-of-mutually-recursive-functions][A Simple Implementation of Mutually-Recursive Functions]]
 - [[#contribution][Contribution]]
-  - [[#on-implementation][On Implementation]]
-  - [[#on-documentation][On Documentation]]
+  - [[#to-implementation][To Implementation]]
+  - [[#to-documentation][To Documentation]]
+  - [[#to-theory][To Theory]]
 - [[#references][References]]
 
 * Hopefully Illuminating Examples
@@ -69,6 +70,82 @@ The `with identity.bind` is the same as so-called do-notation specilized to the 
   (string.print str))
 #+END_SRC
 You may note that the language doesn't require the IO monad. This is because the evaluation strategy of Neut is CBV.
+
+By running =$ neut build --no-alloc-cancellation --emit llvm filename.neut=, we obtain the following LLVM IR (the =--no-alloc-cancellation= is to disable certain optimization that we will see [[#memory-reuse-via-linearity][later]]):
+#+BEGIN_SRC llvm
+declare void @free(i8*)
+declare i8* @write(i8*, i8*, i8*)
+declare i8* @malloc(i64)
+define i64 @main() {
+  %_11875 = getelementptr i8, i8* null, i64 1
+  %_11876 = ptrtoint i8* %_11875 to i64
+  %_11877 = call fastcc i8* @malloc(i64 %_11876)
+  %_11878 = bitcast i8* %_11877 to [1 x i8]*
+  %_11879 = inttoptr i8 97 to i8*
+  %_11880 = ptrtoint i8* %_11879 to i8
+  %_11881 = getelementptr [1 x i8], [1 x i8]* %_11878, i32 0, i64 0
+  store i8 %_11880, i8* %_11881
+  %_11882 = inttoptr i64 1 to i8*
+  %_11883 = inttoptr i64 1 to i8*
+  %_11884 = call fastcc i8* @write(i8* %_11882, i8* %_11877, i8* %_11883)
+  %_11885 = bitcast i8* %_11877 to [1 x i8]*
+  %_11886 = getelementptr [1 x i8], [1 x i8]* %_11885, i32 0, i32 0
+  %_11887 = load i8, i8* %_11886
+  %_11888 = bitcast [1 x i8]* %_11885 to i8*
+  call fastcc void @free(i8* %_11888)
+  %_11889 = inttoptr i8 %_11887 to i8*
+  %_11890 = getelementptr i8, i8* null, i64 1
+  %_11891 = ptrtoint i8* %_11890 to i64
+  %_11892 = call fastcc i8* @malloc(i64 %_11891)
+  %_11893 = bitcast i8* %_11892 to [1 x i8]*
+  %_11894 = inttoptr i8 97 to i8*
+  %_11895 = ptrtoint i8* %_11894 to i8
+  %_11896 = getelementptr [1 x i8], [1 x i8]* %_11893, i32 0, i64 0
+  store i8 %_11895, i8* %_11896
+  %_11897 = inttoptr i64 1 to i8*
+  %_11898 = inttoptr i64 1 to i8*
+  %_11899 = call fastcc i8* @write(i8* %_11897, i8* %_11892, i8* %_11898)
+  %_11900 = bitcast i8* %_11892 to [1 x i8]*
+  %_11901 = getelementptr [1 x i8], [1 x i8]* %_11900, i32 0, i32 0
+  %_11902 = load i8, i8* %_11901
+  %_11903 = bitcast [1 x i8]* %_11900 to i8*
+  call fastcc void @free(i8* %_11903)
+  %_11904 = inttoptr i8 %_11902 to i8*
+  %_11905 = getelementptr i8, i8* null, i64 1
+  %_11906 = ptrtoint i8* %_11905 to i64
+  %_11907 = call fastcc i8* @malloc(i64 %_11906)
+  %_11908 = bitcast i8* %_11907 to [1 x i8]*
+  %_11909 = inttoptr i8 97 to i8*
+  %_11910 = ptrtoint i8* %_11909 to i8
+  %_11911 = getelementptr [1 x i8], [1 x i8]* %_11908, i32 0, i64 0
+  store i8 %_11910, i8* %_11911
+  %_11912 = inttoptr i64 1 to i8*
+  %_11913 = inttoptr i64 1 to i8*
+  %_11914 = call fastcc i8* @write(i8* %_11912, i8* %_11907, i8* %_11913)
+  %_11915 = bitcast i8* %_11907 to [1 x i8]*
+  %_11916 = getelementptr [1 x i8], [1 x i8]* %_11915, i32 0, i32 0
+  %_11917 = load i8, i8* %_11916
+  %_11918 = bitcast [1 x i8]* %_11915 to i8*
+  call fastcc void @free(i8* %_11918)
+  %_11919 = inttoptr i8 %_11917 to i8*
+  %_11920 = inttoptr i64 0 to i8*
+  %_11921 = ptrtoint i8* %_11920 to i64
+  ret i64 %_11921
+}
+#+END_SRC
+or more schematically:
+#+BEGIN_SRC llvm
+declare void @free(i8*)
+declare i8* @write(i8*, i8*, i8*)
+declare i8* @malloc(i64)
+define i64 @main() {
+  ;; Repeat the following for the 3 times:
+  ;;   <memory allocation for the string>
+  ;;   <create the string "a" (i.e. write the character 'a' to the allocated memory)>
+  ;;   <write the string into stdout>
+  ;;   <memory deallocation for the string>
+}
+#+END_SRC
 
 ** Borrowing (and its resulting assembly)
 #+BEGIN_SRC scheme
@@ -246,9 +323,11 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec eleifend tellus e
 
 * Contribution
 
-** On Implementation
+** To Implementation
 
-** On Documentation
+** To Documentation
+
+** To Theory
 
 * References
 - L. de Moura, J. Avigad, S. Kong, and C. Roux, Elaboration in Dependent Type Theory, [[https://arxiv.org/abs/1505.04324]], 2015.
