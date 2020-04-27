@@ -5,7 +5,7 @@ Neut is a dependently-typed programming language based on [[https://en.wikipedia
 - garbage collection,
 - region-based memory management.
 
-Theoretically, this is made possible by translating the source language into a dependent-and-linear variant of [[https://www.cs.bham.ac.uk/~pbl/papers/thesisqmwphd.pdf][Call-by-Push-Value]]. The crucial point of the translation is to see that knowing the type of a term is knowning how to eta-expand the term, which in turn means knowing how to copy/discard the term. In the translation, a type is not erased, but *translated into a computationally-meaningful term that copies/discards the terms of the type*. Those who are interested in these theoretical things can find further details <yet-to-be-written>.
+Theoretically, this is made possible by translating the source language into a dependent-and-linear variant of [[https://www.cs.bham.ac.uk/~pbl/papers/thesisqmwphd.pdf][Call-by-Push-Value]]. The crucial point of the translation is to see that knowing the type of a term is knowning how to eta-expand the term, which in turn means knowing how to copy/discard the term. In the translation, a type is not erased, but *translated into a computationally-meaningful term that copies/discards the terms of the type*. Those who are interested in these theoretical things can find further details in the [[#theory][theory section]].
 
 Practically, this means that you can write your program in the ordinary lambda calculus without any extra restrictions/annotations, and at the same time are allowed to pursue performance in the language via e.g. borrowing or linearity. The source code doesn't need esoteric annotations for the compiler to infer how to use resources. Nor does the world stop all of a sudden by GC. You have full control over resource allocation.
 
@@ -38,10 +38,13 @@ Here I briefly summerize the basic characteristics of Neut before diving into th
   - [[#array][Array]]
   - [[#struct][Struct]]
 - [[#inductive-and-coinductive-types][Inductive and Coinductive types]]
-- [[#universe-hierarchy-and-the-weakly-normalizing-fragment][Universe Hierarchy and the Weakly-Normalizing Fragment]]
 - [[#writing-library][Writing Library]]
 - [[#where-is-][Where is ...?]]
   - [[#where-is-typeclass][Where is typeclass?]]
+- [[#theory][Theory]]
+  - [[#compile-time-memory-usage-determination][Compile-Time Memory Usage Determination]]
+  - [[#realizing-inductivecoinductive-types-within-coc][Realizing Inductive/Coinductive Types within CoC]]
+  - [[#universe-hierarchy-and-the-weakly-normalizing-fragment][Universe Hierarchy and the Weakly-Normalizing Fragment]]
 - [[#hacking-the-compiler][Hacking the Compiler]]
 - [[#references][References]]
 
@@ -216,13 +219,19 @@ Make sure that you have =~/.local/bin= in your =$PATH=.
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec eleifend tellus euismod erat accumsan, nec euismod sem placerat. Ut eu lacinia arcu, id imperdiet lacus. Integer feugiat lacus mattis, dictum nunc nec, interdum justo. Fusce sed dui id orci faucibus elementum. Vivamus sit amet sapien a lorem efficitur posuere suscipit in lacus. Praesent eget sagittis nisi, id vehicula elit. Vestibulum laoreet odio ex, a aliquet justo consectetur quis. Aenean laoreet vehicula libero id varius. Vivamus condimentum, sem sed sollicitudin placerat, nulla enim faucibus odio, gravida commodo velit mi ac sapien. Integer feugiat diam in lectus porttitor, sit amet viverra velit malesuada.
 
 
-* Universe Hierarchy and the Weakly-Normalizing Fragment
-
 * Writing Library
 
 * Where is ...?
 
 ** Where is typeclass?
+
+* Theory
+
+** Compile-Time Memory Usage Determination
+
+** Realizing Inductive/Coinductive Types within CoC
+
+** Universe Hierarchy and the Weakly-Normalizing Fragment
 
 * Hacking the Compiler
 
