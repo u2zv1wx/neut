@@ -49,7 +49,7 @@ Here I briefly summerize the basic characteristics of Neut before diving into th
 ** Automatic Memory Management (with resulting x64 assembly)
 Let us move on to the interesting part. Here we will see an "inefficient" version of string printing. After that, we will see an efficient version of that code, and compare resulting assembly code.
 
-Here I will write code in a rather verbose way to make things as explicit as possible to the readers. You don't have to be that verbose in the actual code, of course.
+Here I will write code in a rather verbose way to make things as explicit as possible to the readers. You don't have to be that verbose in actual code, of course.
 
 The `with identity.bind` is the same as so-called do-notation specilized to the identity monad.
 #+BEGIN_SRC scheme
@@ -57,7 +57,7 @@ The `with identity.bind` is the same as so-called do-notation specilized to the 
   (let str "hello")          ;; define a variable `str : string` with content `"hello"`
   (let _ (string.print str)) ;; you can also write just `(print str)` instead of `(let _ (print str))`
   (let _ (string.print str))
-  (let _ (string.print str)))
+  (string.print str))
 #+END_SRC
 You may note that the language doesn't require the IO monad. This is because the evaluation strategy of Neut is CBV.
 
@@ -67,7 +67,7 @@ You may note that the language doesn't require the IO monad. This is because the
   (let str "hello")
   (let (tuple _ str) (string.print str))
   (let (tuple _ str) (string.print str))
-  (let (tuple _ str) (string.print str)))
+  (string.print str))
 #+END_SRC
 
 #+BEGIN_SRC scheme
@@ -75,7 +75,41 @@ You may note that the language doesn't require the IO monad. This is because the
   (let str "hello")
   (let _ (string.print &str))
   (let _ (string.print &str))
-  (let _ (string.print &str)))
+  (string.print str))
+#+END_SRC
+
+#+BEGIN_SRC llvm
+declare void @free(i8*)
+declare i8* @write(i8*, i8*, i8*)
+declare i8* @malloc(i64)
+define i64 @main() {
+  %_12034 = getelementptr i8, i8* null, i64 1
+  %_12035 = ptrtoint i8* %_12034 to i64
+  %_12036 = call fastcc i8* @malloc(i64 %_12035)
+  %_12037 = bitcast i8* %_12036 to [1 x i8]*
+  %_12038 = inttoptr i8 97 to i8*
+  %_12039 = ptrtoint i8* %_12038 to i8
+  %_12040 = getelementptr [1 x i8], [1 x i8]* %_12037, i32 0, i64 0
+  store i8 %_12039, i8* %_12040
+  %_12041 = inttoptr i64 1 to i8*
+  %_12042 = inttoptr i64 1 to i8*
+  %_12043 = call fastcc i8* @write(i8* %_12041, i8* %_12036, i8* %_12042)
+  %_12044 = inttoptr i64 1 to i8*
+  %_12045 = inttoptr i64 1 to i8*
+  %_12046 = call fastcc i8* @write(i8* %_12044, i8* %_12036, i8* %_12045)
+  %_12047 = inttoptr i64 1 to i8*
+  %_12048 = inttoptr i64 1 to i8*
+  %_12049 = call fastcc i8* @write(i8* %_12047, i8* %_12036, i8* %_12048)
+  %_12050 = bitcast i8* %_12036 to [1 x i8]*
+  %_12051 = getelementptr [1 x i8], [1 x i8]* %_12050, i32 0, i32 0
+  %_12052 = load i8, i8* %_12051
+  %_12053 = bitcast [1 x i8]* %_12050 to i8*
+  call fastcc void @free(i8* %_12053)
+  %_12054 = inttoptr i8 %_12052 to i8*
+  %_12055 = inttoptr i64 0 to i8*
+  %_12056 = ptrtoint i8* %_12055 to i64
+  ret i64 %_12056
+}
 #+END_SRC
 
 ** Memory Reuse via Linearity
