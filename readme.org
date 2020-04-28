@@ -165,7 +165,7 @@ And this is the notation that is implemented in Neut. Indeed, the following is a
 #+END_SRC
 where the last =(i64 0)= is to tell the compiler that the type of =0= is =i64= and not, e.g. =i32=. This notation is "borrowing" in Neut. Note that borrowing is nothing but a syntactic translation. Borrowing has nothing to do with, for example, the type system, or the semantics, of Neut. Indeed, this syntactic translation is processed in the stage of parsing in the compiler.
 
-We obtain the following LLVM IR by running =$ neut build --no-alloc-cancellation --emit llvm filename.neut=:
+OK, then, how does the resulting LLVM IR change? Is it faster now? Let us compile the code above by running =$ neut build --no-alloc-cancellation --emit llvm filename.neut=. The output is short enough to include it here:
 #+BEGIN_SRC llvm
 declare void @free(i8*)
 declare i8* @write(i8*, i8*, i8*)
@@ -217,7 +217,44 @@ define i64 @main() {
   ;; <return 0>
 }
 #+END_SRC
-The former LLVM IR is the actual output except for the comments like ";; memory allocation", which are inserted after compilation for explanatory purposes. The important point here is that the string stored at =%12036= (the second argument of =@write=) is reused without copying.
+The former LLVM IR is the actual output except for the comments like ";; memory allocation", which are inserted after compilation for explanatory purposes. The point here is that the string stored at =%12036= (the second argument of =@write=) is reused without copying, as expected. The resulting assembly code is reasonably small too:
+#+BEGIN_SRC asm
+	.section	__TEXT,__text,regular,pure_instructions
+	.macosx_version_min 12, 15
+	.globl	_main                   ## -- Begin function main
+	.p2align	4, 0x90
+_main:                                  ## @main
+	.cfi_startproc
+## %bb.0:
+	pushq	%rbx
+	.cfi_def_cfa_offset 16
+	.cfi_offset %rbx, -15
+	movl	$1, %edi
+	callq	_malloc
+	movq	%rax, %rbx
+	movb	$97, (%rax) # a = 97
+	movl	$1, %edi
+	movl	$1, %edx
+	movq	%rax, %rsi
+	callq	_write
+	movl	$1, %edi
+	movl	$1, %edx
+	movq	%rbx, %rsi
+	callq	_write
+	movl	$1, %edi
+	movl	$1, %edx
+	movq	%rbx, %rsi
+	callq	_write
+	movq	%rbx, %rdi
+	callq	_free
+	xorl	%eax, %eax
+	popq	%rbx
+	retq
+	.cfi_endproc
+                                        ## -- End function
+.subsections_via_symbols
+#+END_SRC
+The resulting code is faster in that the code is free from the redundant copying/discarding we saw in the first example.
 
 ** Memory Reuse via Linearity
 
