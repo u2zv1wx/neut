@@ -95,7 +95,7 @@ The way how a variable is copied is determined by the type of the variable. For 
 
 This is the basics of the behavior of resource copying/discarding of this language. As you can easily imagine, this naive copying/discarding would result in an inefficient object code. We often use a variable more than once. If those uses of a variable result in copying the content every time, the performance of the resulting code would be nothing but a disaster. Thankfully, there is a workaround for this problem.
 
-** Borrowing (and its resulting assembly)
+** Borrowing (and its resulting LLVM IR / assembly code)
 The point of the workaround is nothing special: If those copying/discarding result from using variables in non-linear way, we just have to use those variables in linear way. Let's go back to the first example code:
 #+BEGIN_SRC scheme
 (with identity.bind
@@ -229,23 +229,23 @@ _main:                                  ## @main
 	pushq	%rbx
 	.cfi_def_cfa_offset 16
 	.cfi_offset %rbx, -15
-	movl	$1, %edi
+	movl	$1, %edi                 # 1-byte memory allocation (you can ignore the lines above this line)
 	callq	_malloc
 	movq	%rax, %rbx
-	movb	$97, (%rax) # a = 97
-	movl	$1, %edi
+	movb	$97, (%rax)              # write 'a' (= 97) to the allocated memory
+	movl	$1, %edi                 # set the arguments for `_write`
 	movl	$1, %edx
 	movq	%rax, %rsi
-	callq	_write
-	movl	$1, %edi
+	callq	_write                   # ... and call `_write` (i.e. print 'a')
+	movl	$1, %edi                 # (repeat)
 	movl	$1, %edx
 	movq	%rbx, %rsi
 	callq	_write
-	movl	$1, %edi
+	movl	$1, %edi                 # (repeat)
 	movl	$1, %edx
 	movq	%rbx, %rsi
 	callq	_write
-	movq	%rbx, %rdi
+	movq	%rbx, %rdi               # free the allocated memory
 	callq	_free
 	xorl	%eax, %eax
 	popq	%rbx
@@ -254,7 +254,11 @@ _main:                                  ## @main
                                         ## -- End function
 .subsections_via_symbols
 #+END_SRC
-The resulting code is faster in that the code is free from the redundant copying/discarding we saw in the first example.
+In short: the resulting code is faster in that it is free from the redundant copying/discarding we saw in the first example.
+
+This is how Neut controls resources efficiently, without modifying the type system of the source language (the ordinary dependent lambda calculus).
+
+Cute, I believe. Isn't it?
 
 ** Memory Reuse via Linearity
 
