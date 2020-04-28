@@ -21,7 +21,7 @@ Here I briefly summerize the basic characteristics of Neut before diving into th
 
 * Table of Contents                                                    :TOC:
 - [[#hopefully-illuminating-examples][Hopefully Illuminating Examples]]
-  - [[#automatic-memory-management-with-resulting-x64-assembly][Automatic Memory Management (with resulting x64 assembly)]]
+  - [[#automatic-memory-management-with-resulting-llvm-ir][Automatic Memory Management (with resulting LLVM IR)]]
   - [[#borrowing-and-its-resulting-assembly][Borrowing (and its resulting assembly)]]
   - [[#memory-reuse-via-linearity][Memory Reuse via Linearity]]
   - [[#inductive-type-algebraic-data-type][Inductive type (algebraic data type)]]
@@ -58,20 +58,21 @@ Here I briefly summerize the basic characteristics of Neut before diving into th
 
 * Hopefully Illuminating Examples
 
-** Automatic Memory Management (with resulting x64 assembly)
-Let us move on to the interesting part. Here we will see an "inefficient" version of string printing. After that, we will see an efficient version of that code, and compare resulting assembly code.
+** Automatic Memory Management (with resulting LLVM IR)
+Here I will firstly show an "inefficient" version of some code pieces. After that, I will show a more efficient version of the code, and compare resulting LLVM IR.
 
-Here I will write code in a rather verbose way to make things as explicit as possible to the readers. You don't have to be that verbose in actual code, of course.
+Note that the code here is written in a rather verbose way to make things as explicit as possible to the readers. You don't have to be that verbose in actual code.
 
-The `with identity.bind` is the same as so-called do-notation specilized to the identity monad.
+The following code prints the string ="a"= for the three times:
 #+BEGIN_SRC scheme
 (with identity.bind
-  (let str "hello")          ;; define a variable `str : string` with content `"hello"`
+  (let str "a")          ;; define a variable `str : string` with content `"hello"`
   (let _ (string.print str)) ;; you can also write just `(print str)` instead of `(let _ (print str))`
   (let _ (string.print str))
   (string.print str))
 #+END_SRC
-You may note that the language doesn't require the IO monad. This is because the evaluation strategy of Neut is CBV.
+The `(with identity.bind (...))` is the same as so-called do-notation in Haskell or other languages, specilized to the identity monad.
+# You may note that the language doesn't require the IO monad. This is because the evaluation strategy of Neut is CBV.
 
 By running =$ neut build --no-alloc-cancellation --emit llvm filename.neut=, we obtain schematically the following LLVM IR (the =--no-alloc-cancellation= is to disable certain optimization that we will see [[#memory-reuse-via-linearity][later]]):
 #+BEGIN_SRC llvm
@@ -88,7 +89,42 @@ define i64 @main() {
 #+END_SRC
 The non-schematic, actual output can also be be found in the [[#llvm-ir-for-the-first-example][appendix]]. I chose not to write the IR here since the output is a bit long (59 lines).
 
+The resulting LLVM IR creates a string in memory, print it, and free it for the three times. In other words, the IR creates two copies of the original string. This is because the variable =str= is used for the three times; The content of a variable is copied to create n instances when the variable is used for the n times. If the variable isn't used at all (n = 0), the content of the variable is discarded (deallocated). If the variable is used exactly once, or linearly (n = 0), the content of the variable is used without any discarding/copying operation.
+
+The way how a variable is copied is determined by the type of the variable. For example, if the type of a variable is the array type as in the example above, the copying operation is something that you would do in C to copy an array (allocation then value insertion). If the type is an immediate type like an integer type, the "copying" operation is the one that uses the original value for the clone value. Every type determines how to copy/discard the type of a value of the type, including the type of type itself.
+
+This is the basics of the behavior of resource copying/discarding of this language. As you can easily imagine, this naive copying/discarding would result in an inefficient object code. We often use a variable more than once. If those uses of a variable result in copying the content every time, the performance of the resulting code would be nothing but a disaster. Thankfully, there is a workaround for this problem.
+
 ** Borrowing (and its resulting assembly)
+The point of the workaround is nothing special: If those copying/discarding result from using variables in non-linear way, we just have to use those variables in linear way. Let's go back to the first example code:
+#+BEGIN_SRC scheme
+(with identity.bind
+  (let str "a")
+  (let _ (string.print str))
+  (let _ (string.print str))
+  (string.print str))
+#+END_SRC
+We would like to use the variable =str= linear way. To this end, we just request =string.print= to include the argument =str= in its return value. So, the type of =string.print= shouldn't be something like =string -> top= - where the =top= is the unit type - but should be =string -> top * string=. More specifically, the implementation of =string.print= should be something like (in pseudo-code):
+#+BEGIN_SRC text
+string.print :: string -> top * string
+string.print str = do
+  {print the string `str` without consuming it}
+  return (unit, str)
+#+END_SRC
+With that definition of =string.print=, we can use the variable =str= linear way (again, in pseudo-code):
+#+BEGIN_SRC text
+with identity.bind $
+  let str = "a";
+  let (_, str2) := string.print str;
+  let (_, str3) := string.print str2;
+  let (_, str4) := string.print str3;
+  0
+#+END_SRC
+
+
+It would be natural to think
+
+
 #+BEGIN_SRC scheme
 (with let-bind
   (let str "hello")
