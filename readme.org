@@ -113,33 +113,57 @@ string.print str = do
 #+END_SRC
 With that definition of =string.print=, we can use the variable =str= linear way (again, in pseudo-code):
 #+BEGIN_SRC text
-with identity.bind $
-  let str = "a";
-  let (_, str2) := string.print str;
-  let (_, str3) := string.print str2;
-  let (_, str4) := string.print str3;
-  0
+let str1 = "a";
+let (_, str2) := string.print str1;
+let (_, str3) := string.print str2;
+let (_, str4) := string.print str3;
+0
+#+END_SRC
+Note that the variables =str1=, =str2=, =str2=, and =str3= are used exactly once, and =str4= for the 0 time. Therefore, the copying operation doesn't occur in the code above. Also, since the =str4= is defined but not used, the =str4= is discarded immediately after its definition:
+#+BEGIN_SRC text
+let str1 = "a";                         -- allocation of `str1`
+let (_, str2) := string.print str1;     -- print `str1`, return it as a element of a tuple, and rename it as `str2`
+let (_, str3) := string.print str2;     -- print `str2`, return it as a element of a tuple, and rename it as `str3`
+let (_, str4) := string.print str3;     -- print `str3`, return it as a element of a tuple, and rename it as `str4`, then deallocate `str4`
+0                                       -- return 0
 #+END_SRC
 
-
-It would be natural to think
-
-
-#+BEGIN_SRC scheme
-(with let-bind
-  (let str "hello")
-  (let (tuple _ str) (string.print str))
-  (let (tuple _ str) (string.print str))
-  (string.print str))
+Now we have seen that those redundant copying/discarding can be avoided by writing the code in the manner above. The remaining problem is code cluttering. It would be much nicer to have more sophisticated notation of that code pattern. Towards that end, firstly note that we can use the same name for the variables =str1=, =str2=, =str3=, and =str4= thanks to variable shadowing:
+#+BEGIN_SRC text
+let str = "a";
+let (_, str) := string.print str;
+let (_, str) := string.print str;
+let (_, str) := string.print str;
+0
+#+END_SRC
+Now, we just have to introduce a notation that translates:
+#+BEGIN_SRC text
+let foo := string.print &str;
+#+END_SRC
+into:
+#+BEGIN_SRC text
+let (foo, str) := string.print &str;
 #+END_SRC
 
+With this notation, our running example is rewritten as follows:
+#+BEGIN_SRC text
+let str = "a";
+let _ := string.print &str;
+let _ := string.print &str;
+let _ := string.print &str;
+0
+#+END_SRC
+
+And this is the notation that is implemented in Neut. Indeed, the following is a valid code of Neut:
 #+BEGIN_SRC scheme
-(with let-bind
-  (let str "hello")
+(with identity.bind
+  (let str "a")
   (let _ (string.print &str))
   (let _ (string.print &str))
-  (string.print str))
+  (let _ (string.print &str))
+  (i64 0))
 #+END_SRC
+where the last =(i64 0)= is to tell the compiler that the type of =0= is =i64= and not, e.g. =i32=. This notation is "borrowing" in Neut. Note that borrowing is nothing but a syntactic translation. Borrowing has nothing to do with, for example, the type system, or the semantics, of Neut. Indeed, this syntactic translation is processed in the stage of parsing in the compiler.
 
 We obtain the following LLVM IR by running =$ neut build --no-alloc-cancellation --emit llvm filename.neut=:
 #+BEGIN_SRC llvm
