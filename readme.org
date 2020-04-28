@@ -11,8 +11,8 @@ Practically, this means that you can write your program in the ordinary lambda c
 
 Here I briefly summerize the basic characteristics of Neut before diving into the details:
 
-- Neut is a compiled language
-- The output of Neut is LLVM IR / assembly / object binary (the last two are via clang)
+- A compiled language
+- The output is LLVM IR / assembly / object binary (the last two are via clang)
 - The type system is CoC + recursion + int + float + enum + array + struct
 - The evaluation strategy is call-by-value
 - Every tail call is optimized into a loop
@@ -24,7 +24,6 @@ Here I briefly summerize the basic characteristics of Neut before diving into th
   - [[#automatic-memory-management-with-resulting-x64-assembly][Automatic Memory Management (with resulting x64 assembly)]]
   - [[#borrowing-and-its-resulting-assembly][Borrowing (and its resulting assembly)]]
   - [[#memory-reuse-via-linearity][Memory Reuse via Linearity]]
-  - [[#hello-world][Hello World]]
   - [[#inductive-type-algebraic-data-type][Inductive type (algebraic data type)]]
   - [[#summary-or-mental-model-of-memory-management-in-neut][Summary, or Mental Model of Memory Management in Neut]]
 - [[#installation][Installation]]
@@ -53,8 +52,8 @@ Here I briefly summerize the basic characteristics of Neut before diving into th
   - [[#to-documentation][To Documentation]]
   - [[#to-theory][To Theory]]
 - [[#appendix][Appendix]]
-  - [[#llvm-ir-for-the-first-example][LLVM IR for the First Example]]
-  - [[#llvm-ir-for-the-second-example][LLVM IR for the Second Example]]
+  - [[#llvm-ir-for-the-first-example-print-without-borrowing][LLVM IR for the First Example (Print without Borrowing)]]
+  - [[#llvm-ir-for-the-second-example-print-with-borrowing][LLVM IR for the Second Example (Print with Borrowing)]]
 - [[#references][References]]
 
 * Hopefully Illuminating Examples
@@ -106,7 +105,7 @@ The non-schematic, actual output can also be be found in the [[#llvm-ir-for-the-
   (string.print str))
 #+END_SRC
 
-We obtain the following LLVM IR by running =$ neut build --emit llvm filename.neut=:
+We obtain the following LLVM IR by running =$ neut build --no-alloc-cancellation --emit llvm filename.neut=:
 #+BEGIN_SRC llvm
 declare void @free(i8*)
 declare i8* @write(i8*, i8*, i8*)
@@ -161,11 +160,6 @@ define i64 @main() {
 The former LLVM IR is the actual output except for the comments like ";; memory allocation", which are inserted after compilation for explanatory purposes. The important point here is that the string stored at =%12036= (the second argument of =@write=) is reused without copying.
 
 ** Memory Reuse via Linearity
-
-** Hello World
-#+BEGIN_SRC neut
-(string.print "Hello, world!\n")
-#+END_SRC
 
 ** Inductive type (algebraic data type)
 You can declare an inductive type as follows:
@@ -273,7 +267,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec eleifend tellus e
 
 * Appendix
 
-** LLVM IR for the First Example
+** LLVM IR for the First Example (Print without Borrowing)
 #+BEGIN_SRC llvm
 declare void @free(i8*)
 declare i8* @write(i8*, i8*, i8*)
@@ -336,7 +330,7 @@ define i64 @main() {
 }
 #+END_SRC
 
-** LLVM IR for the Second Example
+** LLVM IR for the Second Example (Print with Borrowing)
 #+BEGIN_SRC llvm
 declare void @free(i8*)
 declare i8* @write(i8*, i8*, i8*)
