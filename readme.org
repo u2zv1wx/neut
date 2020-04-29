@@ -21,11 +21,10 @@ Here I briefly summerize the basic properties of Neut before diving into the det
 
 * Table of Contents                                                    :TOC:
 - [[#hopefully-illuminating-examples][Hopefully Illuminating Examples]]
-  - [[#automatic-memory-management-with-resulting-llvm-ir][Automatic Memory Management (with resulting LLVM IR)]]
-  - [[#borrowing-and-its-resulting-assembly][Borrowing (and its resulting assembly)]]
-  - [[#memory-reuse-via-linearity][Memory Reuse via Linearity]]
-  - [[#inductive-type-algebraic-data-type][Inductive type (algebraic data type)]]
-  - [[#summary-or-mental-model-of-memory-management-in-neut][Summary, or Mental Model of Memory Management in Neut]]
+  - [[#type-based-mallocfree-determination][Type-Based malloc/free Determination]]
+  - [[#manual-optimization-via-borrowing][Manual Optimization via Borrowing]]
+  - [[#automatic-optimization-via-mallocfree-cancellation][Automatic Optimization via malloc/free Cancellation]]
+  - [[#summary][Summary]]
 - [[#installation][Installation]]
 - [[#syntax-and-semantics][Syntax and Semantics]]
   - [[#tau][tau]]
@@ -46,6 +45,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#box-modality-polarity-and-closure-conversion][Box Modality, Polarity, and Closure Conversion]]
   - [[#realizing-inductivecoinductive-types-within-coc][Realizing Inductive/Coinductive Types within CoC]]
   - [[#universe-hierarchy-and-the-weakly-normalizing-fragment][Universe Hierarchy and the Weakly-Normalizing Fragment]]
+  - [[#unified-pattern-resolution-in-dependent-type-inference]["Unified" Pattern Resolution in Dependent Type Inference]]
   - [[#a-simple-implementation-of-mutually-recursive-functions][A Simple Implementation of Mutually-Recursive Functions]]
 - [[#contribution][Contribution]]
   - [[#to-implementation][To Implementation]]
@@ -58,7 +58,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
 
 * Hopefully Illuminating Examples
 
-** Automatic Memory Management (with resulting LLVM IR)
+** Type-Based malloc/free Determination
 Here I will firstly show an "inefficient" version of some code pieces. After that, I will show a more efficient version of the code, and compare resulting LLVM IR.
 
 Note that the code here is written in a rather verbose way to make things as explicit as possible to the readers. You don't have to be that verbose in actual code.
@@ -95,7 +95,7 @@ The way how a variable is copied is determined by the type of the variable. For 
 
 This is the basics of the behavior of resource copying/discarding of this language. As you can easily imagine, this naive copying/discarding would result in an inefficient object code. We often use a variable more than once. If those uses of a variable result in copying the content every time, the performance of the resulting code would be nothing but a disaster. Thankfully, there is a workaround for this performance problem.
 
-** Borrowing (and its resulting LLVM IR / assembly code)
+** Manual Optimization via Borrowing
 The point of the workaround is nothing special: If those copying/discarding result from using variables in non-linear way, we just have to use those variables in linear way. Let's go back to the first example code:
 #+BEGIN_SRC scheme
 (with identity.bind
@@ -258,9 +258,77 @@ In short: the resulting code is faster in that it is free from the redundant cop
 
 This is how Neut controls resources efficiently, without modifying the type system of the source language (the ordinary dependent lambda calculus).
 
-** Memory Reuse via Linearity
+** Automatic Optimization via malloc/free Cancellation
+Neut's static, type-based malloc/free determination enables not only the "manual" optimization we have just seen, but also another "automatic" optimization. Remember the first example:
+#+BEGIN_SRC scheme
+(with identity.bind
+  (let str "a")
+  (let _ (string.print str))
+  (let _ (string.print str))
+  (let _ (string.print str))
+  (i64 0))
+#+END_SRC
+and the output IR of this example code:
+#+BEGIN_SRC llvm
+declare void @free(i8*)
+declare i8* @write(i8*, i8*, i8*)
+declare i8* @malloc(i64)
+define i64 @main() {
+  ;; Repeat the following for the 3 times:
+  ;;   <memory allocation for the string>
+  ;;   <create the string "a" (i.e. write the character 'a' to the allocated memory)>
+  ;;   <write the string into stdout>
+  ;;   <memory deallocation for the string>
+}
+#+END_SRC
+The code is already judged to be inefficient in that it allocates/deallocates memory unnecessarily. In other words, it is inefficient in that the code deallocates the memory that can actually be reused.
 
-** Summary, or Mental Model of Memory Management in Neut
+But if the size of memory being allocated/deallocated is known at compile-time, isn't it possible to compare the size of them in compile-time and emit a code that reuses the allocated memory?
+
+And it is indeed possible. When the option =--no-alloc-cancellation= is not passed, the compiler translates code pieces something like this:
+#+BEGIN_SRC llvm
+define TYPE @FUNCTION_NAME(...) {
+  (...)
+  ;; <memory allocation for the string>
+  ;; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
+  ;; <write the string into stdout>
+  ;; <memory deallocation for the string>    -- (*1)
+  ;; <memory allocation for the string>      -- (*2)
+  ;; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
+  ;; <write the string into stdout>
+  ;; <memory deallocation for the string>
+  (...)
+}
+#+END_SRC
+into something like this:
+#+BEGIN_SRC llvm
+define TYPE @FUNCTION_NAME(...) {
+  (...)
+  ;; <memory allocation for the string>
+  ;; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
+  ;; <write the string into stdout>
+  ;; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
+  ;; <write the string into stdout>
+  ;; <memory deallocation for the string>
+  (...)
+}
+#+END_SRC
+In other words, the compiler can cancel the memory deallocation at =(*1)= and the allocation at =(*2)=, reusing the allocated memory in its continuation. This is automatic malloc/free cancellation. By this "fallback" optimization, the compiler can emit performant code even if a user wrote code in "inefficient" way.
+
+Note that the "creating string" parts are not optimized away in the resulting LLVM IR, in contrast to the one of borrowing:
+#+BEGIN_SRC llvm
+define i64 @main() {
+  ;; <memory allocation for the string>
+  ;; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
+  ;; <write the string into stdout for the three times>
+  ;; <memory deallocation for the string>
+  ;; <return 0>
+}
+#+END_SRC
+Although the compiler can cancel memory allocations/deallocations, it cannot cancel its accompanying initialization process. It might also be possible to optimize away these initializations, but at least currently it is not possible. If you do need performance, you need to write code in the linear/borrowing style.
+
+# , or Mental Model of Memory Management in Neut
+** Summary
 - The content of a variable is
   - discarded if and only if the variable isn't used at all.
   - untouched if and only if the variable is used exactly once.
