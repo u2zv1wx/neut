@@ -415,7 +415,7 @@ If the implicit information of a variable =x= is set to be =(implicit NUM ... NU
 If the variable is prefixed by =@= when its used, the implicit information is ignored.
 
 ** constant
-The =constant= statement declares external constant.
+The =constant= statement declares an external constant.
 
 *** Example
 #+BEGIN_SRC scheme
@@ -430,7 +430,7 @@ The =constant= statement declares external constant.
 (constant ID TERM)
 #+END_SRC
 *** Semantics
-When evaluated, the =(constant x t)= statement declares a [[#constant][constant]] =x= of type =t= for later use. Declared constants can then be available for use as in the same way of ordinary [[#upsilon][variables]]. Every constant must have distinct names. This statement is currently intended for internal use, such as for implementation of syscalls. External constants (FFI) might also be supported in future release via this statement.
+When evaluated, the =(constant x t)= statement modifies the state of the compiler so that a [[#constant][constant]] =x= of type =t= is available for later use. Declared constants can then be available for use as in the same way of ordinary [[#upsilon][variables]]. Every constant must have distinct names. This statement is currently intended for internal use, such as for implementation of syscalls. External constants (FFI) might also be supported in future release via this statement.
 
 ** define/let
 *** Example
