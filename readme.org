@@ -9,7 +9,7 @@ Theoretically, this is made possible by translating the source language into a d
 
 Practically, this means that you can write your program in the ordinary lambda calculus without any extra restrictions/annotations, and at the same time are allowed to pursue performance in the language via e.g. borrowing or linearity. The source code doesn't need esoteric annotations for the compiler to infer how to use resources. Nor does the world stop all of a sudden by GC. You have full control over resource allocation.
 
-Here I briefly summerize the basic characteristics of Neut before diving into the details:
+Here I briefly summerize the basic properties of Neut before diving into the details:
 
 - A compiled language
 - The output is LLVM IR / assembly / object binary (the last two are via clang)
@@ -93,7 +93,7 @@ The resulting LLVM IR creates a string in memory, print it, and free it for the 
 
 The way how a variable is copied is determined by the type of the variable. For example, if the type of a variable is the array type as in the example above, the copying operation is something that you would do in C to copy an array (allocation then value insertion). If the type is an immediate type like an integer type, the "copying" operation is the one that uses the original value for the clone value. Every type determines how to copy/discard the type of a value of the type, including the type of type itself.
 
-This is the basics of the behavior of resource copying/discarding of this language. As you can easily imagine, this naive copying/discarding would result in an inefficient object code. We often use a variable more than once. If those uses of a variable result in copying the content every time, the performance of the resulting code would be nothing but a disaster. Thankfully, there is a workaround for this problem.
+This is the basics of the behavior of resource copying/discarding of this language. As you can easily imagine, this naive copying/discarding would result in an inefficient object code. We often use a variable more than once. If those uses of a variable result in copying the content every time, the performance of the resulting code would be nothing but a disaster. Thankfully, there is a workaround for this performance problem.
 
 ** Borrowing (and its resulting LLVM IR / assembly code)
 The point of the workaround is nothing special: If those copying/discarding result from using variables in non-linear way, we just have to use those variables in linear way. Let's go back to the first example code:
@@ -128,7 +128,7 @@ let (_, str4) := string.print str3;     -- print `str3`, return it as a element 
 0                                       -- return 0
 #+END_SRC
 
-Now we have seen that those redundant copying/discarding can be avoided by writing the code in the manner above. The remaining problem is code cluttering. It would be much nicer to have more sophisticated notation of that code pattern. Towards that end, firstly note that we can use the same name for the variables =str1=, =str2=, =str3=, and =str4= thanks to variable shadowing:
+Now we have seen that those redundant copying/discarding can be avoided by writing the code in the manner above. There still remains a problem: code cluttering. It would be much nicer to have more sophisticated notation of that code pattern. Towards that end, firstly note that we can use the same name for the variables =str1=, =str2=, =str3=, and =str4= thanks to variable shadowing:
 #+BEGIN_SRC text
 let str = "a";
 let (_, str) := string.print str;
@@ -163,7 +163,7 @@ And this is the notation that is implemented in Neut. Indeed, the following is a
   (let _ (string.print &str))
   (i64 0))
 #+END_SRC
-where the last =(i64 0)= is to tell the compiler that the type of =0= is =i64= and not, e.g. =i32=. This notation is "borrowing" in Neut. Note that borrowing is nothing but a syntactic translation. Borrowing has nothing to do with, for example, the type system, or the semantics, of Neut. Indeed, this syntactic translation is processed in the stage of parsing in the compiler.
+where the last =(i64 0)= is to tell the compiler that the type of =0= is =i64= and not, e.g. =i32=. This notation is "borrowing" in Neut. Note that borrowing is nothing but a syntactic translation. Borrowing has nothing to do with, for example, the type system, or the operational semantics, of Neut. Indeed, this syntactic translation is processed in the stage of parsing in the compiler.
 
 OK, then, how does the resulting LLVM IR change? Is it faster now? Let us compile the code above by running =$ neut build --no-alloc-cancellation --emit llvm filename.neut=. The output is short enough to include it here:
 #+BEGIN_SRC llvm
@@ -257,8 +257,6 @@ _main:                                  ## @main
 In short: the resulting code is faster in that it is free from the redundant copying/discarding we saw in the first example.
 
 This is how Neut controls resources efficiently, without modifying the type system of the source language (the ordinary dependent lambda calculus).
-
-Cute, I believe. Isn't it?
 
 ** Memory Reuse via Linearity
 
@@ -355,6 +353,8 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec eleifend tellus e
 ** Realizing Inductive/Coinductive Types within CoC
 
 ** Universe Hierarchy and the Weakly-Normalizing Fragment
+
+** "Unified" Pattern Resolution in Dependent Type Inference
 
 ** A Simple Implementation of Mutually-Recursive Functions
 
