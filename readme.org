@@ -260,40 +260,6 @@ This is how Neut controls resources efficiently, without modifying the type syst
 
 ** Memory Reuse via Linearity
 
-** Inductive type (algebraic data type)
-You can declare an inductive type as follows:
-#+BEGIN_SRC scheme
-(inductive list ((a type))
-  (nil ()
-    (list a))
-  (cons ((_ a) (_ (list a)))
-    (list a)))
-#+END_SRC
-where the haskell equivalent of the code above is:
-#+BEGIN_SRC haskell
-data List a where
-  Nil  :: () -> List a
-  Cons :: (A, List a) -> List a
-#+END_SRC
-You can then pattern match on the term of the type:
-#+BEGIN_SRC scheme
-(define length
-  ((a tau)
-   (xs (list a)))
-  (case xs
-    ((nil)
-      0)
-    ((cons _ ys)
-      (add-i64 1 (length a ys))))) ;; this `add-i64` is lowered to the LLVM's instruction 'add' over i64
-#+END_SRC
-and use it as in the expected way:
-#+BEGIN_SRC scheme
-(let xs (list.cons 1 (list.cons 2 (list.cons 3 (@list.nil i64)))))
-
-(i64.print (length i64 xs)) ;; ~> 3
-#+END_SRC
-In actual code, you don't have to be that verbose as in the example above, thanks to implicit terms and notations (like Coq, Agda, and Lean). We will see it later.
-
 ** Summary, or Mental Model of Memory Management in Neut
 - The content of a variable is
   - discarded if and only if the variable isn't used at all.
