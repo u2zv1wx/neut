@@ -347,9 +347,8 @@ The currently supported platforms are: Linux (x64), macOS (x64).
 Ensure you have already installed =stack= and =clang=. Then, clone the repository and build it:
 #+BEGIN_SRC shell
 $ git clone https://github.com/u2zv1wx/neut
-$ git checkout XXXXXX
-$ stack build
-$ stack install # installs the binary `neut` into ~/.local/bin
+$ cd neut
+$ ./install.sh 0.1.0.0
 #+END_SRC
 Make sure that you have =~/.local/bin= in your =$PATH=.
 
