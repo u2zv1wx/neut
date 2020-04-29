@@ -53,7 +53,11 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#with-notation-do-notation-with-explicit-monadic-bind][With Notation: do-Notation with Explicit Monadic Bind]]
   - [[#record][Record]]
   - [[#inductive-and-coinductive-types][Inductive and Coinductive types]]
-- [[#writing-library][Writing Library]]
+- [[#compiler-commands][Compiler Commands]]
+  - [[#archive][archive]]
+  - [[#build][build]]
+  - [[#check][check]]
+  - [[#complete][complete]]
 - [[#where-is-][Where is ...?]]
   - [[#unsigned-integers][Unsigned Integers?]]
   - [[#typeclass][Typeclass?]]
@@ -62,7 +66,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
 - [[#theoretical-notes][Theoretical Notes]]
   - [[#compile-time-memory-usage-determination][Compile-Time Memory Usage Determination]]
   - [[#box-modality-polarity-and-closure-conversion][Box Modality, Polarity, and Closure Conversion]]
-  - [[#realizing-inductivecoinductive-types-within-coc][Realizing Inductive/Coinductive Types within CoC]]
+  - [[#realizing-inductivecoinductive-types-within-coc-including-nested-mutual-or-higher-ones][Realizing Inductive/Coinductive Types within CoC (including nested, mutual, or higher ones)]]
   - [[#universe-hierarchy-and-the-weakly-normalizing-fragment][Universe Hierarchy and the Weakly-Normalizing Fragment]]
   - [[#unified-pattern-resolution-in-dependent-type-inference]["Unified" Pattern Resolution in Dependent Type Inference]]
   - [[#a-simple-implementation-of-mutually-recursive-functions][A Simple Implementation of Mutually-Recursive Functions]]
@@ -374,17 +378,35 @@ Also make sure that you have =~/.local/bin= in your =$PATH=.
 To uninstall, you just have to remove =~/.local/bin/neut= and =~/.local/share/neut=; Neut won't clutter your system.
 
 * Syntax and Semantics of Statements
+A program of Neut is a list of statements. Each statement is one of the following statements described in this section.
 
 ** attribute
 *** Example
 #+BEGIN_SRC neut
+(define id ((a tau) (x a)) x)
+
+(id top top.unit) ;; ~> top.unit
+
+;; (id top.unit) ;; ~> type error
+
 (attribute id (implicit 0)) ;; => Set the first argument of `id` to be implicit
+
+;; (id top top.unit) ;; ~> type error
+
+(id top.unit) ;; ~> {translated into `(id hole top.unit)`} ~> results in top.unit
+
+(@id top top.unit) ;; ~> top.unit
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
-(attribute ID TERM)
+(attribute ID ATTR)
 #+END_SRC
 *** Semantics
+When evaluated, the =(attribute x attr)= statement modifies the state of compiler so that the variable =x= has specified attribute =attr=. Currently, the only attribute that can be specified is =(implicit NUM ... NUM)=.
+
+If the implicit information of a variable =x= is set to be =(implicit NUM ... NUM)=, the compiler inserts holes at the specified indices of the arguments of function-application =(x e1 ... en)=.
+
+If the variable is prefixed by =@= when its used, the implicit information is ignored.
 
 ** constant
 *** Example
@@ -497,7 +519,15 @@ To uninstall, you just have to remove =~/.local/bin/neut= and =~/.local/share/ne
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec eleifend tellus euismod erat accumsan, nec euismod sem placerat. Ut eu lacinia arcu, id imperdiet lacus. Integer feugiat lacus mattis, dictum nunc nec, interdum justo. Fusce sed dui id orci faucibus elementum. Vivamus sit amet sapien a lorem efficitur posuere suscipit in lacus. Praesent eget sagittis nisi, id vehicula elit. Vestibulum laoreet odio ex, a aliquet justo consectetur quis. Aenean laoreet vehicula libero id varius. Vivamus condimentum, sem sed sollicitudin placerat, nulla enim faucibus odio, gravida commodo velit mi ac sapien. Integer feugiat diam in lectus porttitor, sit amet viverra velit malesuada.
 
 
-* Writing Library
+* Compiler Commands
+
+** archive
+
+** build
+
+** check
+
+** complete
 
 * Where is ...?
 
@@ -517,7 +547,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec eleifend tellus e
 ** Box Modality, Polarity, and Closure Conversion
 (to be written later)
 
-** Realizing Inductive/Coinductive Types within CoC
+** Realizing Inductive/Coinductive Types within CoC (including nested, mutual, or higher ones)
 (to be written later)
 
 ** Universe Hierarchy and the Weakly-Normalizing Fragment
