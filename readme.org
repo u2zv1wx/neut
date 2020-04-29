@@ -27,17 +27,17 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#summary][Summary]]
 - [[#installation][Installation]]
 - [[#syntax-and-semantics-of-statements][Syntax and Semantics of Statements]]
-  - [[#attribute---add-an-attribute-to-a-variable][attribute - Add an Attribute to a Variable]]
-  - [[#constant---declare-external-constant-eg-syscall][constant - Declare External Constant (e.g. Syscall)]]
-  - [[#definelet---define-a-variable][define/let - Define a variable]]
-  - [[#ensure---fetch-the-content-of-specified-url-to-be-used-as-library][ensure - Fetch the Content of Specified URL to be Used as Library]]
-  - [[#enum---declare-enum-type][enum - Declare Enum Type]]
-  - [[#include---include-the-content-of-the-file-located-at-the-specified-path][include - Include the Content of the File located at the Specified Path]]
-  - [[#inductivecoinductive---declare-inductivecoinductive-type-and-its-introductionelimination-rules][inductive/coinductive - Declare Inductive/Coinductive Type and its Introduction/Elimination Rules]]
-  - [[#introspect---for-platform-dependent-code][introspect - For Platform-Dependent Code]]
-  - [[#keywordnotation---define-convenient-notations-macros][keyword/notation - Define Convenient Notations (Macros)]]
-  - [[#useunusesectionend---namespace-control][use/unuse/section/end - Namespace Control]]
-  - [[#verify---for-theorem-proving][verify - For theorem proving]]
+  - [[#attribute][attribute]]
+  - [[#constant][constant]]
+  - [[#definelet][define/let]]
+  - [[#ensure][ensure]]
+  - [[#enum][enum]]
+  - [[#include][include]]
+  - [[#inductivecoinductive][inductive/coinductive]]
+  - [[#introspect][introspect]]
+  - [[#keywordnotation][keyword/notation]]
+  - [[#useunusesectionend][use/unuse/section/end]]
+  - [[#verify][verify]]
 - [[#syntax-and-semantics-of-terms][Syntax and Semantics of Terms]]
   - [[#tau-the-type-of-type][tau: The Type of Type]]
   - [[#pi-forall-lambda-abstraction-and-application][pi: Forall, lambda-abstraction, and application]]
@@ -45,7 +45,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#hole][hole]]
   - [[#int][Int]]
   - [[#float][Float]]
-  - [[#enum][Enum]]
+  - [[#enum-1][Enum]]
   - [[#array][Array]]
   - [[#struct][Struct]]
 - [[#auxiliary-syntax][Auxiliary Syntax]]
@@ -373,27 +373,27 @@ To uninstall, you just have to remove =~/.local/bin/neut= and =~/.local/share/ne
 
 * Syntax and Semantics of Statements
 
-** attribute - Add an Attribute to a Variable
+** attribute
 
-** constant - Declare External Constant (e.g. Syscall)
+** constant
 
-** define/let - Define a variable
+** define/let
 
-** ensure - Fetch the Content of Specified URL to be Used as Library
+** ensure
 
-** enum - Declare Enum Type
+** enum
 
-** include - Include the Content of the File located at the Specified Path
+** include
 
-** inductive/coinductive - Declare Inductive/Coinductive Type and its Introduction/Elimination Rules
+** inductive/coinductive
 
-** introspect - For Platform-Dependent Code
+** introspect
 
-** keyword/notation - Define Convenient Notations (Macros)
+** keyword/notation
 
-** use/unuse/section/end - Namespace Control
+** use/unuse/section/end
 
-** verify - For theorem proving
+** verify
 
 * Syntax and Semantics of Terms
 
