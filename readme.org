@@ -381,6 +381,8 @@ To uninstall, you just have to remove =~/.local/bin/neut= and =~/.local/share/ne
 A program of Neut is a list of statements. Each statement is one of the following statements described in this section.
 
 ** attribute
+The =attribute= statement modifies the state of the compiler so that given identifier has given attributes.
+
 *** Example
 #+BEGIN_SRC scheme
 (define id ((a tau) (x a)) x)
@@ -409,12 +411,22 @@ If the implicit information of a variable =x= is set to be =(implicit NUM ... NU
 If the variable is prefixed by =@= when its used, the implicit information is ignored.
 
 ** constant
+The =constant= statement declares external constant.
+
 *** Example
+#+BEGIN_SRC scheme
+(constant os.file-descriptor tau)
+
+(constant os.stdin os.file-descriptor)
+
+(constant os.fork (pi () i64))
+#+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
 (constant ID TERM)
 #+END_SRC
 *** Semantics
+When evaluated, the =(constant x t)= statement declares constant =x= of type =t= for later use. Declared constants can then be available for use as in the same way of ordinary variables. Every constant must have distinct names. This statement is currently intended for internal use, such as for implementation of syscalls. External constants (FFI) might be supported in future release via this statement.
 
 ** define/let
 *** Example
