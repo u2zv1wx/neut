@@ -313,14 +313,16 @@ define TYPE @FUNCTION_NAME(...) {
   (...)
 }
 #+END_SRC
-In other words, the compiler can cancel the memory deallocation at =(*1)= and the allocation at =(*2)=, reusing the allocated memory in its continuation. This is automatic malloc/free cancellation. By this "fallback" optimization, the compiler can emit performant code even if a user wrote code in "inefficient" way.
+In other words, the compiler can cancel the memory deallocation at =(*1)= and the allocation at =(*2)=, reusing the allocated memory in its continuation. This is automatic malloc/free cancellation. By this "fallback" optimization, the compiler can emit performant code even if a user wrote code in an "inefficient" way.
 
-Note that the "creating string" parts are not optimized away in the resulting LLVM IR, in contrast to the one of borrowing:
+Note that the "create the string" parts are not optimized away from the resulting LLVM IR, in contrast to the one of borrowing:
 #+BEGIN_SRC llvm
 define i64 @main() {
   ;; <memory allocation for the string>
   ;; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
-  ;; <write the string into stdout for the three times>
+  ;; <write the string into stdout>
+  ;; <write the string into stdout>
+  ;; <write the string into stdout>
   ;; <memory deallocation for the string>
   ;; <return 0>
 }
@@ -335,8 +337,8 @@ Although the compiler can cancel memory allocations/deallocations, it cannot can
   - copied if and only if the variable is used more than once.
 - Linearity results in an efficient code.
 - Non-linearity results in an inefficient code.
-- Borrowing can be used as a convenient syntactic notation when accomplishing linearity.
-- Redundant malloc/free can be alleviated by automatic malloc/free cancellation.
+- Borrowing can be used as a convenient syntactic tool when accomplishing linearity.
+- Redundant malloc/free can be reduced by automatic malloc/free cancellation.
 - Borrowing-based, or "manually" optimized code is faster than cancellation-based, or "automatically" optimized code.
 
 * Installation
