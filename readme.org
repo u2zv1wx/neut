@@ -344,7 +344,7 @@ Although the compiler can cancel memory allocations/deallocations, it cannot can
 * Installation
 The currently supported platforms are: Linux (x64), macOS (x64).
 
-Make sure you have already installed =[[https://docs.haskellstack.org/en/stable/README/][stack]]= and =[[https://clang.llvm.org/][clang]]=. Then, clone the repository and build it:
+Make sure you have already installed [[https://docs.haskellstack.org/en/stable/README/][stack]] and [[https://clang.llvm.org/][clang]]. Then, clone the repository and build it:
 #+BEGIN_SRC shell
 $ git clone https://github.com/u2zv1wx/neut
 $ cd neut
