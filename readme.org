@@ -55,8 +55,10 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#inductive-and-coinductive-types][Inductive and Coinductive types]]
 - [[#writing-library][Writing Library]]
 - [[#where-is-][Where is ...?]]
-  - [[#where-is-typeclass][Where is typeclass?]]
-  - [[#proof-related-stuff][Proof-related stuff?]]
+  - [[#unsigned-integers][Unsigned Integers?]]
+  - [[#typeclass][Typeclass?]]
+  - [[#proof-related-stuff][Proof-Related Stuff?]]
+  - [[#the-universe-hierarchy][The Universe Hierarchy?]]
 - [[#theoretical-notes][Theoretical Notes]]
   - [[#compile-time-memory-usage-determination][Compile-Time Memory Usage Determination]]
   - [[#box-modality-polarity-and-closure-conversion][Box Modality, Polarity, and Closure Conversion]]
@@ -375,6 +377,9 @@ To uninstall, you just have to remove =~/.local/bin/neut= and =~/.local/share/ne
 
 ** attribute
 *** Example
+#+BEGIN_SRC neut
+(attribute id (implicit 0)) ;; => Set the first argument of `id` to be implicit
+#+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
 (attribute ID TERM)
@@ -496,9 +501,13 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec eleifend tellus e
 
 * Where is ...?
 
-** Where is typeclass?
+** Unsigned Integers?
 
-** Proof-related stuff?
+** Typeclass?
+
+** Proof-Related Stuff?
+
+** The Universe Hierarchy?
 
 * Theoretical Notes
 
