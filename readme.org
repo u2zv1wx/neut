@@ -374,26 +374,91 @@ To uninstall, you just have to remove =~/.local/bin/neut= and =~/.local/share/ne
 * Syntax and Semantics of Statements
 
 ** attribute
+*** Example
+*** Syntax
+#+BEGIN_SRC neut
+(attribute ID TERM)
+#+END_SRC
+*** Semantics
 
 ** constant
+*** Example
+*** Syntax
+#+BEGIN_SRC neut
+(constant ID TERM)
+#+END_SRC
+*** Semantics
 
 ** define/let
+*** Example
+*** Syntax
+#+BEGIN_SRC neut
+(define
+  (ID ((ID TERM) ... (ID TERM))
+    TERM)
+  ...
+  (ID ((ID TERM) ... (ID TERM))
+    TERM))
+
+;; alternative notation for (define (ID ((ID TERM) ... (ID TERM)) TERM))
+(define ID ((ID TERM) ... (ID TERM)) TERM)
+
+(let (ID TERM) TERM)
+
+(let ID TERM)
+#+END_SRC
+*** Semantics
 
 ** ensure
+*** Example
+*** Syntax
+#+BEGIN_SRC neut
+(ensure PATHSTRING "URL")
+#+END_SRC
+*** Semantics
 
 ** enum
+*** Example
+*** Syntax
+#+BEGIN_SRC neut
+(enum ID (ID INT) ... (ID INT))
+#+END_SRC
+*** Semantics
 
 ** include
+*** Example
+*** Syntax
+#+BEGIN_SRC neut
+(include "PATH_TO_FILE")
+
+(include library "PATH_TO_FILE")
+#+END_SRC
+*** Semantics
 
 ** inductive/coinductive
+*** Example
+*** Syntax
+*** Semantics
 
 ** introspect
+*** Example
+*** Syntax
+*** Semantics
 
 ** keyword/notation
+*** Example
+*** Syntax
+*** Semantics
 
 ** use/unuse/section/end
+*** Example
+*** Syntax
+*** Semantics
 
 ** verify
+*** Example
+*** Syntax
+*** Semantics
 
 * Syntax and Semantics of Terms
 
