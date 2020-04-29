@@ -27,7 +27,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#summary][Summary]]
 - [[#installation][Installation]]
 - [[#syntax-and-semantics-of-statements][Syntax and Semantics of Statements]]
-  - [[#attribute-add-an-attribute-to-a-variable][Attribute: Add an Attribute to a Variable]]
+  - [[#attribute-add-an-attribute-to-a-variable][=attribute=: Add an Attribute to a Variable]]
   - [[#constant-declare-external-constant-eg-syscall][Constant: Declare External Constant (e.g. Syscall)]]
   - [[#definelet-define-a-variable][Define/Let: Define a variable]]
   - [[#ensure-fetch-the-content-of-specified-url-to-be-used-as-library][Ensure: Fetch the Content of Specified URL to be Used as Library]]
@@ -372,7 +372,7 @@ To uninstall, you just have to remove =~/.local/bin/neut= and =~/.local/share/ne
 
 * Syntax and Semantics of Statements
 
-** Attribute: Add an Attribute to a Variable
+** =attribute=: Add an Attribute to a Variable
 
 ** Constant: Declare External Constant (e.g. Syscall)
 
