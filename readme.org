@@ -329,11 +329,16 @@ Although the compiler can cancel memory allocations/deallocations, it cannot can
 
 # , or Mental Model of Memory Management in Neut
 ** Summary
+- Neut statically determines malloc/free at compile-time via type information.
 - The content of a variable is
   - discarded if and only if the variable isn't used at all.
-  - untouched if and only if the variable is used exactly once.
+  - untouched if and only if the variable is used exactly once (i.e. used linearly).
   - copied if and only if the variable is used more than once.
-- You can avoid variable copying by borrowing.
+- Linearity results in an efficient code.
+- Non-linearity results in an inefficient code.
+- Borrowing can be used as a convenient syntactic notation when accomplishing linearity.
+- Resulting code is free from redundant malloc/free thanks to automatic malloc/free cancellation.
+- Borrowing-based, or "manually" optimized code is faster than cancellation-based, or "automatically" optimized code.
 
 * Installation
 The currently supported platforms are: Linux (x64), macOS (x64).
