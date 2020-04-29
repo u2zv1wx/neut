@@ -40,8 +40,10 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#verify][verify]]
 - [[#syntax-and-semantics-of-terms][Syntax and Semantics of Terms]]
   - [[#tau-the-type-of-type][tau: The Type of Type]]
-  - [[#pi-forall-lambda-abstraction-and-application][pi: Forall, lambda-abstraction, and application]]
+  - [[#upsilon][upsilon]]
+  - [[#pi][pi]]
   - [[#fix-recursion-operator][fix: Recursion operator]]
+  - [[#constant-1][constant]]
   - [[#hole][hole]]
   - [[#int][Int]]
   - [[#float][Float]]
@@ -378,7 +380,9 @@ Also make sure that you have =~/.local/bin= in your =$PATH=.
 To uninstall, you just have to remove =~/.local/bin/neut= and =~/.local/share/neut=; Neut won't clutter your system.
 
 * Syntax and Semantics of Statements
-A program of Neut is a list of statements. Each statement is one of the following statements described in this section.
+A program of Neut is a list of statements. Each statement is one of the following statements described in this section. Note that this section is intended to be a reference, and not a tutorial.
+
+Every example in this section is a complete program in itself. You can [[#build][build]] and run the code to check the behavior.
 
 ** attribute
 The =attribute= statement modifies the state of the compiler so that given identifier has given attributes.
@@ -404,9 +408,9 @@ The =attribute= statement modifies the state of the compiler so that given ident
 (attribute ID ATTR)
 #+END_SRC
 *** Semantics
-When evaluated, the =(attribute x attr)= statement modifies the state of compiler so that the variable =x= has specified attribute =attr=. Currently, the only attribute that can be specified is =(implicit NUM ... NUM)=.
+When evaluated, the =(attribute x attr)= statement modifies the state of compiler so that the [[#upsilon][variable]] =x= has specified attribute =attr=. Currently, the only attribute that can be specified is =(implicit NUM ... NUM)=.
 
-If the implicit information of a variable =x= is set to be =(implicit NUM ... NUM)=, the compiler inserts holes at the specified indices of the arguments of function-application =(x e1 ... en)=.
+If the implicit information of a variable =x= is set to be =(implicit NUM ... NUM)=, the compiler inserts [[#hole][holes]] at the specified indices of the arguments of [[#pi][function-application]] =(x e1 ... en)=.
 
 If the variable is prefixed by =@= when its used, the implicit information is ignored.
 
@@ -426,7 +430,7 @@ The =constant= statement declares external constant.
 (constant ID TERM)
 #+END_SRC
 *** Semantics
-When evaluated, the =(constant x t)= statement declares constant =x= of type =t= for later use. Declared constants can then be available for use as in the same way of ordinary variables. Every constant must have distinct names. This statement is currently intended for internal use, such as for implementation of syscalls. External constants (FFI) might be supported in future release via this statement.
+When evaluated, the =(constant x t)= statement declares a [[#constant][constant]] =x= of type =t= for later use. Declared constants can then be available for use as in the same way of ordinary [[#upsilon][variables]]. Every constant must have distinct names. This statement is currently intended for internal use, such as for implementation of syscalls. External constants (FFI) might also be supported in future release via this statement.
 
 ** define/let
 *** Example
@@ -503,9 +507,13 @@ When evaluated, the =(constant x t)= statement declares constant =x= of type =t=
 
 ** tau: The Type of Type
 
-** pi: Forall, lambda-abstraction, and application
+** upsilon
+
+** pi
 
 ** fix: Recursion operator
+
+** constant
 
 ** hole
 
