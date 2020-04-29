@@ -27,21 +27,22 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#summary][Summary]]
 - [[#installation][Installation]]
 - [[#syntax-and-semantics-of-statements][Syntax and Semantics of Statements]]
-  - [[#attribute-add-an-attribute-to-a-variable][=attribute=: Add an Attribute to a Variable]]
-  - [[#constant-declare-external-constant-eg-syscall][Constant: Declare External Constant (e.g. Syscall)]]
-  - [[#definelet-define-a-variable][Define/Let: Define a variable]]
-  - [[#ensure-fetch-the-content-of-specified-url-to-be-used-as-library][Ensure: Fetch the Content of Specified URL to be Used as Library]]
-  - [[#enum-declare-enum-type][Enum: Declare Enum Type]]
-  - [[#include-include-the-content-of-the-file-located-at-the-specified-path][Include: Include the Content of the File located at the Specified Path]]
-  - [[#inductivecoinductive-declare-inductivecoinductive-type-and-its-introductionelimination-rules][Inductive/Coinductive: Declare Inductive/Coinductive Type and its Introduction/Elimination Rules]]
-  - [[#introspect-for-platform-dependent-code][Introspect: For Platform-Dependent Code]]
-  - [[#keywordnotation-define-convenient-notations-macros][Keyword/Notation: Define Convenient Notations (Macros)]]
-  - [[#useunusesectionend-namespace-control][Use/Unuse/Section/End: Namespace Control]]
-  - [[#verify-for-theorem-proving][Verify: For theorem proving]]
-- [[#core-syntax-and-semantics-of-terms][Core Syntax and Semantics of Terms]]
+  - [[#attribute---add-an-attribute-to-a-variable][attribute - Add an Attribute to a Variable]]
+  - [[#constant---declare-external-constant-eg-syscall][constant - Declare External Constant (e.g. Syscall)]]
+  - [[#definelet---define-a-variable][define/let - Define a variable]]
+  - [[#ensure---fetch-the-content-of-specified-url-to-be-used-as-library][ensure - Fetch the Content of Specified URL to be Used as Library]]
+  - [[#enum---declare-enum-type][enum - Declare Enum Type]]
+  - [[#include---include-the-content-of-the-file-located-at-the-specified-path][include - Include the Content of the File located at the Specified Path]]
+  - [[#inductivecoinductive---declare-inductivecoinductive-type-and-its-introductionelimination-rules][inductive/coinductive - Declare Inductive/Coinductive Type and its Introduction/Elimination Rules]]
+  - [[#introspect---for-platform-dependent-code][introspect - For Platform-Dependent Code]]
+  - [[#keywordnotation---define-convenient-notations-macros][keyword/notation - Define Convenient Notations (Macros)]]
+  - [[#useunusesectionend---namespace-control][use/unuse/section/end - Namespace Control]]
+  - [[#verify---for-theorem-proving][verify - For theorem proving]]
+- [[#syntax-and-semantics-of-terms][Syntax and Semantics of Terms]]
   - [[#tau-the-type-of-type][tau: The Type of Type]]
   - [[#pi-forall-lambda-abstraction-and-application][pi: Forall, lambda-abstraction, and application]]
   - [[#fix-recursion-operator][fix: Recursion operator]]
+  - [[#hole][hole]]
   - [[#int][Int]]
   - [[#float][Float]]
   - [[#enum][Enum]]
@@ -49,7 +50,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#struct][Struct]]
 - [[#auxiliary-syntax][Auxiliary Syntax]]
   - [[#sigma-type][Sigma Type]]
-  - [[#with-notation-explicit-do-notation][With Notation: Explicit do-Notation]]
+  - [[#with-notation-do-notation-with-explicit-monadic-bind][With Notation: do-Notation with Explicit Monadic Bind]]
   - [[#record][Record]]
   - [[#inductive-and-coinductive-types][Inductive and Coinductive types]]
 - [[#writing-library][Writing Library]]
@@ -372,35 +373,37 @@ To uninstall, you just have to remove =~/.local/bin/neut= and =~/.local/share/ne
 
 * Syntax and Semantics of Statements
 
-** =attribute=: Add an Attribute to a Variable
+** attribute - Add an Attribute to a Variable
 
-** Constant: Declare External Constant (e.g. Syscall)
+** constant - Declare External Constant (e.g. Syscall)
 
-** Define/Let: Define a variable
+** define/let - Define a variable
 
-** Ensure: Fetch the Content of Specified URL to be Used as Library
+** ensure - Fetch the Content of Specified URL to be Used as Library
 
-** Enum: Declare Enum Type
+** enum - Declare Enum Type
 
-** Include: Include the Content of the File located at the Specified Path
+** include - Include the Content of the File located at the Specified Path
 
-** Inductive/Coinductive: Declare Inductive/Coinductive Type and its Introduction/Elimination Rules
+** inductive/coinductive - Declare Inductive/Coinductive Type and its Introduction/Elimination Rules
 
-** Introspect: For Platform-Dependent Code
+** introspect - For Platform-Dependent Code
 
-** Keyword/Notation: Define Convenient Notations (Macros)
+** keyword/notation - Define Convenient Notations (Macros)
 
-** Use/Unuse/Section/End: Namespace Control
+** use/unuse/section/end - Namespace Control
 
-** Verify: For theorem proving
+** verify - For theorem proving
 
-* Core Syntax and Semantics of Terms
+* Syntax and Semantics of Terms
 
 ** tau: The Type of Type
 
 ** pi: Forall, lambda-abstraction, and application
 
 ** fix: Recursion operator
+
+** hole
 
 ** Int
 
@@ -416,7 +419,7 @@ To uninstall, you just have to remove =~/.local/bin/neut= and =~/.local/share/ne
 
 ** Sigma Type
 
-** With Notation: Explicit do-Notation
+** With Notation: do-Notation with Explicit Monadic Bind
 
 ** Record
 
