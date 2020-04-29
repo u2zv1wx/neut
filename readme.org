@@ -387,22 +387,22 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec eleifend tellus e
 * Theoretical Notes
 
 ** Compile-Time Memory Usage Determination
-(the info is currently only in the source code and my notebook; to be written later)
+(to be written later)
 
 ** Box Modality, Polarity, and Closure Conversion
-(the info is currently only in the source code and my notebook; to be written later)
+(to be written later)
 
 ** Realizing Inductive/Coinductive Types within CoC
-(the info is currently only in the source code and my notebook; to be written later)
+(to be written later)
 
 ** Universe Hierarchy and the Weakly-Normalizing Fragment
-(the info is currently only in the source code and my notebook; to be written later)
+(to be written later)
 
 ** "Unified" Pattern Resolution in Dependent Type Inference
-(the info is currently only in the source code and my notebook; to be written later)
+(to be written later)
 
 ** A Simple Implementation of Mutually-Recursive Functions
-(the info is currently only in the source code and my notebook; to be written later)
+(to be written later)
 
 * Contribution
 
