@@ -344,13 +344,15 @@ Although the compiler can cancel memory allocations/deallocations, it cannot can
 * Installation
 The currently supported platforms are: Linux (x64), macOS (x64).
 
-Ensure you have already installed =stack= and =clang=. Then, clone the repository and build it:
+Make sure you have already installed =[[https://docs.haskellstack.org/en/stable/README/][stack]]= and =[[https://clang.llvm.org/][clang]]=. Then, clone the repository and build it:
 #+BEGIN_SRC shell
 $ git clone https://github.com/u2zv1wx/neut
 $ cd neut
 $ ./install.sh 0.1.0.0
 #+END_SRC
-Make sure that you have =~/.local/bin= in your =$PATH=.
+Also make sure that you have =~/.local/bin= in your =$PATH=.
+
+To uninstall, you just have to remove =~/.local/bin/neut= and =~/.local/share/neut=; Neut won't clutter your system.
 
 * Syntax and Semantics
 
