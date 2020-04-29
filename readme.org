@@ -382,7 +382,7 @@ A program of Neut is a list of statements. Each statement is one of the followin
 
 ** attribute
 *** Example
-#+BEGIN_SRC neut
+#+BEGIN_SRC scheme
 (define id ((a tau) (x a)) x)
 
 (id top top.unit) ;; ~> top.unit
