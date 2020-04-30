@@ -433,7 +433,7 @@ The =constant= statement declares an external constant.
 When evaluated, the =(constant x t)= statement modifies the state of the compiler so that a [[#constant][constant]] =x= of type =t= is available for later use. Declared constants can then be available for use as in the same way of ordinary [[#upsilon][variables]]. Every constant must have distinct names. This statement is currently intended for internal use, such as for implementation of syscalls. External constants (FFI) might also be supported in future release via this statement.
 
 ** define/let
-The =define=/=let= statement evaluates given term and binds the result to a variable.
+The =define= / =let= statement evaluates given term and binds the result to a variable.
 
 *** Example
 #+BEGIN_SRC scheme
