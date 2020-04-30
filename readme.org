@@ -701,8 +701,41 @@ The =coinductive= statement defines a coinductive type, its elimination rules, a
   (tail
     ((_ (stream A)))
     (stream A)))
+
+(let stream-from-zero
+  (stream.unfold
+    (lambda ((x tau)) x)
+    (lambda ((x i64)) x)
+    (lambda ((x i64)) (add-i64 x 1))
+    0))
+
+(i64.print (stream.head (stream.tail (stream.tail (stream.tail stream-from-zero)))))
 #+END_SRC
 *** Syntax
+#+BEGIN_SRC scheme
+(coinductive LEAF ((LEAF TREE) ... (LEAF TREE))
+  (LEAF ((LEAF TREE) ... (LEAF TREE))
+    TREE)
+  ...
+  (LEAF ((LEAF TREE) ... (LEAF TREE))
+    TREE))
+
+;; n-mutual coinductive type
+(coinductive
+  (LEAF ((LEAF TREE) ... (LEAF TREE))
+    (LEAF ((LEAF TREE) ... (LEAF TREE))
+      TREE)
+    ...
+    (LEAF ((LEAF TREE) ... (LEAF TREE))
+      TREE))
+  ...
+  (LEAF ((LEAF TREE) ... (LEAF TREE))
+    (LEAF ((LEAF TREE) ... (LEAF TREE))
+      TREE)
+    ...
+    (LEAF ((LEAF TREE) ... (LEAF TREE))
+      TREE)))
+#+END_SRC
 *** Semantics
 
 ** introspect
