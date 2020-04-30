@@ -634,7 +634,7 @@ When parsed, the =(introspect var (v1 stmt-list-1) ... (vn stmt-list-n))= statem
 
 If the corresponding value is not found in the clause list, this statement does nothing.
 
-The =var= must be a valid compile-time variable. Valid compile-time variables and its possible values are as in the table below:
+The =var= must be a valid compile-time variable. Valid compile-time variables and its possible values currently available are as in the table below:
 
 | compile-time variable | possible values |
 |-----------------------+-----------------|
