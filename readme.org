@@ -772,6 +772,7 @@ is equivalent to:
 In other words, the =section= / =end= statement
 - insert the [[#useunuse][use/unuse]] statements at the beginning and the end of the section
 - add the name of the section as a prefix of the variables defined by =let= / =define= statements
+- keep all the other statements in the section untouched
 
 Each =section= statement must be paired with an =end= statement with the corresponding name.
 
