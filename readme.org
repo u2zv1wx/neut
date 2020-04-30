@@ -415,7 +415,7 @@ When evaluated, the =(attribute x attr)= statement modifies the state of compile
 
 If the implicit information of a variable =x= is set to be =(implicit NUM ... NUM)=, the compiler inserts [[#hole][holes]] at the specified indices of the arguments of [[#pi][function-application]] =(x e1 ... en)=.
 
-If the variable is prefixed by =@= when its used, the implicit information is ignored.
+If a variable is prefixed by =@= when its used, its implicit information is ignored.
 
 ** constant
 The =constant= statement declares an external constant.
