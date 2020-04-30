@@ -648,7 +648,7 @@ The =inductive= statement defines an inductive type, its introduction rules, and
     TREE)
   ...
   (LEAF ((LEAF TREE) ... (LEAF TREE))
-    TREE)))
+    TREE))
 
 ;; n-mutual inductive type
 (inductive
