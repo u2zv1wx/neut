@@ -380,9 +380,9 @@ Also make sure that you have =~/.local/bin= in your =$PATH=.
 To uninstall, you just have to remove =~/.local/bin/neut= and =~/.local/share/neut=; Neut won't clutter your system.
 
 * Syntax and Semantics of Statements
-A program of Neut is a list of statements. Each statement is one of the following statements described in this section. Note that this section is intended to be a reference, and not a tutorial.
+A program of Neut is a list of statements. Each statement is one of the following statements described in this section.
 
-Every example in this section is a complete program in itself. You can [[#build][build]] and run the code to check the behavior.
+Every example in this section is a valid program in itself. You can [[#build][build]] and run the code to check the behavior.
 
 ** attribute
 The =attribute= statement modifies the state of the compiler so that given identifier has given attributes.
@@ -434,8 +434,58 @@ When evaluated, the =(constant x t)= statement modifies the state of the compile
 
 ** define/let
 *** Example
+#+BEGIN_SRC scheme
+(let foo (i64 10)) ;; define a variable `foo` to be `10`
+
+(i64.print foo) ;; ~> 10
+
+(let (bar i64) 20) ;; define with type annotation
+
+(i64.print bar) ;; ~> 20
+
+;; ordinary definition (i.e. 1-mutual definition)
+(define fact ((x i64))
+  (if (icmp-sle-i64 x 0) ;; compare (by less-than-or-equal) two `i64`s as signed integers
+    1
+    (mul-i64 x (fact (sub-i64 x 1))))) ;; the self-referential variable "fact" is available in its function body
+
+(i64.print (fact foo)) ;; ~> 3628800 (= 10!)
+
+;; 2-mutual definition
+(define
+  (even (n)      ;; argument without type annotation
+    (if (icmp-eq-i64 n 0) ;; compare (by equal) two `i64`s
+      true
+      (odd (sub-i64 n 1))))
+  (odd ((n i64)) ;; argument with type annotation
+    (if (icmp-eq-i64 n 0)
+      false
+      (even (sub-i64 n 1)))))
+
+(i64.print
+  (if (even 10)
+    100
+    1000)) ;; ~> 100
+
+;; 1-mutual definition (i.e. generalized notation of "ordinary" definition)
+(define
+  (fact ((x i64))
+    (if (icmp-sle-i64 x 0)
+      1
+      (mul-i64 x (fact (sub-i64 x 1))))))
+
+(i64.print (fact 10)) ;; ~> 3628800
+
+
+;; 0-mutual definition is also valid
+(define)
+#+END_SRC
 *** Syntax
-#+BEGIN_SRC neut
+#+BEGIN_SRC scheme
+(let (ID TERM) TERM)
+
+(let ID TERM)
+
 (define
   (ID ((ID TERM) ... (ID TERM))
     TERM)
@@ -445,12 +495,15 @@ When evaluated, the =(constant x t)= statement modifies the state of the compile
 
 ;; alternative notation for (define (ID ((ID TERM) ... (ID TERM)) TERM))
 (define ID ((ID TERM) ... (ID TERM)) TERM)
-
-(let (ID TERM) TERM)
-
-(let ID TERM)
 #+END_SRC
 *** Semantics
+When evaluated, the =(let x e)= statement checks the type of the term =e=, evaluates the term =e=, then defines a variable =x= with =e= as its content. =x= is available in the remaining program. The type of =x= can be specified to be =t= by writing =(let (x t) e)=.
+
+The 0-mutual definition does nothing.
+
+When parsed, 1-mutual definitions =(define (f ((x A) ... (x A)) e))= are translated into =(let f (fix f ((x A) ... (x A)) e))=, and then evaluated as ordinary let statement. Convenient 1-mutual definitions =(define f ((x A) ... (x A)) e)= are translated into =(define (f ((x A) ... (x A)) e))=, and then processed as ordinary 1-mutual definitions.
+
+When parsed, n-mutual definitions (n >= 2) are also translated into appropriate let-and-fix.
 
 ** ensure
 *** Example
