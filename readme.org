@@ -673,9 +673,45 @@ When parsed, the statement =(notation FROM TO)= modifies the state of the compil
 See [[#macroexpansion][the section on macro expansion]] for the details of keywords and notations.
 
 ** use/unuse
+The =use= / =unuse= statement registers a prefix for name resolution.
 *** Example
+#+BEGIN_SRC scheme
+(let foo.bar.buz (i64 10))
+
+;; (i64.print buz)      ;; ~> undefined variable: `buz`
+;; (i64.print bar.buz)  ;; ~> undefined variable: `bar.buz`
+(i64.print foo.bar.buz) ;; ~> 10
+
+(use foo)
+
+;; (i64.print buz)      ;; ~> undefined variable: `buz`
+(i64.print bar.buz)     ;; ~> 10
+(i64.print foo.bar.buz) ;; ~> 10
+
+(use foo.bar)
+
+(i64.print buz)         ;; ~> 10
+(i64.print bar.buz)     ;; ~> 10
+(i64.print foo.bar.buz) ;; ~> 10
+
+(unuse foo)
+
+(i64.print buz)         ;; ~> 10
+;; (i64.print bar.buz)  ;; ~> undefined variable: `bar.buz`
+(i64.print foo.bar.buz) ;; ~> 10
+#+END_SRC
 *** Syntax
+#+BEGIN_SRC scheme
+(use LEAF)
+
+(unuse LEAF)
+#+END_SRC
 *** Semantics
+When parsed, the statement =(use PREFIX)= inserts =PREFIX= at the head of the prefix environment, which is a list of prefixes.
+
+When parsed, the statement =(unuse PREFIX)= removes =PREFIX= from the prefix environment. If the =PREFIX= is not contained in the environment, the =unuse= statement does nothing.
+
+The prefix environment modifies [[#upsilon][how the compiler parses a variable]].
 
 ** section/end
 *** Example
