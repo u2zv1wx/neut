@@ -622,7 +622,7 @@ The =inductive= statement defines an inductive type, its introduction rules, and
   (zero () (nat))
   (succ (_ (nat)) (nat)))
 
-(inductive list ((a tau)) ;; list .= Pi (a . tau). tauだからaがunusedとして報告される。修正すること。
+(inductive list ((a tau))
   (nil ()
     (list a))
   (cons ((_ a) (_ (list a)))
