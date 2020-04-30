@@ -589,7 +589,7 @@ The =include= statement temporary transfers the parsing process to the file spec
 #+BEGIN_SRC scheme
 (include "relative/path/from/this/file/to/some/file.neut")
 
-(include "relative/path/from/this/file/to/some/file.neut") ;; including same file; do nothing
+(include "relative/path/from/this/file/to/some/file.neut") ;; including an already included file; do nothing
 
 (include library "relative/path/from/library/dir/to/some/file.neut")
 #+END_SRC
