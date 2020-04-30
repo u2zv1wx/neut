@@ -782,7 +782,7 @@ The =verify= statement normalizes given term.
 #+BEGIN_SRC scheme
 (verify ((λ ((x tau)) x) top)) ;; ~> verification succeeded (0.000027 seconds)
 
-;; proof for: forall proposition A, A implies A
+;; a proof for: forall proposition A, A implies A
 (let some-theorem
   (Π ((A tau))
     (hom A A))
