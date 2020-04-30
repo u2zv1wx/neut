@@ -497,6 +497,8 @@ When evaluated, the =(constant x t)= statement modifies the state of the compile
 (define ID ((ID TERM) ... (ID TERM)) TERM)
 #+END_SRC
 *** Semantics
+When parsed, the =(let x e)= statement does nothing.
+
 When evaluated, the =(let x e)= statement checks the type of the term =e=, evaluates the term =e=, then defines a variable =x= with =e= as its content. =x= is available in the remaining program. The type of =x= can be specified to be =t= by writing =(let (x t) e)=.
 
 The 0-mutual definition does nothing.
@@ -507,11 +509,23 @@ When parsed, n-mutual definitions (n >= 2) are also translated into appropriate 
 
 ** ensure
 *** Example
+#+BEGIN_SRC scheme
+;; extracts the content of URL into ~/.local/share/neut/NEUT_VERSION/library/some-library/0.2.0.0
+(ensure some-library/0.2.0.0
+  "https://example.com/some-library-0.2.0.0.tar.gz")
+
+(include library "some-library/0.2.0.0/some-file.neut")
+#+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
-(ensure PATHSTRING "URL")
+(ensure ID "URL_OF_LIBRARY")
 #+END_SRC
 *** Semantics
+When parsed, the =(ensure path "URL")= statement fetches the content of the specified URL, extracts the content into =~/.local/share/neut/NEUT_VERSION/path=, assuming that the format of the archive is =tar.gz=. The =path= must be a valid path string. Every path separator in =path= is treated as "real" one. For example, if the =path= is =some-library/0.2.0.0=, the content of the archive is extracted into =~/.local/share/neut/NEUT_VERSION/some-library/0.2.0.0=. Incidentally, this means that users can choose where to install third-party libraries.
+
+This statement is intended to be used in harmony with the [[#include][include]] statement.
+
+Archives specified in the =ensure= statement are intended to be the ones created via the [[#archive][archive]] subcommand.
 
 ** enum
 *** Example
