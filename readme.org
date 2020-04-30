@@ -12,7 +12,7 @@ Practically, this means that you can write your program in the ordinary lambda c
 Here I briefly summerize the basic properties of Neut before diving into the details:
 
 - A compiled language
-- The output is LLVM IR / assembly / object binary (the last two are via clang)
+- The output is [[https://llvm.org/docs/LangRef.html][LLVM IR]] / assembly / object binary (the last two are via clang)
 - The type system is CoC + recursion + int + float + enum + array + struct
 - The evaluation strategy is call-by-value
 - Every tail call is optimized into a loop
