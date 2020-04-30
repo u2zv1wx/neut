@@ -40,11 +40,11 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#useunuse][use/unuse]]
   - [[#sectionend][section/end]]
   - [[#verify][verify]]
-- [[#syntax-and-semantics-of-terms][Syntax and Semantics of Terms]]
-  - [[#tau-the-type-of-type][tau: The Type of Type]]
+- [[#syntax-and-semantics-of-inference-rules][Syntax and Semantics of Inference Rules]]
+  - [[#tau][tau]]
   - [[#upsilon][upsilon]]
   - [[#pi][pi]]
-  - [[#fix-recursion-operator][fix: Recursion operator]]
+  - [[#fix][fix]]
   - [[#constant-1][constant]]
   - [[#hole][hole]]
   - [[#int][Int]]
@@ -693,6 +693,15 @@ Nested inductive type is allowed if and only if the outer, already-defined induc
 ** coinductive
 The =coinductive= statement defines a coinductive type, its elimination rules, and its introduction rule (unfold).
 *** Example
+#+BEGIN_SRC scheme
+(coinductive stream ((A tau))
+  (head
+    ((_ (stream A)))
+    A)
+  (tail
+    ((_ (stream A)))
+    (stream A)))
+#+END_SRC
 *** Syntax
 *** Semantics
 
@@ -881,15 +890,15 @@ The evaluation strategy of the normalization process is the applicative order; t
 
 This statement can be used to check if the given term is contained in the weakly-normalizing fragment of the CoC without the universe hierarchy.
 
-* Syntax and Semantics of Terms
+* Syntax and Semantics of Inference Rules
 
-** tau: The Type of Type
+** tau
 
 ** upsilon
 
 ** pi
 
-** fix: Recursion operator
+** fix
 
 ** constant
 
