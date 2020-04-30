@@ -33,7 +33,8 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#ensure][ensure]]
   - [[#enum][enum]]
   - [[#include][include]]
-  - [[#inductivecoinductive][inductive/coinductive]]
+  - [[#inductive][inductive]]
+  - [[#coinductive][coinductive]]
   - [[#introspect][introspect]]
   - [[#keywordnotation][keyword/notation]]
   - [[#useunuse][use/unuse]]
@@ -613,7 +614,62 @@ When including a file, both [[#useunuse][the prefix environment]] and [[#section
 
 Cyclic inclusion is invalid.
 
-** inductive/coinductive
+** inductive
+The =inductive= statement defines an inductive type, its introduction rules, and its elimination rule (fold).
+*** Example
+#+BEGIN_SRC scheme
+(inductive nat ()
+  (zero () (nat))
+  (succ (_ (nat)) (nat)))
+
+(inductive list ((a tau)) ;; list .= Pi (a . tau). tauだからaがunusedとして報告される。修正すること。
+  (nil ()
+    (list a))
+  (cons ((_ a) (_ (list a)))
+    (list a)))
+
+(define length
+  ((a tau)
+   (xs (list a)))
+  (case xs
+    ((list.nil)
+      0)
+    ((list.cons _ ys)
+      (add-i64 1 (length a ys)))))
+
+(let (xs (list i64)) (list.cons 10 (list.cons 20 (list.nil)))
+
+(i64.print (length xs)) ;; ~> 2
+#+END_SRC
+*** Syntax
+#+BEGIN_SRC scheme
+(inductive LEAF ((LEAF TREE) ... (LEAF TREE))
+  (LEAF ((LEAF TREE) ... (LEAF TREE))
+    TREE)
+  ...
+  (LEAF ((LEAF TREE) ... (LEAF TREE))
+    TREE)))
+
+;; n-mutual inductive type
+(inductive
+  (LEAF ((LEAF TREE) ... (LEAF TREE))
+    (LEAF ((LEAF TREE) ... (LEAF TREE))
+      TREE)
+    ...
+    (LEAF ((LEAF TREE) ... (LEAF TREE))
+      TREE))
+  ...
+  (LEAF ((LEAF TREE) ... (LEAF TREE))
+    (LEAF ((LEAF TREE) ... (LEAF TREE))
+      TREE)
+    ...
+    (LEAF ((LEAF TREE) ... (LEAF TREE))
+      TREE)))
+#+END_SRC
+*** Semantics
+
+** coinductive
+The =coinductive= statement defines a coinductive type, its elimination rules, and its introduction rule (unfold).
 *** Example
 *** Syntax
 *** Semantics
