@@ -437,7 +437,7 @@ When evaluated, the =(constant x t)= statement modifies the state of the compile
 #+BEGIN_SRC scheme
 (let foo (i64 10)) ;; define a variable `foo` to be `10`
 
-(i64.print foo) ;; ~> 10
+(i64.print foo) ;; ~> 10 (this is equivalent to `(let _ (i64.print foo))`)
 
 (let (bar i64) 20) ;; define with type annotation
 
@@ -507,6 +507,8 @@ When parsed, 1-mutual definitions =(define (f ((x A) ... (x A)) e))= are transla
 
 When parsed, n-mutual definitions (n >= 2) are also translated into appropriate let-and-fix.
 
+If user input is not parsed as a statement when it is supposed to be, the compiler firstly interpret it as a term =e=, and then processes a statement =(let _ e)=.
+
 ** ensure
 *** Example
 #+BEGIN_SRC scheme
@@ -529,11 +531,45 @@ Archives specified in =(ensure path "URL")= is intended to be ones created via t
 
 ** enum
 *** Example
+#+BEGIN_SRC scheme
+(enum choice left right) ;; defines choice : tau, choice.left : choice, and choice.right : choice
+
+(let x choice.left)
+
+(i64.print
+  (enum-elimination x
+    (choice.left
+      (i64 1))
+     choice.right
+      (i64 2))) ;; ~> 1
+
+(i64.print (unsafe.cast choice i64 choice.left)) ;; ~> 0
+
+(i64.print (unsafe.cast choice i64 choice.right)) ;; ~> 1
+
+(enum foo
+  (a 100)
+  b
+  (c 20)
+  d
+  e
+  (f 103))
+
+(i64.print (unsafe.cast foo i64 foo.a)) ;; ~> 100
+(i64.print (unsafe.cast foo i64 foo.b)) ;; ~> 101
+(i64.print (unsafe.cast foo i64 foo.c)) ;; ~> 20
+(i64.print (unsafe.cast foo i64 foo.d)) ;; ~> 21
+(i64.print (unsafe.cast foo i64 foo.e)) ;; ~> 22
+(i64.print (unsafe.cast foo i64 foo.f)) ;; ~> 103
+#+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
-(enum ID (ID INT) ... (ID INT))
+(enum ID ID_INT ... ID_INT)
+
+ID_INT := ID | (ID INT)
 #+END_SRC
 *** Semantics
+When parsed, a =(enum x a1 ... an)= statement updates the state of the compiler so that the specified enum-type =x : tau= and the enum-values =x.a1, ..., x.an : x= can be used in the succeeding code. Every enum-value has its internal i64 value (discriminant). Those discriminant value can be extracted by using the unsafe cast, though not recommended in ordinary use. Discriminant value starts from =0= by default, and increments one by one. The "current" value of this increment can be changed by writing, e.g. =(enum foo a (b 100) c d)=. In this example, the discriminant value of =c= is defined to be =101 (== 100 + 1)=. Every discriminant value must be distinct.
 
 ** include
 *** Example
