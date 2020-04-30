@@ -777,9 +777,31 @@ In other words, the =section= / =end= statement
 Each =section= statement must be paired with an =end= statement with the corresponding name.
 
 ** verify
+The =verify= statement normalizes given term.
 *** Example
+#+BEGIN_SRC scheme
+(verify ((λ ((x tau)) x) top)) ;; ~> verification succeeded (0.000027 seconds)
+
+;; proof for: forall proposition A, A implies A
+(let some-theorem
+  (Π ((A tau))
+    (hom A A))
+  (assume (_)
+    (assume (x) x)))
+
+;; check if the proof of the theorem is weakly-normalizing
+(verify some-theorem)
+#+END_SRC
 *** Syntax
+#+BEGIN_SRC scheme
+(verify TERM)
+#+END_SRC
 *** Semantics
+The =verify= statement normalizes given term after type checking. The term is reduced so that it doesn't contain any redexes. If the term doesn't terminate, this normalization doesn't terminate.
+
+The evaluation strategy of the normalization process is the applicative order; the call-by-value strategy cannot be used here since it might "overlook" redexes in a lambda abstraction.
+
+This statement can be used to check if the given term is contained in the weakly-normalizing fragment of the CoC without the universe hierarchy.
 
 * Syntax and Semantics of Terms
 
