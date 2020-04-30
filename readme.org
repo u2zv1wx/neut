@@ -676,12 +676,12 @@ When parsed, the =inductive= statement is translated into =let= statements that 
     (list a)))
 #+END_SRC
 Given this statement, the compiler generates [[#definelet][let]] statements that defines the followings:
-- (1) The inductive type =list : Pi (a : tau). tau=
-- (2) The introduction rules (constructors) of the type:
-  - =list.nil : Pi (a : tau). list a=, where the =a : tau= is set to be [[#attribute][implicit]].
-  - =list.cons : Pi (a : tau, _ : a, _ : list a). list a=, where the =a : tau= is set to be [[#attribute][implicit]].
-- (3) The elimination rule of the type:
-  - =list.fold : (Π ((a tau) (_ (list a)) (list (arrow (tau) tau)) (_ (arrow () (F a))) (_ (arrow (a (F a)) (F a)))) (F a))=
+1. The inductive type =list : Pi (a : tau). tau=
+2. The introduction rules (constructors) of the type:
+   - =list.nil : Pi (a : tau). list a=, where the =a : tau= is set to be [[#attribute][implicit]].
+   - =list.cons : Pi (a : tau, _ : a, _ : list a). list a=, where the =a : tau= is set to be [[#attribute][implicit]].
+3. The elimination rule of the type:
+   - =list.fold : (Π ((a tau) (_ (list a)) (list (arrow (tau) tau)) (_ (arrow () (F a))) (_ (arrow (a (F a)) (F a)))) (F a))=
 The elimination rule might seem intimidating. In the actual code, however, you don't have to use that generated term since the rule [[#case][case]] can be used in harmony with the rule [[#fix][fix]] to achieve the expressiveness of =fold=, as in the function =length= in the example code above.
 
 When used in the domain of a constructor, the inductive type being defined must be occurred covariantly.
