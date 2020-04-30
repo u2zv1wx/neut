@@ -715,8 +715,65 @@ The prefix environment modifies [[#upsilon][how the compiler parses a variable]]
 
 ** section/end
 *** Example
+#+BEGIN_SRC scheme
+(section pohe)
+
+(let foo (i64 10))
+
+(section qux)
+
+(let bar (i64 20))
+
+(i64.print foo)          ;; ~> 10
+(i64.print pohe.foo)     ;; ~> 10
+(i64.print bar)          ;; ~> 20
+(i64.print qux.bar)      ;; ~> 20
+(i64.print pohe.qux.bar) ;; ~> 20
+
+(end qux)
+
+(i64.print foo)          ;; ~> 10
+(i64.print pohe.foo)     ;; ~> 10
+;; (i64.print bar)       ;; ~> undefined variable: `bar`
+(i64.print qux.bar)      ;; ~> 20
+(i64.print pohe.qux.bar) ;; ~> 20
+
+(end pohe)
+
+;; (i64.print foo)       ;; ~> undefined variable: `foo`
+(i64.print pohe.foo)     ;; ~> 10
+;; (i64.print bar)       ;; ~> undefined variable: `bar`
+;; (i64.print qux.bar)   ;; ~> undefined variable: `qux.bar`
+(i64.print pohe.qux.bar) ;; ~> 20
+#+END_SRC
 *** Syntax
+#+BEGIN_SRC scheme
+(section LEAF)
+
+(end LEAF)
+#+END_SRC
 *** Semantics
+The list of statement
+#+BEGIN_SRC scheme
+(section FOO)
+(let x1 e1)
+...
+(let xn en)
+(end FOO)
+#+END_SRC
+is equivalent to:
+#+BEGIN_SRC scheme
+(use FOO)
+(let FOO.x1 e1)
+...
+(let FOO.xn en)
+(unuse FOO)
+#+END_SRC
+In other words, the =section= / =end= statement
+- insert the [[#useunuse][use/unuse]] statements at the beginning and the end of the section
+- add the name of the section as a prefix of the variables defined by =let= / =define= statements
+
+Each =section= statement must be paired with an =end= statement with the corresponding name.
 
 ** verify
 *** Example
