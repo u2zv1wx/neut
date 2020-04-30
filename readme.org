@@ -790,7 +790,7 @@ The =verify= statement normalizes given term.
     (assume (x) x)))
 
 ;; check if the proof of the theorem is weakly-normalizing
-(verify some-theorem)
+(verify some-theorem) ;; ~> verification succeeded (0.000003 seconds)
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC scheme
