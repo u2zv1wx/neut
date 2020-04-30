@@ -36,7 +36,8 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#inductivecoinductive][inductive/coinductive]]
   - [[#introspect][introspect]]
   - [[#keywordnotation][keyword/notation]]
-  - [[#useunusesectionend][use/unuse/section/end]]
+  - [[#useunuse][use/unuse]]
+  - [[#sectionend][section/end]]
   - [[#verify][verify]]
 - [[#syntax-and-semantics-of-terms][Syntax and Semantics of Terms]]
   - [[#tau-the-type-of-type][tau: The Type of Type]]
@@ -382,7 +383,7 @@ To uninstall, you just have to remove =~/.local/bin/neut= and =~/.local/share/ne
 * Syntax and Semantics of Statements
 A program of Neut is a list of statements. Each statement is one of the following statements described in this section.
 
-Every example in this section is a valid program in itself. You can [[#build][build]] and run the code to check the behavior.
+# Every example in this section is a valid program in itself. You can [[#build][build]] and run the code to check the behavior.
 
 ** attribute
 The =attribute= statement modifies the state of the compiler so that given identifier has given attributes.
@@ -583,7 +584,15 @@ Discriminant value starts from =0= by default, and increments one by one. The "c
 The discriminant values of a enum-type must be distinct.
 
 ** include
+The =include= statement temporary transfers the parsing process to the file specified by given path, if necessary.
 *** Example
+#+BEGIN_SRC neut
+(include "relative/path/from/this/file/to/some/file.neut")
+
+(include "relative/path/from/this/file/to/some/file.neut") ;; including same file; do nothing
+
+(include library "relative/path/from/library/dir/to/some/file.neut")
+#+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
 (include "PATH_TO_FILE")
@@ -591,6 +600,15 @@ The discriminant values of a enum-type must be distinct.
 (include library "PATH_TO_FILE")
 #+END_SRC
 *** Semantics
+When parsed, the =(include path)= statement transfers current parsing process to the parsing process of the file specified by the =path=. After the transferred parsing process is finished, the suspended remaining parsing process is resumed.
+
+The path is computed relative to the current file by default. The =(include library path)= statement can be used to set the base path of this path calculation to be the library path of Neut (i.e. =~/.local/share/neut/NEUT_VERSION/library=).
+
+If the file at the =path= is already included, this statement does nothing.
+
+When including a file, both [[#useunuse][the prefix environment]] and [[#sectionend][the section environment]] must be empty.
+
+Cyclic inclusion is invalid.
 
 ** inductive/coinductive
 *** Example
@@ -607,7 +625,12 @@ The discriminant values of a enum-type must be distinct.
 *** Syntax
 *** Semantics
 
-** use/unuse/section/end
+** use/unuse
+*** Example
+*** Syntax
+*** Semantics
+
+** section/end
 *** Example
 *** Syntax
 *** Semantics
