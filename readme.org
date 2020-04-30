@@ -586,7 +586,7 @@ The discriminant values of a enum-type must be distinct.
 ** include
 The =include= statement temporary transfers the parsing process to the file specified by given path, if necessary.
 *** Example
-#+BEGIN_SRC neut
+#+BEGIN_SRC scheme
 (include "relative/path/from/this/file/to/some/file.neut")
 
 (include "relative/path/from/this/file/to/some/file.neut") ;; including same file; do nothing
@@ -594,7 +594,7 @@ The =include= statement temporary transfers the parsing process to the file spec
 (include library "relative/path/from/library/dir/to/some/file.neut")
 #+END_SRC
 *** Syntax
-#+BEGIN_SRC neut
+#+BEGIN_SRC scheme
 (include "PATH_TO_FILE")
 
 (include library "PATH_TO_FILE")
