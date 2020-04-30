@@ -525,7 +525,7 @@ When parsed, the =(ensure path "URL")= statement fetches the content of the spec
 
 This statement is intended to be used in harmony with the [[#include][include]] statement.
 
-Archives specified in the =ensure= statement are intended to be the ones created via the [[#archive][archive]] subcommand.
+Archives specified in =(ensure path "URL")= is intended to be ones created via the [[#archive][archive]] subcommand.
 
 ** enum
 *** Example
