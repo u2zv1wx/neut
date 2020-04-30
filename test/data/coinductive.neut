@@ -1,11 +1,44 @@
 ;; simple coinductive type
-(coinductive stream ((A tau))
-  (head
-    ((_ (stream A)))
-    A)
-  (tail
-    ((_ (stream A)))
-    (stream A)))
+;; (coinductive stream ((A tau))
+;;   (head
+;;     ((_ (stream A)))
+;;     A)
+;;   (tail
+;;     ((_ (stream A)))
+;;     (stream A)))
+
+(inductive stream ((A tau))
+  (unfold ((F (hom tau tau))
+           (h (hom (F A) A))
+           (t (hom (F A) (F A)))
+           (_ (F A)))
+          (stream A)))
+
+(define stream.head ((A tau) (x (stream A)))
+  (case x
+    ((stream.unfold _ h _ v) (h v))))
+
+(attribute stream.head (implicit 0))
+
+(define stream.tail ((A tau) (x (stream A)))
+  (witness (stream A)
+    (case x
+      ((stream.unfold F h t v)
+        (stream.unfold F h t (t v)))))) ;; externalize!
+
+(attribute stream.tail (implicit 0))
+;; ?stream.unfold
+
+(let stream-from-zero
+  (stream.unfold
+    (lambda ((x tau)) x)
+    (lambda ((x i64)) x)
+    (lambda ((x i64)) (add-i64 x 1))
+    0))
+
+;; ?stream.tail
+(i64.print (stream.head (stream.tail (stream.tail (stream.tail stream-from-zero)))))
+;; (i64.print (stream.head stream-from-zero))
 
 ;; nested coinductive type
 (coinductive foo ((A tau))
