@@ -20,13 +20,13 @@ Here I briefly summerize the basic properties of Neut before diving into the det
 - Has inductive/coinductive type (despite the fact that the core logic is not CoIC but CoC)
 
 * Table of Contents                                                    :TOC:
-- [[#1-some-hopefully-illuminating-examples][1. Some (Hopefully) Illuminating Examples]]
+- [[#some-hopefully-illuminating-examples][Some (Hopefully) Illuminating Examples]]
   - [[#type-based-mallocfree-determination][Type-Based malloc/free Determination]]
   - [[#manual-optimization-via-borrowing][Manual Optimization via Borrowing]]
   - [[#automatic-optimization-via-mallocfree-cancellation][Automatic Optimization via malloc/free Cancellation]]
   - [[#summary][Summary]]
-- [[#2-installation][2. Installation]]
-- [[#3-syntax-and-semantics-of-statements][3. Syntax and Semantics of Statements]]
+- [[#installation][Installation]]
+- [[#syntax-and-semantics-of-statements][Syntax and Semantics of Statements]]
   - [[#attribute][attribute]]
   - [[#constant][constant]]
   - [[#definelet][define/let]]
@@ -36,10 +36,11 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#inductivecoinductive][inductive/coinductive]]
   - [[#introspect][introspect]]
   - [[#keywordnotation][keyword/notation]]
+  - [[#notation][notation]]
   - [[#useunuse][use/unuse]]
   - [[#sectionend][section/end]]
   - [[#verify][verify]]
-- [[#4-syntax-and-semantics-of-terms][4. Syntax and Semantics of Terms]]
+- [[#syntax-and-semantics-of-terms][Syntax and Semantics of Terms]]
   - [[#tau-the-type-of-type][tau: The Type of Type]]
   - [[#upsilon][upsilon]]
   - [[#pi][pi]]
@@ -51,38 +52,39 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#enum-1][Enum]]
   - [[#array][Array]]
   - [[#struct][Struct]]
-- [[#5-auxiliary-syntax][5. Auxiliary Syntax]]
+- [[#auxiliary-syntax][Auxiliary Syntax]]
   - [[#sigma-type][Sigma Type]]
   - [[#with-notation-do-notation-with-explicit-monadic-bind][With Notation: do-Notation with Explicit Monadic Bind]]
   - [[#record][Record]]
   - [[#inductive-and-coinductive-types][Inductive and Coinductive types]]
-- [[#6-compiler-commands][6. Compiler Commands]]
+- [[#macro-expansion][Macro Expansion]]
+- [[#compiler-commands][Compiler Commands]]
   - [[#archive][archive]]
   - [[#build][build]]
   - [[#check][check]]
   - [[#complete][complete]]
-- [[#7-where-is-][7. Where is ...?]]
+- [[#where-is-][Where is ...?]]
   - [[#unsigned-integers][Unsigned Integers?]]
   - [[#typeclass][Typeclass?]]
   - [[#proof-related-stuff][Proof-Related Stuff?]]
   - [[#the-universe-hierarchy][The Universe Hierarchy?]]
-- [[#8-theoretical-notes][8. Theoretical Notes]]
+- [[#theoretical-notes][Theoretical Notes]]
   - [[#compile-time-memory-usage-determination][Compile-Time Memory Usage Determination]]
   - [[#box-modality-polarity-and-closure-conversion][Box Modality, Polarity, and Closure Conversion]]
   - [[#realizing-inductivecoinductive-types-within-coc-including-nested-mutual-or-higher-ones][Realizing Inductive/Coinductive Types within CoC (including nested, mutual, or higher ones)]]
   - [[#universe-hierarchy-and-the-weakly-normalizing-fragment][Universe Hierarchy and the Weakly-Normalizing Fragment]]
   - [[#unified-pattern-resolution-in-dependent-type-inference]["Unified" Pattern Resolution in Dependent Type Inference]]
   - [[#a-simple-implementation-of-mutually-recursive-functions][A Simple Implementation of Mutually-Recursive Functions]]
-- [[#9-contribution][9. Contribution]]
+- [[#contribution][Contribution]]
   - [[#to-implementation][To Implementation]]
   - [[#to-documentation][To Documentation]]
   - [[#to-theory][To Theory]]
-- [[#10-appendix][10. Appendix]]
+- [[#appendix][Appendix]]
   - [[#llvm-ir-for-the-first-example-print-without-borrowing][LLVM IR for the First Example (Print without Borrowing)]]
   - [[#llvm-ir-for-the-second-example-print-with-borrowing][LLVM IR for the Second Example (Print with Borrowing)]]
-- [[#11-references][11. References]]
+- [[#references][References]]
 
-* 1. Some (Hopefully) Illuminating Examples
+* Some (Hopefully) Illuminating Examples
 
 ** Type-Based malloc/free Determination
 Here I will firstly show an "inefficient" version of some code pieces. After that, I will show a more efficient version of the code, and compare resulting LLVM IR.
@@ -367,7 +369,7 @@ Although the compiler can cancel memory allocations/deallocations, it cannot can
 - Redundant malloc/free can be reduced by automatic malloc/free cancellation.
 - Borrowing-based, or "manually" optimized code is faster than cancellation-based, or "automatically" optimized code.
 
-* 2. Installation
+* Installation
 The currently supported platforms are: Linux (x64), macOS (x64).
 
 Make sure you have already installed [[https://docs.haskellstack.org/en/stable/README/][stack]] and [[https://clang.llvm.org/][clang]]. Then, clone the repository and build it:
@@ -380,7 +382,7 @@ Also make sure that you have =~/.local/bin= in your =$PATH=.
 
 To uninstall, you just have to remove =~/.local/bin/neut= and =~/.local/share/neut=; Neut won't clutter your system.
 
-* 3. Syntax and Semantics of Statements
+* Syntax and Semantics of Statements
 A program of Neut is a list of statements. Each statement is one of the following statements described in this section.
 
 # Every example in this section is a valid program in itself. You can [[#build][build]] and run the code to check the behavior.
@@ -644,9 +646,45 @@ The =var= must be a valid compile-time variable. Valid compile-time variables an
 | architecture          | x64             |
 
 ** keyword/notation
+The =keyword= statement registers a keyword for [[#notation][notation]].
 *** Example
+#+BEGIN_SRC scheme
+(keyword λ)
+
+(notation λ pi-introduction)
+#+END_SRC
 *** Syntax
+#+BEGIN_SRC scheme
+(keyword ID)
+#+END_SRC
 *** Semantics
+When parsed, the statement =(keyword x)= modifies the state of the compiler so that the =x= is treated as a keyword. This affects the result of [[#macro-expansion][macro expansion]] in the succeeding code.
+
+See [[#macroexpansion][the section on macro expansion]] for the details of keywords and notations.
+
+** notation
+The =notation= keyword registers a notation.
+*** Example
+#+BEGIN_SRC scheme
+(keyword λ)
+
+(notation λ pi-introduction)
+
+(keyword if)
+
+(notation (if b e1 e2)
+  (enum-elimination b
+    (bool.true e1)
+    (bool.false e2)))
+#+END_SRC
+*** Syntax
+#+BEGIN_SRC scheme
+(notation TREE TREE)
+#+END_SRC
+*** Semantics
+When parsed, the statement =(notation FROM TO)= modifies the state of the compiler so that the mapping =FROM ~> TO= is recognized as a notation. This affects the result of [[#macro-expansion][macro expansion]] in the succeeding code.
+
+See [[#macroexpansion][the section on macro expansion]] for the details of keywords and notations.
 
 ** use/unuse
 *** Example
@@ -663,7 +701,7 @@ The =var= must be a valid compile-time variable. Valid compile-time variables an
 *** Syntax
 *** Semantics
 
-* 4. Syntax and Semantics of Terms
+* Syntax and Semantics of Terms
 
 ** tau: The Type of Type
 
@@ -687,7 +725,7 @@ The =var= must be a valid compile-time variable. Valid compile-time variables an
 
 ** Struct
 
-* 5. Auxiliary Syntax
+* Auxiliary Syntax
 
 ** Sigma Type
 
@@ -698,8 +736,9 @@ The =var= must be a valid compile-time variable. Valid compile-time variables an
 ** Inductive and Coinductive types
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec eleifend tellus euismod erat accumsan, nec euismod sem placerat. Ut eu lacinia arcu, id imperdiet lacus. Integer feugiat lacus mattis, dictum nunc nec, interdum justo. Fusce sed dui id orci faucibus elementum. Vivamus sit amet sapien a lorem efficitur posuere suscipit in lacus. Praesent eget sagittis nisi, id vehicula elit. Vestibulum laoreet odio ex, a aliquet justo consectetur quis. Aenean laoreet vehicula libero id varius. Vivamus condimentum, sem sed sollicitudin placerat, nulla enim faucibus odio, gravida commodo velit mi ac sapien. Integer feugiat diam in lectus porttitor, sit amet viverra velit malesuada.
 
+* Macro Expansion
 
-* 6. Compiler Commands
+* Compiler Commands
 
 ** archive
 
@@ -709,7 +748,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec eleifend tellus e
 
 ** complete
 
-* 7. Where is ...?
+* Where is ...?
 
 ** Unsigned Integers?
 
@@ -719,7 +758,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec eleifend tellus e
 
 ** The Universe Hierarchy?
 
-* 8. Theoretical Notes
+* Theoretical Notes
 
 ** Compile-Time Memory Usage Determination
 (to be written later)
@@ -739,7 +778,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec eleifend tellus e
 ** A Simple Implementation of Mutually-Recursive Functions
 (to be written later)
 
-* 9. Contribution
+* Contribution
 
 ** To Implementation
 
@@ -747,7 +786,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec eleifend tellus e
 
 ** To Theory
 
-* 10. Appendix
+* Appendix
 
 ** LLVM IR for the First Example (Print without Borrowing)
 #+BEGIN_SRC llvm
@@ -852,6 +891,6 @@ define i64 @main() {
 }
 #+END_SRC
 
-* 11. References
+* References
 - L. de Moura, J. Avigad, S. Kong, and C. Roux, Elaboration in Dependent Type Theory, [[https://arxiv.org/abs/1505.04324]], 2015.
 - P. Levy, Call-by-Push-Value: A Subsuming Paradigm, Ph. D. thesis, Queen Mary College, 2001.
