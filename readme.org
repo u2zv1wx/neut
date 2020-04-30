@@ -569,7 +569,13 @@ Archives specified in =(ensure path "URL")= is intended to be ones created via t
 ID_INT := ID | (ID INT)
 #+END_SRC
 *** Semantics
-When parsed, a =(enum x a1 ... an)= statement updates the state of the compiler so that the specified enum-type =x : tau= and the enum-values =x.a1, ..., x.an : x= can be used in the succeeding code. Every enum-value has its internal i64 value (discriminant). Those discriminant value can be extracted by using the unsafe cast, though not recommended in ordinary use. Discriminant value starts from =0= by default, and increments one by one. The "current" value of this increment can be changed by writing, e.g. =(enum foo a (b 100) c d)=. In this example, the discriminant value of =c= is defined to be =101 (== 100 + 1)=. Every discriminant value must be distinct.
+When parsed, a =(enum x a1 ... an)= statement updates the state of the compiler so that the specified enum-type =x : tau= and the enum-values =x.a1, ..., x.an : x= can be used in the succeeding code.
+
+Every enum-value has its internal i64 value (discriminant). Those discriminant value can be extracted by using the unsafe cast, though not recommended in ordinary use.
+
+Discriminant value starts from =0= by default, and increments one by one. The "current" value of this process can be modified by writing, e.g. =(enum foo a (b 100) c d)=. In this example, the discriminant value of =c= is defined to be =101=.
+
+Every discriminant value must be distinct.
 
 ** include
 *** Example
