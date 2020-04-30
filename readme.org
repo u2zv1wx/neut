@@ -433,6 +433,8 @@ The =constant= statement declares an external constant.
 When evaluated, the =(constant x t)= statement modifies the state of the compiler so that a [[#constant][constant]] =x= of type =t= is available for later use. Declared constants can then be available for use as in the same way of ordinary [[#upsilon][variables]]. Every constant must have distinct names. This statement is currently intended for internal use, such as for implementation of syscalls. External constants (FFI) might also be supported in future release via this statement.
 
 ** define/let
+The =define=/=let= statement evaluates given term and binds the result to a variable.
+
 *** Example
 #+BEGIN_SRC scheme
 (let foo (i64 10)) ;; define a variable `foo` to be `10`
@@ -510,6 +512,8 @@ When parsed, n-mutual definitions (n >= 2) are also translated into appropriate 
 If user input is not parsed as a statement when it is supposed to be, the compiler firstly interpret it as a term =e=, and then processes a statement =(let _ e)=.
 
 ** ensure
+The =ensure= statement fetches the content of the specified URL for later use.
+
 *** Example
 #+BEGIN_SRC scheme
 ;; extracts the content of URL into ~/.local/share/neut/NEUT_VERSION/library/some-library/0.2.0.0
@@ -530,6 +534,7 @@ This statement is intended to be used in harmony with the [[#include][include]] 
 Archives specified in =(ensure path "URL")= is intended to be ones created via the [[#archive][archive]] subcommand.
 
 ** enum
+The =enum= statement declares a new enum-type and its values.
 *** Example
 #+BEGIN_SRC scheme
 (enum choice left right) ;; defines choice : tau, choice.left : choice, and choice.right : choice
@@ -575,7 +580,7 @@ Every enum-value has its internal i64 value (discriminant). Those discriminant v
 
 Discriminant value starts from =0= by default, and increments one by one. The "current" value of this process can be modified by writing, e.g. =(enum foo a (b 100) c d)=. In this example, the discriminant value of =c= is defined to be =101=.
 
-Every discriminant value must be distinct.
+The discriminant values of a enum-type must be distinct.
 
 ** include
 *** Example
