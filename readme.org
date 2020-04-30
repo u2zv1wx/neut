@@ -36,7 +36,6 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#inductivecoinductive][inductive/coinductive]]
   - [[#introspect][introspect]]
   - [[#keywordnotation][keyword/notation]]
-  - [[#notation][notation]]
   - [[#useunuse][use/unuse]]
   - [[#sectionend][section/end]]
   - [[#verify][verify]]
@@ -646,24 +645,7 @@ The =var= must be a valid compile-time variable. Valid compile-time variables an
 | architecture          | x64             |
 
 ** keyword/notation
-The =keyword= statement registers a keyword for [[#notation][notation]].
-*** Example
-#+BEGIN_SRC scheme
-(keyword λ)
-
-(notation λ pi-introduction)
-#+END_SRC
-*** Syntax
-#+BEGIN_SRC scheme
-(keyword ID)
-#+END_SRC
-*** Semantics
-When parsed, the statement =(keyword x)= modifies the state of the compiler so that the =x= is treated as a keyword. This affects the result of [[#macro-expansion][macro expansion]] in the succeeding code.
-
-See [[#macroexpansion][the section on macro expansion]] for the details of keywords and notations.
-
-** notation
-The =notation= keyword registers a notation.
+The =keyword= statement registers a keyword for notation. The =notation= statement registers a notation.
 *** Example
 #+BEGIN_SRC scheme
 (keyword λ)
@@ -679,9 +661,13 @@ The =notation= keyword registers a notation.
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC scheme
+(keyword LEAF)
+
 (notation TREE TREE)
 #+END_SRC
 *** Semantics
+When parsed, the statement =(keyword x)= modifies the state of the compiler so that the =x= is treated as a keyword. This affects the result of [[#macro-expansion][macro expansion]] in the succeeding code.
+
 When parsed, the statement =(notation FROM TO)= modifies the state of the compiler so that the mapping =FROM ~> TO= is recognized as a notation. This affects the result of [[#macro-expansion][macro expansion]] in the succeeding code.
 
 See [[#macroexpansion][the section on macro expansion]] for the details of keywords and notations.
