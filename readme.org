@@ -53,7 +53,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#struct][struct]]
 - [[#auxiliary-syntax][Auxiliary Syntax]]
   - [[#hole][hole]]
-  - [[#sigma-type][Sigma Type]]
+  - [[#sigma][sigma]]
   - [[#with][with]]
   - [[#cocaserecord][cocase/record]]
 - [[#macro-expansion][Macro Expansion]]
@@ -1369,7 +1369,7 @@ If the type is not determined, the compiler raises an error; For example, the ty
 #+END_SRC
 since the =10= cannot be determined to be =i32=, =i16=, or =i64=, etc.
 
-** Sigma Type
+** sigma
 The =sigma= term is a term that represents the existential quantification.
 *** Example
 #+BEGIN_SRC scheme
