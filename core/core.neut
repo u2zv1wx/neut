@@ -8,6 +8,8 @@
 
 (include "bool.neut")
 
+(include "identity.neut")
+
 (include "list.neut")
 
 (include "coproduct.neut")
