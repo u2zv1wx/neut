@@ -49,7 +49,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#int][int]]
   - [[#float][float]]
   - [[#enum-1][enum]]
-  - [[#array][Array]]
+  - [[#array][array]]
   - [[#struct][Struct]]
 - [[#auxiliary-syntax][Auxiliary Syntax]]
   - [[#hole][hole]]
@@ -1237,10 +1237,57 @@ LEAF [where this LEAF is already defined to be an enum value]
   (cn en))
 ~> ei [where c = ci]
 #+END_SRC
-** Array
+** array
+The =array= term represents array in LLVM.
 *** Example
+#+BEGIN_SRC scheme
+(let xs
+  (array-introduction i64 1 2 -30 20))
+
+;; float array
+(let _
+  (array-introduction f16 3.28 2.14 2.0 9.82))
+
+(let k
+  (with let-bind
+    (let a (i64.array-access 0 hole &xs))
+    (let b (i64.array-access 1 4 &xs))
+    (let c (i64.array-access 2 4 &xs))
+    (let d (i64.array-access 3 hole &xs))
+    (erase xs)
+    (i64.add a (i64.add b (i64.add c d)))))
+
+(i64.print k) ;; -7
+#+END_SRC
 *** Syntax
+#+BEGIN_SRC text
+;; the array type
+(array TREE LOWTYPE)
+
+(array-introduction LOWTYPE TREE ... TREE)
+
+(array-elimination LOWTYPE (LEAFPLUS ... LEAFPLUS) TREE TREE)
+
+LOWTYPE ::= i{n} | f{n}
+
+LEAFPLUS ::= LEAF | (LEAF TREE)
+#+END_SRC
 *** Semantics
+#+BEGIN_SRC neut
+(array-elimination _ (x1 ... xn) (array-introduction _ e1 ... en) e)
+~> e {x1 := e1,
+      ...,
+      xn := en}
+#+END_SRC
+*** Notes
+The type of elements of an array must be the integer type, or the float type.
+
+The memory layout of an array is the same as the one of LLVM; For example, an array of type =i8= is aligned as in the array =[0 x i8]= in LLVM.
+
+The array type can be used, for example, to implement strings.
+
+In the actual code, you won't use =array-elimination=. Rather, you would use the constant =array-access=.
+
 ** Struct
 *** Example
 *** Syntax
