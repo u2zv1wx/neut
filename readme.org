@@ -46,13 +46,13 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#pi][pi]]
   - [[#fix][fix]]
   - [[#constant-1][constant]]
-  - [[#hole][hole]]
-  - [[#int][Int]]
+  - [[#int][int]]
   - [[#float][Float]]
   - [[#enum-1][Enum]]
   - [[#array][Array]]
   - [[#struct][Struct]]
 - [[#auxiliary-syntax][Auxiliary Syntax]]
+  - [[#hole][hole]]
   - [[#sigma-type][Sigma Type]]
   - [[#with-notation-do-notation-with-explicit-monadic-bind][With Notation: do-Notation with Explicit Monadic Bind]]
   - [[#record][Record]]
@@ -1151,17 +1151,40 @@ LEAFPLUS ::= LEAF | (LEAF TREE)
       self := (fix self ((x1 A1) ... (xn An)) e)}
 #+END_SRC
 ** constant
+The =constant= rule is for external constants. Proof-theoretically, this can be understood as admitted axioms.
 *** Example
+#+BEGIN_SRC scheme
+(constant os.fork)
+#+END_SRC
 *** Syntax
+#+BEGIN_SRC scheme
+(constant LEAF)
+LEAF
+#+END_SRC
 *** Semantics
-** hole
+The =constant= rule doesn't have any operational semantics by itself; Each constant has its own dedicated semantics.
+*** Notes
+If a leaf is declared to be a constant using the [[#constant][constant]] statement, the leaf is parsed as =(constant LEAF)=.
+
+** int
+The =int= term is the one that represents the integer type in LLVM.
 *** Example
+#+BEGIN_SRC scheme
+(i64 1)
+(i32 10)
+(i2 100)
+#+END_SRC
 *** Syntax
+#+BEGIN_SRC scheme
+(i64 10)
+#+END_SRC
 *** Semantics
-** Int
-*** Example
-*** Syntax
-*** Semantics
+The terms of integer type doesn't have any operational semantics.
+*** Notes
+The =int= type in Neut is the same as the one of LLVM, restricted into =i1=, =i2=, ..., =i64=.
+
+If the specified integer literal is out of range of its type =i{n}=, the integer is interpreted modulo =2^n=, just as in the same way of LLVM. For example, =(i2 10)= is the same as =(i2 6)=, =(i2 2)=, =(i2 -2)=, or =(i2 -6)=, since all of these are equivalent modulo =2^2=.
+
 ** Float
 *** Example
 *** Syntax
@@ -1179,6 +1202,10 @@ LEAFPLUS ::= LEAF | (LEAF TREE)
 *** Syntax
 *** Semantics
 * Auxiliary Syntax
+** hole
+*** Example
+*** Syntax
+*** Semantics
 
 ** Sigma Type
 
