@@ -48,7 +48,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#constant-1][constant]]
   - [[#int][int]]
   - [[#float][float]]
-  - [[#enum-1][Enum]]
+  - [[#enum-1][enum]]
   - [[#array][Array]]
   - [[#struct][Struct]]
 - [[#auxiliary-syntax][Auxiliary Syntax]]
@@ -1220,10 +1220,23 @@ The =float= type in Neut is the same as the one of LLVM. Specifically, LLVM's =h
 
 An float without explicit type information is overloaded; it's type is firstly set to be unknown, and then inferred.
 
-** Enum
+** enum
+The =enum= term represents enumeration as in other language.
 *** Example
+See the example in [[#enum][the section about the enum statement]].
 *** Syntax
+#+BEGIN_SRC scheme
+(enum-introduction LEAF)
+LEAF [where this LEAF is already defined to be an enum value]
+#+END_SRC
 *** Semantics
+#+BEGIN_SRC scheme
+(enum-elimination (enum-introduction c)
+  (c1 e1)
+  ...
+  (cn en))
+~> ei [where c = ci]
+#+END_SRC
 ** Array
 *** Example
 *** Syntax
