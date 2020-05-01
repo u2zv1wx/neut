@@ -1369,6 +1369,59 @@ If the type is not determined, the compiler raises an error; For example, the ty
 since the =10= cannot be determined to be =i32=, =i16=, or =i64=, etc.
 
 ** Sigma Type
+The =sigma= term is a term that represents the existential quantification.
+*** Example
+#+BEGIN_SRC scheme
+;; binary sigma-intro without dependence
+(let pair
+  (sigma-introduction (i64 2) (lambda ((x tau)) x)))
+
+;; binary sigma-elim without dependence
+(sigma-elimination (x _) pair
+  (i64.print x))
+
+(let n-pair
+  (sigma-introduction (i64 1) (lambda ((x tau)) x) (f32 10.82) top.unit top.unit top tau))
+
+(let 0-pair
+  (sigma-introduction)
+#+END_SRC
+*** Syntax
+#+BEGIN_SRC scheme
+(sigma ((x1 A1) ... (xn An)) B)
+
+(sigma-introduction e1 ... en)
+
+(sigma-elimination (LEAFPLUS ... LEAFPLUS) e1 e2)
+
+LEAFPLUS ::= LEAF | (LEAF TREE)
+#+END_SRC
+*** Semantics
+#+BEGIN_SRC text
+(sigma ((x1 A1) ... (xn An)) B)
+~> (pi ((Z tau)
+        (_ (pi ((x1 A1) ... (xn An) (_ B)) Z)))
+       Z))
+
+(sigma-introduction e1 ... en)
+~> (pi-introduction
+     ((Z tau)
+      (k (pi ((x1 hole) ... (xn hole)) Z)))
+     (k e1 ... en))
+
+(sigma-elimination ((x1 A1) ... (xn An)) e1 e2)
+~> (e1 hole (lambda ((x1 A1) ... (xn An)) e2))
+#+END_SRC
+*** Notes
+The sigma-type is just a convenient notation of certain pattern of use of pi-type; This encoding is the ordinary one in CoC.
+
+Sigma-type with dependence can be used, for example, to realize the type of string as follows:
+#+BEGIN_SRC text
+(define string
+  (sigma ((len i64)) (array len i8)))
+#+END_SRC
+
+A sigma-type without dependence is the familiar product type; =(sigma ((_ A1) ... (_ An)) B)= is =(product A1 ... An B)=.
 
 ** With Notation: do-Notation with Explicit Monadic Bind
 
