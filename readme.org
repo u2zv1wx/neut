@@ -1072,7 +1072,7 @@ If a node =(e e1 ... en)= is not parsed into any other terms, the node is parsed
 
 Note that the arguments of a lambda abstraction is generalized from unary to n-ary. This enables the compiler to emit more performant code when a lambda abstraction receives multiple arguments; Without that generalization, the argument must be represented as a tuple, discarding the possibility to pass the arguments of a function using multiple registers.
 
-Some additional notations for pi is defined by default:
+Some additional notations for pi are defined by default:
 #+BEGIN_SRC scheme
 (keyword forall)
 
