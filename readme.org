@@ -1663,15 +1663,15 @@ An example output of this subcommand is as follows:
 #+END_SRC
 This subcommand is intended to be used with a completion engine like [[https://company-mode.github.io/][company-mode]].
 
-* Where is ...?
+# * Where is ...?
 
-** Unsigned Integers?
+# ** Unsigned Integers?
 
-** Typeclass?
+# ** Typeclass?
 
-** Proof-Related Stuff?
+# ** Proof-Related Stuff?
 
-** The Universe Hierarchy?
+# ** The Universe Hierarchy?
 
 * Theoretical Notes
 
