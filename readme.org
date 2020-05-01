@@ -50,7 +50,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#float][float]]
   - [[#enum-1][enum]]
   - [[#array][array]]
-  - [[#struct][Struct]]
+  - [[#struct][struct]]
 - [[#auxiliary-syntax][Auxiliary Syntax]]
   - [[#hole][hole]]
   - [[#sigma-type][Sigma Type]]
@@ -1238,7 +1238,7 @@ LEAF [where this LEAF is already defined to be an enum value]
 ~> ei [where c = ci]
 #+END_SRC
 ** array
-The =array= term represents array in LLVM.
+The =array= term represents the array in LLVM.
 *** Example
 #+BEGIN_SRC scheme
 ;; float array
@@ -1290,12 +1290,54 @@ The memory layout of an array is the same as the one of LLVM; For example, an ar
 
 The array type can be used, for example, to implement strings.
 
-You won't use =array-elimination= in the actual code; You would use the constant =array-access= instead.
+You won't use =array-elimination= in actual code; You would use the constant =array-access= instead.
 
-** Struct
+** struct
+The =array= term represents the struct in LLVM.
 *** Example
+#+BEGIN_SRC scheme
+(let st
+  (struct-introduction
+    (f16 3.8)
+    (i8 8)
+    (i16 -300)
+    (f32 33.0)
+    (i64 30)
+    (i64 10)
+    (f64 -329444.4444444)
+    (i8 9)))
+
+(i64.print
+  (struct-elimination
+    ((_ f16) (_ i8) (_ i16) (_ f32) (z i64) (w i64) (_ f64) (_ i8))
+    st
+    (i64.add z w))) ;; ~> 40
+#+END_SRC
 *** Syntax
+#+BEGIN_SRC scheme
+;; the struct type
+(struct LOWTYPE ... LOWTYPE)
+
+(struct-introduction (LOWTYPE TREE) ... (LOWTYPE TREE))
+
+(struct-elimination ((LEAF LOWTYPE) ... (LEAF LOWTYPE)) TREE TREE)
+
+LOWTYPE ::= i{n} | f{n}
+#+END_SRC
 *** Semantics
+#+BEGIN_SRC text
+(struct-elimination (x1 _) ... (xn _) (struct-introduction (_ e1) ... (_ en)) e)
+~> e {x1 := e1,
+      ...,
+      xn := en}
+#+END_SRC
+*** Notes
+The type of elements of a struct must be the integer type, or the float type.
+
+The memory layout of a struct is the same as the one of LLVM; For example, a struct of type =(struct i8 f16 i32)= is aligned as in a struct of type ={i8, f16, f32}= in LLVM.
+
+The struct type is intended to be used for implementation of interfaces of syscalls.
+
 * Auxiliary Syntax
 ** hole
 *** Example
