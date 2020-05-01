@@ -14,6 +14,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
 - A compiled language
 - The output is [[https://llvm.org/docs/LangRef.html][LLVM IR]] / assembly / object binary (the last two are via clang)
 - The type system is CoC + recursion + int + float + enum + array + struct
+- The type inference algorithm is based on [[https://arxiv.org/abs/1505.04324][the one of Lean]]
 - The evaluation strategy is call-by-value
 - Every tail call is optimized into a loop
 - The memory management is statically determined at compile time (Can be optimized via borrowing and linearity)
