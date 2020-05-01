@@ -71,7 +71,6 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#a-simple-implementation-of-mutually-recursive-functions][A Simple Implementation of Mutually-Recursive Functions]]
 - [[#appendix][Appendix]]
   - [[#llvm-ir-for-the-first-example][LLVM IR for the First Example]]
-- [[#references][References]]
 
 * Some (Hopefully) Illuminating Examples
 
@@ -1802,7 +1801,3 @@ define i64 @main() {
   ret i64 %_11921
 }
 #+END_SRC
-
-* References
-- L. de Moura, J. Avigad, S. Kong, and C. Roux, Elaboration in Dependent Type Theory, [[https://arxiv.org/abs/1505.04324]], 2015.
-- P. Levy, Call-by-Push-Value: A Subsuming Paradigm, Ph. D. thesis, Queen Mary College, 2001.
