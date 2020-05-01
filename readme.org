@@ -714,26 +714,26 @@ The =coinductive= statement defines a coinductive type, its elimination rules, a
 *** Syntax
 #+BEGIN_SRC scheme
 (coinductive LEAF ((LEAF TREE) ... (LEAF TREE))
-  (LEAF ((LEAF TREE) ... (LEAF TREE))
+  (LEAF ((LEAF TREE))
     TREE)
   ...
-  (LEAF ((LEAF TREE) ... (LEAF TREE))
+  (LEAF ((LEAF TREE))
     TREE))
 
 ;; n-mutual coinductive type
 (coinductive
   (LEAF ((LEAF TREE) ... (LEAF TREE))
-    (LEAF ((LEAF TREE) ... (LEAF TREE))
+    (LEAF ((LEAF TREE))
       TREE)
     ...
-    (LEAF ((LEAF TREE) ... (LEAF TREE))
+    (LEAF ((LEAF TREE))
       TREE))
   ...
   (LEAF ((LEAF TREE) ... (LEAF TREE))
-    (LEAF ((LEAF TREE) ... (LEAF TREE))
+    (LEAF ((LEAF TREE))
       TREE)
     ...
-    (LEAF ((LEAF TREE) ... (LEAF TREE))
+    (LEAF ((LEAF TREE))
       TREE)))
 #+END_SRC
 *** Semantics
