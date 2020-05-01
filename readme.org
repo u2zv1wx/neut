@@ -3,7 +3,7 @@ Neut is a dependently-typed programming language based on [[https://en.wikipedia
 
 - explicit malloc/free,
 - garbage collection,
-- or region-based memory management.
+- region-based memory management.
 
 Theoretically, this is made possible by translating the source language into a dependent-and-linear variant of [[https://www.cs.bham.ac.uk/~pbl/papers/thesisqmwphd.pdf][Call-by-Push-Value]]. The crucial point of the translation is to see that knowing the type of a term is knowning how to eta-expand the term, which in turn means knowing how to copy/discard the term. In the translation, a type is not erased, but *translated into a computationally-meaningful term that copies/discards the terms of the type*. Those who are interested in these theoretical things can find further details in the [[#theoretical-notes][section about the theory of Neut]].
 
@@ -70,10 +70,6 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#universe-hierarchy-and-the-weakly-normalizing-fragment][Universe Hierarchy and the Weakly-Normalizing Fragment]]
   - [[#unified-pattern-resolution-in-dependent-type-inference]["Unified" Pattern Resolution in Dependent Type Inference]]
   - [[#a-simple-implementation-of-mutually-recursive-functions][A Simple Implementation of Mutually-Recursive Functions]]
-- [[#contribution][Contribution]]
-  - [[#to-implementation][To Implementation]]
-  - [[#to-documentation][To Documentation]]
-  - [[#to-theory][To Theory]]
 - [[#appendix][Appendix]]
   - [[#llvm-ir-for-the-first-example-print-without-borrowing][LLVM IR for the First Example (Print without Borrowing)]]
   - [[#llvm-ir-for-the-second-example-print-with-borrowing][LLVM IR for the Second Example (Print with Borrowing)]]
@@ -1658,6 +1654,16 @@ An example output of this subcommand is as follows:
 #+END_SRC
 This subcommand is intended to be used with a completion engine like [[https://company-mode.github.io/][company-mode]].
 
+# * Where is ...?
+
+# ** Unsigned Integers?
+
+# ** Typeclass?
+
+# ** Proof-Related Stuff?
+
+# ** The Universe Hierarchy?
+
 * Theoretical Notes
 
 ** Compile-Time Memory Usage Determination
@@ -1678,13 +1684,13 @@ This subcommand is intended to be used with a completion engine like [[https://c
 ** A Simple Implementation of Mutually-Recursive Functions
 (to be written later)
 
-* Contribution
+# * Contribution
 
-** To Implementation
+# ** To Implementation
 
-** To Documentation
+# ** To Documentation
 
-** To Theory
+# ** To Theory
 
 * Appendix
 
