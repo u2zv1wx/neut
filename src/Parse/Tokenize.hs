@@ -31,8 +31,8 @@ tokenize input = do
   let env = TEnv {text = input, line = 1, column = 1, filePath = path}
   resultOrError <- liftIO $ try $ runStateT (skip' >> program []) env
   case resultOrError of
-    Left (Error err) ->
-      throw $ Error err
+    Left (err :: Error) ->
+      throw err
     Right (result, _) ->
       return result
 
@@ -280,4 +280,4 @@ incrementColumn =
 raiseTokenizeError :: T.Text -> Tokenizer a
 raiseTokenizeError txt = do
   m <- currentMeta
-  throw $ Error [logError (getPosInfo m) txt]
+  throw $ ErrorRight [logError (getPosInfo m) txt]

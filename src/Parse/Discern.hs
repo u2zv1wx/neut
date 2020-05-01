@@ -7,11 +7,13 @@ module Parse.Discern
   )
 where
 
+import Control.Exception.Safe
 import Control.Monad.State.Lazy
 import Data.EnumCase
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import Data.Ident
+import Data.List (sort)
 import Data.Meta
 import Data.Namespace
 import qualified Data.Set as S
@@ -64,8 +66,13 @@ discern' nenv term =
                   case mc of
                     Just c ->
                       return (m, WeakTermConst c)
-                    Nothing ->
-                      raiseError m $ "undefined variable: " <> asText x
+                    Nothing
+                      | s == "*cursor*" -> do
+                        let predicate = T.all (`S.notMember` S.fromList "()")
+                        let candList = map (\cand -> "\"" <> cand <> "\"") $ filter predicate $ Map.keys nenv
+                        throw $ ErrorLeft $ sort candList
+                      | otherwise ->
+                        raiseError m $ "undefined variable: " <> asText x
     (m, WeakTermPi mName xts t) -> do
       (xts', t') <- discernBinder nenv xts t
       return (m, WeakTermPi mName xts' t')

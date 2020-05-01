@@ -332,6 +332,7 @@ foobaraoaeuaeou日本語入力ホゲホゲ。このへんの色ってどうに�
 ;; (attribute unused-function
 ;;   (implicit 0))
 
+?list.fold
 
 ;; (provide unused-function)
 (?string.print "\n")

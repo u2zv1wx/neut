@@ -155,9 +155,14 @@ initialEnv =
       nopFreeSet = S.empty
     }
 
-newtype Error
-  = Error [Log]
+data Error
+  = ErrorLeft [T.Text]
+  | ErrorRight [Log]
   deriving (Show)
+
+-- newtype Error
+--   = Error [Log]
+--   deriving (Show)
 
 instance Exception Error
 
@@ -435,15 +440,15 @@ lowTypeToArrayKind m lowType =
 
 raiseError :: Meta -> T.Text -> WithEnv a
 raiseError m text =
-  throw $ Error [logError (getPosInfo m) text]
+  throw $ ErrorRight [logError (getPosInfo m) text]
 
 raiseCritical :: Meta -> T.Text -> WithEnv a
 raiseCritical m text =
-  throw $ Error [logCritical (getPosInfo m) text]
+  throw $ ErrorRight [logCritical (getPosInfo m) text]
 
 raiseCritical' :: T.Text -> WithEnv a
 raiseCritical' text =
-  throw $ Error [logCritical' text]
+  throw $ ErrorRight [logCritical' text]
 
 getCurrentFilePath :: WithEnv (Path Abs File)
 getCurrentFilePath = do

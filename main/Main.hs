@@ -9,6 +9,7 @@ import Data.ByteString.Builder
 import qualified Data.ByteString.Lazy as L
 import Data.Env
 import Data.Log
+import qualified Data.Text as T
 import Elaborate
 import Emit
 import GHC.IO.Handle
@@ -210,8 +211,10 @@ run cmd =
       mOutputPath <- mapM resolveFile' mOutputPathStr
       outputPath <- constructOutputPath basename mOutputPath outputKind
       case resultOrErr of
-        Left (Error err) ->
+        Left (ErrorRight err) ->
           seqIO (map (outputLog True "") err) >> exitWith (ExitFailure 1)
+        Left (ErrorLeft _) ->
+          exitWith (ExitFailure 1) -- shouldn't occur
         Right llvmIRBuilder -> do
           let llvmIR = toLazyByteString llvmIRBuilder
           case outputKind of
@@ -232,8 +235,10 @@ run cmd =
       case resultOrErr of
         Right _ ->
           return ()
-        Left (Error err) ->
+        Left (ErrorRight err) ->
           seqIO (map (outputLog colorizeFlag eoe) err) >> exitWith (ExitFailure 1)
+        Left (ErrorLeft _) ->
+          exitWith (ExitFailure 1) -- shouldn't occur
     Archive inputPathStr mOutputPathStr -> do
       inputPath <- resolveDir' inputPathStr
       contents <- listDirectory $ toFilePath inputPath
@@ -245,10 +250,19 @@ run cmd =
       resultOrErr <-
         evalWithEnv (complete inputPath l c) initialEnv
       case resultOrErr of
-        Left _ ->
+        Left (ErrorLeft candList) ->
+          mapM_ (putStrLn . T.unpack) candList
+        _ ->
           return ()
-        Right result ->
-          mapM_ putStrLn result
+
+--   case err of
+--     ErrorLeft candList ->
+--       mapM_ putStrLn candList
+--     _ ->
+--       return ()
+
+-- Right result ->
+--   mapM_ putStrLn result
 
 constructOutputPath :: Path Rel File -> Maybe (Path Abs File) -> OutputKind -> IO (Path Abs File)
 constructOutputPath basename mPath kind =

@@ -178,7 +178,7 @@ throwTypeErrors = do
   q <- gets constraintQueue
   let pcs = sortOn fst $ nub $ setupPosInfo $ Q.toList q
   errorList <- constructErrors [] pcs
-  throw $ Error errorList
+  throw $ ErrorRight errorList
 
 setupPosInfo :: [EnrichedConstraint] -> [(PosInfo, PreConstraint)]
 setupPosInfo constraintList =

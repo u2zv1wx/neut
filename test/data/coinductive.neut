@@ -18,6 +18,8 @@
   (case x
     ((stream.unfold _ h _ v) (h v))))
 
+?stream.unfold
+
 (attribute stream.head (implicit 0))
 
 (define stream.tail ((A tau) (x (stream A)))
