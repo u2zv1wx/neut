@@ -6,11 +6,11 @@
 ;; (ensure libarchive/3.4.2
 ;;   "https.//www.libarchive.org/downloads/libarchive-3.4.2.tar.gz")
 
-(include "notation.neut")
+(include library "core/notation.neut")
 
-(include "option.neut")
+(include library "core/option.neut")
 
-(include "bool.neut")
+(include library "core/bool.neut")
 
 (use option)
 

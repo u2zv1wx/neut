@@ -1,21 +1,21 @@
 (no-implicit-core)
 
-(include "foundation.neut")
+(include library "core/foundation.neut")
 
-(include "base.neut")
+(include library "core/base.neut")
 
-(include "top.neut")
+(include library "core/top.neut")
 
-(include "bool.neut")
+(include library "core/bool.neut")
 
-(include "identity.neut")
+(include library "core/identity.neut")
 
-(include "list.neut")
+(include library "core/list.neut")
 
-(include "coproduct.neut")
+(include library "core/coproduct.neut")
 
-(include "option.neut")
+(include library "core/option.neut")
 
-(include "string.neut")
+(include library "core/string.neut")
 
-(include "integer.neut")
+(include library "core/integer.neut")

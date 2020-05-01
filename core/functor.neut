@@ -1,7 +1,7 @@
 (no-implicit-core)
 
 ;; (include library "core/foundation.neut")
-(include "notation.neut")
+(include library "core/notation.neut")
 
 ;; (coinductive
 ;;   (foo ((f (hom tau tau)))

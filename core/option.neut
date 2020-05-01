@@ -1,10 +1,10 @@
 (no-implicit-core)
 
-(include "foundation.neut")
+(include library "core/foundation.neut")
 
-(include "functor.neut")
+(include library "core/functor.neut")
 
-(include "monad.neut")
+(include library "core/monad.neut")
 
 (section option)
 

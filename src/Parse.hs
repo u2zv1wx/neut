@@ -320,6 +320,8 @@ includeFile m mPath pathString computeDirPath as = do
   path <- readStrOrThrow mPath' pathString
   dirPath <- computeDirPath
   newPath <- resolveFile dirPath path
+  p "newPath:"
+  p' newPath
   ensureFileExistence m' newPath
   denv <- gets fileEnv
   case Map.lookup newPath denv of

@@ -1,4 +1,8 @@
+(no-implicit-core)
+
 (include library "core/functor.neut")
+
+(include library "core/monad.neut")
 
 (use top)
 
