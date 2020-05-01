@@ -63,11 +63,6 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#build][build]]
   - [[#check][check]]
   - [[#complete][complete]]
-- [[#where-is-][Where is ...?]]
-  - [[#unsigned-integers][Unsigned Integers?]]
-  - [[#typeclass][Typeclass?]]
-  - [[#proof-related-stuff][Proof-Related Stuff?]]
-  - [[#the-universe-hierarchy][The Universe Hierarchy?]]
 - [[#theoretical-notes][Theoretical Notes]]
   - [[#compile-time-memory-usage-determination][Compile-Time Memory Usage Determination]]
   - [[#box-modality-polarity-and-closure-conversion][Box Modality, Polarity, and Closure Conversion]]
@@ -1662,16 +1657,6 @@ An example output of this subcommand is as follows:
 (...)
 #+END_SRC
 This subcommand is intended to be used with a completion engine like [[https://company-mode.github.io/][company-mode]].
-
-# * Where is ...?
-
-# ** Unsigned Integers?
-
-# ** Typeclass?
-
-# ** Proof-Related Stuff?
-
-# ** The Universe Hierarchy?
 
 * Theoretical Notes
 
