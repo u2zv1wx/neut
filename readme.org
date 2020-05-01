@@ -1067,7 +1067,9 @@ The =pi= term is a term that represents the universal quantification.
 ~> (pi-elimination v v1 ... vn)  [i.e. reduce e and ei to values v and vi, from left to right]
 
 (pi-elimination (pi-introduction ((x1 A1) ... (xn An)) e) v1 ... vn)
-~> e {x1 := v1, ..., xn := vn}
+~> e {x1 := v1,
+      ...,
+      xn := vn}
 #+END_SRC
 *** Notes
 If a tree =(e e1 ... en)= is not parsed into any other terms, the tree is parsed as =(pi-elimination e e1 ... en)=.
@@ -1136,12 +1138,17 @@ The =fix= term is a term that realizes recursion.
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC scheme
-(fix LEAF ((LEAF TREE) ... (LEAF TREE)) TREE)
+(fix LEAFPLUS (LEAFPLUS ... LEAFPLUS) TREE)
+
+LEAFPLUS ::= LEAF | (LEAF TREE)
 #+END_SRC
 *** Semantics
 #+BEGIN_SRC scheme
 (pi-elimination (fix self ((x1 A1) ... (xn An)) e) v1 ... vn)
-~> e {x1 := v1, ..., xn := vn, self := (fix self ((x1 A1) ... (xn An)) e)}
+~> e {x1 := v1,
+      ...,
+      xn := vn,
+      self := (fix self ((x1 A1) ... (xn An)) e)}
 #+END_SRC
 ** constant
 *** Example
