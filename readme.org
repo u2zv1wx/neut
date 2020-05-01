@@ -47,7 +47,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#fix][fix]]
   - [[#constant-1][constant]]
   - [[#int][int]]
-  - [[#float][Float]]
+  - [[#float][float]]
   - [[#enum-1][Enum]]
   - [[#array][Array]]
   - [[#struct][Struct]]
@@ -1194,7 +1194,7 @@ If the specified integer literal is out of range of its type =i{n}=, the integer
 
 An integer without explicit type information is overloaded; it's type is firstly set to be unknown, and then inferred.
 
-** Float
+** float
 The =float= term is the one that represents the float type in LLVM.
 *** Example
 #+BEGIN_SRC scheme
