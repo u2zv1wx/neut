@@ -1176,22 +1176,50 @@ The =int= term is the one that represents the integer type in LLVM.
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC scheme
+;; the integer type i{n}
+i{n} [where n is one of 1, 2, ..., 64]
+
+;; an integer of type i{n}
 (i{n} LEAF)  [where n is one of 1, 2, ..., 64]
+
+;; an integer without explicit type info
 LEAF [where this LEAF can be parsed as integer]
 #+END_SRC
 *** Semantics
-The terms of integer type doesn't have any operational semantics.
+The terms of an integer type doesn't have any operational semantics.
 *** Notes
 The =int= type in Neut is the same as the one of LLVM, restricted into =i1=, =i2=, ..., =i64=.
 
 If the specified integer literal is out of range of its type =i{n}=, the integer is interpreted modulo =2^n=, just as in the same way of LLVM. For example, =(i2 10)= is the same as =(i2 6)=, =(i2 2)=, =(i2 -2)=, or =(i2 -6)=, since all of these are equivalent modulo =2^2=.
 
-An integer term without explicit type information is overloaded;
+An integer without explicit type information is overloaded; it's type is firstly set to be unknown, and then inferred.
 
 ** Float
+The =float= term is the one that represents the float type in LLVM.
 *** Example
+#+BEGIN_SRC scheme
+(f16 3.8)
+(f32 9.22888)
+(f64 1.23456789)
+(fadd-f64 1.23456 7.89)
+#+END_SRC
 *** Syntax
+#+BEGIN_SRC scheme
+;; the float type f{n}
+f{n}   [where n is one of 16, 32, 64]
+
+;; a float of type f{n}
+(f{n} LEAF) [where n is one of 16, 32, 64]
+
+LEAF [where this LEAF can be parsed as float]
+#+END_SRC
 *** Semantics
+The terms of a float type doesn't have any operational semantics.
+*** Notes
+The =float= type in Neut is the same as the one of LLVM. Specifically, LLVM's =half= corresponds to Neut's =f16=, =float= to =f32=, and =double= to =f64=.
+
+An float without explicit type information is overloaded; it's type is firstly set to be unknown, and then inferred.
+
 ** Enum
 *** Example
 *** Syntax
