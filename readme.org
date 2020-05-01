@@ -1241,23 +1241,27 @@ LEAF [where this LEAF is already defined to be an enum value]
 The =array= term represents array in LLVM.
 *** Example
 #+BEGIN_SRC scheme
-(let xs
-  (array-introduction i64 1 2 -30 20))
-
 ;; float array
 (let _
   (array-introduction f16 3.28 2.14 2.0 9.82))
 
+(let xs
+  (array-introduction i64 1 2 -30 20))
+
 (let k
-  (with let-bind
-    (let a (i64.array-access 0 hole &xs))
+  (with identity.bind
+    (let a (i64.array-access 0 4 &xs))
     (let b (i64.array-access 1 4 &xs))
     (let c (i64.array-access 2 4 &xs))
-    (let d (i64.array-access 3 hole &xs))
+    (let d (i64.array-access 3 4 &xs))
     (erase xs)
     (i64.add a (i64.add b (i64.add c d)))))
 
 (i64.print k) ;; -7
+
+(i64.print
+  (array-elimination i64 (a b c d) xs
+    (i64.add a (i64.add b (i64.add c d))))) ;; -7
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC text
