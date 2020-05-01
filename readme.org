@@ -1290,7 +1290,7 @@ The memory layout of an array is the same as the one of LLVM; For example, an ar
 
 The array type can be used, for example, to implement strings.
 
-In the actual code, you won't use =array-elimination=. Rather, you would use the constant =array-access=.
+You won't use =array-elimination= in the actual code; You would use the constant =array-access=.
 
 ** Struct
 *** Example
