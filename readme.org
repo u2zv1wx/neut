@@ -637,7 +637,7 @@ The =inductive= statement defines an inductive type, its introduction rules, and
     ((list.cons _ ys)
       (add-i64 1 (length a ys)))))
 
-(let (xs (list i64)) (list.cons 10 (list.cons 20 (list.nil)))
+(let (xs (list i64)) (list.cons 10 (list.cons 20 (list.nil))))
 
 (i64.print (length xs)) ;; ~> 2
 #+END_SRC
@@ -1027,8 +1027,46 @@ If a leaf is not parsed into any other syntactic construct, the leaf is consider
 ** pi
 The =pi= term is a term that represents the universal quantification.
 *** Example
+#+BEGIN_SRC scheme
+;; unary pi-introduction
+(let (f2 (pi (x i64) i64))  ;; f2 : Pi (x : i64). i64  (i.e. f2 receives a term of type i64, and returns a term of type i64)
+  (pi-introduction ((x i64)) x))
+
+;; "explicit" pi-elimination
+(pi-elimination i64.print (pi-elimination f2 2))
+
+;; "automatic" pi-elimination
+(i64.print (f2 2))
+
+;; nullary pi-introduction
+(let (f1 (pi () i64))
+  (lambda () (i64 1))) ;; 'lambda' can be used instead of 'pi-introduction'
+
+;; "explicit" pi-elimination
+(pi-elimination i64.print (pi-elimination f1))
+
+;; "automatic" pi-elimination
+(i64.print (f1))
+
+;; binary pi-introduction
+(let f3
+  (lambda ((x i64) (y i64)) (i64.add x y)))
+
+(i64.print (f3 1 2))
+#+END_SRC
 *** Syntax
+#+BEGIN_SRC scheme
+(pi ((x1 A1) ... (xn An)) B)
+(pi-introduction ((x1 A1) ... (xn An)) e)
+(pi-elimination e e1 ... en)
+(e e1 ... en)
+#+END_SRC
 *** Semantics
+#+BEGIN_SRC scheme
+(pi-elimination (pi-introduction ((x1 A1) ... (xn An)) e) e1 ... en)
+~> e {x1 := e1, ..., xn := en}
+#+END_SRC
+*** Notes
 
 ** fix
 *** Example
