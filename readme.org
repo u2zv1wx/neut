@@ -5,7 +5,8 @@ Neut is a dependently-typed programming language based on [[https://en.wikipedia
 - garbage collection,
 - region-based memory management.
 
-Theoretically, this is made possible by translating the source language into a dependent-and-linear variant of [[https://www.cs.bham.ac.uk/~pbl/papers/thesisqmwphd.pdf][Call-by-Push-Value]]. The crucial point of the translation is to see that knowing the type of a term is knowning how to eta-expand the term, which in turn means knowing how to copy/discard the term. In the translation, a type is not erased, but *translated into a computationally-meaningful term that copies/discards the terms of the type*. Those who are interested in these theoretical things can find further details in the [[#theoretical-notes][section about the theory of Neut]].
+Theoretically, this is made possible by translating the source language into a dependent-and-linear variant of [[https://www.cs.bham.ac.uk/~pbl/papers/thesisqmwphd.pdf][Call-by-Push-Value]]. The crucial point of the translation is to see that knowing the type of a term is knowning how to eta-expand the term, which in turn means knowing how to copy/discard the term. In the translation, a type is not erased, but *translated into a computationally-meaningful term that copies/discards the terms of the type*.
+# Those who are interested in these theoretical things can find further details in the [[#theoretical-notes][section about the theory of Neut]].
 
 Practically, this means that you can write your program in the ordinary lambda calculus without any extra restrictions/annotations, and at the same time are allowed to pursue performance in the language via e.g. borrowing or linearity. The source code doesn't need esoteric annotations for the compiler to infer how to use resources. Nor does the world stop all of a sudden by GC. You have full control over resource allocation.
 
@@ -63,13 +64,6 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#build][build]]
   - [[#check][check]]
   - [[#complete][complete]]
-- [[#theoretical-notes][Theoretical Notes]]
-  - [[#compile-time-memory-usage-determination][Compile-Time Memory Usage Determination]]
-  - [[#box-modality-polarity-and-closure-conversion][Box Modality, Polarity, and Closure Conversion]]
-  - [[#realizing-inductivecoinductive-types-within-coc-including-nested-mutual-or-higher-ones][Realizing Inductive/Coinductive Types within CoC (including nested, mutual, or higher ones)]]
-  - [[#universe-hierarchy-and-the-weakly-normalizing-fragment][Universe Hierarchy and the Weakly-Normalizing Fragment]]
-  - [[#unified-pattern-resolution-in-dependent-type-inference]["Unified" Pattern Resolution in Dependent Type Inference]]
-  - [[#a-simple-implementation-of-mutually-recursive-functions][A Simple Implementation of Mutually-Recursive Functions]]
 - [[#appendix][Appendix]]
   - [[#llvm-ir-for-the-first-example][LLVM IR for the First Example]]
 
@@ -1694,25 +1688,25 @@ This subcommand is intended to be used with a completion engine like [[https://c
 
 # ** The Universe Hierarchy?
 
-* Theoretical Notes
+# * Theoretical Notes
 
-** Compile-Time Memory Usage Determination
-(to be written later)
+# ** Compile-Time Memory Usage Determination
+# (to be written later)
 
-** Box Modality, Polarity, and Closure Conversion
-(to be written later)
+# ** Box Modality, Polarity, and Closure Conversion
+# (to be written later)
 
-** Realizing Inductive/Coinductive Types within CoC (including nested, mutual, or higher ones)
-(to be written later)
+# ** Realizing Inductive/Coinductive Types within CoC (including nested, mutual, or higher ones)
+# (to be written later)
 
-** Universe Hierarchy and the Weakly-Normalizing Fragment
-(to be written later)
+# ** Universe Hierarchy and the Weakly-Normalizing Fragment
+# (to be written later)
 
-** "Unified" Pattern Resolution in Dependent Type Inference
-(to be written later)
+# ** "Unified" Pattern Resolution in Dependent Type Inference
+# (to be written later)
 
-** A Simple Implementation of Mutually-Recursive Functions
-(to be written later)
+# ** A Simple Implementation of Mutually-Recursive Functions
+# (to be written later)
 
 # * Contribution
 
