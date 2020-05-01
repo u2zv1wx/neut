@@ -1063,8 +1063,10 @@ The =pi= term is a term that represents the universal quantification.
 #+END_SRC
 *** Semantics
 #+BEGIN_SRC scheme
-(pi-elimination (pi-introduction ((x1 A1) ... (xn An)) e) e1 ... en)
-~> (pi-elimination (pi-introduction ((x1 A1) ... (xn An)) e) v1 ... vn)  [i.e. reduce ei to values vi]
+(pi-elimination e e1 ... en)
+~> (pi-elimination v v1 ... vn)  [i.e. reduce e and ei to values v and vi, from left to right]
+
+(pi-elimination (pi-introduction ((x1 A1) ... (xn An)) e) v1 ... vn)
 ~> e {x1 := v1, ..., xn := vn}
 #+END_SRC
 *** Notes
