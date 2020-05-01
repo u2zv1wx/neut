@@ -58,7 +58,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#with][with]]
   - [[#cocaserecord][cocase/record]]
 - [[#macro-expansion][Macro Expansion]]
-- [[#compiler-commands][Compiler Commands]]
+- [[#compiler-subcommands][Compiler Subcommands]]
   - [[#archive][archive]]
   - [[#build][build]]
   - [[#check][check]]
@@ -1601,11 +1601,28 @@ The =cocase= / =record= notation constructs a term of a degenerated coinductive 
 
 * Macro Expansion
 
-* Compiler Commands
+* Compiler Subcommands
+The =neut= binary provides subcommands in this section.
 
 ** archive
+*** Example
+#+BEGIN_SRC shell
+$ neut archive path/to/some/directory # ~> creates a tar.gz archive `directory.tar.gz`
+$ neut archive path/to/some/directory -o pohe # ~> creates a tar.gz archive `pohe`
+#+END_SRC
+*** Notes
+The =archive= subcommand creates a tar.gz archive from the specified directory. The [[#ensure][ensure]] statement expects an archive created by this subcommand.
 
 ** build
+*** Example
+#+BEGIN_SRC shell
+$ neut build path/to/file.neut             # create an executable ./file
+$ neut build -o output path/to/file.neut   # create an executable ./output
+$ neut build --emit llvm path/to/file.neut # create a LLVM IR file ./file.ll
+$ neut build --emit asm path/to/file.neut  # create an assembly code ./file.s
+#+END_SRC
+*** Notes
+The =build= subcommand builds given source code and emits resulting code.
 
 ** check
 
