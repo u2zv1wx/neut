@@ -606,7 +606,7 @@ When including a file, both [[#useunuse][the prefix environment]] and [[#section
 Cyclic inclusion is invalid.
 
 ** inductive
-The =inductive= statement defines an inductive type, its introduction rules, and its elimination rule (fold).
+The =inductive= statement defines an inductive type, its introduction rules (constructors), and its elimination rule (fold).
 *** Example
 #+BEGIN_SRC scheme
 (inductive nat ()
@@ -682,7 +682,7 @@ The codomain of each constructor must be of the form =(a e1 ... en)=, where the 
 Nested inductive type is allowed if and only if the outer, already-defined inductive type is neither mutual nor generalized.
 
 ** coinductive
-The =coinductive= statement defines a coinductive type, its elimination rules, and its introduction rule (unfold).
+The =coinductive= statement defines a coinductive type, its elimination rules (destructors), and its introduction rule (unfold).
 *** Example
 #+BEGIN_SRC scheme
 (coinductive stream ((A tau))
