@@ -272,10 +272,8 @@ constructOutputArchivePath inputPath mPath =
   case mPath of
     Just path ->
       return path
-    Nothing -> do
-      let baseName = fromRelDir $ dirname inputPath
-      outputPath <- resolveFile' baseName
-      addExtension ".tar.gz" outputPath
+    Nothing ->
+      resolveFile' (fromRelDir $ dirname inputPath) >>= addExtension ".tar" >>= addExtension ".gz"
 
 runBuild :: Path Abs File -> WithEnv Builder
 runBuild =
