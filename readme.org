@@ -3,7 +3,7 @@ Neut is a dependently-typed programming language based on [[https://en.wikipedia
 
 - explicit malloc/free,
 - garbage collection,
-- region-based memory management.
+- or region-based memory management.
 
 Theoretically, this is made possible by translating the source language into a dependent-and-linear variant of [[https://www.cs.bham.ac.uk/~pbl/papers/thesisqmwphd.pdf][Call-by-Push-Value]]. The crucial point of the translation is to see that knowing the type of a term is knowning how to eta-expand the term, which in turn means knowing how to copy/discard the term. In the translation, a type is not erased, but *translated into a computationally-meaningful term that copies/discards the terms of the type*. Those who are interested in these theoretical things can find further details in the [[#theoretical-notes][section about the theory of Neut]].
 
@@ -1131,8 +1131,8 @@ The =fix= term is a term that realizes recursion.
 *** Example
 #+BEGIN_SRC scheme
 (let fact
-  (fix (self (hom i64 i64)) ((x i64))
-    (if (icmp-sle-i64 x 0)
+  (fix self ((x i64))
+    (if (icmp-sle-i64 x 0) ;; i.e. if x <= 0
       1
       (mul-i64 x (self (sub-i64 x 1))))))
 #+END_SRC
@@ -1176,7 +1176,8 @@ The =int= term is the one that represents the integer type in LLVM.
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC scheme
-(i64 10)
+(i{n} LEAF)  [where n is one of 1, 2, ..., 64]
+LEAF [where this LEAF can be parsed as integer]
 #+END_SRC
 *** Semantics
 The terms of integer type doesn't have any operational semantics.
@@ -1184,6 +1185,8 @@ The terms of integer type doesn't have any operational semantics.
 The =int= type in Neut is the same as the one of LLVM, restricted into =i1=, =i2=, ..., =i64=.
 
 If the specified integer literal is out of range of its type =i{n}=, the integer is interpreted modulo =2^n=, just as in the same way of LLVM. For example, =(i2 10)= is the same as =(i2 6)=, =(i2 2)=, =(i2 -2)=, or =(i2 -6)=, since all of these are equivalent modulo =2^2=.
+
+An integer term without explicit type information is overloaded;
 
 ** Float
 *** Example
