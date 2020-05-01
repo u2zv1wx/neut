@@ -346,8 +346,8 @@ Although the compiler can cancel memory allocations/deallocations, it cannot can
   - discarded if and only if the variable isn't used at all.
   - untouched if and only if the variable is used exactly once (i.e. used linearly).
   - copied if and only if the variable is used more than once.
-- Linearity results in an efficient code.
-- Non-linearity results in an inefficient code.
+- Linearity tends to result in an efficient code.
+- Non-linearity tends to result in an inefficient code.
 - Borrowing can be used as a convenient syntactic tool when accomplishing linearity.
 - Redundant malloc/free can be reduced by automatic malloc/free cancellation.
 - Borrowing-based, or "manually" optimized code is faster than cancellation-based, or "automatically" optimized code.
