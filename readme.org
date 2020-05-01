@@ -70,8 +70,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#unified-pattern-resolution-in-dependent-type-inference]["Unified" Pattern Resolution in Dependent Type Inference]]
   - [[#a-simple-implementation-of-mutually-recursive-functions][A Simple Implementation of Mutually-Recursive Functions]]
 - [[#appendix][Appendix]]
-  - [[#llvm-ir-for-the-first-example-print-without-borrowing][LLVM IR for the First Example (Print without Borrowing)]]
-  - [[#llvm-ir-for-the-second-example-print-with-borrowing][LLVM IR for the Second Example (Print with Borrowing)]]
+  - [[#llvm-ir-for-the-first-example][LLVM IR for the First Example]]
 - [[#references][References]]
 
 * Some (Hopefully) Illuminating Examples
@@ -1725,20 +1724,24 @@ This subcommand is intended to be used with a completion engine like [[https://c
 
 * Appendix
 
-** LLVM IR for the First Example (Print without Borrowing)
+** LLVM IR for the First Example
 #+BEGIN_SRC llvm
 declare void @free(i8*)
 declare i8* @write(i8*, i8*, i8*)
 declare i8* @malloc(i64)
 define i64 @main() {
+  ;; <REPETITION 1>
+  ;; <memory allocation for the string>
   %_11875 = getelementptr i8, i8* null, i64 1
   %_11876 = ptrtoint i8* %_11875 to i64
   %_11877 = call fastcc i8* @malloc(i64 %_11876)
+  ;; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
   %_11878 = bitcast i8* %_11877 to [1 x i8]*
   %_11879 = inttoptr i8 97 to i8*
   %_11880 = ptrtoint i8* %_11879 to i8
   %_11881 = getelementptr [1 x i8], [1 x i8]* %_11878, i32 0, i64 0
   store i8 %_11880, i8* %_11881
+  ;; <write the string into stdout>
   %_11882 = inttoptr i64 1 to i8*
   %_11883 = inttoptr i64 1 to i8*
   %_11884 = call fastcc i8* @write(i8* %_11882, i8* %_11877, i8* %_11883)
@@ -1746,16 +1749,21 @@ define i64 @main() {
   %_11886 = getelementptr [1 x i8], [1 x i8]* %_11885, i32 0, i32 0
   %_11887 = load i8, i8* %_11886
   %_11888 = bitcast [1 x i8]* %_11885 to i8*
+  ;; <memory deallocation for the string>
   call fastcc void @free(i8* %_11888)
   %_11889 = inttoptr i8 %_11887 to i8*
+  ;; <REPETITION 2>
+  ;; <memory allocation for the string>
   %_11890 = getelementptr i8, i8* null, i64 1
   %_11891 = ptrtoint i8* %_11890 to i64
   %_11892 = call fastcc i8* @malloc(i64 %_11891)
+  ;; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
   %_11893 = bitcast i8* %_11892 to [1 x i8]*
   %_11894 = inttoptr i8 97 to i8*
   %_11895 = ptrtoint i8* %_11894 to i8
   %_11896 = getelementptr [1 x i8], [1 x i8]* %_11893, i32 0, i64 0
   store i8 %_11895, i8* %_11896
+  ;; <write the string into stdout>
   %_11897 = inttoptr i64 1 to i8*
   %_11898 = inttoptr i64 1 to i8*
   %_11899 = call fastcc i8* @write(i8* %_11897, i8* %_11892, i8* %_11898)
@@ -1763,16 +1771,21 @@ define i64 @main() {
   %_11901 = getelementptr [1 x i8], [1 x i8]* %_11900, i32 0, i32 0
   %_11902 = load i8, i8* %_11901
   %_11903 = bitcast [1 x i8]* %_11900 to i8*
+  ;; <memory deallocation for the string>
   call fastcc void @free(i8* %_11903)
   %_11904 = inttoptr i8 %_11902 to i8*
+  ;; <REPETITION 3>
+  ;; <memory allocation for the string>
   %_11905 = getelementptr i8, i8* null, i64 1
   %_11906 = ptrtoint i8* %_11905 to i64
   %_11907 = call fastcc i8* @malloc(i64 %_11906)
+  ;; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
   %_11908 = bitcast i8* %_11907 to [1 x i8]*
   %_11909 = inttoptr i8 97 to i8*
   %_11910 = ptrtoint i8* %_11909 to i8
   %_11911 = getelementptr [1 x i8], [1 x i8]* %_11908, i32 0, i64 0
   store i8 %_11910, i8* %_11911
+  ;; <write the string into stdout>
   %_11912 = inttoptr i64 1 to i8*
   %_11913 = inttoptr i64 1 to i8*
   %_11914 = call fastcc i8* @write(i8* %_11912, i8* %_11907, i8* %_11913)
@@ -1780,51 +1793,13 @@ define i64 @main() {
   %_11916 = getelementptr [1 x i8], [1 x i8]* %_11915, i32 0, i32 0
   %_11917 = load i8, i8* %_11916
   %_11918 = bitcast [1 x i8]* %_11915 to i8*
+  ;; <memory deallocation for the string>
   call fastcc void @free(i8* %_11918)
   %_11919 = inttoptr i8 %_11917 to i8*
+  ;; <return 0>
   %_11920 = inttoptr i64 0 to i8*
   %_11921 = ptrtoint i8* %_11920 to i64
   ret i64 %_11921
-}
-#+END_SRC
-
-** LLVM IR for the Second Example (Print with Borrowing)
-#+BEGIN_SRC llvm
-declare void @free(i8*)
-declare i8* @write(i8*, i8*, i8*)
-declare i8* @malloc(i64)
-define i64 @main() {
-  ;; memory allocation
-  %_12034 = getelementptr i8, i8* null, i64 1
-  %_12035 = ptrtoint i8* %_12034 to i64
-  %_12036 = call fastcc i8* @malloc(i64 %_12035)
-  ;; create the string "a" (i.e. write the character 'a' to the allocated memory)
-  %_12037 = bitcast i8* %_12036 to [1 x i8]*
-  %_12038 = inttoptr i8 97 to i8* ;; a = 97
-  %_12039 = ptrtoint i8* %_12038 to i8
-  %_12040 = getelementptr [1 x i8], [1 x i8]* %_12037, i32 0, i64 0 ;; where to write 'a'
-  store i8 %_12039, i8* %_12040 ;; write a
-  ;; write the string into stdout for the three times
-  %_12041 = inttoptr i64 1 to i8* ;; this `1` stands for stdout
-  %_12042 = inttoptr i64 1 to i8* ;; this `1` is the length of the string in bytes
-  %_12043 = call fastcc i8* @write(i8* %_12041, i8* %_12036, i8* %_12042)
-  %_12044 = inttoptr i64 1 to i8*
-  %_12045 = inttoptr i64 1 to i8*
-  %_12046 = call fastcc i8* @write(i8* %_12044, i8* %_12036, i8* %_12045)
-  %_12047 = inttoptr i64 1 to i8*
-  %_12048 = inttoptr i64 1 to i8*
-  %_12049 = call fastcc i8* @write(i8* %_12047, i8* %_12036, i8* %_12048)
-  ;; memory deallocation
-  %_12050 = bitcast i8* %_12036 to [1 x i8]*
-  %_12051 = getelementptr [1 x i8], [1 x i8]* %_12050, i32 0, i32 0
-  %_12052 = load i8, i8* %_12051
-  %_12053 = bitcast [1 x i8]* %_12050 to i8*
-  call fastcc void @free(i8* %_12053)
-  %_12054 = inttoptr i8 %_12052 to i8*
-  ;; return 0
-  %_12055 = inttoptr i64 0 to i8*
-  %_12056 = ptrtoint i8* %_12055 to i64
-  ret i64 %_12056
 }
 #+END_SRC
 
