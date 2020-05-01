@@ -1125,9 +1125,24 @@ is preferred to:
 #+END_SRC
 
 ** fix
+The =fix= term is a term that realizes recursion.
 *** Example
+#+BEGIN_SRC scheme
+(let fact
+  (fix (self (hom i64 i64)) ((x i64))
+    (if (icmp-sle-i64 x 0)
+      1
+      (mul-i64 x (self (sub-i64 x 1))))))
+#+END_SRC
 *** Syntax
+#+BEGIN_SRC scheme
+(fix LEAF ((LEAF TREE) ... (LEAF TREE)) TREE)
+#+END_SRC
 *** Semantics
+#+BEGIN_SRC scheme
+(pi-elimination (fix self ((x1 A1) ... (xn An)) e) v1 ... vn)
+~> e {x1 := v1, ..., xn := vn, self := (fix self ((x1 A1) ... (xn An)) e)}
+#+END_SRC
 ** constant
 *** Example
 *** Syntax
