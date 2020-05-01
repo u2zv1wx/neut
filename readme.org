@@ -1577,8 +1577,27 @@ The =cocase= / =record= notation is a convenient notation to construct a term of
       (b e)
       ...
       (b e)))
+
+(cocase (ai e ... e)
+  ((a1 e ... e)
+   (b e)
+   ...
+   (b e))
+  ((an e ... e)
+   (b e)
+   ...
+   (b e)))
+~> (ai.unfold
+     a1
+     ...
+     an
+     (lambda (_) e)
+     ...
+     (lambda (_) e)
+     UNSAFEVALUE)
 #+END_SRC
 *** Notes
+The =cocase= / =record= notation constructs a term of a degenerated coinductive type using the fact that every destructor of a degenerated coinductive type always discards the argument. Since the argument is always discarded, we can supply a "fake" value for the argument.
 
 * Macro Expansion
 
