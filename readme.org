@@ -57,7 +57,6 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#sigma][sigma]]
   - [[#with][with]]
   - [[#cocaserecord][cocase/record]]
-- [[#macro-expansion][Macro Expansion]]
 - [[#compiler-subcommands][Compiler Subcommands]]
   - [[#archive][archive]]
   - [[#build][build]]
@@ -827,11 +826,45 @@ The =keyword= statement registers a keyword for notation. The =notation= stateme
 (notation TREE TREE)
 #+END_SRC
 *** Semantics
-When parsed, the statement =(keyword x)= modifies the state of the compiler so that the =x= is treated as a keyword. This affects the result of [[#macro-expansion][macro expansion]] in the succeeding code.
+When parsed, the statement =(keyword x)= modifies the state of the compiler so that the =x= is treated as a keyword. This affects the result of macro expansion in the succeeding code.
 
-When parsed, the statement =(notation FROM TO)= modifies the state of the compiler so that the mapping =FROM ~> TO= is recognized as a notation. This affects the result of [[#macro-expansion][macro expansion]] in the succeeding code.
+When parsed, the statement =(notation FROM TO)= modifies the state of the compiler so that the mapping =FROM ~> TO= is recognized as a notation. This affects the result of macro expansion in the succeeding code.
 
-See [[#macroexpansion][the section on macro expansion]] for the details of keywords and notations.
+# See [[#macroexpansion][the section on macro expansion]] for the details of keywords and notations.
+
+*** Notes on Macro Expansion
+Every source code of Neut is firstly translated into the corresponding trees that is conceptually defined as follows:
+#+BEGIN_SRC text
+tree ::= leaf STRING | node (LIST tree)
+#+END_SRC
+After this translation, the resulting ASTs are *macro-expanded*, and then interpreted as, for example, statements by the compiler. Here I will explain how this macro-expansion works.
+
+In short, the macro-expansion of an AST in Neut is a call-by-value-like recursive application of the *step-expansion*.
+
+I believe the step-expansion process is best explained by an example. Consider we have defined a keyword and a notation as follows:
+#+BEGIN_SRC text
+(keyword if)
+
+(notation (if b e1 e2)
+  (switch b
+    (bool.true e1)
+    (bool.false e2)))
+#+END_SRC
+Now, suppose we have an AST =(if some-condition (i64.print 10) (string.print "hello"))=. The compiler then creates the following substitution:
+#+BEGIN_SRC text
+b  ~> some-condition
+e1 ~> (i64.print 10)
+e2 ~> (string.print "hello")
+#+END_SRC
+and then replaces =b=, =e1=, and =e2= in the codomain of the notation according to this substitution. The resulting tree is:
+#+BEGIN_SRC text
+(switch some-condition
+  (bool.true (i64.print 10))
+  (bool.false (string.print "hello")))
+#+END_SRC
+This translation is the step-expansion. The keyword environment here is required to determine whether a leaf of the domain of a notation is a variable or an opaque syntactic construct (i.e. "keyword"). In the example above, without the =(keyword if)= statement, we cannot determine if the =if= in =(if b e1 e2)= is a variable or a keyword.
+
+Given this step-expansion, the macro-expansion proceeds as follows. Take =t= to be an input tree. If the tree =t= is of the form =(leaf STRING)=, the compiler returns the result of step-expansion of =t=. If a tree is of the form =(node t1 ... tn)=, the =t1=, ..., =tn= are firstly macro-expanded them into =t1'= , ..., =tn'= , and then the compiler step-expands the tree =(node t1' ... tn')=.
 
 ** use/unuse
 The =use= / =unuse= statement registers a prefix for name resolution.
@@ -1589,46 +1622,6 @@ The =cocase= / =record= notation is a convenient notation to construct a term of
 #+END_SRC
 *** Notes
 The =cocase= / =record= notation constructs a term of a degenerated coinductive type using the fact that every destructor of a degenerated coinductive type always discards the argument. Since the argument is always discarded, we can supply a "fake" value for the argument.
-
-* Macro Expansion
-Every source code of Neut is firstly translated into a tree that is conceptually defined as follows:
-#+BEGIN_SRC text
-tree ::= leaf STRING | node (LIST tree)
-#+END_SRC
-After this translation, the resulting ASTs are *macro-expanded*, and then interpreted as, for example, statements by the compiler. Here I will explain how this macro-expansion works.
-
-In short, the macro-expansion of an AST in Neut is a call-by-value-like recursive application of the *step-expansion* on the AST.
-
-More specifically, the macro-expansion proceeds as follows. Take =t= to be an input tree. If the tree =t= is of the form =(leaf STRING)=, the compiler returns the result of step-expansion of =t=. If a tree is of the form =(node t1 ... tn)=, the =t1=, ..., =tn= are firstly macro-expanded them into =t1'= , ..., =tn'= , and then the compiler step-expands the tree =(node t1' ... tn')=.
-
-Given an input tree, the step-expansion proceeds by:
-1. looking up the keyword environment and the notation environment,
-2. tries to *match* the input tree with a domain of a correspondence in the notation environment, and
-3. returning the codomain of the correspondence, resolving variable bindings.
-
-I believe the matching process is best explained by an example. Consider we have defined a keyword and a notation as follows:
-#+BEGIN_SRC text
-(keyword if)
-
-(notation (if b e1 e2)
-  (switch b
-    (bool.true e1)
-    (bool.false e2)))
-#+END_SRC
-Now, suppose we have an AST =(if some-condition (i64.print 10) (string.print "hello"))=, the matching process creates the following substitution:
-#+BEGIN_SRC text
-b  ~> some-condition
-e1 ~> (i64.print 10)
-e2 ~> (string.print "hello")
-#+END_SRC
-and then replaces =b=, =e1=, and =e2= in the codomain of the notation according to this substitution. The resulting tree is:
-#+BEGIN_SRC text
-(switch some-condition
-  (bool.true (i64.print 10))
-  (bool.false (string.print "hello")))
-#+END_SRC
-
-The keyword environment is to determine whether a leaf of the domain of a notation is a variable or an opaque syntactic construct (i.e. "keyword").
 
 * Compiler Subcommands
 The =neut= binary provides subcommands in this section.
