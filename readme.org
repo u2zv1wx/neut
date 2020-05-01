@@ -1003,11 +1003,13 @@ The universe hierarchy is intentionally removed from the source language since (
 The =upsilion= term is a term that represents a variable.
 *** Example
 #+BEGIN_SRC scheme
+(let x (i64 10))
+
 ;; "explicit" notation
-(define id ((a tau) (x a)) (upsilon x))
+(i64.print (upsilon x)) ;; ~> 10
 
 ;; "implicit" notation
-(define id ((a tau) (x a)) x)
+(i64.print x)           ;; ~> 10
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC scheme
