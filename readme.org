@@ -1024,6 +1024,8 @@ The =upsilon= term can be interpreted as a variable.
 
 If a leaf is not parsed into any other syntactic construct, the leaf is considered to be wrapped by =upsilon=.
 
+If the name of a variable is "_", the compiler automatically generates a fresh variable so that the variable cannot be referred in the succeeding code.
+
 ** pi
 The =pi= term is a term that represents the universal quantification.
 *** Example
