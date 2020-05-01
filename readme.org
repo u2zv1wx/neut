@@ -1340,9 +1340,33 @@ The struct type is intended to be used for implementation of interfaces of sysca
 
 * Auxiliary Syntax
 ** hole
+The =hole= term is a placeholder that should be inferred.
 *** Example
+#+BEGIN_SRC scheme
+(define id ((a tau) (x a)) x)
+
+(enum foo value)
+
+;; explicit application
+(id foo foo.value) ;; ~> foo.value
+
+;; implicit application
+(id hole foo.value) ;; ~> foo.value (the `hole` part is inferred to be `foo`)
+#+END_SRC
 *** Syntax
+#+BEGIN_SRC scheme
+hole
+#+END_SRC
 *** Semantics
+The =hole= term doesn't have any operational semantics.
+*** Notes
+The =hole= term can be used as a placeholder that must be resolved by the compiler using the constraints generated in its type inference procedure.
+
+If the type is not determined, the compiler raises an error; For example, the type of =x= in the following code is not determined:
+#+BEGIN_SRC scheme
+(let x 10)
+#+END_SRC
+since the =10= cannot be determined to be =i32=, =i16=, or =i64=, etc.
 
 ** Sigma Type
 
