@@ -370,15 +370,15 @@ parseDef xds = do
   metaNameList <- mapM (extractFunName >=> uncurry discernIdent) defList
   let nameList = map snd metaNameList
   -- xiの名前をtopNameEnvに追加した状態でそれぞれの定義をdiscernする
-  -- defList' <- mapM interpretIter defList
-  defList' <- mapM (interpretIter >=> discernDef) defList
+  -- defList' <- mapM interpretFix defList
+  defList' <- mapM (interpretFix >=> discernDef) defList
   -- sub^nを計算する
   let baseSub = IntMap.fromList $ map defToSub $ zip nameList defList'
   -- sub^1からスタートだから、sub^nを得るためにはn - 1回追加で合成すればいい
   let sub = selfCompose (length baseSub - 1) baseSub
   -- 変数を「閉じる」
-  let iterSelfVarList = map (uncurry toVar . defToName) defList'
-  let aligner = IntMap.fromList $ zip (map asInt nameList) iterSelfVarList
+  let fixSelfVarList = map (uncurry toVar . defToName) defList'
+  let aligner = IntMap.fromList $ zip (map asInt nameList) fixSelfVarList
   -- sub^nをf1, ..., fnに適用する
   let closedSub = IntMap.map (substWeakTermPlus aligner) sub -- capturing substitution
   let typeList = map (\(_, (m, _, t), _, _) -> (m, t)) defList'
@@ -435,7 +435,7 @@ toLetList defList =
 
 defToSub :: (Ident, Def) -> (Int, WeakTermPlus)
 defToSub (dom, (m, xt, xts, e)) =
-  (asInt dom, (m, WeakTermIter xt xts e))
+  (asInt dom, (m, WeakTermFix xt xts e))
 
 selfCompose :: Int -> SubstWeakTerm -> SubstWeakTerm
 selfCompose i sub =

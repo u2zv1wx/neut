@@ -16,7 +16,7 @@ data Term
   | TermPi (Maybe T.Text) [IdentPlus] TermPlus
   | TermPiIntro (Maybe (Ident, T.Text, [IdentPlus])) [IdentPlus] TermPlus
   | TermPiElim TermPlus [TermPlus]
-  | TermIter IdentPlus [IdentPlus] TermPlus
+  | TermFix IdentPlus [IdentPlus] TermPlus
   | TermConst T.Text
   | TermCall Ident -- S4 necessity
   | TermInt IntSize Integer
@@ -91,7 +91,7 @@ varTermPlus term =
       let xs1 = varTermPlus e
       let xs2 = concatMap varTermPlus es
       xs1 ++ xs2
-    (_, TermIter (_, x, t) xts e) ->
+    (_, TermFix (_, x, t) xts e) ->
       varTermPlus t ++ filter (/= x) (varTermPlus' xts [e])
     (_, TermConst _) ->
       []
@@ -157,11 +157,11 @@ substTermPlus sub term =
       let e' = substTermPlus sub e
       let es' = map (substTermPlus sub) es
       (m, TermPiElim e' es')
-    (m, TermIter (mx, x, t) xts e) -> do
+    (m, TermFix (mx, x, t) xts e) -> do
       let t' = substTermPlus sub t
       let sub' = IntMap.delete (asInt x) sub
       let (xts', e') = substTermPlus'' sub' xts e
-      (m, TermIter (mx, x, t') xts' e')
+      (m, TermFix (mx, x, t') xts' e')
     e@(_, TermConst _) ->
       e
     e@(_, TermCall _) ->
@@ -248,11 +248,11 @@ weaken term =
       let e' = weaken e
       let es' = map weaken es
       (m, WeakTermPiElim e' es')
-    (m, TermIter (mx, x, t) xts e) -> do
+    (m, TermFix (mx, x, t) xts e) -> do
       let t' = weaken t
       let xts' = weakenArgs xts
       let e' = weaken e
-      (m, WeakTermIter (mx, x, t') xts' e')
+      (m, WeakTermFix (mx, x, t') xts' e')
     (m, TermConst x) ->
       (m, WeakTermConst x)
     (m, TermCall x) ->

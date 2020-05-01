@@ -18,7 +18,7 @@ data WeakTerm
       [WeakIdentPlus]
       WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
-  | WeakTermIter WeakIdentPlus [WeakIdentPlus] WeakTermPlus
+  | WeakTermFix WeakIdentPlus [WeakIdentPlus] WeakTermPlus
   | WeakTermHole Ident
   | WeakTermConst T.Text
   | WeakTermCall Ident
@@ -121,7 +121,7 @@ varWeakTermPlus term =
       let xs = varWeakTermPlus e
       let ys = S.unions $ map varWeakTermPlus es
       S.union xs ys
-    (_, WeakTermIter (_, x, t) xts e) -> do
+    (_, WeakTermFix (_, x, t) xts e) -> do
       let set1 = varWeakTermPlus t
       let set2 = S.filter (/= x) (varWeakTermPlus' xts [e])
       S.union set1 set2
@@ -195,7 +195,7 @@ holeWeakTermPlus term =
       let set1 = holeWeakTermPlus e
       let set2 = S.unions $ map holeWeakTermPlus es
       S.union set1 set2
-    (_, WeakTermIter (_, _, t) xts e) -> do
+    (_, WeakTermFix (_, _, t) xts e) -> do
       let set1 = holeWeakTermPlus t
       let set2 = holeWeakTermPlus' xts [e]
       S.union set1 set2
@@ -275,11 +275,11 @@ substWeakTermPlus sub term =
       let e' = substWeakTermPlus sub e
       let es' = map (substWeakTermPlus sub) es
       (m, WeakTermPiElim e' es')
-    (m, WeakTermIter (mx, x, t) xts e) -> do
+    (m, WeakTermFix (mx, x, t) xts e) -> do
       let t' = substWeakTermPlus sub t
       let sub' = IntMap.delete (asInt x) sub
       let (xts', e') = substWeakTermPlus'' sub' xts e
-      (m, WeakTermIter (mx, x, t') xts' e')
+      (m, WeakTermFix (mx, x, t') xts' e')
     (_, WeakTermConst _) ->
       term
     (_, WeakTermCall _) ->
@@ -412,7 +412,7 @@ toText term =
       "<#" <> name <> "-" <> "internal" <> "#>"
     (_, WeakTermPiElim e es) ->
       showCons $ map toText $ e : es
-    (_, WeakTermIter (_, x, _) xts e) -> do
+    (_, WeakTermFix (_, x, _) xts e) -> do
       let argStr = inParen $ showItems $ map showArg xts
       showCons ["μ", asText' x, argStr, toText e]
     (_, WeakTermConst x) ->

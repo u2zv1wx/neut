@@ -132,11 +132,11 @@ elaborate' term =
       e' <- elaborate' e
       es' <- mapM elaborate' es
       return (m, TermPiElim e' es')
-    (m, WeakTermIter (mx, x, t) xts e) -> do
+    (m, WeakTermFix (mx, x, t) xts e) -> do
       t' <- elaborate' t
       xts' <- mapM elaboratePlus xts
       e' <- elaborate' e
-      return (m, TermIter (mx, x, t') xts' e')
+      return (m, TermFix (mx, x, t') xts' e')
     (m, WeakTermHole _) ->
       raiseCritical
         m

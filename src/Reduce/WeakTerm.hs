@@ -41,7 +41,7 @@ reduceWeakTermPlus term =
             reduceWeakTermPlus $ substWeakTermPlus sub body
         _ ->
           (m, app)
-    (m, WeakTermIter (mx, x, t) xts e)
+    (m, WeakTermFix (mx, x, t) xts e)
       | x `notElem` varWeakTermPlus e ->
         reduceWeakTermPlus (m, weakTermPiIntro xts e)
       | otherwise -> do
@@ -49,7 +49,7 @@ reduceWeakTermPlus term =
         let e' = reduceWeakTermPlus e
         let (ms, xs, ts) = unzip3 xts
         let ts' = map reduceWeakTermPlus ts
-        (m, WeakTermIter (mx, x, t') (zip3 ms xs ts') e')
+        (m, WeakTermFix (mx, x, t') (zip3 ms xs ts') e')
     (m, WeakTermEnumElim (e, t) les) -> do
       let e' = reduceWeakTermPlus e
       let (ls, es) = unzip les

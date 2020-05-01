@@ -4,7 +4,7 @@ module Reduce.Term
   )
 where
 
-import Control.Monad.State
+import Control.Monad.State hiding (fix)
 import Data.EnumCase
 import Data.Env
 import Data.Ident
@@ -42,7 +42,7 @@ reduceTermPlus term =
             reduceTermPlus $ substTermPlus sub body
         _ ->
           (m, app)
-    (m, TermIter (mx, x, t) xts e)
+    (m, TermFix (mx, x, t) xts e)
       | x `notElem` varTermPlus e ->
         reduceTermPlus (m, termPiIntro xts e)
       | otherwise -> do
@@ -50,7 +50,7 @@ reduceTermPlus term =
         let (ms, xs, ts) = unzip3 xts
         let ts' = map reduceTermPlus ts
         let e' = reduceTermPlus e
-        (m, TermIter (mx, x, t') (zip3 ms xs ts') e')
+        (m, TermFix (mx, x, t') (zip3 ms xs ts') e')
     (m, TermEnumElim (e, t) les) -> do
       let t' = reduceTermPlus t
       let e' = reduceTermPlus e
@@ -132,7 +132,7 @@ isValue term =
       True
     (_, TermPiIntro {}) ->
       True
-    (_, TermIter {}) ->
+    (_, TermFix {}) ->
       True
     (_, TermConst x) ->
       isValueConst x
@@ -200,18 +200,18 @@ normalize term =
           let xs = map (\(_, x, _) -> asInt x) xts
           let sub = IntMap.fromList $ zip xs es'
           normalize $ substTermPlus sub body
-        iter@(_, TermIter (_, self, _) xts body) -> do
+        fix@(_, TermFix (_, self, _) xts body) -> do
           let xs = map (\(_, x, _) -> asInt x) xts
-          let sub = IntMap.fromList $ (asInt self, iter) : zip xs es'
+          let sub = IntMap.fromList $ (asInt self, fix) : zip xs es'
           normalize $ substTermPlus sub body
         _ ->
           return (m, TermPiElim e' es')
-    (m, TermIter (mx, x, t) xts e) -> do
+    (m, TermFix (mx, x, t) xts e) -> do
       t' <- normalize t
       let (ms, xs, ts) = unzip3 xts
       ts' <- mapM normalize ts
       e' <- normalize e
-      return (m, TermIter (mx, x, t') (zip3 ms xs ts') e')
+      return (m, TermFix (mx, x, t') (zip3 ms xs ts') e')
     (m, TermConst x) ->
       return (m, TermConst x)
     (m, TermCall x) ->

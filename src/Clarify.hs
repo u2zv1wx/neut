@@ -69,7 +69,7 @@ clarify' tenv term =
       es' <- mapM (clarifyPlus tenv) es
       e' <- clarify' tenv e
       callClosure m e' es'
-    (m, TermIter (_, x, t) mxts e) -> do
+    (m, TermFix (_, x, t) mxts e) -> do
       let tenv' = insTypeEnv' (asInt x) t tenv
       e' <- clarify' (insTypeEnv1 mxts tenv') e
       fvs <- nubFVS <$> chainTermPlus tenv term
@@ -605,7 +605,7 @@ chainTermPlus tenv term =
       xs1 <- chainTermPlus tenv e
       xs2 <- concat <$> mapM (chainTermPlus tenv) es
       return $ xs1 ++ xs2
-    (_, TermIter (_, x, t) xts e) -> do
+    (_, TermFix (_, x, t) xts e) -> do
       xs1 <- chainTermPlus tenv t
       xs2 <- chainTermPlus' (insTypeEnv' (asInt x) t tenv) xts [e]
       return $ xs1 ++ filter (\(_, y, _) -> y /= x) xs2

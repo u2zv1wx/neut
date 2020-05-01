@@ -662,13 +662,13 @@ substRuleType sub@((a1, es1), (a2, es2)) term =
         e' <- substRuleType sub e
         es' <- mapM (substRuleType sub) es
         return (m, WeakTermPiElim e' es')
-    (m, WeakTermIter (mx, x, t) xts e) -> do
+    (m, WeakTermFix (mx, x, t) xts e) -> do
       t' <- substRuleType sub t
       if fst (fst sub) == x
-        then return (m, WeakTermIter (mx, x, t') xts e)
+        then return (m, WeakTermFix (mx, x, t') xts e)
         else do
           (xts', e') <- substRuleType'' sub xts e
-          return (m, WeakTermIter (mx, x, t') xts' e')
+          return (m, WeakTermFix (mx, x, t') xts' e')
     (m, WeakTermConst x) ->
       return (m, WeakTermConst x)
     (m, WeakTermCall x) ->

@@ -8,7 +8,7 @@ import Data.WeakTerm
 type PreConstraint =
   (WeakTermPlus, WeakTermPlus)
 
-type IterInfo =
+type FixInfo =
   (Meta, Ident, [WeakIdentPlus], WeakTermPlus, WeakTermPlus)
 
 data Constraint

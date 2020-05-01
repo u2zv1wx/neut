@@ -231,10 +231,10 @@ unravel term =
       e' <- unravel e
       es' <- mapM unravel es
       return (m, WeakTermPiElim e' es')
-    (m, WeakTermIter (mx, x, t) xts e) -> do
+    (m, WeakTermFix (mx, x, t) xts e) -> do
       x' <- unravelUpsilon x
       (xts', e') <- unravelBinder xts e
-      return (m, WeakTermIter (mx, x', t) xts' e')
+      return (m, WeakTermFix (mx, x', t) xts' e')
     (m, WeakTermConst x) ->
       return (m, WeakTermConst x)
     (m, WeakTermCall x) ->

@@ -70,7 +70,7 @@ simp' constraintList =
             length args1 == length args2 -> do
             simpBinder args1 args2
             simp $ ((m1, weakTermPiIntro xts1 e1), (m2, weakTermPiIntro xts2 e2)) : cs
-        ((m1, WeakTermIter xt1@(_, x1, _) xts1 e1), (m2, WeakTermIter xt2@(_, x2, _) xts2 e2))
+        ((m1, WeakTermFix xt1@(_, x1, _) xts1 e1), (m2, WeakTermFix xt2@(_, x2, _) xts2 e2))
           | x1 == x2,
             length xts1 == length xts2 -> do
             yt1 <- asWeakIdentPlus m1 e1
@@ -274,7 +274,7 @@ data Stuck
   = StuckPiElimUpsilon Ident Meta [(Meta, [WeakTermPlus])]
   | StuckPiElimHole Ident [[WeakTermPlus]]
   | StuckPiElimHoleStrict Ident [[WeakTermPlus]]
-  | StuckPiElimIter IterInfo [(Meta, [WeakTermPlus])]
+  | StuckPiElimFix FixInfo [(Meta, [WeakTermPlus])]
   | StuckPiElimConst T.Text Meta [(Meta, [WeakTermPlus])]
 
 asStuckedTerm :: WeakTermPlus -> Maybe Stuck
@@ -286,8 +286,8 @@ asStuckedTerm term =
       Just $ StuckPiElimHoleStrict h []
     (m, WeakTermConst x) ->
       Just $ StuckPiElimConst x m []
-    (mi, WeakTermIter (_, x, _) xts body) ->
-      Just $ StuckPiElimIter (mi, x, xts, body, term) []
+    (mi, WeakTermFix (_, x, _) xts body) ->
+      Just $ StuckPiElimFix (mi, x, xts, body, term) []
     (m, WeakTermPiElim e es) ->
       case asStuckedTerm e of
         Just (StuckPiElimHole h iess) ->
@@ -298,8 +298,8 @@ asStuckedTerm term =
               Just $ StuckPiElimHoleStrict h $ iexss ++ [es]
             Nothing ->
               Just $ StuckPiElimHole h $ iexss ++ [es]
-        Just (StuckPiElimIter mu ess) ->
-          Just $ StuckPiElimIter mu $ ess ++ [(m, es)]
+        Just (StuckPiElimFix mu ess) ->
+          Just $ StuckPiElimFix mu $ ess ++ [(m, es)]
         Just (StuckPiElimConst x mx ess) ->
           Just $ StuckPiElimConst x mx $ ess ++ [(m, es)]
         Just (StuckPiElimUpsilon x mx ess) ->

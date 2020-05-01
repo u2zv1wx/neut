@@ -59,7 +59,7 @@ infer' ctx term =
       etls <- mapM (infer' ctx) es'
       etl <- infer' ctx e
       inferPiElim ctx m etl etls
-    (m, WeakTermIter (mx, x, t) xts e) -> do
+    (m, WeakTermFix (mx, x, t) xts e) -> do
       t' <- inferType' ctx t
       insWeakTypeEnv x t'
       -- Note that we cannot extend context with x. The type of e cannot be dependent on `x`.
@@ -67,7 +67,7 @@ infer' ctx term =
       (xts', (e', tCod)) <- inferBinder ctx xts e
       let piType = (m, weakTermPi xts' tCod)
       insConstraintEnv piType t'
-      return ((m, WeakTermIter (mx, x, t') xts' e'), piType)
+      return ((m, WeakTermFix (mx, x, t') xts' e'), piType)
     (m, WeakTermHole x) -> do
       zenv <- gets holeEnv
       case IntMap.lookup (asInt x) zenv of

@@ -30,7 +30,7 @@ discern e = do
 discernDef :: Def -> WithEnv Def
 discernDef (m, xt, xts, e) = do
   nenv <- gets topNameEnv
-  (xt', xts', e') <- discernIter nenv xt xts e
+  (xt', xts', e') <- discernFix nenv xt xts e
   return (m, xt', xts', e')
 
 discernText :: Meta -> T.Text -> WithEnv Ident
@@ -90,9 +90,9 @@ discern' nenv term =
       es' <- mapM (discern' nenv) es
       e' <- discern' nenv e
       return (m, WeakTermPiElim e' es')
-    (m, WeakTermIter (mx, x, t) xts e) -> do
-      (xt', xts', e') <- discernIter nenv (mx, x, t) xts e
-      return (m, WeakTermIter xt' xts' e')
+    (m, WeakTermFix (mx, x, t) xts e) -> do
+      (xt', xts', e') <- discernFix nenv (mx, x, t) xts e
+      return (m, WeakTermFix xt' xts' e')
     (m, WeakTermConst x) ->
       return (m, WeakTermConst x)
     (m, WeakTermCall x) ->
@@ -200,13 +200,13 @@ discernBinder nenv binder e =
       (xts', e') <- discernBinder (insertName x x' nenv) xts e
       return ((mx, x', t') : xts', e')
 
-discernIter ::
+discernFix ::
   NameEnv ->
   WeakIdentPlus ->
   [WeakIdentPlus] ->
   WeakTermPlus ->
   WithEnv (WeakIdentPlus, [WeakIdentPlus], WeakTermPlus)
-discernIter nenv self binder e = do
+discernFix nenv self binder e = do
   (binder', e') <- discernBinder nenv (self : binder) e
   return (head binder', tail binder', e')
 

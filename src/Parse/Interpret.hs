@@ -2,7 +2,7 @@ module Parse.Interpret
   ( interpret,
     interpretWeakIdentPlus,
     interpretIdentPlus,
-    interpretIter,
+    interpretFix,
     interpretEnumItem,
     raiseSyntaxError,
   )
@@ -107,12 +107,12 @@ interpret inputTree =
             return $ sigmaElim m h xts' e1' e2'
           | otherwise ->
             raiseSyntaxError m "(sigma-elimination (TREE*) TREE TREE)"
-        "iterate"
+        "fix"
           | [xt, xts@(_, TreeNode _), e] <- rest -> do
-            (m', xt', xts', e') <- interpretIter (m, TreeNode [xt, xts, e])
-            return (m', WeakTermIter xt' xts' e')
+            (m', xt', xts', e') <- interpretFix (m, TreeNode [xt, xts, e])
+            return (m', WeakTermFix xt' xts' e')
           | otherwise ->
-            raiseSyntaxError m "(iterate TREE (TREE*) TREE)"
+            raiseSyntaxError m "(fix TREE (TREE*) TREE)"
         "constant"
           | [(_, TreeLeaf x)] <- rest ->
             return (m, WeakTermConst x)
@@ -363,8 +363,8 @@ interpretWeakIdentPlus tree =
     t ->
       raiseSyntaxError (fst t) "(LEAF TREE)"
 
-interpretIter :: TreePlus -> WithEnv Def
-interpretIter tree =
+interpretFix :: TreePlus -> WithEnv Def
+interpretFix tree =
   case tree of
     (m, TreeNode [xt, (_, TreeNode xts), e]) -> do
       xt' <- interpretWeakIdentPlus xt
