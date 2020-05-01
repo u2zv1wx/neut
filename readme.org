@@ -51,6 +51,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#enum-1][enum]]
   - [[#array][array]]
   - [[#struct][struct]]
+  - [[#case][case]]
 - [[#auxiliary-syntax][Auxiliary Syntax]]
   - [[#hole][hole]]
   - [[#sigma][sigma]]
@@ -1339,6 +1340,46 @@ The memory layout of a struct is the same as the one of LLVM; For example, a str
 
 The struct type is intended to be used for implementation of interfaces of syscalls.
 
+** case
+=case= is for so-called pattern-matching (the composition =µF -> FµF -> A=).
+*** Example
+#+BEGIN_SRC scheme
+(inductive bottom ())
+
+(define ex-falso-quodlibet ((a tau) (x (bottom)))
+  (witness a
+    (case x)))
+
+(inductive my-nat ()
+  (zero ()
+    (my-nat))
+  (succ ((_ (my-nat)))
+    (my-nat)))
+
+(define my-nat-to-i64 ((n (my-nat)))
+  (witness i64
+    (case n
+      ((my-nat.zero)
+        0)
+      ((my-nat.succ m)
+        (i64.add 1 (my-nat-to-i64 m))))))
+#+END_SRC
+*** Syntax
+#+BEGIN_SRC scheme
+(case TREE
+  ((LEAF LEAF ... LEAF) TREE)
+  ...
+  ((LEAF LEAF ... LEAF) TREE))
+#+END_SRC
+*** Semantics
+#+BEGIN_SRC scheme
+(case (ci v1i ... vn{i}i)
+  ((c1 x11 ... xn{1}1) e1)
+   ...
+   (cm x1m ... xn{m}m) em)
+~> ei {x1i := v1i, ..., xn{i}i := vni}
+#+END_SRC
+
 * Auxiliary Syntax
 ** hole
 The =hole= term is a placeholder that should be inferred.
@@ -1481,6 +1522,63 @@ Note that the =bind= operator is not restricted to the monadic bind; You can set
 The =e= in =(let x e)= is automatically surrounded by =with=.
 
 ** cocase/record
+The =cocase= / =record= notation is a convenient notation to construct a term of a degenerated coinductive type.
+*** Example
+#+BEGIN_SRC scheme
+(coinductive my-record ((a tau))
+  (item-1 ((_ (my-record a))) a)
+  (item-2 ((_ (my-record a))) i64)
+  (item-3 ((_ (my-record a))) top))
+
+(let rec
+  (record (my-record i64)
+    (item-1 10)
+    (item-3 top.unit)
+    (item-2 20)))
+
+(i64.print (my-record.item-1 rec)) ;; ~> 10
+(i64.print (my-record.item-2 rec)) ;; ~> 20
+
+(let rec2
+  (cocase (my-record i64)
+    ((my-record i64)
+      (item-1 10)
+      (item-3 top.unit)
+      (item-2 20))))
+
+(i64.print (my-record.item-1 rec2)) ;; ~> 10
+(i64.print (my-record.item-2 rec2)) ;; ~> 20
+#+END_SRC
+*** Syntax
+#+BEGIN_SRC scheme
+(record (a e ... e)
+  ((b e)
+   ...
+   (b e)))
+
+(cocase (a e ... e)
+  ((a e ... e)
+   (b e)
+   ...
+   (b e))
+  ((a e ... e)
+   (b e)
+   ...
+   (b e)))
+#+END_SRC
+*** Semantics
+#+BEGIN_SRC scheme
+(record (a e ... e)
+  ((b e)
+   ...
+   (b e)))
+~> (cocase (a e ... e)
+     ((a e ... e)
+      (b e)
+      ...
+      (b e)))
+#+END_SRC
+*** Notes
 
 * Macro Expansion
 
