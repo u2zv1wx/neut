@@ -761,8 +761,8 @@ The domain of each constructor must be of the form =(a x1 ... xn)=, where the =a
 
 Nested coinductive type is allowed if and only if the outer, already-defined coinductive type is not mutual.
 
-As a side note, internally, a =coinductive= statement is implemented via a translation into an =inductive= statement. For example, the example of =stream= above is translated into the following +BEGIN_SRC:
-#statement scheme
+As a side note, internally, a =coinductive= statement is implemented via a translation into an =inductive= statement. For example, the example of =stream= above is translated into the following statement:
+#+BEGIN_SRC scheme
 (inductive stream ((A tau))
   (unfold ((F (hom tau tau))
            (h (hom (F A) A))
