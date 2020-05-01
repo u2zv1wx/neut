@@ -40,7 +40,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#useunuse][use/unuse]]
   - [[#sectionend][section/end]]
   - [[#verify][verify]]
-- [[#syntax-and-semantics-of-inference-rules][Syntax and Semantics of Inference Rules]]
+- [[#syntax-and-semantics-of-terms][Syntax and Semantics of Terms]]
   - [[#tau][tau]]
   - [[#upsilon][upsilon]]
   - [[#pi][pi]]
@@ -973,7 +973,7 @@ The evaluation strategy of the normalization process is the applicative order; t
 
 This statement can be used to check if the given term is contained in the weakly-normalizing fragment of the CoC without the universe hierarchy.
 
-* Syntax and Semantics of Inference Rules
+* Syntax and Semantics of Terms
 A term of Neut is a tree of inference rules. Each rule is one of the following rules described in this section.
  # Each statement is one of the following statements described in this section.
 
