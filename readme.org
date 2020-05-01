@@ -1591,6 +1591,44 @@ The =cocase= / =record= notation is a convenient notation to construct a term of
 The =cocase= / =record= notation constructs a term of a degenerated coinductive type using the fact that every destructor of a degenerated coinductive type always discards the argument. Since the argument is always discarded, we can supply a "fake" value for the argument.
 
 * Macro Expansion
+Every source code of Neut is firstly translated into a tree that is conceptually defined as follows:
+#+BEGIN_SRC text
+tree ::= leaf STRING | node (LIST tree)
+#+END_SRC
+After this translation, the resulting ASTs are *macro-expanded*, and then interpreted as, for example, statements by the compiler. Here I will explain how this macro-expansion works.
+
+In short, the macro-expansion of an AST in Neut is a call-by-value-like recursive application of the *step-expansion* on the AST.
+
+More specifically, the macro-expansion proceeds as follows. Take =t= to be an input tree. If the tree =t= is of the form =(leaf STRING)=, the compiler returns the result of step-expansion of =t=. If a tree is of the form =(node t1 ... tn)=, the =t1=, ..., =tn= are firstly macro-expanded them into =t1'= , ..., =tn'= , and then the compiler step-expands the tree =(node t1' ... tn')=.
+
+Given an input tree, the step-expansion proceeds by:
+1. looking up the keyword environment and the notation environment,
+2. tries to *match* the input tree with a domain of a correspondence in the notation environment, and
+3. returning the codomain of the correspondence, resolving variable bindings.
+
+I believe the matching process is best explained by an example. Consider we have defined a keyword and a notation as follows:
+#+BEGIN_SRC text
+(keyword if)
+
+(notation (if b e1 e2)
+  (switch b
+    (bool.true e1)
+    (bool.false e2)))
+#+END_SRC
+Now, suppose we have an AST =(if some-condition (i64.print 10) (string.print "hello"))=, the matching process creates the following substitution:
+#+BEGIN_SRC text
+b  ~> some-condition
+e1 ~> (i64.print 10)
+e2 ~> (string.print "hello")
+#+END_SRC
+and then replaces =b=, =e1=, and =e2= in the codomain of the notation according to this substitution. The resulting tree is:
+#+BEGIN_SRC text
+(switch some-condition
+  (bool.true (i64.print 10))
+  (bool.false (string.print "hello")))
+#+END_SRC
+
+The keyword environment is to determine whether a leaf of the domain of a notation is a variable or an opaque syntactic construct (i.e. "keyword").
 
 * Compiler Subcommands
 The =neut= binary provides subcommands in this section.
