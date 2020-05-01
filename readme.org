@@ -681,7 +681,7 @@ Given this statement, the compiler generates [[#definelet][let]] statements that
    - =list.nil : Pi (a : tau). list a=, where the =a : tau= is set to be [[#attribute][implicit]].
    - =list.cons : Pi (a : tau, _ : a, _ : list a). list a=, where the =a : tau= is set to be [[#attribute][implicit]].
 3. The elimination rule of the type:
-   - =list.fold : (Π ((a tau) (_ (list a)) (list (arrow (tau) tau)) (_ (arrow () (F a))) (_ (arrow (a (F a)) (F a)))) (F a))=
+   - =list.fold : (Π ((a tau) (_ (list a)) (list (arrow (tau) tau)) (_ (arrow () (F a))) (_ (arrow (a (F a)) (F a)))) (F a))=, where the =a : tau= is set to be [[#attribute][implicit]].
 The elimination rule might seem intimidating. In the actual code, however, you don't have to use that generated term since the rule [[#case][case]] can be used in harmony with the rule [[#fix][fix]] to achieve the expressiveness of =fold=, as in the function =length= in the example code above.
 
 When used in the domain of a constructor, the inductive type being defined must be occurred covariantly.
@@ -737,6 +737,55 @@ The =coinductive= statement defines a coinductive type, its elimination rules, a
       TREE)))
 #+END_SRC
 *** Semantics
+When parsed, the =coinductive= statement is translated into =let= statements that defines (1) the coinductive type, (2) the elimination rules (or the destructors of the coinductive type), and (3) the introduction rule (or the "unfold" of the type). For example, consider the following =coinductive= statement:
+#+BEGIN_SRC scheme
+(coinductive stream ((A tau))
+  (head
+    ((_ (stream A)))
+    A)
+  (tail
+    ((_ (stream A)))
+    (stream A)))
+#+END_SRC
+Given this statement, the compiler generates [[#definelet][let]] statements that defines the followings:
+1. The coinductive type =stream : Pi (a : tau). tau=
+2. The elimination rules (destructors) of the type:
+   - =stream.head : Pi (a : tau, _ : stream a). a=, where the =a : tau= is set to be [[#attribute][implicit]].
+   - =stream.tail : Pi (a : tau, _ : stream a). stream a=, where the =a : tau= is set to be [[#attribute][implicit]].
+3. The elimination rule of the type:
+   - =stream.unfold : (Π ((A tau) (F (arrow (tau) tau)) (_ (arrow ((F A)) A)) (_ (arrow ((F A)) (F A))) (_ (F A))) (stream A))=, where the =a : tau= is set to be [[#attribute][implicit]].
+
+When used in the codomain of a destructor, the coinductive type being defined must be occurred covariantly.
+
+The domain of each constructor must be of the form =(a x1 ... xn)=, where the =a= is the inductive type being defined, and =x1, ..., xn= are the argument of the coinductive type. Note that there doesn't exist such a thing like "generalized coinductive type".
+
+Nested coinductive type is allowed if and only if the outer, already-defined coinductive type is not mutual.
+
+As a side note, internally, a =coinductive= statement is implemented via a translation into an =inductive= statement. For example, the example of =stream= above is translated into the following +BEGIN_SRC:
+#statement scheme
+(inductive stream ((A tau))
+  (unfold ((F (hom tau tau))
+           (h (hom (F A) A))
+           (t (hom (F A) (F A)))
+           (_ (F A)))
+          (stream A)))
+#+END_SRC
+with the definitions of corresponding destructors:
+#+BEGIN_SRC scheme
+(define stream.head ((A tau) (x (stream A)))
+  (case x
+    ((stream.unfold _ h _ v) (h v))))
+
+(attribute stream.head (implicit 0))
+
+(define stream.tail ((A tau) (x (stream A)))
+  (witness (stream A)
+    (case x
+      ((stream.unfold F h t v)
+        (stream.unfold F h t (t v))))))
+
+(attribute stream.tail (implicit 0))
+#+END_SRC
 
 ** introspect
 The =introspect= statement introspects the state of the compiler and selects statements by those information.
