@@ -1427,9 +1427,58 @@ A sigma-type without dependence is the familiar product type; =(sigma ((_ A1) ..
 ** with
 =with= is a do-notation with the bind operation made explicit.
 *** Example
+#+BEGIN_SRC scheme
+(with identity.bind
+  (let str "foo")
+  (let _ (string.print &str))
+  (string.print &str) ;; the same as (let _ (string.print &str))
+  (let x (i64 10))
+  (let y (add-i64 100 x))
+  (i64.print y))
+
+(with identity.bind
+  (let str "foo")
+  (let _
+    (let _ (i64 100)) ;; each `e` in `(let x e)` is implicitly wrapped by `with`
+    (string.print &str)
+    (string.print &str))
+  (string.print &str)
+  (let len (string.print &str))
+  len)
+#+END_SRC
 *** Syntax
+#+BEGIN_SRC scheme
+(with TREE TREE ... TREE)
+#+END_SRC
 *** Semantics
+#+BEGIN_SRC text
+(with bind (let x (e e1 ... en)) rest+)
+~> (bind hole hole (with (e e1' ... en'))
+     (lambda (sig)
+       (sigma-elimination (x1 ... xj) sig (with rest+))))
+where:
+  ei' := if ei == &x then x else ei
+  x1, ..., xj := (all the "borrowed" variables in e1, ..., en)
+  sig : a fresh variable
+
+(with bind (let x e) rest+)
+~> (bind hole hole (with e)
+     (lambda (x) (with rest+)))
+
+(with bind e rest+)
+~> (with bind (let _ e) rest+)
+
+(with e)
+~> e
+#+END_SRC
 *** Notes
+The =with= notation can be understood as a generalization of =begin= in Scheme, or an explicit version of the =do= notation in Haskell.
+
+The "borrowing" is covered by the first rule of the semantics; As you can see from the definition, this realization of borrowing works for any =bind= operation.
+
+Note that the =bind= operator is not restricted to the monadic bind; You can set any term there as long as the resulting term of this syntactic translation is well-typed.
+
+The =e= in =(let x e)= is automatically surrounded by =with=.
 
 ** cocase/record
 
