@@ -1068,7 +1068,7 @@ The =pi= term is a term that represents the universal quantification.
 ~> e {x1 := v1, ..., xn := vn}
 #+END_SRC
 *** Notes
-If a node =(e e1 ... en)= is not parsed into any other terms, the node is parsed as =(pi-elimination e e1 ... en)=.
+If a tree =(e e1 ... en)= is not parsed into any other terms, the tree is parsed as =(pi-elimination e e1 ... en)=.
 
 Note that the arguments of a lambda abstraction is generalized from unary to n-ary. This enables the compiler to emit more performant code when a lambda abstraction receives multiple arguments; Without that generalization, the argument must be represented as a tuple, discarding the possibility to pass the arguments of a function using multiple registers.
 
@@ -1108,14 +1108,18 @@ These are in =core/notation.neut=.
 
 Incidentally, I personally recommend you to use the =witness= notation above when defining a function to write the resulting type of the function explicitly. For example, the code
 #+BEGIN_SRC scheme
-(define id ((a tau) (x a))
-  (witness a
-    x))
+(define fact ((x i64))
+  (witness i64
+    (if (icmp-sle-i64 x 0)
+      1
+      (mul-i64 x (fact (sub-i64 x 1))))))
 #+END_SRC
 is preferred to:
 #+BEGIN_SRC scheme
-(define id ((a tau) (x a))
-  x)
+(define fact ((x i64))
+  (if (icmp-sle-i64 x 0)
+    1
+    (mul-i64 x (fact (sub-i64 x 1)))))
 #+END_SRC
 
 ** fix
