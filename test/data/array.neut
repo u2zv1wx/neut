@@ -25,7 +25,7 @@
 (i64.print k) ;; -7
 
 (let k
-  (with let-bind
+  (with identity.bind
     (let a (i64.array-access 0 hole &xs))
     (let b (i64.array-access 1 4 &xs))
     (let c (i64.array-access 2 4 &xs))

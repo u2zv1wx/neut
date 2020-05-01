@@ -4,10 +4,12 @@
 
 (include library "core/base.neut")
 
-(define execute ((a tau) (x a))
-  (witness top
-    (with let-bind
-      x
-      top.unit)))
+;; (include library "core/identity.neut")
+
+;; (define execute ((a tau) (x a))
+;;   (witness top
+;;     (with identity.bind
+;;       x
+;;       top.unit)))
 
 ;; (attribute execute (implicit 0))

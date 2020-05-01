@@ -8,7 +8,7 @@
 ;; bypass by `enum-introduction`
 (let lam-bar
   (lambda ((sample-2.bar tau))
-    (with let-bind
+    (with identity.bind
       (let _ sample-2.bar) ;; こっちは変数のほう
       (enum-introduction sample-2.bar)))) ;; 定数のほうも参照可能
 

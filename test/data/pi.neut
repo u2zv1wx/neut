@@ -24,7 +24,7 @@
 
 ;; a function with a free variable
 (define f5 ((x i64))
-  (with let-bind
+  (with identity.bind
     (let adder (lambda (y) (i64.add x y)))
     adder))
 
@@ -34,7 +34,7 @@
 
 ;; a function with a free variable of type pi
 (define f6 ((g (hom i64 i64)))
-  (with let-bind
+  (with identity.bind
     (let app (lambda (y) (g y)))
     app))
 

@@ -12,35 +12,35 @@
 
 (section identity)
 
-(define map ()
+(let map
   (witness (functor-form identity)
     (lambda (_ _ f value)
       (f value))))
 
-(define return ()
+(let return
   (witness (return-type identity)
     (lambda (_ x)
       x)))
 
-(define bind ()
+(let bind
   (witness (bind-type identity)
     (lambda (_ _ comp k)
       (k comp))))
 
-(define witness-functor ()
+(let witness-functor
   (witness (functor identity)
     (record (functor identity)
       (map
-        (identity.map)))))
+        identity.map))))
 
-(define witness-monad ()
+(let witness-monad
   (witness (monad identity)
     (record (monad identity)
       (witness-functor
-        (identity.witness-functor))
+        identity.witness-functor)
       (return
-        (identity.return))
+        identity.return)
       (bind
-        (identity.bind)))))
+        identity.bind))))
 
 (end identity)

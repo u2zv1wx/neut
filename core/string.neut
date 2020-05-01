@@ -4,6 +4,8 @@
 
 (include library "core/top.neut")
 
+(include library "core/identity.neut")
+
 (define string
   (sigma
     ((len i64))
@@ -13,7 +15,7 @@
 
 (define print-character ((value i8))
   (witness top
-    (with let-bind
+    (with identity.bind
       (let char (array-introduction i8 value))
       (os.write hole os.stdout char 1)
       top.unit)))

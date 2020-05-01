@@ -65,7 +65,7 @@
 (keyword destruct)
 
 (notation (destruct e xts rest+)
-  (sigma-elimination xts e (with let-bind rest+)))
+  (sigma-elimination xts e (with identity.bind rest+)))
 
 (keyword if)
 

@@ -1,7 +1,7 @@
 (let (x hole) (i64 1))
 
 (let (y hole)
-  (with let-bind
+  (with identity.bind
     (let (z hole) x)
     z))
 

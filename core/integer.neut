@@ -18,19 +18,19 @@
 
 (define print-digit ((x i64))
   (witness top
-    (with let-bind
+    (with identity.bind
       (print-character (unsafe.cast i64 i8 (add-i64 x 48))))))
 
 ;; とりあえず直接printする。ホントはbufferをつかって実装するべき。
 (define print ((x i64))
   (witness top
     (if (icmp-slt-i64 x 0)
-      (with let-bind
+      (with identity.bind
         (string.print "-")
         (print (negate x)))
       (if (icmp-slt-i64 x 10)
         (print-digit x)
-        (with let-bind
+        (with identity.bind
           (let q (sdiv-i64 x 10))
           (let r (srem-i64 x 10))
           (print q)
