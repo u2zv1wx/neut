@@ -54,9 +54,8 @@ Here I briefly summerize the basic properties of Neut before diving into the det
 - [[#auxiliary-syntax][Auxiliary Syntax]]
   - [[#hole][hole]]
   - [[#sigma-type][Sigma Type]]
-  - [[#with-notation-do-notation-with-explicit-monadic-bind][With Notation: do-Notation with Explicit Monadic Bind]]
-  - [[#record][Record]]
-  - [[#inductive-and-coinductive-types][Inductive and Coinductive types]]
+  - [[#with][with]]
+  - [[#cocaserecord][cocase/record]]
 - [[#macro-expansion][Macro Expansion]]
 - [[#compiler-commands][Compiler Commands]]
   - [[#archive][archive]]
@@ -754,7 +753,7 @@ Given this statement, the compiler generates [[#definelet][let]] statements that
    - =stream.tail : Pi (a : tau, _ : stream a). stream a=, where the =a : tau= is set to be [[#attribute][implicit]].
 3. The introduction rule of the type:
    - =stream.unfold : (Π ((A tau) (F (arrow (tau) tau)) (_ (arrow ((F A)) A)) (_ (arrow ((F A)) (F A))) (_ (F A))) (stream A))=, where the =a : tau= is set to be [[#attribute][implicit]].
-The introduction rule might seem intimidating. In the actual code, however, you don’t have to use that generated term as long as what you need is a degenerated coinductive type (i.e. the record type), since in that case the rule [[#record][record]] can be used to construct (introduce) a value of a record type.
+The introduction rule might seem intimidating. In the actual code, however, you don’t have to use that generated term as long as what you need is a degenerated coinductive type (i.e. the record type), since in that case the rule [[#cocaserecord][record]] can be used to construct (introduce) a value of a record type.
 
 When used in the codomain of a destructor, the coinductive type being defined must be occurred covariantly.
 
@@ -1425,12 +1424,14 @@ Sigma-type with dependence can be used, for example, to realize the type of stri
 
 A sigma-type without dependence is the familiar product type; =(sigma ((_ A1) ... (_ An)) B)= is =(product A1 ... An B)=.
 
-** With Notation: do-Notation with Explicit Monadic Bind
+** with
+=with= is a do-notation with the bind operation made explicit.
+*** Example
+*** Syntax
+*** Semantics
+*** Notes
 
-** Record
-
-** Inductive and Coinductive types
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec eleifend tellus euismod erat accumsan, nec euismod sem placerat. Ut eu lacinia arcu, id imperdiet lacus. Integer feugiat lacus mattis, dictum nunc nec, interdum justo. Fusce sed dui id orci faucibus elementum. Vivamus sit amet sapien a lorem efficitur posuere suscipit in lacus. Praesent eget sagittis nisi, id vehicula elit. Vestibulum laoreet odio ex, a aliquet justo consectetur quis. Aenean laoreet vehicula libero id varius. Vivamus condimentum, sem sed sollicitudin placerat, nulla enim faucibus odio, gravida commodo velit mi ac sapien. Integer feugiat diam in lectus porttitor, sit amet viverra velit malesuada.
+** cocase/record
 
 * Macro Expansion
 
