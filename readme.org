@@ -752,7 +752,7 @@ Given this statement, the compiler generates [[#definelet][let]] statements that
 2. The elimination rules (destructors) of the type:
    - =stream.head : Pi (a : tau, _ : stream a). a=, where the =a : tau= is set to be [[#attribute][implicit]].
    - =stream.tail : Pi (a : tau, _ : stream a). stream a=, where the =a : tau= is set to be [[#attribute][implicit]].
-3. The elimination rule of the type:
+3. The introduction rule of the type:
    - =stream.unfold : (Π ((A tau) (F (arrow (tau) tau)) (_ (arrow ((F A)) A)) (_ (arrow ((F A)) (F A))) (_ (F A))) (stream A))=, where the =a : tau= is set to be [[#attribute][implicit]].
 
 When used in the codomain of a destructor, the coinductive type being defined must be occurred covariantly.
