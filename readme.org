@@ -978,27 +978,88 @@ A term of Neut is a tree of inference rules. Each rule is one of the following r
  # Each statement is one of the following statements described in this section.
 
 ** tau
+The =tau= term is the type of types.
+*** Example
+#+BEGIN_SRC scheme
+(define id ((a tau) (x a)) x)
+
+(id i64 10)
+
+(id tau tau) ;; valid since `tau : tau`
+#+END_SRC
+*** Syntax
+#+BEGIN_SRC scheme
+tau
+#+END_SRC
+*** Semantics
+The =tau= rule doesn't have any operational semantics.
+
+*** Notes
+The =tau= type is the type of types. In other words, a term =e= is defined to be a type if and only if =e : tau=. Obviously, =tau= is also a type since =tau : tau= holds.
+
+The universe hierarchy is intentionally removed from the source language since (1) the source language already contains the =fix= operator, and (2) we can check if a term is subsumed in the weakly-normalizing fragment of the type system, which is consistent, by using the [[#verify][verify]] statement.
 
 ** upsilon
+The =upsilion= term is a term that represents a variable.
+*** Example
+#+BEGIN_SRC scheme
+;; "explicit" notation
+(define id ((a tau) (x a)) (upsilon x))
+
+;; "implicit" notation
+(define id ((a tau) (x a)) x)
+#+END_SRC
+*** Syntax
+#+BEGIN_SRC scheme
+(upsilon LEAF)
+LEAF
+#+END_SRC
+*** Semantics
+The =upsilon= rule doesn't have any operational semantics.
+
+*** Notes
+The =upsilon= term can be interpreted as a variable.
+
+If a leaf is not parsed into any other syntactic construct, the leaf is considered to be wrapped by =upsilon=.
 
 ** pi
+The =pi= term is a term that represents the universal quantification.
+*** Example
+*** Syntax
+*** Semantics
 
 ** fix
-
+*** Example
+*** Syntax
+*** Semantics
 ** constant
-
+*** Example
+*** Syntax
+*** Semantics
 ** hole
-
+*** Example
+*** Syntax
+*** Semantics
 ** Int
-
+*** Example
+*** Syntax
+*** Semantics
 ** Float
-
+*** Example
+*** Syntax
+*** Semantics
 ** Enum
-
+*** Example
+*** Syntax
+*** Semantics
 ** Array
-
+*** Example
+*** Syntax
+*** Semantics
 ** Struct
-
+*** Example
+*** Syntax
+*** Semantics
 * Auxiliary Syntax
 
 ** Sigma Type
