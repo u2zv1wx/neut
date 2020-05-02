@@ -3,13 +3,10 @@ module Parse.Rule
     asInductive,
     insForm,
     insInductive,
-    internalize,
     registerLabelInfo,
     generateProjections,
   )
 where
-
--- toStmtImplicit,
 
 import Control.Monad.State.Lazy
 import Data.Env
@@ -229,7 +226,9 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
       (_, WeakTermPiIntro xtsyts (_, WeakTermPiIntro atsbts (_, WeakTermPiElim b _))) -> do
         as <- mapM (\(_, x, _) -> asInt <$> discernText m (asText x)) ats
         insInductive as constructorIdent
-        yts' <- mapM (internalize as atsbts) $ drop (length xts) xtsyts
+        yts' <- mapM (internalize as atsbts) $ drop (length xts') xtsyts
+        p "yts':"
+        p' yts'
         return
           [ WeakStmtLetWT
               m
