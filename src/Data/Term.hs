@@ -34,10 +34,10 @@ data Term
   | TermStruct [ArrayKind] -- e.g. (struct u8 u8 f16 f32 u64)
   | TermStructIntro [(TermPlus, ArrayKind)]
   | TermStructElim [(Meta, Ident, ArrayKind)] TermPlus TermPlus
-  | TermCase
-      (Maybe Ident)
-      TermPlus -- (the `e` in `case e of (...)`, the type of `e`)
-      [Clause] -- ((cons x xs) e), ((nil) e), ((succ n) e).  (not ((cons A x xs) e).)
+  -- | TermCase
+  --     (Maybe Ident)
+  --     TermPlus -- (the `e` in `case e of (...)`, the type of `e`)
+  --     [Clause] -- ((cons x xs) e), ((nil) e), ((succ n) e).  (not ((cons A x xs) e).)
   deriving (Show)
 
 type TextPlus =
@@ -124,10 +124,10 @@ varTermPlus term =
     (_, TermStructElim xts d e) -> do
       let xs = map (\(_, x, _) -> x) xts
       varTermPlus d ++ filter (`notElem` xs) (varTermPlus e)
-    (_, TermCase _ e cxes) -> do
-      let xs = varTermPlus e
-      let ys = concatMap (\((_, xts), body) -> varTermPlus' xts [body]) cxes
-      xs ++ ys
+    -- (_, TermCase _ e cxes) -> do
+    --   let xs = varTermPlus e
+    --   let ys = concatMap (\((_, xts), body) -> varTermPlus' xts [body]) cxes
+    --   xs ++ ys
 
 varTermPlus' :: [IdentPlus] -> [TermPlus] -> [Ident]
 varTermPlus' binder es =
@@ -202,13 +202,13 @@ substTermPlus sub term =
       let sub' = foldr IntMap.delete sub xs
       let e' = substTermPlus sub' e
       (m, TermStructElim xts v' e')
-    (m, TermCase indName e cxtes) -> do
-      let e' = substTermPlus sub e
-      let cxtes' =
-            flip map cxtes $ \((c, xts), body) -> do
-              let (xts', body') = substTermPlus'' sub xts body
-              ((c, xts'), body')
-      (m, TermCase indName e' cxtes')
+    -- (m, TermCase indName e cxtes) -> do
+    --   let e' = substTermPlus sub e
+    --   let cxtes' =
+    --         flip map cxtes $ \((c, xts), body) -> do
+    --           let (xts', body') = substTermPlus'' sub xts body
+    --           ((c, xts'), body')
+    --   (m, TermCase indName e' cxtes')
 
 substTermPlus' :: SubstTerm -> [IdentPlus] -> [IdentPlus]
 substTermPlus' sub binder =
@@ -292,14 +292,14 @@ weaken term =
       let v' = weaken v
       let e' = weaken e
       (m, WeakTermStructElim xts v' e')
-    (m, TermCase indName e cxtes) -> do
-      let e' = weaken e
-      let cxtes' =
-            flip map cxtes $ \((c, xts), body) -> do
-              let xts' = weakenArgs xts
-              let body' = weaken body
-              ((c, xts'), body')
-      (m, WeakTermCase indName e' cxtes')
+    -- (m, TermCase indName e cxtes) -> do
+    --   let e' = weaken e
+    --   let cxtes' =
+    --         flip map cxtes $ \((c, xts), body) -> do
+    --           let xts' = weakenArgs xts
+    --           let body' = weaken body
+    --           ((c, xts'), body')
+    --   (m, WeakTermCase indName e' cxtes')
 
 weakenArgs :: [(Meta, Ident, TermPlus)] -> [(Meta, Ident, WeakTermPlus)]
 weakenArgs xts = do

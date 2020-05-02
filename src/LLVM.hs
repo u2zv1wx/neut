@@ -69,8 +69,9 @@ llvmCode term =
       let idxList = map (\i -> (LLVMDataInt i, i32)) [0 ..]
       ys <- mapM newNameWith xs
       loadContent v bt (zip idxList (zip ys xts)) e
-    (m, CodeCase sub v branchList) ->
-      prepareBranch sub branchList >>= llvmCodeCase m v
+
+-- (m, CodeCase sub v branchList) ->
+--   prepareBranch sub branchList >>= llvmCodeCase m v
 
 prepareBranch :: SubstDataPlus -> [(a, CodePlus)] -> WithEnv [(a, CodePlus)]
 prepareBranch sub branchList = do
@@ -420,28 +421,28 @@ llvmCodeEnumElim v branchList = do
       (cast, castThen) <- llvmCast (Just "enum-base") v t
       castThen $ LLVMSwitch (cast, t) defaultCase caseList
 
-llvmCodeCase :: Meta -> DataPlus -> [((Meta, T.Text), CodePlus)] -> WithEnv LLVM
-llvmCodeCase m v mces =
-  case mces of
-    [] ->
-      return LLVMUnreachable
-    [(_, code)] ->
-      llvmCode code
-    (((_, c), code) : branchList) -> do
-      code' <- llvmCode code
-      cont <- llvmCodeCase m v branchList
-      (tmp, tmpVar) <- newDataLocal c
-      (base, baseVar) <- newDataLocal $ takeBaseName v
-      (isEq, isEqVar) <- newDataLocal "cmp"
-      cenv <- gets codeEnv
-      case Map.lookup c cenv of
-        Nothing -> raiseCritical m "llvmCodeCase"
-        Just (Definition _ args _) -> do
-          uncastThenCmpThenBranch <-
-            llvmUncastLet tmp (LLVMDataGlobal c) (toFunPtrType args)
-              $ LLVMLet isEq (LLVMOpBinaryOp (BinaryOpICmpEQ voidPtr) tmpVar baseVar)
-              $ LLVMBranch isEqVar code' cont
-          llvmDataLet base v uncastThenCmpThenBranch
+-- llvmCodeCase :: Meta -> DataPlus -> [((Meta, T.Text), CodePlus)] -> WithEnv LLVM
+-- llvmCodeCase m v mces =
+--   case mces of
+--     [] ->
+--       return LLVMUnreachable
+--     [(_, code)] ->
+--       llvmCode code
+--     (((_, c), code) : branchList) -> do
+--       code' <- llvmCode code
+--       cont <- llvmCodeCase m v branchList
+--       (tmp, tmpVar) <- newDataLocal c
+--       (base, baseVar) <- newDataLocal $ takeBaseName v
+--       (isEq, isEqVar) <- newDataLocal "cmp"
+--       cenv <- gets codeEnv
+--       case Map.lookup c cenv of
+--         Nothing -> raiseCritical m "llvmCodeCase"
+--         Just (Definition _ args _) -> do
+--           uncastThenCmpThenBranch <-
+--             llvmUncastLet tmp (LLVMDataGlobal c) (toFunPtrType args)
+--               $ LLVMLet isEq (LLVMOpBinaryOp (BinaryOpICmpEQ voidPtr) tmpVar baseVar)
+--               $ LLVMBranch isEqVar code' cont
+--           llvmDataLet base v uncastThenCmpThenBranch
 
 data AggPtrType
   = AggPtrTypeArray Int LowType

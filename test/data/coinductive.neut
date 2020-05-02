@@ -41,7 +41,7 @@
 
 (define stream.tail ((A tau) (x (stream A)))
   (stream.fold x
-    (lambda (_)
+    (lambda ((A tau))
       (stream A))
     (lambda (F h t v)
       (stream.unfold F h t (t v)))))
@@ -89,6 +89,20 @@
     ((_ (my-record a)))
     top))
 
+
+?my-record.item-1
+?my-record.fold
+
+(coinductive my-record-2 ((a tau) (b i64))
+  (item-1
+    ((_ (my-record a)))
+    a)
+  (item-2
+    ((_ (my-record a)))
+    i64)
+  (item-3
+    ((_ (my-record a)))
+    top))
 
 (let item
   (record (my-record i64)

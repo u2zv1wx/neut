@@ -199,13 +199,13 @@ interpret inputTree =
             return (m, WeakTermStructElim xts' e1' e2')
           | otherwise ->
             raiseSyntaxError m "(struct-elimination (TREE*) TREE TREE)"
-        "case"
-          | e : cxtes <- rest -> do
-            e' <- interpret e
-            cxtes' <- mapM interpretCaseClause cxtes
-            return (m, WeakTermCase Nothing e' cxtes')
-          | otherwise ->
-            raiseSyntaxError m "(case TREE TREE*)"
+        -- "case"
+        --   | e : cxtes <- rest -> do
+        --     e' <- interpret e
+        --     cxtes' <- mapM interpretCaseClause cxtes
+        --     return (m, WeakTermCase Nothing e' cxtes')
+        --   | otherwise ->
+        --     raiseSyntaxError m "(case TREE TREE*)"
         "question"
           | [e] <- rest -> do
             e' <- interpret e
@@ -457,15 +457,15 @@ interpretStructElim tree =
     e ->
       raiseSyntaxError (fst e) "(LEAF TREE)"
 
-interpretCaseClause :: TreePlus -> WithEnv (((Meta, Ident), [WeakIdentPlus]), WeakTermPlus)
-interpretCaseClause tree =
-  case tree of
-    (_, TreeNode [(_, TreeNode ((m, TreeLeaf c) : xts)), e]) -> do
-      xts' <- mapM interpretWeakIdentPlus xts
-      e' <- interpret e
-      return (((m, asIdent c), xts'), e')
-    t ->
-      raiseSyntaxError (fst t) "((LEAF TREE ... TREE) TREE)"
+-- interpretCaseClause :: TreePlus -> WithEnv (((Meta, Ident), [WeakIdentPlus]), WeakTermPlus)
+-- interpretCaseClause tree =
+--   case tree of
+--     (_, TreeNode [(_, TreeNode ((m, TreeLeaf c) : xts)), e]) -> do
+--       xts' <- mapM interpretWeakIdentPlus xts
+--       e' <- interpret e
+--       return (((m, asIdent c), xts'), e')
+--     t ->
+--       raiseSyntaxError (fst t) "((LEAF TREE ... TREE) TREE)"
 
 type CocaseClause =
   ((Ident, [WeakTermPlus]), [(Ident, WeakTermPlus)])

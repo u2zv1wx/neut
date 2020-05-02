@@ -105,15 +105,15 @@ reduceTermPlus term =
             reduceTermPlus $ substTermPlus sub e2
         _ ->
           (m, TermStructElim xks e1' e2)
-    (m, TermCase indName e cxtes) -> do
-      let e' = reduceTermPlus e
-      let cxtes'' =
-            flip map cxtes $ \((c, xts), body) -> do
-              let (ms, xs, ts) = unzip3 xts
-              let ts' = map reduceTermPlus ts
-              let body' = reduceTermPlus body
-              ((c, zip3 ms xs ts'), body')
-      (m, TermCase indName e' cxtes'')
+    -- (m, TermCase indName e cxtes) -> do
+    --   let e' = reduceTermPlus e
+    --   let cxtes'' =
+    --         flip map cxtes $ \((c, xts), body) -> do
+    --           let (ms, xs, ts) = unzip3 xts
+    --           let ts' = map reduceTermPlus ts
+    --           let body' = reduceTermPlus body
+    --           ((c, zip3 ms xs ts'), body')
+    --   (m, TermCase indName e' cxtes'')
     _ ->
       term
 
@@ -280,12 +280,12 @@ normalize term =
             normalize $ substTermPlus sub e2
         _ ->
           return (m, TermStructElim xks e1' e2)
-    (m, TermCase indName e cxtes) -> do
-      e' <- normalize e
-      cxtes'' <-
-        flip mapM cxtes $ \((c, xts), body) -> do
-          let (ms, xs, ts) = unzip3 xts
-          ts' <- mapM normalize ts
-          body' <- normalize body
-          return ((c, zip3 ms xs ts'), body')
-      return (m, TermCase indName e' cxtes'')
+-- (m, TermCase indName e cxtes) -> do
+--   e' <- normalize e
+--   cxtes'' <-
+--     flip mapM cxtes $ \((c, xts), body) -> do
+--       let (ms, xs, ts) = unzip3 xts
+--       ts' <- mapM normalize ts
+--       body' <- normalize body
+--       return ((c, zip3 ms xs ts'), body')
+--   return (m, TermCase indName e' cxtes'')

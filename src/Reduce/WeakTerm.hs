@@ -100,15 +100,15 @@ reduceWeakTermPlus term =
             reduceWeakTermPlus $ substWeakTermPlus sub e2
         _ ->
           (m, WeakTermStructElim xks e1' e2)
-    (m, WeakTermCase indName e cxtes) -> do
-      let e' = reduceWeakTermPlus e
-      let cxtes'' =
-            flip map cxtes $ \((c, xts), body) -> do
-              let (ms, xs, ts) = unzip3 xts
-              let ts' = map reduceWeakTermPlus ts
-              let body' = reduceWeakTermPlus body
-              ((c, zip3 ms xs ts'), body')
-      (m, WeakTermCase indName e' cxtes'')
+    -- (m, WeakTermCase indName e cxtes) -> do
+    --   let e' = reduceWeakTermPlus e
+    --   let cxtes'' =
+    --         flip map cxtes $ \((c, xts), body) -> do
+    --           let (ms, xs, ts) = unzip3 xts
+    --           let ts' = map reduceWeakTermPlus ts
+    --           let body' = reduceWeakTermPlus body
+    --           ((c, zip3 ms xs ts'), body')
+    --   (m, WeakTermCase indName e' cxtes'')
     (_, WeakTermQuestion e _) ->
       reduceWeakTermPlus e
     _ -> term

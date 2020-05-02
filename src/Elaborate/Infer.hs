@@ -164,39 +164,39 @@ infer' ctx term =
       forM_ (zip xs ts) $ uncurry insWeakTypeEnv
       (e2', t2) <- infer' (ctx ++ zip3 ms xs ts) e2
       return ((m, WeakTermStructElim xks e1' e2'), t2)
-    (m, WeakTermCase mIndName e cxtes) -> do
-      (e', t') <- infer' ctx e
-      resultType <- newTypeHoleInCtx ctx m
-      if null cxtes
-        then return ((m, WeakTermCase mIndName e' []), resultType) -- ex falso quodlibet
-        else do
-          (indName, indInfo) <- getIndInfo $ map (fst . fst) cxtes
-          (indType, argHoleList) <- constructIndType m ctx indName
-          -- indType = a @ (HOLE, ..., HOLE)
-          insConstraintEnv indType t'
-          cxtes' <-
-            forM (zip indInfo cxtes) $ \(is, (((mc, c), args), body)) -> do
-              let usedHoleList = map (argHoleList !!) is
-              args' <- inferPatArgs ctx args
-              let items = map (\(mx, x, tx) -> ((mx, WeakTermUpsilon x), tx)) args'
-              et <- infer' ctx (mc, WeakTermUpsilon c)
-              -- et <- infer' ctx (mc, WeakTermConst c)
-              _ <- inferPiElim ctx m et (usedHoleList ++ items)
-              (body', bodyType) <- infer' (ctx ++ args') body
-              insConstraintEnv resultType bodyType
-              xts <- mapM (toWeakIdentPlus mc) usedHoleList
-              return (((mc, c), xts ++ args'), body')
-          return ((m, WeakTermCase (Just indName) e' cxtes'), resultType)
+    -- (m, WeakTermCase mIndName e cxtes) -> do
+    --   (e', t') <- infer' ctx e
+    --   resultType <- newTypeHoleInCtx ctx m
+    --   if null cxtes
+    --     then return ((m, WeakTermCase mIndName e' []), resultType) -- ex falso quodlibet
+    --     else do
+    --       (indName, indInfo) <- getIndInfo $ map (fst . fst) cxtes
+    --       (indType, argHoleList) <- constructIndType m ctx indName
+    --       -- indType = a @ (HOLE, ..., HOLE)
+    --       insConstraintEnv indType t'
+    --       cxtes' <-
+    --         forM (zip indInfo cxtes) $ \(is, (((mc, c), args), body)) -> do
+    --           let usedHoleList = map (argHoleList !!) is
+    --           args' <- inferPatArgs ctx args
+    --           let items = map (\(mx, x, tx) -> ((mx, WeakTermUpsilon x), tx)) args'
+    --           et <- infer' ctx (mc, WeakTermUpsilon c)
+    --           -- et <- infer' ctx (mc, WeakTermConst c)
+    --           _ <- inferPiElim ctx m et (usedHoleList ++ items)
+    --           (body', bodyType) <- infer' (ctx ++ args') body
+    --           insConstraintEnv resultType bodyType
+    --           xts <- mapM (toWeakIdentPlus mc) usedHoleList
+    --           return (((mc, c), xts ++ args'), body')
+    --       return ((m, WeakTermCase (Just indName) e' cxtes'), resultType)
     (m, WeakTermQuestion e _) -> do
       (e', te) <- infer' ctx e
       return ((m, WeakTermQuestion e' te), te)
     (_, WeakTermErase _ e) ->
       infer' ctx e
 
-toWeakIdentPlus :: Meta -> (WeakTermPlus, WeakTermPlus) -> WithEnv WeakIdentPlus
-toWeakIdentPlus m (_, t) = do
-  x <- newNameWith' "pat"
-  return (m, x, t)
+-- toWeakIdentPlus :: Meta -> (WeakTermPlus, WeakTermPlus) -> WithEnv WeakIdentPlus
+-- toWeakIdentPlus m (_, t) = do
+--   x <- newNameWith' "pat"
+--   return (m, x, t)
 
 inferArgs ::
   Meta ->
@@ -216,70 +216,70 @@ inferArgs m args1 args2 cod =
     _ ->
       raiseCritical m "invalid argument passed to inferArgs"
 
-constructIndType ::
-  Meta ->
-  Context ->
-  Ident ->
-  WithEnv (WeakTermPlus, [(WeakTermPlus, WeakTermPlus)])
-constructIndType m ctx x = do
-  senv <- gets substEnv
-  case IntMap.lookup (asInt x) senv of
-    Just e ->
-      case e of
-        e'@(me, WeakTermPiIntro Nothing xts cod) -> do
-          holeList <- mapM (const $ newHoleInCtx ctx me) xts
-          _ <- inferArgs m holeList xts cod
-          let es = map (\(h, _) -> h) holeList
-          return ((me, WeakTermPiElim e' es), holeList)
-        e' ->
-          raiseCritical m $
-            "the definition of inductive type must be of the form `(lambda (xts) (...))`, but is:\n"
-              <> toText e'
-    _ -> raiseCritical m $ "no such inductive type defined: " <> asText x
+-- constructIndType ::
+--   Meta ->
+--   Context ->
+--   Ident ->
+--   WithEnv (WeakTermPlus, [(WeakTermPlus, WeakTermPlus)])
+-- constructIndType m ctx x = do
+--   senv <- gets substEnv
+--   case IntMap.lookup (asInt x) senv of
+--     Just e ->
+--       case e of
+--         e'@(me, WeakTermPiIntro Nothing xts cod) -> do
+--           holeList <- mapM (const $ newHoleInCtx ctx me) xts
+--           _ <- inferArgs m holeList xts cod
+--           let es = map (\(h, _) -> h) holeList
+--           return ((me, WeakTermPiElim e' es), holeList)
+--         e' ->
+--           raiseCritical m $
+--             "the definition of inductive type must be of the form `(lambda (xts) (...))`, but is:\n"
+--               <> toText e'
+--     _ -> raiseCritical m $ "no such inductive type defined: " <> asText x
 
-getIndInfo :: [(Meta, Ident)] -> WithEnv (Ident, [[Int]])
-getIndInfo cs = do
-  (indNameList, usedPosList) <- unzip <$> mapM getIndInfo' cs
-  checkIntegrity indNameList
-  return (snd $ head indNameList, usedPosList)
+-- getIndInfo :: [(Meta, Ident)] -> WithEnv (Ident, [[Int]])
+-- getIndInfo cs = do
+--   (indNameList, usedPosList) <- unzip <$> mapM getIndInfo' cs
+--   checkIntegrity indNameList
+--   return (snd $ head indNameList, usedPosList)
 
-getIndInfo' :: (Meta, Ident) -> WithEnv ((Meta, Ident), [Int])
-getIndInfo' (m, c) = do
-  rienv <- gets revIndEnv
-  case Map.lookup (asText c) rienv of
-    Just (i, is) ->
-      return ((m, i), is)
-    _ ->
-      raiseError m $ "no such constructor defined: " <> asText c
+-- getIndInfo' :: (Meta, Ident) -> WithEnv ((Meta, Ident), [Int])
+-- getIndInfo' (m, c) = do
+--   rienv <- gets revIndEnv
+--   case Map.lookup (asText c) rienv of
+--     Just (i, is) ->
+--       return ((m, i), is)
+--     _ ->
+--       raiseError m $ "no such constructor defined: " <> asText c
 
-checkIntegrity :: [(Meta, Ident)] -> WithEnv ()
-checkIntegrity mis =
-  case mis of
-    [] ->
-      return ()
-    (mi : is) ->
-      checkIntegrity' mi is
+-- checkIntegrity :: [(Meta, Ident)] -> WithEnv ()
+-- checkIntegrity mis =
+--   case mis of
+--     [] ->
+--       return ()
+--     (mi : is) ->
+--       checkIntegrity' mi is
 
-checkIntegrity' :: (Meta, Ident) -> [(Meta, Ident)] -> WithEnv ()
-checkIntegrity' i mjs =
-  case mjs of
-    [] ->
-      return ()
-    (j : js) ->
-      if snd i == snd j
-        then checkIntegrity' i js
-        else raiseError (supMeta (fst i) (fst j)) "foo"
+-- checkIntegrity' :: (Meta, Ident) -> [(Meta, Ident)] -> WithEnv ()
+-- checkIntegrity' i mjs =
+--   case mjs of
+--     [] ->
+--       return ()
+--     (j : js) ->
+--       if snd i == snd j
+--         then checkIntegrity' i js
+--         else raiseError (supMeta (fst i) (fst j)) "foo"
 
-inferPatArgs :: Context -> [WeakIdentPlus] -> WithEnv [WeakIdentPlus]
-inferPatArgs ctx args =
-  case args of
-    [] ->
-      return []
-    ((mx, x, t) : xts) -> do
-      t' <- inferType' ctx t
-      insWeakTypeEnv x t'
-      xts' <- inferPatArgs (ctx ++ [(mx, x, t')]) xts
-      return $ (mx, x, t') : xts'
+-- inferPatArgs :: Context -> [WeakIdentPlus] -> WithEnv [WeakIdentPlus]
+-- inferPatArgs ctx args =
+--   case args of
+--     [] ->
+--       return []
+--     ((mx, x, t) : xts) -> do
+--       t' <- inferType' ctx t
+--       insWeakTypeEnv x t'
+--       xts' <- inferPatArgs (ctx ++ [(mx, x, t')]) xts
+--       return $ (mx, x, t') : xts'
 
 inferExternal :: Meta -> T.Text -> WithEnv TermPlus -> WithEnv (WeakTermPlus, WeakTermPlus)
 inferExternal m x comp = do

@@ -101,33 +101,69 @@ generateProjections ts = do
       forM bts $ \(mb, b, tb) -> do
         xts <- takeXTS ta
         (dom@(my, y, ty), cod) <- separate tb
-        v <- newNameWith'' "base"
-        let b' = a <> nsSep <> b
         e <-
           discern
             ( mb,
               weakTermPiIntro
                 (xts ++ [dom])
                 ( mb,
-                  WeakTermCase
-                    (Just $ asIdent a)
-                    (my, WeakTermUpsilon y)
-                    [ ( ( (mb, asIdent (a <> nsSep <> "unfold")),
-                          xts ++ [(ma, asIdent a, ta)] ++ bts' ++ [(mb, v, ty)] -- `xts ++` is required since LetWT bypasses `infer`
-                        ),
-                        ( mb,
-                          WeakTermPiElim (mb, WeakTermUpsilon $ asIdent b) [(mb, WeakTermUpsilon v)]
-                        )
-                      )
-                    ]
+                  WeakTermPiElim
+                    (mb, WeakTermUpsilon $ asIdent (a <> nsSep <> "fold"))
+                    $ map toVar' xts
+                      ++ [ (my, WeakTermUpsilon y),
+                           (mb, weakTermPiIntro xts cod),
+                           ( mb,
+                             weakTermPiIntro
+                               ([(ma, asIdent a, ta)] ++ bts' ++ [(mb, y, ty)])
+                               ( mb,
+                                 -- ここでexternalizeを行うべき？
+                                 WeakTermPiElim (mb, WeakTermUpsilon $ asIdent b) [(mb, WeakTermUpsilon y)]
+                               )
+                           )
+                         ]
                 )
             )
-        -- ここでexternalizeを行うべき、ってこと？
+        let b' = a <> nsSep <> b
         bt <- discernIdentPlus (mb, asIdent b', (mb, weakTermPi (xts ++ [dom]) cod))
         imp1 <- toStmtImplicit mb b' [0 .. length xts - 1]
         imp2 <- toStmtImplicit mb (a <> nsSep <> "unfold") [0 .. length xts - 1]
         return [WeakStmtLetWT mb bt e, imp1, imp2]
   return $ concat $ concat stmtListList
+
+-- (ats, bts) <- toIndInfo ts
+-- let bts' = map textPlusToWeakIdentPlus bts
+-- stmtListList <-
+--   forM ats $ \(ma, a, ta) ->
+--     forM bts $ \(mb, b, tb) -> do
+--       xts <- takeXTS ta
+--       (dom@(my, y, ty), cod) <- separate tb
+--       v <- newNameWith'' "base"
+--       let b' = a <> nsSep <> b
+--       e <-
+--         discern
+--           ( mb,
+--             weakTermPiIntro
+--               (xts ++ [dom])
+--               ( mb,
+--                 WeakTermCase
+--                   (Just $ asIdent a)
+--                   (my, WeakTermUpsilon y)
+--                   [ ( ( (mb, asIdent (a <> nsSep <> "unfold")),
+--                         xts ++ [(ma, asIdent a, ta)] ++ bts' ++ [(mb, v, ty)] -- `xts ++` is required since LetWT bypasses `infer`
+--                       ),
+--                       ( mb,
+--                         WeakTermPiElim (mb, WeakTermUpsilon $ asIdent b) [(mb, WeakTermUpsilon v)]
+--                       )
+--                     )
+--                   ]
+--               )
+--           )
+--       -- ここでexternalizeを行うべき、ってこと？
+--       bt <- discernIdentPlus (mb, asIdent b', (mb, weakTermPi (xts ++ [dom]) cod))
+--       imp1 <- toStmtImplicit mb b' [0 .. length xts - 1]
+--       imp2 <- toStmtImplicit mb (a <> nsSep <> "unfold") [0 .. length xts - 1]
+--       return [WeakStmtLetWT mb bt e, imp1, imp2]
+-- return $ concat $ concat stmtListList
 
 toStmtImplicit :: Meta -> T.Text -> [Int] -> WithEnv WeakStmt
 toStmtImplicit mx x is = do
@@ -717,13 +753,13 @@ substRuleType sub@((a1, es1), (a2, es2)) term =
         else do
           e' <- substRuleType sub e
           return (m, WeakTermStructElim xts v' e')
-    (m, WeakTermCase indName e cxtes) -> do
-      e' <- substRuleType sub e
-      cxtes' <-
-        flip mapM cxtes $ \((c, xts), body) -> do
-          (xts', body') <- substRuleType'' sub xts body
-          return ((c, xts'), body')
-      return (m, WeakTermCase indName e' cxtes')
+    -- (m, WeakTermCase indName e cxtes) -> do
+    --   e' <- substRuleType sub e
+    --   cxtes' <-
+    --     flip mapM cxtes $ \((c, xts), body) -> do
+    --       (xts', body') <- substRuleType'' sub xts body
+    --       return ((c, xts'), body')
+    --   return (m, WeakTermCase indName e' cxtes')
     (m, WeakTermQuestion e t) -> do
       e' <- substRuleType sub e
       t' <- substRuleType sub t

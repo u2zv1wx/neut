@@ -138,20 +138,20 @@ discern' nenv term =
       e1' <- discern' nenv e1
       (xts', e2') <- discernStruct nenv xts e2
       return (m, WeakTermStructElim xts' e1' e2')
-    (m, WeakTermCase indInfo e cxtes) -> do
-      e' <- discern' nenv e
-      penv <- gets prefixEnv
-      cxtes' <-
-        flip mapM cxtes $ \(((mc, c), xts), body) -> do
-          c' <- lookupName'' mc penv nenv c
-          (xts', body') <- discernBinder nenv xts body
-          return (((mc, c'), xts'), body')
-      case indInfo of
-        Nothing ->
-          return (m, WeakTermCase Nothing e' cxtes')
-        Just indName -> do
-          indName' <- lookupName'' m penv nenv indName
-          return (m, WeakTermCase (Just indName') e' cxtes')
+    -- (m, WeakTermCase indInfo e cxtes) -> do
+    --   e' <- discern' nenv e
+    --   penv <- gets prefixEnv
+    --   cxtes' <-
+    --     flip mapM cxtes $ \(((mc, c), xts), body) -> do
+    --       c' <- lookupName'' mc penv nenv c
+    --       (xts', body') <- discernBinder nenv xts body
+    --       return (((mc, c'), xts'), body')
+    --   case indInfo of
+    --     Nothing ->
+    --       return (m, WeakTermCase Nothing e' cxtes')
+    --     Just indName -> do
+    --       indName' <- lookupName'' m penv nenv indName
+    --       return (m, WeakTermCase (Just indName') e' cxtes')
     (m, WeakTermQuestion e t) -> do
       e' <- discern' nenv e
       t' <- discern' nenv t

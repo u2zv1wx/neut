@@ -135,14 +135,15 @@ clarify' tenv term =
       e2' <- clarify' (insTypeEnv1 (zip3 ms xs ts) tenv) e2
       (struct, structVar) <- newDataUpsilonWith m "struct"
       return $ bindLet [(struct, e1')] (m, CodeStructElim (zip xs ks) structVar e2')
-    (m, TermCase _ e cxtes) -> do
-      e' <- clarify' tenv e
-      (cls, clsVar) <- newDataUpsilonWith m "case-closure"
-      res <- newNameWith' "case-res"
-      env <- newNameWith' "case-env"
-      lam <- newNameWith' "label"
-      cxtes' <- clarifyCase tenv m cxtes res env lam
-      return $ bindLet [(cls, e')] (m, sigmaElim [res, env, lam] clsVar cxtes')
+
+-- (m, TermCase _ e cxtes) -> do
+--   e' <- clarify' tenv e
+--   (cls, clsVar) <- newDataUpsilonWith m "case-closure"
+--   res <- newNameWith' "case-res"
+--   env <- newNameWith' "case-env"
+--   lam <- newNameWith' "label"
+--   cxtes' <- clarifyCase tenv m cxtes res env lam
+--   return $ bindLet [(cls, e')] (m, sigmaElim [res, env, lam] clsVar cxtes')
 
 clarifyPlus :: TypeEnv -> TermPlus -> WithEnv (Ident, CodePlus, DataPlus)
 clarifyPlus tenv e@(m, _) = do
@@ -159,51 +160,51 @@ alignFVS tenv m fvs es = do
   es' <- mapM (retClosure tenv Nothing fvs m []) es
   mapM (\cls -> callClosure m cls []) es'
 
-clarifyCase ::
-  TypeEnv ->
-  Meta ->
-  [Clause] ->
-  Ident ->
-  Ident ->
-  Ident ->
-  WithEnv CodePlus
-clarifyCase tenv m cxtes typeVarName envVarName lamVarName = do
-  fvs <- constructCaseFVS tenv cxtes m typeVarName envVarName
-  es <- (mapM (clarifyCase' tenv m envVarName) >=> alignFVS tenv m fvs) cxtes
-  (y, e', yVar) <- clarifyPlus tenv (m, TermUpsilon lamVarName)
-  let sub = IntMap.fromList $ map (\(mx, x, _) -> (asInt x, (mx, DataUpsilon x))) fvs
-  let cs = map (\(((mc, c), _), _) -> (mc, showInHex $ asText c)) cxtes
-  return $ bindLet [(y, e')] (m, CodeCase sub yVar (zip cs es))
+-- clarifyCase ::
+--   TypeEnv ->
+--   Meta ->
+--   [Clause] ->
+--   Ident ->
+--   Ident ->
+--   Ident ->
+--   WithEnv CodePlus
+-- clarifyCase tenv m cxtes typeVarName envVarName lamVarName = do
+--   fvs <- constructCaseFVS tenv cxtes m typeVarName envVarName
+--   es <- (mapM (clarifyCase' tenv m envVarName) >=> alignFVS tenv m fvs) cxtes
+--   (y, e', yVar) <- clarifyPlus tenv (m, TermUpsilon lamVarName)
+--   let sub = IntMap.fromList $ map (\(mx, x, _) -> (asInt x, (mx, DataUpsilon x))) fvs
+--   let cs = map (\(((mc, c), _), _) -> (mc, showInHex $ asText c)) cxtes
+--   return $ bindLet [(y, e')] (m, CodeCase sub yVar (zip cs es))
 
-constructCaseFVS ::
-  TypeEnv ->
-  [Clause] ->
-  Meta ->
-  Ident ->
-  Ident ->
-  WithEnv [IdentPlus]
-constructCaseFVS tenv cxtes m typeVarName envVarName = do
-  fvss <- mapM (chainCaseClause tenv) cxtes
-  let fvs = nubFVS $ concat fvss
-  return $
-    (m, typeVarName, (m, TermTau))
-      : (m, envVarName, (m, TermUpsilon typeVarName))
-      : fvs
+-- constructCaseFVS ::
+--   TypeEnv ->
+--   [Clause] ->
+--   Meta ->
+--   Ident ->
+--   Ident ->
+--   WithEnv [IdentPlus]
+-- constructCaseFVS tenv cxtes m typeVarName envVarName = do
+--   fvss <- mapM (chainCaseClause tenv) cxtes
+--   let fvs = nubFVS $ concat fvss
+--   return $
+--     (m, typeVarName, (m, TermTau))
+--       : (m, envVarName, (m, TermUpsilon typeVarName))
+--       : fvs
 
-chainCaseClause :: TypeEnv -> Clause -> WithEnv [IdentPlus]
-chainCaseClause tenv (((m, _), xts), body) =
-  chainTermPlus tenv (m, termPiIntro xts body)
+-- chainCaseClause :: TypeEnv -> Clause -> WithEnv [IdentPlus]
+-- chainCaseClause tenv (((m, _), xts), body) =
+--   chainTermPlus tenv (m, termPiIntro xts body)
 
 nubFVS :: [IdentPlus] -> [IdentPlus]
 nubFVS =
   nubBy (\(_, x, _) (_, y, _) -> x == y)
 
-clarifyCase' :: TypeEnv -> Meta -> Ident -> Clause -> WithEnv CodePlus
-clarifyCase' tenv m envVarName ((_, xts), e) = do
-  xts' <- clarifyBinder tenv xts
-  e' <- clarify' tenv e >>= linearize (dropFst xts')
-  let xs = map (\(_, x, _) -> x) xts
-  return (m, sigmaElim xs (m, DataUpsilon envVarName) e')
+-- clarifyCase' :: TypeEnv -> Meta -> Ident -> Clause -> WithEnv CodePlus
+-- clarifyCase' tenv m envVarName ((_, xts), e) = do
+--   xts' <- clarifyBinder tenv xts
+--   e' <- clarify' tenv e >>= linearize (dropFst xts')
+--   let xs = map (\(_, x, _) -> x) xts
+--   return (m, sigmaElim xs (m, DataUpsilon envVarName) e')
 
 clarifyConst :: TypeEnv -> Meta -> T.Text -> WithEnv CodePlus
 clarifyConst tenv m x
@@ -644,10 +645,11 @@ chainTermPlus tenv term =
       xs2 <- chainTermPlus tenv e2
       let xs = map (\(_, y, _) -> y) xks
       return $ xs1 ++ filter (\(_, y, _) -> y `notElem` xs) xs2
-    (_, TermCase _ e cxtes) -> do
-      xs <- chainTermPlus tenv e
-      ys <- concat <$> mapM (\((_, xts), body) -> chainTermPlus' tenv xts [body]) cxtes
-      return $ xs ++ ys
+
+-- (_, TermCase _ e cxtes) -> do
+--   xs <- chainTermPlus tenv e
+--   ys <- concat <$> mapM (\((_, xts), body) -> chainTermPlus' tenv xts [body]) cxtes
+--   return $ xs ++ ys
 
 chainTermPlus' :: TypeEnv -> [IdentPlus] -> [TermPlus] -> WithEnv [IdentPlus]
 chainTermPlus' tenv binder es =

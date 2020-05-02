@@ -37,11 +37,11 @@ data WeakTerm
   | WeakTermStruct [ArrayKind] -- e.g. (struct u8 u8 f16 f32 u64)
   | WeakTermStructIntro [(WeakTermPlus, ArrayKind)]
   | WeakTermStructElim [(Meta, Ident, ArrayKind)] WeakTermPlus WeakTermPlus
-  | WeakTermCase
-      (Maybe Ident)
-      WeakTermPlus
-      [(((Meta, Ident), [WeakIdentPlus]), WeakTermPlus)]
-  | WeakTermQuestion WeakTermPlus WeakTermPlus -- e : t (output the type `t` as note)
+  | -- | WeakTermCase
+    --     (Maybe Ident)
+    --     WeakTermPlus
+    --     [(((Meta, Ident), [WeakIdentPlus]), WeakTermPlus)]
+    WeakTermQuestion WeakTermPlus WeakTermPlus -- e : t (output the type `t` as note)
   | WeakTermErase [(Meta, T.Text)] WeakTermPlus
   deriving (Show, Eq)
 
@@ -159,10 +159,10 @@ varWeakTermPlus term =
       let set1 = varWeakTermPlus d
       let set2 = S.filter (`notElem` xs) (varWeakTermPlus e)
       S.union set1 set2
-    (_, WeakTermCase _ e cxes) -> do
-      let xs = varWeakTermPlus e
-      let ys = S.unions $ map (\((_, xts), body) -> varWeakTermPlus' xts [body]) cxes
-      S.union xs ys
+    -- (_, WeakTermCase _ e cxes) -> do
+    --   let xs = varWeakTermPlus e
+    --   let ys = S.unions $ map (\((_, xts), body) -> varWeakTermPlus' xts [body]) cxes
+    --   S.union xs ys
     (_, WeakTermQuestion e t) -> do
       let set1 = varWeakTermPlus e
       let set2 = varWeakTermPlus t
@@ -234,10 +234,10 @@ holeWeakTermPlus term =
       let set1 = holeWeakTermPlus d
       let set2 = holeWeakTermPlus e
       S.union set1 set2
-    (_, WeakTermCase _ e cxes) -> do
-      let set1 = holeWeakTermPlus e
-      let set2 = S.unions $ map (\((_, xts), body) -> holeWeakTermPlus' xts [body]) cxes
-      S.union set1 set2
+    -- (_, WeakTermCase _ e cxes) -> do
+    --   let set1 = holeWeakTermPlus e
+    --   let set2 = S.unions $ map (\((_, xts), body) -> holeWeakTermPlus' xts [body]) cxes
+    --   S.union set1 set2
     (_, WeakTermQuestion e t) -> do
       let set1 = holeWeakTermPlus e
       let set2 = holeWeakTermPlus t
@@ -326,13 +326,13 @@ substWeakTermPlus sub term =
       let sub' = foldr IntMap.delete sub (map asInt xs)
       let e' = substWeakTermPlus sub' e
       (m, WeakTermStructElim xts v' e')
-    (m, WeakTermCase indName e cxtes) -> do
-      let e' = substWeakTermPlus sub e
-      let cxtes' =
-            flip map cxtes $ \((c, xts), body) -> do
-              let (xts', body') = substWeakTermPlus'' sub xts body
-              ((c, xts'), body')
-      (m, WeakTermCase indName e' cxtes')
+    -- (m, WeakTermCase indName e cxtes) -> do
+    --   let e' = substWeakTermPlus sub e
+    --   let cxtes' =
+    --         flip map cxtes $ \((c, xts), body) -> do
+    --           let (xts', body') = substWeakTermPlus'' sub xts body
+    --           ((c, xts'), body')
+    --   (m, WeakTermCase indName e' cxtes')
     (m, WeakTermQuestion e t) -> do
       let e' = substWeakTermPlus sub e
       let t' = substWeakTermPlus sub t
@@ -447,18 +447,18 @@ toText term =
     (_, WeakTermStructElim xts e1 e2) -> do
       let argStr = inParen $ showItems $ map (\(_, x, _) -> asText x) xts
       showCons ["struct-elimination", argStr, toText e1, toText e2]
-    (_, WeakTermCase _ e cxtes) ->
-      showCons
-        ( "case"
-            : toText e
-            : flip
-              map
-              cxtes
-              ( \((c, xts), body) -> do
-                  let xs = map (\(_, x, _) -> asText x) xts
-                  showCons [showCons (asText (snd c) : xs), toText body]
-              )
-        )
+    -- (_, WeakTermCase _ e cxtes) ->
+    --   showCons
+    --     ( "case"
+    --         : toText e
+    --         : flip
+    --           map
+    --           cxtes
+    --           ( \((c, xts), body) -> do
+    --               let xs = map (\(_, x, _) -> asText x) xts
+    --               showCons [showCons (asText (snd c) : xs), toText body]
+    --           )
+    --     )
     (_, WeakTermQuestion e _) ->
       toText e
     (_, WeakTermErase _ e) ->

@@ -204,9 +204,10 @@ distinguishCode zs term =
       let zs' = filter (`notElem` map fst xts) zs
       (vs2, e') <- distinguishCode zs' e
       return (merge [vs1, vs2], (ml, CodeStructElim xts d' e'))
-    (ml, CodeCase varInfo d branchList) -> do
-      (vs, varInfo', d') <- distinguishBranch zs varInfo d
-      return (vs, (ml, CodeCase varInfo' d' branchList))
+
+-- (ml, CodeCase varInfo d branchList) -> do
+--   (vs, varInfo', d') <- distinguishBranch zs varInfo d
+--   return (vs, (ml, CodeCase varInfo' d' branchList))
 
 distinguishBranch :: [Ident] -> SubstDataPlus -> DataPlus -> WithEnv (NameMap, SubstDataPlus, DataPlus)
 distinguishBranch zs varInfo d = do

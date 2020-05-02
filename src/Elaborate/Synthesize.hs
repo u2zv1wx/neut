@@ -273,13 +273,13 @@ unravel term =
       e1' <- unravel e1
       (xts', e2') <- unravelStruct xts e2
       return (m, WeakTermStructElim xts' e1' e2')
-    (m, WeakTermCase indName e cxtes) -> do
-      e' <- unravel e
-      cxtes' <-
-        flip mapM cxtes $ \((c, xts), body) -> do
-          (xts', body') <- unravelBinder xts body
-          return ((c, xts'), body')
-      return (m, WeakTermCase indName e' cxtes')
+    -- (m, WeakTermCase indName e cxtes) -> do
+    --   e' <- unravel e
+    --   cxtes' <-
+    --     flip mapM cxtes $ \((c, xts), body) -> do
+    --       (xts', body') <- unravelBinder xts body
+    --       return ((c, xts'), body')
+    --   return (m, WeakTermCase indName e' cxtes')
     (_, WeakTermQuestion e _) ->
       unravel e
     (_, WeakTermErase _ e) ->
