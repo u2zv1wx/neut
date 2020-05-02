@@ -23,7 +23,6 @@ reduceTermPlus term =
       let cod' = reduceTermPlus cod
       (m, TermPi (zip3 ms xs ts') cod')
     (m, TermPiIntro xts e) -> do
-      -- let info' = fmap (fmap (map reduceIdentPlus)) info
       let (ms, xs, ts) = unzip3 xts
       let ts' = map reduceTermPlus ts
       let e' = reduceTermPlus e
@@ -44,7 +43,7 @@ reduceTermPlus term =
           (m, app)
     (m, TermFix (mx, x, t) xts e)
       | x `notElem` varTermPlus e ->
-        reduceTermPlus (m, termPiIntro xts e)
+        reduceTermPlus (m, TermPiIntro xts e)
       | otherwise -> do
         let t' = reduceTermPlus t
         let (ms, xs, ts) = unzip3 xts
@@ -105,21 +104,8 @@ reduceTermPlus term =
             reduceTermPlus $ substTermPlus sub e2
         _ ->
           (m, TermStructElim xks e1' e2)
-    -- (m, TermCase indName e cxtes) -> do
-    --   let e' = reduceTermPlus e
-    --   let cxtes'' =
-    --         flip map cxtes $ \((c, xts), body) -> do
-    --           let (ms, xs, ts) = unzip3 xts
-    --           let ts' = map reduceTermPlus ts
-    --           let body' = reduceTermPlus body
-    --           ((c, zip3 ms xs ts'), body')
-    --   (m, TermCase indName e' cxtes'')
     _ ->
       term
-
-reduceIdentPlus :: IdentPlus -> IdentPlus
-reduceIdentPlus (m, x, t) =
-  (m, x, reduceTermPlus t)
 
 isValue :: TermPlus -> Bool
 isValue term =
@@ -280,12 +266,3 @@ normalize term =
             normalize $ substTermPlus sub e2
         _ ->
           return (m, TermStructElim xks e1' e2)
--- (m, TermCase indName e cxtes) -> do
---   e' <- normalize e
---   cxtes'' <-
---     flip mapM cxtes $ \((c, xts), body) -> do
---       let (ms, xs, ts) = unzip3 xts
---       ts' <- mapM normalize ts
---       body' <- normalize body
---       return ((c, zip3 ms xs ts'), body')
---   return (m, TermCase indName e' cxtes'')

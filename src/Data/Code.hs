@@ -29,7 +29,6 @@ data Code
   | CodeUpElim Ident CodePlus CodePlus
   | CodeEnumElim SubstDataPlus DataPlus [(EnumCase, CodePlus)]
   | CodeStructElim [(Ident, ArrayKind)] DataPlus CodePlus
-  -- | CodeCase SubstDataPlus DataPlus [((Meta, T.Text), CodePlus)]
   deriving (Show)
 
 data Primitive
@@ -125,10 +124,6 @@ substCodePlus sub term =
       let sub' = foldr IntMap.delete sub (map (asInt . fst) xks)
       let e' = substCodePlus sub' e
       (m, CodeStructElim xks v' e')
-    -- (m, CodeCase fvInfo v branchList) -> do
-    --   let fvInfo' = IntMap.map (substDataPlus sub) fvInfo
-    --   let v' = substDataPlus sub v
-    --   (m, CodeCase fvInfo' v' branchList)
 
 substPrimitive :: SubstDataPlus -> Primitive -> Primitive
 substPrimitive sub c =

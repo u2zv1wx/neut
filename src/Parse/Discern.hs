@@ -79,14 +79,6 @@ discern' nenv term =
     (m, WeakTermPiIntro xts e) -> do
       (xts', e') <- discernBinder nenv xts e
       return (m, WeakTermPiIntro xts' e')
-    -- case info of
-    --   Nothing ->
-    --     return (m, WeakTermPiIntro Nothing xts' e')
-    --   Just (indName, consName, args) -> do
-    --     penv <- gets prefixEnv
-    --     indName' <- lookupName'' m penv nenv indName
-    --     args' <- mapM (discernFreeIdentPlus nenv) args
-    --     return (m, WeakTermPiIntro (Just (indName', consName, args')) xts' e')
     (m, WeakTermPiElim e es) -> do
       es' <- mapM (discern' nenv) es
       e' <- discern' nenv e
@@ -139,20 +131,6 @@ discern' nenv term =
       e1' <- discern' nenv e1
       (xts', e2') <- discernStruct nenv xts e2
       return (m, WeakTermStructElim xts' e1' e2')
-    -- (m, WeakTermCase indInfo e cxtes) -> do
-    --   e' <- discern' nenv e
-    --   penv <- gets prefixEnv
-    --   cxtes' <-
-    --     flip mapM cxtes $ \(((mc, c), xts), body) -> do
-    --       c' <- lookupName'' mc penv nenv c
-    --       (xts', body') <- discernBinder nenv xts body
-    --       return (((mc, c'), xts'), body')
-    --   case indInfo of
-    --     Nothing ->
-    --       return (m, WeakTermCase Nothing e' cxtes')
-    --     Just indName -> do
-    --       indName' <- lookupName'' m penv nenv indName
-    --       return (m, WeakTermCase (Just indName') e' cxtes')
     (m, WeakTermQuestion e t) -> do
       e' <- discern' nenv e
       t' <- discern' nenv t
@@ -163,13 +141,6 @@ discern' nenv term =
       let xs = map snd mxs
       let nenv' = Map.filterWithKey (\k _ -> k `notElem` xs) nenv
       discern' nenv' e
-
--- discernFreeIdentPlus :: NameEnv -> WeakIdentPlus -> WithEnv WeakIdentPlus
--- discernFreeIdentPlus nenv (m, x, t) = do
---   t' <- discern' nenv t
---   penv <- gets prefixEnv
---   x' <- lookupName'' m penv nenv x
---   return (m, x', t')
 
 discernIdent :: Meta -> Ident -> WithEnv (Meta, Ident)
 discernIdent m x = do

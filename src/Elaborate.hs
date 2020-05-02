@@ -111,12 +111,6 @@ elaborate' term =
       xts' <- mapM elaboratePlus xts
       e' <- elaborate' e
       return (m, TermPiIntro xts' e')
-    -- case info of
-    --   Nothing ->
-    --     return (m, TermPiIntro Nothing xts' e')
-    --   Just (indName, consName, args) -> do
-    --     args' <- mapM elaboratePlus args
-    --     return (m, TermPiIntro (Just (indName, consName, args')) xts' e')
     (m, WeakTermPiElim (mh, WeakTermHole (I (_, x))) es) -> do
       sub <- gets substEnv
       case IntMap.lookup x sub of
@@ -210,39 +204,6 @@ elaborate' term =
       e1' <- elaborate' e1
       e2' <- elaborate' e2
       return (m, TermStructElim xts e1' e2')
-    -- (m, WeakTermCase mIndName e cxtes) -> do
-    --   e' <- elaborate' e
-    --   cxtes' <-
-    --     forM cxtes $ \((c, xts), body) -> do
-    --       xts' <- mapM elaboratePlus xts
-    --       body' <- elaborate' body
-    --       return ((c, xts'), body')
-    --   eenv <- gets enumEnv
-    --   case cxtes' of
-    --     [] ->
-    --       case mIndName of
-    --         Nothing ->
-    --           return (m, TermCase Nothing e' cxtes') -- ex falso quodlibet
-    --         Just indName ->
-    --           raiseError m $ "the inductive type `" <> asText indName <> "` is not a bottom-type"
-    --     _ ->
-    --       case mIndName of
-    --         Nothing ->
-    --           raiseCritical m undefined
-    --         Just indName ->
-    --           case Map.lookup (asText indName) eenv of
-    --             Nothing -> raiseError m $ "no such inductive type defined: " <> asText indName
-    --             Just bis -> do
-    --               let bs' = map (snd . fst . fst) cxtes
-    --               let b1 = isLinear bs'
-    --               let b2 = length bis == length bs'
-    --               case (b1, b2) of
-    --                 (False, _) ->
-    --                   raiseError m "found a non-linear pattern"
-    --                 (_, False) ->
-    --                   raiseError m "found a non-exhaustive pattern"
-    --                 (True, True) ->
-    --                   return (m, TermCase (Just indName) e' cxtes')
     (m, WeakTermQuestion e t) -> do
       e' <- elaborate' e
       whenCheck $ do

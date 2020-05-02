@@ -104,16 +104,16 @@ generateProjections ts = do
         e <-
           discern
             ( mb,
-              weakTermPiIntro
+              WeakTermPiIntro
                 (xts ++ [dom])
                 ( mb,
                   WeakTermPiElim
                     (mb, WeakTermUpsilon $ asIdent (a <> nsSep <> "fold"))
                     $ map toVar' xts
                       ++ [ (my, WeakTermUpsilon y),
-                           (mb, weakTermPiIntro xts cod),
+                           (mb, WeakTermPiIntro xts cod),
                            ( mb,
-                             weakTermPiIntro
+                             WeakTermPiIntro
                                ([(ma, asIdent a, ta)] ++ bts' ++ [(mb, y, ty)])
                                ( mb,
                                  -- ここでexternalizeを行うべき？
@@ -124,46 +124,11 @@ generateProjections ts = do
                 )
             )
         let b' = a <> nsSep <> b
-        bt <- discernIdentPlus (mb, asIdent b', (mb, weakTermPi (xts ++ [dom]) cod))
+        bt <- discernIdentPlus (mb, asIdent b', (mb, WeakTermPi (xts ++ [dom]) cod))
         imp1 <- toStmtImplicit mb b' [0 .. length xts - 1]
         imp2 <- toStmtImplicit mb (a <> nsSep <> "unfold") [0 .. length xts - 1]
         return [WeakStmtLetWT mb bt e, imp1, imp2]
   return $ concat $ concat stmtListList
-
--- (ats, bts) <- toIndInfo ts
--- let bts' = map textPlusToWeakIdentPlus bts
--- stmtListList <-
---   forM ats $ \(ma, a, ta) ->
---     forM bts $ \(mb, b, tb) -> do
---       xts <- takeXTS ta
---       (dom@(my, y, ty), cod) <- separate tb
---       v <- newNameWith'' "base"
---       let b' = a <> nsSep <> b
---       e <-
---         discern
---           ( mb,
---             weakTermPiIntro
---               (xts ++ [dom])
---               ( mb,
---                 WeakTermCase
---                   (Just $ asIdent a)
---                   (my, WeakTermUpsilon y)
---                   [ ( ( (mb, asIdent (a <> nsSep <> "unfold")),
---                         xts ++ [(ma, asIdent a, ta)] ++ bts' ++ [(mb, v, ty)] -- `xts ++` is required since LetWT bypasses `infer`
---                       ),
---                       ( mb,
---                         WeakTermPiElim (mb, WeakTermUpsilon $ asIdent b) [(mb, WeakTermUpsilon v)]
---                       )
---                     )
---                   ]
---               )
---           )
---       -- ここでexternalizeを行うべき、ってこと？
---       bt <- discernIdentPlus (mb, asIdent b', (mb, weakTermPi (xts ++ [dom]) cod))
---       imp1 <- toStmtImplicit mb b' [0 .. length xts - 1]
---       imp2 <- toStmtImplicit mb (a <> nsSep <> "unfold") [0 .. length xts - 1]
---       return [WeakStmtLetWT mb bt e, imp1, imp2]
--- return $ concat $ concat stmtListList
 
 toStmtImplicit :: Meta -> T.Text -> [Int] -> WithEnv WeakStmt
 toStmtImplicit mx x is = do
@@ -212,10 +177,7 @@ toInductive ats bts connective@(m, ai, xts, _) = do
   -- definition of inductive type
   indType <-
     discern
-      (m, weakTermPiIntro xts (m, WeakTermPi atsbts cod))
-  -- indType <-
-  --   discern
-  --     (m, weakTermPiIntro xts (m, WeakTermPi (Just ai) atsbts cod))
+      (m, WeakTermPiIntro xts (m, WeakTermPi atsbts cod))
   at' <- discernIdentPlus at
   insForm (length ats) at' indType
   -- definition of fold
@@ -224,10 +186,10 @@ toInductive ats bts connective@(m, ai, xts, _) = do
   let indArgs = xts ++ [zt] ++ atsbts
   fold <-
     discern
-      (m, weakTermPiIntro indArgs (m, WeakTermPiElim (toVar' zt) (map toVar' atsbts)))
+      (m, WeakTermPiIntro indArgs (m, WeakTermPiElim (toVar' zt) (map toVar' atsbts)))
   foldIdent <-
     discernIdentPlus
-      (m, asIdent $ ai <> nsSep <> "fold", (m, weakTermPi indArgs cod))
+      (m, asIdent $ ai <> nsSep <> "fold", (m, WeakTermPi indArgs cod))
   imp <- toStmtImplicit m (ai <> nsSep <> "fold") [0 .. length xts - 1]
   return
     [ WeakStmtLetWT m at' indType,
@@ -253,30 +215,27 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
   | (_, WeakTermPiElim (_, WeakTermUpsilon a') es) <- cod,
     ai == asText a',
     length xts == length es = do
-    let vs = varWeakTermPlus (m, weakTermPi yts cod)
+    let vs = varWeakTermPlus (m, WeakTermPi yts cod)
     let ixts = filter (\(_ :: Int, (_, x, _)) -> x `S.member` vs) $ zip [0 ..] xts
     let (is, xts') = unzip ixts
     constructor <-
       discern
         ( m,
-          weakTermPiIntro
+          WeakTermPiIntro
             (xts' ++ yts)
             ( m,
               WeakTermPiIntro
-                -- (Just (asIdent ai, bi, xts' ++ yts))
                 (ats ++ bts)
                 (m, WeakTermPiElim (mb, WeakTermUpsilon (asIdent bi)) (map toVar' yts))
             )
         )
     constructorIdent <-
       discernIdentPlus
-        (mb, asIdent bi, (m, weakTermPi (xts' ++ yts) cod))
+        (mb, asIdent bi, (m, WeakTermPi (xts' ++ yts) cod))
     imp <- toStmtImplicit m bi [0 .. length xts' - 1]
     case constructor of
-      -- (_, WeakTermPiIntro _ xtsyts (_, WeakTermPiIntro indInfo@(Just (ai', _, _)) atsbts (_, WeakTermPiElim b _))) -> do
       (_, WeakTermPiIntro xtsyts (_, WeakTermPiIntro atsbts (_, WeakTermPiElim b _))) -> do
         let as = take (length ats) $ map (\(_, x, _) -> asInt x) atsbts
-        -- modify (\env -> env {revIndEnv = Map.insert bi (ai', is) (revIndEnv env)})
         insInductive as constructorIdent
         yts' <- mapM (internalize as atsbts) $ drop (length is) xtsyts
         return
@@ -284,7 +243,7 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
               m
               constructorIdent
               ( m {metaIsReducible = False},
-                weakTermPiIntro
+                WeakTermPiIntro
                   xtsyts
                   ( m,
                     WeakTermPiIntro atsbts (m, WeakTermPiElim b yts')
@@ -304,11 +263,11 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
 
 ruleAsWeakIdentPlus :: Rule -> WithEnv WeakIdentPlus
 ruleAsWeakIdentPlus (mb, b, m, xts, t) =
-  return (mb, asIdent b, (m, weakTermPi xts t))
+  return (mb, asIdent b, (m, WeakTermPi xts t))
 
 ruleAsWeakTextPlus :: Rule -> WithEnv WeakTextPlus
 ruleAsWeakTextPlus (mb, b, m, xts, t) =
-  return (mb, b, (m, weakTermPi xts t))
+  return (mb, b, (m, WeakTermPi xts t))
 
 textPlusToWeakIdentPlus :: WeakTextPlus -> WeakIdentPlus
 textPlusToWeakIdentPlus (mx, x, t) =
@@ -519,7 +478,7 @@ thetaPi mode isub modifier xts cod e = do
   appForward <- theta mode isub modifier cod' (fst e, WeakTermPiElim e xsBackward)
   -- 結果をまとめる
   let ts'' = map (substWeakTermPlus isub) ts' -- 引数をinternalizeされたバージョンの型にする
-  return (fst e, weakTermPiIntro (zip3 ms' xs' ts'') appForward)
+  return (fst e, WeakTermPiIntro (zip3 ms' xs' ts'') appForward)
 
 thetaInductive ::
   Mode ->
@@ -564,7 +523,7 @@ thetaInductiveNested mode isub modifier e va aOuter es bts = do
     ( m,
       WeakTermPiElim
         e
-        ((m, weakTermPiIntro xts (m, WeakTermPiElim va es')) : args)
+        ((m, WeakTermPiIntro xts (m, WeakTermPiElim va es')) : args)
     )
 
 thetaInductiveNestedMutual :: Meta -> Ident -> WithEnv WeakTermPlus
@@ -638,7 +597,7 @@ toInternalizedArg mode isub aInner aOuter xts modifier es es' b bInner =
       -- あとは結果を返すだけ
       return
         ( mbInner,
-          weakTermPiIntro
+          WeakTermPiIntro
             ytsInner'
             (mbInner, WeakTermPiElim (toVar' b) (es' ++ args))
         )
@@ -680,16 +639,11 @@ substRuleType sub@((a1, es1), (a2, es2)) term =
     (m, WeakTermUpsilon x) ->
       return (m, WeakTermUpsilon x)
     (m, WeakTermPi xts t) -> do
-      (xts', t') <- substRuleType'' sub xts t
+      (xts', t') <- substRuleType' sub xts t
       return (m, WeakTermPi xts' t')
     (m, WeakTermPiIntro xts body) -> do
-      (xts', body') <- substRuleType'' sub xts body
+      (xts', body') <- substRuleType' sub xts body
       return (m, WeakTermPiIntro xts' body')
-    -- case info of
-    --   Nothing -> return (m, WeakTermPiIntro Nothing xts' body')
-    --   Just (indName, consName, args) -> do
-    --     args' <- substRuleType' sub args
-    --     return (m, WeakTermPiIntro (Just (indName, consName, args')) xts' body')
     (m, WeakTermPiElim e es)
       | (mx, WeakTermUpsilon x) <- e,
         a1 == x ->
@@ -710,7 +664,7 @@ substRuleType sub@((a1, es1), (a2, es2)) term =
       if fst (fst sub) == x
         then return (m, WeakTermFix (mx, x, t') xts e)
         else do
-          (xts', e') <- substRuleType'' sub xts e
+          (xts', e') <- substRuleType' sub xts e
           return (m, WeakTermFix (mx, x, t') xts' e')
     (m, WeakTermConst x) ->
       return (m, WeakTermConst x)
@@ -742,7 +696,7 @@ substRuleType sub@((a1, es1), (a2, es2)) term =
       return (m, WeakTermArrayIntro k es')
     (m, WeakTermArrayElim mk xts v e) -> do
       v' <- substRuleType sub v
-      (xts', e') <- substRuleType'' sub xts e
+      (xts', e') <- substRuleType' sub xts e
       return (m, WeakTermArrayElim mk xts' v' e')
     (m, WeakTermStruct ts) ->
       return (m, WeakTermStruct ts)
@@ -758,13 +712,6 @@ substRuleType sub@((a1, es1), (a2, es2)) term =
         else do
           e' <- substRuleType sub e
           return (m, WeakTermStructElim xts v' e')
-    -- (m, WeakTermCase indName e cxtes) -> do
-    --   e' <- substRuleType sub e
-    --   cxtes' <-
-    --     flip mapM cxtes $ \((c, xts), body) -> do
-    --       (xts', body') <- substRuleType'' sub xts body
-    --       return ((c, xts'), body')
-    --   return (m, WeakTermCase indName e' cxtes')
     (m, WeakTermQuestion e t) -> do
       e' <- substRuleType sub e
       t' <- substRuleType sub t
@@ -773,25 +720,12 @@ substRuleType sub@((a1, es1), (a2, es2)) term =
       e' <- substRuleType sub e
       return (m, WeakTermErase xs e')
 
--- substRuleType' :: SubstRule -> [WeakIdentPlus] -> WithEnv [WeakIdentPlus]
--- substRuleType' sub binder =
---   case binder of
---     [] ->
---       return []
---     (m, x, t) : xts -> do
---       t' <- substRuleType sub t
---       if fst (fst sub) == x
---         then return $ (m, x, t') : xts
---         else do
---           xts' <- substRuleType' sub xts
---           return $ (m, x, t') : xts'
-
-substRuleType'' ::
+substRuleType' ::
   SubstRule ->
   [WeakIdentPlus] ->
   WeakTermPlus ->
   WithEnv ([WeakIdentPlus], WeakTermPlus)
-substRuleType'' sub binder e =
+substRuleType' sub binder e =
   case binder of
     [] -> do
       e' <- substRuleType sub e
@@ -801,5 +735,5 @@ substRuleType'' sub binder e =
       if fst (fst sub) == x
         then return ((m, x, t') : xts, e)
         else do
-          (xts', e') <- substRuleType'' sub xts e
+          (xts', e') <- substRuleType' sub xts e
           return ((m, x, t') : xts', e')

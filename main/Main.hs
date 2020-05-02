@@ -255,15 +255,6 @@ run cmd =
         _ ->
           return ()
 
---   case err of
---     ErrorLeft candList ->
---       mapM_ putStrLn candList
---     _ ->
---       return ()
-
--- Right result ->
---   mapM_ putStrLn result
-
 constructOutputPath :: Path Rel File -> Maybe (Path Abs File) -> OutputKind -> IO (Path Abs File)
 constructOutputPath basename mPath kind =
   case mPath of

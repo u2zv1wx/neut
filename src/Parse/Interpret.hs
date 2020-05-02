@@ -73,13 +73,13 @@ interpret inputTree =
         "pi"
           | [(_, TreeNode xts), t] <- rest -> do
             (xts', t') <- interpretBinder xts t
-            return (m, weakTermPi xts' t')
+            return (m, WeakTermPi xts' t')
           | otherwise ->
             raiseSyntaxError m "(pi (TREE*) TREE)"
         "pi-introduction"
           | [(_, TreeNode xts), e] <- rest -> do
             (xts', e') <- interpretBinder xts e
-            return (m, weakTermPiIntro xts' e')
+            return (m, WeakTermPiIntro xts' e')
           | otherwise ->
             raiseSyntaxError m "(pi-introduction (TREE*) TREE)"
         "pi-elimination"
@@ -199,13 +199,6 @@ interpret inputTree =
             return (m, WeakTermStructElim xts' e1' e2')
           | otherwise ->
             raiseSyntaxError m "(struct-elimination (TREE*) TREE TREE)"
-        -- "case"
-        --   | e : cxtes <- rest -> do
-        --     e' <- interpret e
-        --     cxtes' <- mapM interpretCaseClause cxtes
-        --     return (m, WeakTermCase Nothing e' cxtes')
-        --   | otherwise ->
-        --     raiseSyntaxError m "(case TREE TREE*)"
         "question"
           | [e] <- rest -> do
             e' <- interpret e
@@ -290,9 +283,9 @@ sigmaIntro m es = do
   let xts = zipWith (\x t -> (m, x, t)) xs ts
   return
     ( m,
-      weakTermPiIntro
+      WeakTermPiIntro
         [ (m, z, (m, WeakTermTau)),
-          (m, k, (m, weakTermPi xts (m, WeakTermUpsilon z)))
+          (m, k, (m, WeakTermPi xts (m, WeakTermUpsilon z)))
         ]
         (m, WeakTermPiElim (m, WeakTermUpsilon k) es)
     )
@@ -309,12 +302,12 @@ sigmaIntroString m u8s = do
   arrVar <- newNameWith'' "array"
   return
     ( m,
-      weakTermPiIntro
+      WeakTermPiIntro
         [ (m, z, (m, WeakTermTau)),
           ( m,
             k,
             ( m,
-              weakTermPi
+              WeakTermPi
                 [ (m, lenVar, (m, WeakTermConst (showIntSize 64))),
                   ( m,
                     arrVar,
@@ -347,7 +340,7 @@ sigmaElim ::
   WeakTermPlus ->
   WeakTermPlus
 sigmaElim m t xts e1 e2 =
-  (m, WeakTermPiElim e1 [t, (m, weakTermPiIntro xts e2)])
+  (m, WeakTermPiElim e1 [t, (m, WeakTermPiIntro xts e2)])
 
 interpretWeakIdentPlus :: TreePlus -> WithEnv WeakIdentPlus
 interpretWeakIdentPlus tree =
@@ -457,16 +450,6 @@ interpretStructElim tree =
     e ->
       raiseSyntaxError (fst e) "(LEAF TREE)"
 
--- interpretCaseClause :: TreePlus -> WithEnv (((Meta, Ident), [WeakIdentPlus]), WeakTermPlus)
--- interpretCaseClause tree =
---   case tree of
---     (_, TreeNode [(_, TreeNode ((m, TreeLeaf c) : xts)), e]) -> do
---       xts' <- mapM interpretWeakIdentPlus xts
---       e' <- interpret e
---       return (((m, asIdent c), xts'), e')
---     t ->
---       raiseSyntaxError (fst t) "((LEAF TREE ... TREE) TREE)"
-
 type CocaseClause =
   ((Ident, [WeakTermPlus]), [(Ident, WeakTermPlus)])
 
@@ -556,7 +539,7 @@ asLamClause ::
   WithEnv (Ident, WeakTermPlus)
 asLamClause b m t body = do
   h <- newNameWith'' "hole"
-  return (b, (m, weakTermPiIntro [(m, h, t)] body))
+  return (b, (m, WeakTermPiIntro [(m, h, t)] body))
 
 headNameOf :: Meta -> CocaseClause -> (Ident, WeakTermPlus)
 headNameOf m ((a, _), _) = (a, (m, WeakTermUpsilon a))
@@ -566,9 +549,9 @@ cocaseBaseValue m codType =
   ( m,
     WeakTermPiElim
       (m, WeakTermUpsilon $ asIdent $ "unsafe" <> nsSep <> "cast")
-      [ (m, weakTermPi [] (i64 m)),
+      [ (m, WeakTermPi [] (i64 m)),
         codType,
-        (m, weakTermPiIntro [] (m, WeakTermInt (i64 m) 0))
+        (m, WeakTermPiIntro [] (m, WeakTermInt (i64 m) 0))
       ]
   )
 
@@ -666,7 +649,7 @@ interpretWith tree =
           e' <- interpretWith (m, TreeNode (with : bind : es'))
           xt' <- interpretWeakIdentPlus xt
           rest' <- interpretWith (m, TreeNode (with : bind : rest))
-          return (m, WeakTermPiElim bind' [h1, h2, e', (m, weakTermPiIntro [xt'] rest')])
+          return (m, WeakTermPiElim bind' [h1, h2, e', (m, WeakTermPiIntro [xt'] rest')])
     (m, TreeNode (with@(_, TreeLeaf "with") : bind : (_, TreeNode ((_, TreeLeaf "erase") : xs)) : rest)) ->
       case mapM asLeaf xs of
         Nothing ->

@@ -333,7 +333,7 @@ unaryOpToType m op = do
   cod' <- lowTypeToType m cod
   x <- newNameWith' "arg"
   let xts = [(m, x, dom')]
-  return (m, termPi xts cod')
+  return (m, TermPi xts cod')
 
 binaryOpToType :: Meta -> BinaryOp -> WithEnv TermPlus
 binaryOpToType m op = do
@@ -343,7 +343,7 @@ binaryOpToType m op = do
   x1 <- newNameWith' "arg"
   x2 <- newNameWith' "arg"
   let xts = [(m, x1, dom'), (m, x2, dom')]
-  return (m, termPi xts cod')
+  return (m, TermPi xts cod')
 
 arrayAccessToType :: Meta -> LowType -> WithEnv TermPlus
 arrayAccessToType m lowType = do
@@ -359,7 +359,7 @@ arrayAccessToType m lowType = do
   x4 <- newNameWith' "arg"
   x5 <- newNameWith' "arg"
   cod <- termSigma m [(m, x4, arr), (m, x5, t)]
-  return (m, termPi xts cod)
+  return (m, TermPi xts cod)
 
 inferKind :: Meta -> ArrayKind -> WithEnv TermPlus
 inferKind m arrayKind =
@@ -376,16 +376,16 @@ weakTermSigma m xts = do
   z <- newNameWith'' "sigma"
   let vz = (m, WeakTermUpsilon z)
   k <- newNameWith'' "sigma"
-  let yts = [(m, z, (m, WeakTermTau)), (m, k, (m, weakTermPi xts vz))]
-  return (m, weakTermPi yts vz)
+  let yts = [(m, z, (m, WeakTermTau)), (m, k, (m, WeakTermPi xts vz))]
+  return (m, WeakTermPi yts vz)
 
 termSigma :: Meta -> [IdentPlus] -> WithEnv TermPlus
 termSigma m xts = do
   z <- newNameWith'' "sigma"
   let vz = (m, TermUpsilon z)
   k <- newNameWith'' "sigma"
-  let yts = [(m, z, (m, TermTau)), (m, k, (m, termPi xts vz))]
-  return (m, termPi yts vz)
+  let yts = [(m, z, (m, TermTau)), (m, k, (m, TermPi xts vz))]
+  return (m, TermPi yts vz)
 
 insEnumEnv :: Meta -> T.Text -> [(T.Text, Int)] -> WithEnv ()
 insEnumEnv m name xis = do

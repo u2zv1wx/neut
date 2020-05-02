@@ -23,7 +23,6 @@ reduceWeakTermPlus term =
         ys == map (\(_, x, _) -> x) xts ->
         e
     (m, WeakTermPiIntro xts e) -> do
-      -- let info' = fmap (fmap (map reduceWeakTermWeakIdentPlus)) info
       let (ms, xs, ts) = unzip3 xts
       let ts' = map reduceWeakTermPlus ts
       let e' = reduceWeakTermPlus e
@@ -43,7 +42,7 @@ reduceWeakTermPlus term =
           (m, app)
     (m, WeakTermFix (mx, x, t) xts e)
       | x `notElem` varWeakTermPlus e ->
-        reduceWeakTermPlus (m, weakTermPiIntro xts e)
+        reduceWeakTermPlus (m, WeakTermPiIntro xts e)
       | otherwise -> do
         let t' = reduceWeakTermPlus t
         let e' = reduceWeakTermPlus e
@@ -100,15 +99,6 @@ reduceWeakTermPlus term =
             reduceWeakTermPlus $ substWeakTermPlus sub e2
         _ ->
           (m, WeakTermStructElim xks e1' e2)
-    -- (m, WeakTermCase indName e cxtes) -> do
-    --   let e' = reduceWeakTermPlus e
-    --   let cxtes'' =
-    --         flip map cxtes $ \((c, xts), body) -> do
-    --           let (ms, xs, ts) = unzip3 xts
-    --           let ts' = map reduceWeakTermPlus ts
-    --           let body' = reduceWeakTermPlus body
-    --           ((c, zip3 ms xs ts'), body')
-    --   (m, WeakTermCase indName e' cxtes'')
     (_, WeakTermQuestion e _) ->
       reduceWeakTermPlus e
     _ -> term

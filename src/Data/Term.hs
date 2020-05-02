@@ -15,8 +15,6 @@ data Term
   | TermUpsilon Ident
   | TermPi [IdentPlus] TermPlus
   | TermPiIntro [IdentPlus] TermPlus
-  -- | TermPi (Maybe T.Text) [IdentPlus] TermPlus
-  -- | TermPiIntro (Maybe (Ident, T.Text, [IdentPlus])) [IdentPlus] TermPlus
   | TermPiElim TermPlus [TermPlus]
   | TermFix IdentPlus [IdentPlus] TermPlus
   | TermConst T.Text
@@ -36,10 +34,6 @@ data Term
   | TermStruct [ArrayKind] -- e.g. (struct u8 u8 f16 f32 u64)
   | TermStructIntro [(TermPlus, ArrayKind)]
   | TermStructElim [(Meta, Ident, ArrayKind)] TermPlus TermPlus
-  -- | TermCase
-  --     (Maybe Ident)
-  --     TermPlus -- (the `e` in `case e of (...)`, the type of `e`)
-  --     [Clause] -- ((cons x xs) e), ((nil) e), ((succ n) e).  (not ((cons A x xs) e).)
   deriving (Show)
 
 type TextPlus =
@@ -61,14 +55,6 @@ data Stmt
   = StmtReturn Meta
   | StmtLet Meta IdentPlus TermPlus Stmt
   deriving (Show)
-
-termPi :: [IdentPlus] -> TermPlus -> Term
-termPi =
-  TermPi
-
-termPiIntro :: [IdentPlus] -> TermPlus -> Term
-termPiIntro =
-  TermPiIntro
 
 asUpsilon :: TermPlus -> Maybe Ident
 asUpsilon term =
@@ -126,10 +112,6 @@ varTermPlus term =
     (_, TermStructElim xts d e) -> do
       let xs = map (\(_, x, _) -> x) xts
       varTermPlus d ++ filter (`notElem` xs) (varTermPlus e)
-    -- (_, TermCase _ e cxes) -> do
-    --   let xs = varTermPlus e
-    --   let ys = concatMap (\((_, xts), body) -> varTermPlus' xts [body]) cxes
-    --   xs ++ ys
 
 varTermPlus' :: [IdentPlus] -> [TermPlus] -> [Ident]
 varTermPlus' binder es =
@@ -151,8 +133,7 @@ substTermPlus sub term =
     (m, TermPi xts t) -> do
       let (xts', t') = substTermPlus'' sub xts t
       (m, TermPi xts' t')
-    (m, TermPiIntro  xts body) -> do
-      -- let info' = fmap (fmap (substTermPlus' sub)) info
+    (m, TermPiIntro xts body) -> do
       let (xts', body') = substTermPlus'' sub xts body
       (m, TermPiIntro xts' body')
     (m, TermPiElim e es) -> do
@@ -204,13 +185,6 @@ substTermPlus sub term =
       let sub' = foldr IntMap.delete sub xs
       let e' = substTermPlus sub' e
       (m, TermStructElim xts v' e')
-    -- (m, TermCase indName e cxtes) -> do
-    --   let e' = substTermPlus sub e
-    --   let cxtes' =
-    --         flip map cxtes $ \((c, xts), body) -> do
-    --           let (xts', body') = substTermPlus'' sub xts body
-    --           ((c, xts'), body')
-    --   (m, TermCase indName e' cxtes')
 
 substTermPlus' :: SubstTerm -> [IdentPlus] -> [IdentPlus]
 substTermPlus' sub binder =
@@ -243,7 +217,6 @@ weaken term =
     (m, TermPi xts t) ->
       (m, WeakTermPi (weakenArgs xts) (weaken t))
     (m, TermPiIntro xts body) -> do
-      -- let info' = fmap (fmap weakenArgs) info
       let xts' = weakenArgs xts
       (m, WeakTermPiIntro xts' (weaken body))
     (m, TermPiElim e es) -> do
@@ -294,14 +267,6 @@ weaken term =
       let v' = weaken v
       let e' = weaken e
       (m, WeakTermStructElim xts v' e')
-    -- (m, TermCase indName e cxtes) -> do
-    --   let e' = weaken e
-    --   let cxtes' =
-    --         flip map cxtes $ \((c, xts), body) -> do
-    --           let xts' = weakenArgs xts
-    --           let body' = weaken body
-    --           ((c, xts'), body')
-    --   (m, WeakTermCase indName e' cxtes')
 
 weakenArgs :: [(Meta, Ident, TermPlus)] -> [(Meta, Ident, WeakTermPlus)]
 weakenArgs xts = do

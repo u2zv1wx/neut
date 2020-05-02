@@ -24,7 +24,7 @@
 
 (section list)
 
-(inductive list ((a tau)) ;; list .= Pi (a . tau). tauだからaがunusedとして報告される。修正すること。
+(inductive list ((a tau))
   (nil
     ()
     (list a))
@@ -43,16 +43,6 @@
 
 (notation (list.new a rest+)
   (list.cons a (thunk (list.new rest+))))
-
-;; (define head
-;;   ((a tau)
-;;    (xs (list a)))
-;;   (witness (option a)
-;;     (case xs
-;;       ((nil)
-;;         (none))
-;;       ((cons y _)
-;;         (some y)))))
 
 (define head
   ((a tau)
@@ -80,28 +70,7 @@
       (lambda (_ acc)
         (add-i64 1 (force acc))))))
 
-;; (define length
-;;   ((a tau)
-;;    (xs (list a)))
-;;   (witness i64
-;;     (case xs
-;;       ((nil)
-;;         0)
-;;       ((cons _ ys)
-;;         (add-i64 1 (length a ys))))))
-
 (attribute length (implicit 0))
-
-;; (define append
-;;   ((a tau)
-;;    (xs (list a))
-;;    (ys (list a)))
-;;   (witness (list a)
-;;     (case xs
-;;       ((nil)
-;;         ys)
-;;       ((cons z zs)
-;;         (cons z (append a zs ys))))))
 
 (define append
   ((a tau)
@@ -115,23 +84,8 @@
         ys)
       (lambda (z acc)
         (cons z acc)))))
-    ;; (case xs
-    ;;   ((nil)
-    ;;     ys)
-    ;;   ((cons z zs)
-    ;;     (cons z (append a zs ys))))))
 
 (attribute append (implicit 0))
-
-;; ;; (define is-null
-;; ;;   ((a tau)
-;; ;;    (xs (list a)))
-;; ;;   (witness bool
-;; ;;     (case xs
-;; ;;       ((nil)
-;; ;;         true)
-;; ;;       ((cons _ _)
-;; ;;         false))))
 
 (define is-null
   ((a tau)
@@ -144,28 +98,9 @@
         true)
       (lambda (_ _)
         false))))
-;;     ;; (case xs
-;;     ;;   ((nil)
-;;     ;;     true)
-;;     ;;   ((cons _ _)
-;;     ;;     false))))
 
 
 (attribute is-null (implicit 0))
-
-;; ;; (define map
-;; ;;   ((a tau)
-;; ;;    (b tau)
-;; ;;    (f (hom a b))
-;; ;;    (xs (list a)))
-;; ;;   (witness (list b)
-;; ;;     (case xs
-;; ;;       ((nil)
-;; ;;         (nil))
-;; ;;       ((cons y ys)
-;; ;;         (cons
-;; ;;           (f y)
-;; ;;           (map a b f ys))))))
 
 (define map
   ((a tau)
@@ -180,12 +115,7 @@
         (nil))
       (lambda (y acc)
         (cons (f y) acc)))))
-;;       ;; ((nil)
-;;       ;;   (nil))
-;;       ;; ((cons y ys)
-;;       ;;   (cons
-;;       ;;     (f y)
-;;       ;;     (map a b f ys))))))
+
 
 (attribute map (implicit 0 1))
 
@@ -194,7 +124,6 @@
    (x a))
   (witness (list a)
     (list.new x)))
-;;     ;; (cons a x (nil a))))
 
 (attribute return (implicit 0))
 
@@ -209,18 +138,6 @@
         (nil))
       (lambda (xs acc)
         (append xs (force acc))))))
-;;       ;; ((cons x xs)
-;;       ;;   (append x (concatenate a xs))))))
-
-;; ;; (define concatenate
-;; ;;   ((a tau)
-;; ;;    (m (list (list a))))
-;; ;;   (witness (list a)
-;; ;;     (case m
-;; ;;       ((nil)
-;; ;;         (nil))
-;; ;;       ((cons x xs)
-;; ;;         (append x (concatenate a xs))))))
 
 (attribute concatenate (implicit 0))
 

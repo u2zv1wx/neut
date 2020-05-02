@@ -14,32 +14,16 @@
   (some ((x a))
     (option a)))
 
-;; (define map
-;;   (witness (functor-form option)
-;;     (lambda (_ _ f m)
-;;       (case m
-;;         ((none)
-;;           (none))
-;;         ((some x)
-;;           (some (f x)))))))
-
 (define map
   (witness (functor-form option)
-    (lambda (_ _ f m)
+    (lambda (a b f m)
       (fold m
         (lambda (_)
-          hole)
+          (option b))
         (lambda ()
           (none))
         (lambda (x)
           (some (f x)))))))
-        ;; ((none)
-        ;;   (none))
-        ;; ((some x)
-        ;;   (some (f x)))))))
-
-
-;; (satisfies-functor option), (satisfies-return option)みたいに書いてもいいかも。
 
 (define return
   (witness (return-type option)
@@ -48,10 +32,10 @@
 
 (define bind
   (witness (bind-type option)
-    (lambda (_ _ m k)
+    (lambda (a b m k)
       (fold m
         (lambda (_)
-          hole)
+          (option b))
         (lambda ()
           (none))
         (lambda (x)
@@ -74,16 +58,6 @@
 
 ?functor.unfold
 
-;; (coinductive functor ((f (hom tau tau)))
-;;   (map ((_ (functor f)))
-;;     (functor-form f)))
-
-;; (coinductive sample-record ((f (hom tau tau)) (g i64))
-;;   (map ((_ (functor f)))
-;;     (functor-form f)))
-
-;; ?sample-record.unfold
-
 ?monad.unfold
 
 (define witness-functor
@@ -103,23 +77,3 @@
         option.bind))))
 
 (end option)
-
-
-;; 射影はこういう実装になるはずだけど。推論が通ってねえ。
-;; やっぱcaseの推論は修正する必要がある。
-;; (let k (functor-form option)
-;;   (case option.witness-functor
-;;     ((functor.unfold f ma base-value) (ma base-value))))
-
-;; (define witness-fake
-;;   (witness (fake option)
-;;     (fake.unfold
-;;       fake
-;;       (lambda ((_ (fake option))) option.map)
-;;       (unsafe.cast (hom tau tau) (fake option) (lambda (x) x)))))
-      ;; (map
-      ;;   option.map))))
-
-;; (let pohe (functor-form option)
-;;   (case witness-fake
-;;     ((fake.unfold f ma base-value) (ma base-value))))

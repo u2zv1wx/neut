@@ -9,7 +9,6 @@ where
 import Clarify.Linearize
 import Clarify.Sigma
 import Clarify.Utility
--- import Codec.Binary.UTF8.String
 import Control.Monad.State.Lazy
 import Data.Code
 import Data.Env
@@ -24,7 +23,6 @@ import Data.Primitive
 import Data.Syscall
 import Data.Term
 import qualified Data.Text as T
--- import Data.Word
 import Reduce.Term
 
 clarify :: Stmt -> WithEnv CodePlus
@@ -61,10 +59,6 @@ clarify' tenv term =
       fvs <- nubFVS <$> chainTermPlus tenv term
       e' <- clarify' (insTypeEnv1 mxts tenv) e
       retClosure tenv Nothing fvs (m {metaIsReducible = True}) mxts e'
-    -- (m, TermPiIntro (Just (_, name, args)) mxts e) -> do
-    --   e' <- clarify' (insTypeEnv1 mxts tenv) e
-    --   let name' = showInHex name
-    --   retClosure tenv (Just name') args (m {metaIsReducible = True}) mxts e'
     (m, TermPiElim e es) -> do
       es' <- mapM (clarifyPlus tenv) es
       e' <- clarify' tenv e
@@ -136,15 +130,6 @@ clarify' tenv term =
       (struct, structVar) <- newDataUpsilonWith m "struct"
       return $ bindLet [(struct, e1')] (m, CodeStructElim (zip xs ks) structVar e2')
 
--- (m, TermCase _ e cxtes) -> do
---   e' <- clarify' tenv e
---   (cls, clsVar) <- newDataUpsilonWith m "case-closure"
---   res <- newNameWith' "case-res"
---   env <- newNameWith' "case-env"
---   lam <- newNameWith' "label"
---   cxtes' <- clarifyCase tenv m cxtes res env lam
---   return $ bindLet [(cls, e')] (m, sigmaElim [res, env, lam] clsVar cxtes')
-
 clarifyPlus :: TypeEnv -> TermPlus -> WithEnv (Ident, CodePlus, DataPlus)
 clarifyPlus tenv e@(m, _) = do
   e' <- clarify' tenv e
@@ -160,51 +145,9 @@ alignFVS tenv m fvs es = do
   es' <- mapM (retClosure tenv Nothing fvs m []) es
   mapM (\cls -> callClosure m cls []) es'
 
--- clarifyCase ::
---   TypeEnv ->
---   Meta ->
---   [Clause] ->
---   Ident ->
---   Ident ->
---   Ident ->
---   WithEnv CodePlus
--- clarifyCase tenv m cxtes typeVarName envVarName lamVarName = do
---   fvs <- constructCaseFVS tenv cxtes m typeVarName envVarName
---   es <- (mapM (clarifyCase' tenv m envVarName) >=> alignFVS tenv m fvs) cxtes
---   (y, e', yVar) <- clarifyPlus tenv (m, TermUpsilon lamVarName)
---   let sub = IntMap.fromList $ map (\(mx, x, _) -> (asInt x, (mx, DataUpsilon x))) fvs
---   let cs = map (\(((mc, c), _), _) -> (mc, showInHex $ asText c)) cxtes
---   return $ bindLet [(y, e')] (m, CodeCase sub yVar (zip cs es))
-
--- constructCaseFVS ::
---   TypeEnv ->
---   [Clause] ->
---   Meta ->
---   Ident ->
---   Ident ->
---   WithEnv [IdentPlus]
--- constructCaseFVS tenv cxtes m typeVarName envVarName = do
---   fvss <- mapM (chainCaseClause tenv) cxtes
---   let fvs = nubFVS $ concat fvss
---   return $
---     (m, typeVarName, (m, TermTau))
---       : (m, envVarName, (m, TermUpsilon typeVarName))
---       : fvs
-
--- chainCaseClause :: TypeEnv -> Clause -> WithEnv [IdentPlus]
--- chainCaseClause tenv (((m, _), xts), body) =
---   chainTermPlus tenv (m, termPiIntro xts body)
-
 nubFVS :: [IdentPlus] -> [IdentPlus]
 nubFVS =
   nubBy (\(_, x, _) (_, y, _) -> x == y)
-
--- clarifyCase' :: TypeEnv -> Meta -> Ident -> Clause -> WithEnv CodePlus
--- clarifyCase' tenv m envVarName ((_, xts), e) = do
---   xts' <- clarifyBinder tenv xts
---   e' <- clarify' tenv e >>= linearize (dropFst xts')
---   let xs = map (\(_, x, _) -> x) xts
---   return (m, sigmaElim xs (m, DataUpsilon envVarName) e')
 
 clarifyConst :: TypeEnv -> Meta -> T.Text -> WithEnv CodePlus
 clarifyConst tenv m x
@@ -243,7 +186,7 @@ clarifyCast tenv m = do
   let u = (m, TermTau)
   clarify'
     tenv
-    (m, termPiIntro [(m, a, u), (m, b, u), (m, z, varA)] (m, TermUpsilon z))
+    (m, TermPiIntro [(m, a, u), (m, b, u), (m, z, varA)] (m, TermUpsilon z))
 
 clarifyUnaryOp :: TypeEnv -> T.Text -> UnaryOp -> Meta -> WithEnv CodePlus
 clarifyUnaryOp tenv name op m = do
@@ -463,7 +406,7 @@ retWithBorrowedVars tenv m cod xts resultVarName =
       let tenv' = insTypeEnv1 (xts ++ [(m, resultVarName, resultType)]) tenv
       clarify'
         tenv'
-        (m, termPiIntro [zu, kp] (m, TermPiElim (mk, TermUpsilon k) vs))
+        (m, TermPiIntro [zu, kp] (m, TermPiElim (mk, TermUpsilon k) vs))
 
 rightmostOf :: TermPlus -> WithEnv (Meta, TermPlus)
 rightmostOf term =
@@ -646,11 +589,6 @@ chainTermPlus tenv term =
       let xs = map (\(_, y, _) -> y) xks
       return $ xs1 ++ filter (\(_, y, _) -> y `notElem` xs) xs2
 
--- (_, TermCase _ e cxtes) -> do
---   xs <- chainTermPlus tenv e
---   ys <- concat <$> mapM (\((_, xts), body) -> chainTermPlus' tenv xts [body]) cxtes
---   return $ xs ++ ys
-
 chainTermPlus' :: TypeEnv -> [IdentPlus] -> [TermPlus] -> WithEnv [IdentPlus]
 chainTermPlus' tenv binder es =
   case binder of
@@ -686,15 +624,3 @@ obtainChain m x tenv = do
       let chain = xts ++ [(m, x, t)]
       modify (\env -> env {chainEnv = IntMap.insert (asInt x) chain cenv})
       return chain
--- showInHex :: T.Text -> T.Text
--- showInHex x =
---   "x" <> foldr (<>) "" (map showInHex' (encode $ T.unpack x))
-
--- showInHex' :: Word8 -> T.Text
--- showInHex' w = do
---   let (high, low) = (fromIntegral w :: Int) `divMod` 16
---   hex high <> hex low
-
--- hex :: Int -> T.Text
--- hex i =
---   T.singleton $ "0123456789abcdef" !! i
