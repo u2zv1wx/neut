@@ -8,6 +8,8 @@
 
 (include library "core/base.neut")
 
+(include library "core/identity.neut")
+
 (inductive free-internal ((g (hom tau tau)) (a tau))
   (leaf
     ((_ a))
@@ -37,7 +39,7 @@
         ((leaf x)
           (leaf (f x)))
         ((node (p tau) val (cont (hom p ((free g) a))))
-          (with let-bind
+          (with identity.bind
             (let f' (lambda (x) ((map g) a b f x)))
             (node p val (compose hole hole hole cont f'))))))))
 
@@ -63,7 +65,7 @@
         ((leaf x)
           (k x))
         ((node p val cont)
-          (with let-bind
+          (with identity.bind
             (let cont-then-k
               (lambda ((x p))
                 ((bind g) a b (cont x) k)))
