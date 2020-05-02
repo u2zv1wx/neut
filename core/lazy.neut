@@ -13,7 +13,7 @@
     (unfold
       (lambda () x))))
 
-(attribute lazy.thunk
+(attribute thunk
   (implicit 0))
 
 (define force ((a tau) (x (lazy a)))
@@ -24,7 +24,7 @@
       (lambda (acc)
         (acc)))))
 
-(attribute lazy.force
+(attribute force
   (implicit 0))
 
 (end lazy)
