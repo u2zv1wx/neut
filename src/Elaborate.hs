@@ -31,8 +31,8 @@ elaborate =
 elaborateStmt :: [WeakStmt] -> WithEnv Stmt
 elaborateStmt stmt =
   case stmt of
-    [] -> do
-      warnUnusedVar
+    [] ->
+      -- warnUnusedVar
       StmtReturn . newMeta 1 1 <$> getCurrentFilePath
     WeakStmtLet m (mx, x, t) e : cont -> do
       (e', te) <- infer e
@@ -337,22 +337,21 @@ lookupEnumSet m name = do
       raiseError m $ "no such enum defined: " <> name
     Just xis ->
       return $ map fst xis
+-- warnUnusedVar :: WithEnv ()
+-- warnUnusedVar =
+--   whenCheck $ do
+--     set <- gets intactSet
+--     let set' = S.map (\(m, x) -> (getPosInfo m, x)) set
+--     warnUnusedVar' $ S.toList set'
 
-warnUnusedVar :: WithEnv ()
-warnUnusedVar =
-  whenCheck $ do
-    set <- gets intactSet
-    let set' = S.map (\(m, x) -> (getPosInfo m, x)) set
-    warnUnusedVar' $ S.toList set'
-
-warnUnusedVar' :: [(PosInfo, T.Text)] -> WithEnv ()
-warnUnusedVar' infoList =
-  case infoList of
-    [] ->
-      return ()
-    ((pos, x) : pxs)
-      | T.all (`S.notMember` S.fromList "()") x -> do
-        warn pos $ "defined but not used: `" <> x <> "`"
-        warnUnusedVar' pxs
-      | otherwise ->
-        warnUnusedVar' pxs
+-- warnUnusedVar' :: [(PosInfo, T.Text)] -> WithEnv ()
+-- warnUnusedVar' infoList =
+--   case infoList of
+--     [] ->
+--       return ()
+--     ((pos, x) : pxs)
+--       | T.all (`S.notMember` S.fromList "()") x -> do
+--         warn pos $ "defined but not used: `" <> x <> "`"
+--         warnUnusedVar' pxs
+--       | otherwise ->
+--         warnUnusedVar' pxs
