@@ -17,7 +17,7 @@
   (witness top
     (with identity.bind
       (let char (array-introduction i8 value))
-      (os.write hole os.stdout char 1)
+      (os.write * os.stdout char 1)
       top.unit)))
 
 (define string.print ((str string))

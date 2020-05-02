@@ -92,6 +92,7 @@
 
 ?my-record.item-1
 ?my-record.fold
+?my-record.unfold
 
 (coinductive my-record-2 ((a tau) (b i64))
   (item-1
