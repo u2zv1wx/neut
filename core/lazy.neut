@@ -1,0 +1,15 @@
+(no-implicit-core)
+
+(include library "core/foundation.neut")
+
+(define lazy ((a tau))
+  (witness tau
+    (pi () a)))
+
+(define thunk ((a tau) (x a))
+  (witness (lazy a)
+    (lambda () x)))
+
+(define force ((a tau) (x (lazy a)))
+  (witness a
+    (x)))

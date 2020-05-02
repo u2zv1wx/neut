@@ -4,6 +4,8 @@
 
 (include library "core/base.neut")
 
+(include library "core/lazy.neut")
+
 (include library "core/top.neut")
 
 (include library "core/bool.neut")
