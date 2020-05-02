@@ -37,15 +37,27 @@
 (notation (list.new a rest+)
   (list.cons a (list.new rest+)))
 
+;; (define head
+;;   ((a tau)
+;;    (xs (list a)))
+;;   (witness (option a)
+;;     (case xs
+;;       ((nil)
+;;         (none))
+;;       ((cons y _)
+;;         (some y)))))
+
 (define head
   ((a tau)
    (xs (list a)))
   (witness (option a)
-    (case xs
-      ((nil)
+    (list.fold xs
+      (lambda (_)
+        (option a))
+      (lambda ()
         (none))
-      ((cons y _)
-        (some y)))))
+      (lambda (h _)
+        (some h)))))
 
 (attribute head (implicit 0))
 
@@ -53,38 +65,100 @@
   ((a tau)
    (xs (list a)))
   (witness i64
-    (case xs
-      ((nil)
+    (list.fold xs
+      (lambda (_)
+        i64)
+      (lambda ()
         0)
-      ((cons _ ys)
-        (add-i64 1 (length a ys))))))
+      (lambda (_ acc)
+        (add-i64 1 acc)))))
+
+;; (define length
+;;   ((a tau)
+;;    (xs (list a)))
+;;   (witness i64
+;;     (case xs
+;;       ((nil)
+;;         0)
+;;       ((cons _ ys)
+;;         (add-i64 1 (length a ys))))))
 
 (attribute length (implicit 0))
+
+;; (define append
+;;   ((a tau)
+;;    (xs (list a))
+;;    (ys (list a)))
+;;   (witness (list a)
+;;     (case xs
+;;       ((nil)
+;;         ys)
+;;       ((cons z zs)
+;;         (cons z (append a zs ys))))))
 
 (define append
   ((a tau)
    (xs (list a))
    (ys (list a)))
   (witness (list a)
-    (case xs
-      ((nil)
+    (list.fold xs
+      (lambda (_)
+        (list a))
+      (lambda ()
         ys)
-      ((cons z zs)
-        (cons z (append a zs ys))))))
+      (lambda (z acc)
+        (cons z acc)))))
+    ;; (case xs
+    ;;   ((nil)
+    ;;     ys)
+    ;;   ((cons z zs)
+    ;;     (cons z (append a zs ys))))))
 
 (attribute append (implicit 0))
+
+;; (define is-null
+;;   ((a tau)
+;;    (xs (list a)))
+;;   (witness bool
+;;     (case xs
+;;       ((nil)
+;;         true)
+;;       ((cons _ _)
+;;         false))))
 
 (define is-null
   ((a tau)
    (xs (list a)))
   (witness bool
-    (case xs
-      ((nil)
+    (list.fold xs
+      (lambda (_)
+        bool)
+      (lambda ()
         true)
-      ((cons _ _)
+      (lambda (_ _)
         false))))
+    ;; (case xs
+    ;;   ((nil)
+    ;;     true)
+    ;;   ((cons _ _)
+    ;;     false))))
+
 
 (attribute is-null (implicit 0))
+
+;; (define map
+;;   ((a tau)
+;;    (b tau)
+;;    (f (hom a b))
+;;    (xs (list a)))
+;;   (witness (list b)
+;;     (case xs
+;;       ((nil)
+;;         (nil))
+;;       ((cons y ys)
+;;         (cons
+;;           (f y)
+;;           (map a b f ys))))))
 
 (define map
   ((a tau)
@@ -92,13 +166,19 @@
    (f (hom a b))
    (xs (list a)))
   (witness (list b)
-    (case xs
-      ((nil)
+    (list.fold xs
+      (lambda (_)
+        (list b))
+      (lambda ()
         (nil))
-      ((cons y ys)
-        (cons
-          (f y)
-          (map a b f ys))))))
+      (lambda (y acc)
+        (cons (f y) acc)))))
+      ;; ((nil)
+      ;;   (nil))
+      ;; ((cons y ys)
+      ;;   (cons
+      ;;     (f y)
+      ;;     (map a b f ys))))))
 
 (attribute map (implicit 0 1))
 
@@ -115,11 +195,25 @@
   ((a tau)
    (m (list (list a))))
   (witness (list a)
-    (case m
-      ((nil)
+    (list.fold m
+      (lambda (_)
+        (list a))
+      (lambda ()
         (nil))
-      ((cons x xs)
-        (append x (concatenate a xs))))))
+      (lambda (xs acc)
+        (append xs acc)))))
+      ;; ((cons x xs)
+      ;;   (append x (concatenate a xs))))))
+
+;; (define concatenate
+;;   ((a tau)
+;;    (m (list (list a))))
+;;   (witness (list a)
+;;     (case m
+;;       ((nil)
+;;         (nil))
+;;       ((cons x xs)
+;;         (append x (concatenate a xs))))))
 
 (attribute concatenate (implicit 0))
 
