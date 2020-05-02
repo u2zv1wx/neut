@@ -98,33 +98,33 @@ generateProjections ts = do
   let bts' = map textPlusToWeakIdentPlus bts
   stmtListList <-
     forM ats $ \(ma, a, ta) -> do
-      xts <- takeXTS ta
+      (xts, _) <- separatePi ta
       forM bts $ \(mb, b, tb) -> do
-        (dom, cod) <- separate tb
+        (dom, cod) <- separatePi tb
+        when (length dom /= 1) $ raiseSyntaxError mb "(pi (TREE) TREE)"
         e <-
           discern
             ( mb,
               WeakTermPiIntro
-                (xts ++ [dom])
+                (xts ++ dom)
                 ( mb,
                   WeakTermPiElim
                     (mb {metaIsExplicit = True}, WeakTermUpsilon $ asIdent (a <> nsSep <> "fold"))
-                    $ map toVar' xts
-                      ++ [ toVar' dom,
-                           (mb, WeakTermPiIntro xts cod),
+                    $ map toVar' (xts ++ dom)
+                      ++ [ (mb, WeakTermPiIntro xts cod),
                            ( mb,
                              WeakTermPiIntro
-                               ([(ma, asIdent a, ta)] ++ bts' ++ [dom])
+                               ([(ma, asIdent a, ta)] ++ bts' ++ dom)
                                ( mb,
                                  -- ここでexternalizeを行うべき？
-                                 WeakTermPiElim (mb, WeakTermUpsilon $ asIdent b) [toVar' dom]
+                                 WeakTermPiElim (mb, WeakTermUpsilon $ asIdent b) (map toVar' dom)
                                )
                            )
                          ]
                 )
             )
         let b' = a <> nsSep <> b
-        bt <- discernIdentPlus (mb, asIdent b', (mb, WeakTermPi (xts ++ [dom]) cod))
+        bt <- discernIdentPlus (mb, asIdent b', (mb, WeakTermPi (xts ++ dom) cod))
         imp <- toStmtImplicit mb b' [0 .. length xts - 1]
         return [WeakStmtLetWT mb bt e, imp]
   return $ concat $ concat stmtListList
@@ -134,21 +134,13 @@ toStmtImplicit mx x is = do
   x' <- discernText mx x
   return $ WeakStmtImplicit x' is
 
-separate :: WeakTermPlus -> WithEnv (WeakIdentPlus, WeakTermPlus)
-separate e =
+separatePi :: WeakTermPlus -> WithEnv ([WeakIdentPlus], WeakTermPlus)
+separatePi e =
   case e of
-    (_, WeakTermPi [xt] cod) ->
-      return (xt, cod)
+    (_, WeakTermPi xts cod) ->
+      return (xts, cod)
     _ ->
-      raiseSyntaxError (fst e) "(pi (TREE) TREE)"
-
-takeXTS :: WeakTermPlus -> WithEnv [WeakIdentPlus]
-takeXTS t =
-  case t of
-    (_, WeakTermPi xts _) ->
-      return xts
-    _ ->
-      raiseSyntaxError (fst t) "(pi (TREE ... TREE) TREE)"
+      raiseSyntaxError (fst e) "(pi (TREE ... TREE) TREE)"
 
 parseRule :: TreePlus -> WithEnv Rule
 parseRule inputTree =
