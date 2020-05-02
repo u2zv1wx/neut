@@ -2,14 +2,23 @@
 
 (include library "core/foundation.neut")
 
-(define lazy ((a tau))
-  (witness tau
-    (pi () a)))
+(inductive lazy ((a tau))
+  (unfold ((x (pi () a)))
+    (lazy a)))
+
+(section lazy)
 
 (define thunk ((a tau) (x a))
   (witness (lazy a)
-    (lambda () x)))
+    (unfold
+      (lambda () x))))
 
 (define force ((a tau) (x (lazy a)))
   (witness a
-    (x)))
+    (fold x
+      (lambda (_)
+        a)
+      (lambda (acc)
+        (acc)))))
+
+(end lazy)
