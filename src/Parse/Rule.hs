@@ -126,11 +126,6 @@ generateProjections ts = do
         return [WeakStmtLetWT mb bt e]
   return $ concat $ concat stmtListList
 
--- toStmtImplicit :: Meta -> T.Text -> [Int] -> WithEnv WeakStmt
--- toStmtImplicit mx x is = do
---   x' <- discernText mx x
---   return $ WeakStmtImplicit x' is
-
 separatePi :: WeakTermPlus -> WithEnv ([WeakIdentPlus], WeakTermPlus)
 separatePi e =
   case e of
@@ -178,11 +173,9 @@ toInductive ats bts connective@(m, ai, xts, _) = do
   foldIdent <-
     discernIdentPlus
       (m, asIdent $ ai <> nsSep <> "fold", (m, WeakTermPi indArgs cod))
-  -- imp <- toStmtImplicit m (ai <> nsSep <> "fold") [0 .. length xts - 1]
   return
     [ WeakStmtLetWT m at' indType,
       WeakStmtLetWT m foldIdent fold
-      -- imp
     ]
 
 toInductiveIntroList :: [WeakTextPlus] -> [WeakTextPlus] -> Connective -> WithEnv [WeakStmt]
@@ -219,7 +212,6 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
     constructorIdent <-
       discernIdentPlus
         (mb, asIdent bi, (m, WeakTermPi (xts' ++ yts) cod))
-    -- imp <- toStmtImplicit m bi [0 .. length xts' - 1]
     case constructor of
       (_, WeakTermPiIntro xtsyts (_, WeakTermPiIntro atsbts (_, WeakTermPiElim b _))) -> do
         as <- mapM (\(_, x, _) -> asInt <$> discernText m (asText x)) ats
@@ -236,7 +228,6 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
                     WeakTermPiIntro atsbts (m, WeakTermPiElim b yts')
                   )
               )
-            -- imp
           ]
       _ ->
         raiseCritical m "inductive-intro"
