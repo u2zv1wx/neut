@@ -207,8 +207,7 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
     ai == asText a',
     length xts == length es = do
     let vs = varWeakTermPlus (m, WeakTermPi yts cod)
-    let ixts = filter (\(_ :: Int, (_, x, _)) -> x `S.member` vs) $ zip [0 ..] xts
-    let (is, xts') = unzip ixts
+    let xts' = filter (\(_, x, _) -> x `S.member` vs) xts
     constructor <-
       discern
         ( m,
@@ -226,14 +225,14 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
     imp <- toStmtImplicit m bi [0 .. length xts' - 1]
     case constructor of
       (_, WeakTermPiIntro xtsyts (_, WeakTermPiIntro atsbts (_, WeakTermPiElim b _))) -> do
-        let as = take (length ats) $ map (\(_, x, _) -> asInt x) atsbts
+        as <- mapM (\(_, x, _) -> asInt <$> discernText m (asText x)) ats
         insInductive as constructorIdent
-        yts' <- mapM (internalize as atsbts) $ drop (length is) xtsyts
+        yts' <- mapM (internalize as atsbts) $ drop (length xts) xtsyts
         return
           [ WeakStmtLetWT
               m
               constructorIdent
-              ( m {metaIsReducible = False},
+              ( m,
                 WeakTermPiIntro
                   xtsyts
                   ( m,
