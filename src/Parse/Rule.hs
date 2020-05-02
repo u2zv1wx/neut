@@ -97,10 +97,10 @@ generateProjections ts = do
   (ats, bts) <- toIndInfo ts
   let bts' = map textPlusToWeakIdentPlus bts
   stmtListList <-
-    forM ats $ \(ma, a, ta) ->
+    forM ats $ \(ma, a, ta) -> do
+      xts <- takeXTS ta
       forM bts $ \(mb, b, tb) -> do
-        xts <- takeXTS ta
-        (dom@(my, y, ty), cod) <- separate tb
+        (dom, cod) <- separate tb
         e <-
           discern
             ( mb,
@@ -108,16 +108,16 @@ generateProjections ts = do
                 (xts ++ [dom])
                 ( mb,
                   WeakTermPiElim
-                    (mb, WeakTermUpsilon $ asIdent (a <> nsSep <> "fold"))
+                    (mb {metaIsExplicit = True}, WeakTermUpsilon $ asIdent (a <> nsSep <> "fold"))
                     $ map toVar' xts
-                      ++ [ (my, WeakTermUpsilon y),
+                      ++ [ toVar' dom,
                            (mb, WeakTermPiIntro xts cod),
                            ( mb,
                              WeakTermPiIntro
-                               ([(ma, asIdent a, ta)] ++ bts' ++ [(mb, y, ty)])
+                               ([(ma, asIdent a, ta)] ++ bts' ++ [dom])
                                ( mb,
                                  -- ここでexternalizeを行うべき？
-                                 WeakTermPiElim (mb, WeakTermUpsilon $ asIdent b) [(mb, WeakTermUpsilon y)]
+                                 WeakTermPiElim (mb, WeakTermUpsilon $ asIdent b) [toVar' dom]
                                )
                            )
                          ]
@@ -125,9 +125,8 @@ generateProjections ts = do
             )
         let b' = a <> nsSep <> b
         bt <- discernIdentPlus (mb, asIdent b', (mb, WeakTermPi (xts ++ [dom]) cod))
-        imp1 <- toStmtImplicit mb b' [0 .. length xts - 1]
-        imp2 <- toStmtImplicit mb (a <> nsSep <> "unfold") [0 .. length xts - 1]
-        return [WeakStmtLetWT mb bt e, imp1, imp2]
+        imp <- toStmtImplicit mb b' [0 .. length xts - 1]
+        return [WeakStmtLetWT mb bt e, imp]
   return $ concat $ concat stmtListList
 
 toStmtImplicit :: Meta -> T.Text -> [Int] -> WithEnv WeakStmt
