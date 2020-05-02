@@ -12,12 +12,14 @@ import qualified Data.Text as T
 data WeakTerm
   = WeakTermTau
   | WeakTermUpsilon Ident
-  | WeakTermPi (Maybe T.Text) [WeakIdentPlus] WeakTermPlus
-  | WeakTermPiIntro
-      (Maybe (Ident, T.Text, [WeakIdentPlus]))
-      [WeakIdentPlus]
-      WeakTermPlus
-  | WeakTermPiElim WeakTermPlus [WeakTermPlus]
+  | WeakTermPi [WeakIdentPlus] WeakTermPlus
+  | WeakTermPiIntro [WeakIdentPlus] WeakTermPlus
+  | -- | WeakTermPi (Maybe T.Text) [WeakIdentPlus] WeakTermPlus
+    -- | WeakTermPiIntro
+    --     (Maybe (Ident, T.Text, [WeakIdentPlus]))
+    --     [WeakIdentPlus]
+    --     WeakTermPlus
+    WeakTermPiElim WeakTermPlus [WeakTermPlus]
   | WeakTermFix WeakIdentPlus [WeakIdentPlus] WeakTermPlus
   | WeakTermHole Ident
   | WeakTermConst T.Text
@@ -65,7 +67,9 @@ type IdentDef =
 
 weakTermPiIntro :: [WeakIdentPlus] -> WeakTermPlus -> WeakTerm
 weakTermPiIntro =
-  WeakTermPiIntro Nothing
+  WeakTermPiIntro
+
+-- WeakTermPiIntro Nothing
 
 toVar :: Meta -> Ident -> WeakTermPlus
 toVar m x =
@@ -104,7 +108,9 @@ data WeakStmt
 
 weakTermPi :: [WeakIdentPlus] -> WeakTermPlus -> WeakTerm
 weakTermPi =
-  WeakTermPi Nothing
+  WeakTermPi
+
+-- WeakTermPi Nothing
 
 varWeakTermPlus :: WeakTermPlus -> S.Set Ident
 varWeakTermPlus term =
@@ -113,10 +119,14 @@ varWeakTermPlus term =
       S.empty
     (_, WeakTermUpsilon x) ->
       S.singleton x
-    (_, WeakTermPi _ xts t) ->
+    (_, WeakTermPi xts t) ->
       varWeakTermPlus' xts [t]
-    (_, WeakTermPiIntro _ xts e) ->
+    (_, WeakTermPiIntro xts e) ->
       varWeakTermPlus' xts [e]
+    -- (_, WeakTermPi _ xts t) ->
+    --   varWeakTermPlus' xts [t]
+    -- (_, WeakTermPiIntro _ xts e) ->
+    --   varWeakTermPlus' xts [e]
     (_, WeakTermPiElim e es) -> do
       let xs = varWeakTermPlus e
       let ys = S.unions $ map varWeakTermPlus es
@@ -187,10 +197,14 @@ holeWeakTermPlus term =
       S.empty
     (_, WeakTermUpsilon _) ->
       S.empty
-    (_, WeakTermPi _ xts t) ->
+    (_, WeakTermPi xts t) ->
       holeWeakTermPlus' xts [t]
-    (_, WeakTermPiIntro _ xts e) ->
+    (_, WeakTermPiIntro xts e) ->
       holeWeakTermPlus' xts [e]
+    -- (_, WeakTermPi _ xts t) ->
+    --   holeWeakTermPlus' xts [t]
+    -- (_, WeakTermPiIntro _ xts e) ->
+    --   holeWeakTermPlus' xts [e]
     (_, WeakTermPiElim e es) -> do
       let set1 = holeWeakTermPlus e
       let set2 = S.unions $ map holeWeakTermPlus es
@@ -264,13 +278,19 @@ substWeakTermPlus sub term =
       case IntMap.lookup (asInt x) sub of
         Nothing -> e1
         Just e2@(_, e) -> (supMeta (metaOf e1) (metaOf e2), e)
-    (m, WeakTermPi mName xts t) -> do
+    (m, WeakTermPi xts t) -> do
       let (xts', t') = substWeakTermPlus'' sub xts t
-      (m, WeakTermPi mName xts' t')
-    (m, WeakTermPiIntro info xts body) -> do
-      let info' = fmap (fmap (substWeakTermPlus' sub)) info
+      (m, WeakTermPi xts' t')
+    (m, WeakTermPiIntro xts body) -> do
       let (xts', body') = substWeakTermPlus'' sub xts body
-      (m, WeakTermPiIntro info' xts' body')
+      (m, WeakTermPiIntro xts' body')
+    -- (m, WeakTermPi mName xts t) -> do
+    --   let (xts', t') = substWeakTermPlus'' sub xts t
+    --   (m, WeakTermPi mName xts' t')
+    -- (m, WeakTermPiIntro info xts body) -> do
+    --   let info' = fmap (fmap (substWeakTermPlus' sub)) info
+    --   let (xts', body') = substWeakTermPlus'' sub xts body
+    --   (m, WeakTermPiIntro info' xts' body')
     (m, WeakTermPiElim e es) -> do
       let e' = substWeakTermPlus sub e
       let es' = map (substWeakTermPlus sub) es
@@ -386,7 +406,7 @@ toText term =
       "tau"
     (_, WeakTermUpsilon x) ->
       asText' x
-    (_, WeakTermPi Nothing xts cod) ->
+    (_, WeakTermPi xts cod) ->
       case extractSigmaArg term of
         Just yts ->
           case splitLast yts of
@@ -403,13 +423,33 @@ toText term =
           | otherwise -> do
             let (_, _, ts) = unzip3 xts
             showCons ["arrow", showCons $ map toText ts, toText cod]
-    (_, WeakTermPi (Just _) _ cod) ->
-      toText cod
-    (_, WeakTermPiIntro Nothing xts e) -> do
+    -- (_, WeakTermPi Nothing xts cod) ->
+    --   case extractSigmaArg term of
+    --     Just yts ->
+    --       case splitLast yts of
+    --         Just (zts, (_, _, t))
+    --           | isDependent zts t ->
+    --             showCons ["Σ", inParen $ showTypeArgs zts t, toText t]
+    --           | otherwise -> do
+    --             let (_, _, ts) = unzip3 zts
+    --             showCons $ "product" : map toText (ts ++ [t])
+    --         Nothing -> "(product)"
+    --     Nothing
+    --       | isDependent xts cod ->
+    --         showCons ["Π", inParen $ showTypeArgs xts cod, toText cod]
+    --       | otherwise -> do
+    --         let (_, _, ts) = unzip3 xts
+    --         showCons ["arrow", showCons $ map toText ts, toText cod]
+    -- (_, WeakTermPi (Just _) _ cod) ->
+    --   toText cod
+    -- (_, WeakTermPiIntro Nothing xts e) -> do
+    --   let argStr = inParen $ showItems $ map showArg xts
+    --   showCons ["λ", argStr, toText e]
+    (_, WeakTermPiIntro xts e) -> do
       let argStr = inParen $ showItems $ map showArg xts
       showCons ["λ", argStr, toText e]
-    (_, WeakTermPiIntro (Just (_, name, _)) _ _) ->
-      "<#" <> name <> "-" <> "internal" <> "#>"
+    -- (_, WeakTermPiIntro (Just (_, name, _)) _ _) ->
+    --   "<#" <> name <> "-" <> "internal" <> "#>"
     (_, WeakTermPiElim e es) ->
       showCons $ map toText $ e : es
     (_, WeakTermFix (_, x, _) xts e) -> do
@@ -560,11 +600,18 @@ showStruct =
 extractSigmaArg :: WeakTermPlus -> Maybe [WeakIdentPlus]
 extractSigmaArg term =
   case term of
-    (_, WeakTermPi _ [(_, z, (_, WeakTermTau)), (_, _, (_, WeakTermPi _ xts (_, WeakTermUpsilon z')))] (_, WeakTermUpsilon z''))
+    (_, WeakTermPi [(_, z, (_, WeakTermTau)), (_, _, (_, WeakTermPi xts (_, WeakTermUpsilon z')))] (_, WeakTermUpsilon z''))
       | z == z',
         z == z'' ->
         return xts
     _ -> Nothing
+
+-- case term of
+--   (_, WeakTermPi _ [(_, z, (_, WeakTermTau)), (_, _, (_, WeakTermPi _ xts (_, WeakTermUpsilon z')))] (_, WeakTermUpsilon z''))
+--     | z == z',
+--       z == z'' ->
+--       return xts
+--   _ -> Nothing
 
 splitLast :: [a] -> Maybe ([a], a)
 splitLast input =

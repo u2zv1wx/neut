@@ -9,7 +9,7 @@ where
 import Clarify.Linearize
 import Clarify.Sigma
 import Clarify.Utility
-import Codec.Binary.UTF8.String
+-- import Codec.Binary.UTF8.String
 import Control.Monad.State.Lazy
 import Data.Code
 import Data.Env
@@ -24,7 +24,7 @@ import Data.Primitive
 import Data.Syscall
 import Data.Term
 import qualified Data.Text as T
-import Data.Word
+-- import Data.Word
 import Reduce.Term
 
 clarify :: Stmt -> WithEnv CodePlus
@@ -57,14 +57,14 @@ clarify' tenv term =
       return (m, CodeUpIntro (m, DataUpsilon x))
     (m, TermPi {}) ->
       returnClosureType m
-    (m, TermPiIntro Nothing mxts e) -> do
+    (m, TermPiIntro mxts e) -> do
       fvs <- nubFVS <$> chainTermPlus tenv term
       e' <- clarify' (insTypeEnv1 mxts tenv) e
       retClosure tenv Nothing fvs (m {metaIsReducible = True}) mxts e'
-    (m, TermPiIntro (Just (_, name, args)) mxts e) -> do
-      e' <- clarify' (insTypeEnv1 mxts tenv) e
-      let name' = showInHex name
-      retClosure tenv (Just name') args (m {metaIsReducible = True}) mxts e'
+    -- (m, TermPiIntro (Just (_, name, args)) mxts e) -> do
+    --   e' <- clarify' (insTypeEnv1 mxts tenv) e
+    --   let name' = showInHex name
+    --   retClosure tenv (Just name') args (m {metaIsReducible = True}) mxts e'
     (m, TermPiElim e es) -> do
       es' <- mapM (clarifyPlus tenv) es
       e' <- clarify' tenv e
@@ -250,7 +250,7 @@ clarifyUnaryOp tenv name op m = do
   t <- lookupConstTypeEnv m name
   let t' = reduceTermPlus t
   case t' of
-    (_, TermPi _ [(mx, x, tx)] _) -> do
+    (_, TermPi [(mx, x, tx)] _) -> do
       let varX = (mx, DataUpsilon x)
       retClosure
         tenv
@@ -267,7 +267,7 @@ clarifyBinaryOp tenv name op m = do
   t <- lookupConstTypeEnv m name
   let t' = reduceTermPlus t
   case t' of
-    (_, TermPi _ [(mx, x, tx), (my, y, ty)] _) -> do
+    (_, TermPi [(mx, x, tx), (my, y, ty)] _) -> do
       let varX = (mx, DataUpsilon x)
       let varY = (my, DataUpsilon y)
       retClosure
@@ -285,7 +285,7 @@ clarifyArrayAccess tenv m name lowType = do
   arrayAccessType <- lookupConstTypeEnv m name
   let arrayAccessType' = reduceTermPlus arrayAccessType
   case arrayAccessType' of
-    (_, TermPi _ xts cod)
+    (_, TermPi xts cod)
       | length xts == 3 -> do
         (xs, ds, headerList) <- computeHeader m xts [ArgImm, ArgUnused, ArgArray]
         case ds of
@@ -311,7 +311,7 @@ clarifySyscall tenv name syscall args m = do
   syscallType <- lookupConstTypeEnv m name
   let syscallType' = reduceTermPlus syscallType
   case syscallType' of
-    (_, TermPi _ xts cod)
+    (_, TermPi xts cod)
       | length xts == length args -> do
         (xs, ds, headerList) <- computeHeader m xts args
         let tenv' = insTypeEnv1 xts tenv
@@ -468,7 +468,7 @@ retWithBorrowedVars tenv m cod xts resultVarName =
 rightmostOf :: TermPlus -> WithEnv (Meta, TermPlus)
 rightmostOf term =
   case term of
-    (_, TermPi _ xts _)
+    (_, TermPi xts _)
       | length xts >= 1 -> do
         let (m, _, t) = last xts
         return (m, t)
@@ -478,7 +478,7 @@ rightmostOf term =
 sigToPi :: Meta -> TermPlus -> WithEnv (IdentPlus, IdentPlus)
 sigToPi m tPi =
   case tPi of
-    (_, TermPi _ [zu, kp] _) ->
+    (_, TermPi [zu, kp] _) ->
       return (zu, kp)
     _ ->
       raiseCritical m "the type of sigma-intro is wrong"
@@ -598,9 +598,9 @@ chainTermPlus tenv term =
       return []
     (m, TermUpsilon x) ->
       obtainChain m x tenv
-    (_, TermPi _ xts t) ->
+    (_, TermPi xts t) ->
       chainTermPlus' tenv xts [t]
-    (_, TermPiIntro _ xts e) ->
+    (_, TermPiIntro xts e) ->
       chainTermPlus' tenv xts [e]
     (_, TermPiElim e es) -> do
       xs1 <- chainTermPlus tenv e
@@ -686,16 +686,15 @@ obtainChain m x tenv = do
       let chain = xts ++ [(m, x, t)]
       modify (\env -> env {chainEnv = IntMap.insert (asInt x) chain cenv})
       return chain
+-- showInHex :: T.Text -> T.Text
+-- showInHex x =
+--   "x" <> foldr (<>) "" (map showInHex' (encode $ T.unpack x))
 
-showInHex :: T.Text -> T.Text
-showInHex x =
-  "x" <> foldr (<>) "" (map showInHex' (encode $ T.unpack x))
+-- showInHex' :: Word8 -> T.Text
+-- showInHex' w = do
+--   let (high, low) = (fromIntegral w :: Int) `divMod` 16
+--   hex high <> hex low
 
-showInHex' :: Word8 -> T.Text
-showInHex' w = do
-  let (high, low) = (fromIntegral w :: Int) `divMod` 16
-  hex high <> hex low
-
-hex :: Int -> T.Text
-hex i =
-  T.singleton $ "0123456789abcdef" !! i
+-- hex :: Int -> T.Text
+-- hex i =
+--   T.singleton $ "0123456789abcdef" !! i

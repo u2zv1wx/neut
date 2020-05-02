@@ -13,8 +13,10 @@ import Data.WeakTerm
 data Term
   = TermTau
   | TermUpsilon Ident
-  | TermPi (Maybe T.Text) [IdentPlus] TermPlus
-  | TermPiIntro (Maybe (Ident, T.Text, [IdentPlus])) [IdentPlus] TermPlus
+  | TermPi [IdentPlus] TermPlus
+  | TermPiIntro [IdentPlus] TermPlus
+  -- | TermPi (Maybe T.Text) [IdentPlus] TermPlus
+  -- | TermPiIntro (Maybe (Ident, T.Text, [IdentPlus])) [IdentPlus] TermPlus
   | TermPiElim TermPlus [TermPlus]
   | TermFix IdentPlus [IdentPlus] TermPlus
   | TermConst T.Text
@@ -62,11 +64,11 @@ data Stmt
 
 termPi :: [IdentPlus] -> TermPlus -> Term
 termPi =
-  TermPi Nothing
+  TermPi
 
 termPiIntro :: [IdentPlus] -> TermPlus -> Term
 termPiIntro =
-  TermPiIntro Nothing
+  TermPiIntro
 
 asUpsilon :: TermPlus -> Maybe Ident
 asUpsilon term =
@@ -83,9 +85,9 @@ varTermPlus term =
       []
     (_, TermUpsilon x) ->
       [x]
-    (_, TermPi _ xts t) ->
+    (_, TermPi xts t) ->
       varTermPlus' xts [t]
-    (_, TermPiIntro _ xts e) ->
+    (_, TermPiIntro xts e) ->
       varTermPlus' xts [e]
     (_, TermPiElim e es) -> do
       let xs1 = varTermPlus e
@@ -146,13 +148,13 @@ substTermPlus sub term =
       (m, TermTau)
     (m, TermUpsilon x) ->
       fromMaybe (m, TermUpsilon x) (IntMap.lookup (asInt x) sub)
-    (m, TermPi mName xts t) -> do
+    (m, TermPi xts t) -> do
       let (xts', t') = substTermPlus'' sub xts t
-      (m, TermPi mName xts' t')
-    (m, TermPiIntro info xts body) -> do
-      let info' = fmap (fmap (substTermPlus' sub)) info
+      (m, TermPi xts' t')
+    (m, TermPiIntro  xts body) -> do
+      -- let info' = fmap (fmap (substTermPlus' sub)) info
       let (xts', body') = substTermPlus'' sub xts body
-      (m, TermPiIntro info' xts' body')
+      (m, TermPiIntro xts' body')
     (m, TermPiElim e es) -> do
       let e' = substTermPlus sub e
       let es' = map (substTermPlus sub) es
@@ -238,12 +240,12 @@ weaken term =
       (m, WeakTermTau)
     (m, TermUpsilon x) ->
       (m, WeakTermUpsilon x)
-    (m, TermPi mName xts t) ->
-      (m, WeakTermPi mName (weakenArgs xts) (weaken t))
-    (m, TermPiIntro info xts body) -> do
-      let info' = fmap (fmap weakenArgs) info
+    (m, TermPi xts t) ->
+      (m, WeakTermPi (weakenArgs xts) (weaken t))
+    (m, TermPiIntro xts body) -> do
+      -- let info' = fmap (fmap weakenArgs) info
       let xts' = weakenArgs xts
-      (m, WeakTermPiIntro info' xts' (weaken body))
+      (m, WeakTermPiIntro xts' (weaken body))
     (m, TermPiElim e es) -> do
       let e' = weaken e
       let es' = map weaken es

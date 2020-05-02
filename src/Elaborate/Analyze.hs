@@ -43,8 +43,8 @@ simp' constraintList =
         ((_, e1), (_, e2))
           | e1 == e2 ->
             simp cs
-        ((m1, WeakTermPi name1 xts1 cod1), (m2, WeakTermPi name2 xts2 cod2))
-          | name1 == name2 ->
+        ((m1, WeakTermPi xts1 cod1), (m2, WeakTermPi xts2 cod2)) ->
+          -- | name1 == name2 ->
             if length xts1 /= length xts2
               then do
                 let m = supMeta m1 m2
@@ -58,18 +58,18 @@ simp' constraintList =
                 xt2 <- asWeakIdentPlus m2 cod2
                 simpBinder (xts1 ++ [xt1]) (xts2 ++ [xt2])
                 simp cs
-        ((m1, WeakTermPiIntro Nothing xts1 e1), (m2, WeakTermPiIntro Nothing xts2 e2))
+        ((m1, WeakTermPiIntro xts1 e1), (m2, WeakTermPiIntro xts2 e2))
           | length xts1 == length xts2 -> do
             xt1 <- asWeakIdentPlus m1 e1
             xt2 <- asWeakIdentPlus m2 e2
             simpBinder (xts1 ++ [xt1]) (xts2 ++ [xt2])
             simp cs
-        ((m1, WeakTermPiIntro (Just (indName1, consName1, args1)) xts1 e1), (m2, WeakTermPiIntro (Just (indName2, consName2, args2)) xts2 e2))
-          | indName1 == indName2,
-            consName1 == consName2,
-            length args1 == length args2 -> do
-            simpBinder args1 args2
-            simp $ ((m1, weakTermPiIntro xts1 e1), (m2, weakTermPiIntro xts2 e2)) : cs
+        -- ((m1, WeakTermPiIntro (Just (indName1, consName1, args1)) xts1 e1), (m2, WeakTermPiIntro (Just (indName2, consName2, args2)) xts2 e2))
+        --   | indName1 == indName2,
+        --     consName1 == consName2,
+        --     length args1 == length args2 -> do
+        --     simpBinder args1 args2
+        --     simp $ ((m1, weakTermPiIntro xts1 e1), (m2, weakTermPiIntro xts2 e2)) : cs
         ((m1, WeakTermFix xt1@(_, x1, _) xts1 e1), (m2, WeakTermFix xt2@(_, x2, _) xts2 e2))
           | x1 == x2,
             length xts1 == length xts2 -> do

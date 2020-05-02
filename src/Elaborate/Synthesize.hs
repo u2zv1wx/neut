@@ -221,12 +221,12 @@ unravel term =
     (m, WeakTermUpsilon x) -> do
       x' <- unravelUpsilon x
       return (m, WeakTermUpsilon x')
-    (m, WeakTermPi mName xts t) -> do
+    (m, WeakTermPi xts t) -> do
       (xts', t') <- unravelBinder xts t
-      return (m, WeakTermPi mName xts' t')
-    (m, WeakTermPiIntro info xts e) -> do
+      return (m, WeakTermPi xts' t')
+    (m, WeakTermPiIntro xts e) -> do
       (xts', e') <- unravelBinder xts e
-      return (m, WeakTermPiIntro info xts' e')
+      return (m, WeakTermPiIntro xts' e')
     (m, WeakTermPiElim e es) -> do
       e' <- unravel e
       es' <- mapM unravel es

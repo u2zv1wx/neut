@@ -73,19 +73,20 @@ discern' nenv term =
                         throw $ ErrorLeft $ sort candList
                       | otherwise ->
                         raiseError m $ "undefined variable: " <> asText x
-    (m, WeakTermPi mName xts t) -> do
+    (m, WeakTermPi xts t) -> do
       (xts', t') <- discernBinder nenv xts t
-      return (m, WeakTermPi mName xts' t')
-    (m, WeakTermPiIntro info xts e) -> do
+      return (m, WeakTermPi xts' t')
+    (m, WeakTermPiIntro xts e) -> do
       (xts', e') <- discernBinder nenv xts e
-      case info of
-        Nothing ->
-          return (m, WeakTermPiIntro Nothing xts' e')
-        Just (indName, consName, args) -> do
-          penv <- gets prefixEnv
-          indName' <- lookupName'' m penv nenv indName
-          args' <- mapM (discernFreeIdentPlus nenv) args
-          return (m, WeakTermPiIntro (Just (indName', consName, args')) xts' e')
+      return (m, WeakTermPiIntro xts' e')
+    -- case info of
+    --   Nothing ->
+    --     return (m, WeakTermPiIntro Nothing xts' e')
+    --   Just (indName, consName, args) -> do
+    --     penv <- gets prefixEnv
+    --     indName' <- lookupName'' m penv nenv indName
+    --     args' <- mapM (discernFreeIdentPlus nenv) args
+    --     return (m, WeakTermPiIntro (Just (indName', consName, args')) xts' e')
     (m, WeakTermPiElim e es) -> do
       es' <- mapM (discern' nenv) es
       e' <- discern' nenv e
@@ -163,12 +164,12 @@ discern' nenv term =
       let nenv' = Map.filterWithKey (\k _ -> k `notElem` xs) nenv
       discern' nenv' e
 
-discernFreeIdentPlus :: NameEnv -> WeakIdentPlus -> WithEnv WeakIdentPlus
-discernFreeIdentPlus nenv (m, x, t) = do
-  t' <- discern' nenv t
-  penv <- gets prefixEnv
-  x' <- lookupName'' m penv nenv x
-  return (m, x', t')
+-- discernFreeIdentPlus :: NameEnv -> WeakIdentPlus -> WithEnv WeakIdentPlus
+-- discernFreeIdentPlus nenv (m, x, t) = do
+--   t' <- discern' nenv t
+--   penv <- gets prefixEnv
+--   x' <- lookupName'' m penv nenv x
+--   return (m, x', t')
 
 discernIdent :: Meta -> Ident -> WithEnv (Meta, Ident)
 discernIdent m x = do

@@ -40,20 +40,21 @@ infer' ctx term =
     (m, WeakTermUpsilon x) -> do
       t <- lookupWeakTypeEnv m x
       return ((m, WeakTermUpsilon x), (m, snd t))
-    (m, WeakTermPi mName xts t) -> do
+    (m, WeakTermPi xts t) -> do
       (xts', t') <- inferPi ctx xts t
-      return ((m, WeakTermPi mName xts' t'), (m, WeakTermTau))
-    (m, WeakTermPiIntro info xts e) -> do
+      return ((m, WeakTermPi xts' t'), (m, WeakTermTau))
+    (m, WeakTermPiIntro xts e) -> do
       (xts', (e', t')) <- inferBinder ctx xts e
-      case info of
-        Nothing ->
-          return ((m, weakTermPiIntro xts' e'), (m, weakTermPi xts' t'))
-        Just (indName, consName, args) -> do
-          args' <- inferSigma ctx args
-          return
-            ( (m, WeakTermPiIntro (Just (indName, consName, args')) xts' e'),
-              (m, WeakTermPi (Just $ asText indName) xts' t')
-            )
+      return ((m, weakTermPiIntro xts' e'), (m, weakTermPi xts' t'))
+    -- case info of
+    --   Nothing ->
+    --     return ((m, weakTermPiIntro xts' e'), (m, weakTermPi xts' t'))
+    --   Just (indName, consName, args) -> do
+    --     args' <- inferSigma ctx args
+    --     return
+    --       ( (m, WeakTermPiIntro (Just (indName, consName, args')) xts' e'),
+    --         (m, WeakTermPi (Just $ asText indName) xts' t')
+    --       )
     (m, WeakTermPiElim e es) -> do
       es' <- insertImplicits e es
       etls <- mapM (infer' ctx) es'
@@ -348,7 +349,7 @@ inferPiElim ::
 inferPiElim ctx m (e, t) ets = do
   let es = map fst ets
   case t of
-    (_, WeakTermPi _ xts cod)
+    (_, WeakTermPi xts cod)
       | length xts == length ets -> do
         cod' <- inferArgs m ets xts cod
         return ((m, WeakTermPiElim e es), cod')

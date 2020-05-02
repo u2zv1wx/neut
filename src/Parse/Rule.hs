@@ -173,7 +173,7 @@ toStmtImplicit mx x is = do
 separate :: WeakTermPlus -> WithEnv (WeakIdentPlus, WeakTermPlus)
 separate e =
   case e of
-    (_, WeakTermPi _ [xt] cod) ->
+    (_, WeakTermPi [xt] cod) ->
       return (xt, cod)
     _ ->
       raiseSyntaxError (fst e) "(pi (TREE) TREE)"
@@ -181,7 +181,7 @@ separate e =
 takeXTS :: WeakTermPlus -> WithEnv [WeakIdentPlus]
 takeXTS t =
   case t of
-    (_, WeakTermPi _ xts _) ->
+    (_, WeakTermPi xts _) ->
       return xts
     _ ->
       raiseSyntaxError (fst t) "(pi (TREE ... TREE) TREE)"
@@ -212,7 +212,10 @@ toInductive ats bts connective@(m, ai, xts, _) = do
   -- definition of inductive type
   indType <-
     discern
-      (m, weakTermPiIntro xts (m, WeakTermPi (Just ai) atsbts cod))
+      (m, weakTermPiIntro xts (m, WeakTermPi atsbts cod))
+  -- indType <-
+  --   discern
+  --     (m, weakTermPiIntro xts (m, WeakTermPi (Just ai) atsbts cod))
   at' <- discernIdentPlus at
   insForm (length ats) at' indType
   -- definition of fold
@@ -251,7 +254,7 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
     ai == asText a',
     length xts == length es = do
     let vs = varWeakTermPlus (m, weakTermPi yts cod)
-    let ixts = filter (\(_, (_, x, _)) -> x `S.member` vs) $ zip [0 ..] xts
+    let ixts = filter (\(_ :: Int, (_, x, _)) -> x `S.member` vs) $ zip [0 ..] xts
     let (is, xts') = unzip ixts
     constructor <-
       discern
@@ -260,7 +263,7 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
             (xts' ++ yts)
             ( m,
               WeakTermPiIntro
-                (Just (asIdent ai, bi, xts' ++ yts))
+                -- (Just (asIdent ai, bi, xts' ++ yts))
                 (ats ++ bts)
                 (m, WeakTermPiElim (mb, WeakTermUpsilon (asIdent bi)) (map toVar' yts))
             )
@@ -270,9 +273,10 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
         (mb, asIdent bi, (m, weakTermPi (xts' ++ yts) cod))
     imp <- toStmtImplicit m bi [0 .. length xts' - 1]
     case constructor of
-      (_, WeakTermPiIntro _ xtsyts (_, WeakTermPiIntro indInfo@(Just (ai', _, _)) atsbts (_, WeakTermPiElim b _))) -> do
+      -- (_, WeakTermPiIntro _ xtsyts (_, WeakTermPiIntro indInfo@(Just (ai', _, _)) atsbts (_, WeakTermPiElim b _))) -> do
+      (_, WeakTermPiIntro xtsyts (_, WeakTermPiIntro atsbts (_, WeakTermPiElim b _))) -> do
         let as = take (length ats) $ map (\(_, x, _) -> asInt x) atsbts
-        modify (\env -> env {revIndEnv = Map.insert bi (ai', is) (revIndEnv env)})
+        -- modify (\env -> env {revIndEnv = Map.insert bi (ai', is) (revIndEnv env)})
         insInductive as constructorIdent
         yts' <- mapM (internalize as atsbts) $ drop (length is) xtsyts
         return
@@ -283,7 +287,7 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
                 weakTermPiIntro
                   xtsyts
                   ( m,
-                    WeakTermPiIntro indInfo atsbts (m, WeakTermPiElim b yts')
+                    WeakTermPiIntro atsbts (m, WeakTermPiElim b yts')
                   )
               ),
             imp
@@ -475,7 +479,7 @@ theta ::
 theta mode isub modifier t e = do
   ienv <- gets indEnv
   case t of
-    (_, WeakTermPi _ xts cod) ->
+    (_, WeakTermPi xts cod) ->
       thetaPi mode isub modifier xts cod e
     (_, WeakTermPiElim va@(_, WeakTermUpsilon ai) es)
       | Just _ <- IntMap.lookup (asInt ai) isub ->
@@ -577,7 +581,7 @@ lookupInductive ::
 lookupInductive m ai = do
   fenv <- gets formationEnv
   case IntMap.lookup (asInt ai) fenv of
-    Just (Just (_, WeakTermPiIntro Nothing xts (_, WeakTermPi (Just _) atsbts (_, WeakTermPiElim (_, WeakTermUpsilon _) _)))) -> do
+    Just (Just (_, WeakTermPiIntro xts (_, WeakTermPi atsbts (_, WeakTermPiElim (_, WeakTermUpsilon _) _)))) -> do
       let at = head atsbts
       let bts = tail atsbts -- valid since a is not mutual
       return (xts, at, bts)
@@ -606,7 +610,7 @@ toInternalizedArg ::
   WithEnv WeakTermPlus
 toInternalizedArg mode isub aInner aOuter xts modifier es es' b bInner =
   case bInner of
-    (mbInner, _, (_, WeakTermPi _ ytsInner _)) -> do
+    (mbInner, _, (_, WeakTermPi ytsInner _)) -> do
       let (ms, ys, ts) = unzip3 ytsInner
       let vxs = map toVar' xts
       -- 引数の型を適切にsubstする。これによって、aInner (x1, ..., xn)の出現がaOuter (e1', ..., en')へと置き換えられて、
@@ -675,16 +679,17 @@ substRuleType sub@((a1, es1), (a2, es2)) term =
       return (m, WeakTermTau)
     (m, WeakTermUpsilon x) ->
       return (m, WeakTermUpsilon x)
-    (m, WeakTermPi mName xts t) -> do
+    (m, WeakTermPi xts t) -> do
       (xts', t') <- substRuleType'' sub xts t
-      return (m, WeakTermPi mName xts' t')
-    (m, WeakTermPiIntro info xts body) -> do
+      return (m, WeakTermPi xts' t')
+    (m, WeakTermPiIntro xts body) -> do
       (xts', body') <- substRuleType'' sub xts body
-      case info of
-        Nothing -> return (m, WeakTermPiIntro Nothing xts' body')
-        Just (indName, consName, args) -> do
-          args' <- substRuleType' sub args
-          return (m, WeakTermPiIntro (Just (indName, consName, args')) xts' body')
+      return (m, WeakTermPiIntro xts' body')
+    -- case info of
+    --   Nothing -> return (m, WeakTermPiIntro Nothing xts' body')
+    --   Just (indName, consName, args) -> do
+    --     args' <- substRuleType' sub args
+    --     return (m, WeakTermPiIntro (Just (indName, consName, args')) xts' body')
     (m, WeakTermPiElim e es)
       | (mx, WeakTermUpsilon x) <- e,
         a1 == x ->
@@ -768,18 +773,18 @@ substRuleType sub@((a1, es1), (a2, es2)) term =
       e' <- substRuleType sub e
       return (m, WeakTermErase xs e')
 
-substRuleType' :: SubstRule -> [WeakIdentPlus] -> WithEnv [WeakIdentPlus]
-substRuleType' sub binder =
-  case binder of
-    [] ->
-      return []
-    (m, x, t) : xts -> do
-      t' <- substRuleType sub t
-      if fst (fst sub) == x
-        then return $ (m, x, t') : xts
-        else do
-          xts' <- substRuleType' sub xts
-          return $ (m, x, t') : xts'
+-- substRuleType' :: SubstRule -> [WeakIdentPlus] -> WithEnv [WeakIdentPlus]
+-- substRuleType' sub binder =
+--   case binder of
+--     [] ->
+--       return []
+--     (m, x, t) : xts -> do
+--       t' <- substRuleType sub t
+--       if fst (fst sub) == x
+--         then return $ (m, x, t') : xts
+--         else do
+--           xts' <- substRuleType' sub xts
+--           return $ (m, x, t') : xts'
 
 substRuleType'' ::
   SubstRule ->

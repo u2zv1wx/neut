@@ -323,7 +323,7 @@ llvmDataLet x llvmData cont =
         Nothing -> do
           mt <- lookupTypeEnvMaybe m y
           case mt of
-            Just (_, TermPi _ xts _) -> do
+            Just (_, TermPi xts _) -> do
               let y' = "llvm_" <> y
               denv <- gets declEnv
               let argType = map (const voidPtr) xts

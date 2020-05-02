@@ -17,24 +17,24 @@ import qualified Data.Text as T
 reduceTermPlus :: TermPlus -> TermPlus
 reduceTermPlus term =
   case term of
-    (m, TermPi mName xts cod) -> do
+    (m, TermPi xts cod) -> do
       let (ms, xs, ts) = unzip3 xts
       let ts' = map reduceTermPlus ts
       let cod' = reduceTermPlus cod
-      (m, TermPi mName (zip3 ms xs ts') cod')
-    (m, TermPiIntro info xts e) -> do
-      let info' = fmap (fmap (map reduceIdentPlus)) info
+      (m, TermPi (zip3 ms xs ts') cod')
+    (m, TermPiIntro xts e) -> do
+      -- let info' = fmap (fmap (map reduceIdentPlus)) info
       let (ms, xs, ts) = unzip3 xts
       let ts' = map reduceTermPlus ts
       let e' = reduceTermPlus e
-      (m, TermPiIntro info' (zip3 ms xs ts') e')
+      (m, TermPiIntro (zip3 ms xs ts') e')
     (m, TermPiElim e es) -> do
       let e' = reduceTermPlus e
       let es' = map reduceTermPlus es
       let app = TermPiElim e' es'
       let valueCond = and $ map isValue es
       case e' of
-        (_, TermPiIntro Nothing xts body) -- fixme: reduceできるだけreduceするようにする (partial evaluation)
+        (_, TermPiIntro xts body) -- fixme: reduceできるだけreduceするようにする (partial evaluation)
           | length xts == length es',
             valueCond -> do
             let xs = map (\(_, x, _) -> asInt x) xts
@@ -182,21 +182,21 @@ normalize term =
           normalize e
         Nothing ->
           return (m, TermUpsilon x)
-    (m, TermPi mName xts cod) -> do
+    (m, TermPi xts cod) -> do
       let (ms, xs, ts) = unzip3 xts
       ts' <- mapM normalize ts
       cod' <- normalize cod
-      return (m, TermPi mName (zip3 ms xs ts') cod')
-    (m, TermPiIntro info xts e) -> do
+      return (m, TermPi (zip3 ms xs ts') cod')
+    (m, TermPiIntro xts e) -> do
       let (ms, xs, ts) = unzip3 xts
       ts' <- mapM normalize ts
       e' <- normalize e
-      return (m, TermPiIntro info (zip3 ms xs ts') e')
+      return (m, TermPiIntro (zip3 ms xs ts') e')
     (m, TermPiElim e es) -> do
       e' <- normalize e
       es' <- mapM normalize es
       case e' of
-        (_, TermPiIntro _ xts body) -> do
+        (_, TermPiIntro xts body) -> do
           let xs = map (\(_, x, _) -> asInt x) xts
           let sub = IntMap.fromList $ zip xs es'
           normalize $ substTermPlus sub body

@@ -13,27 +13,27 @@ import Data.WeakTerm
 reduceWeakTermPlus :: WeakTermPlus -> WeakTermPlus
 reduceWeakTermPlus term =
   case term of
-    (m, WeakTermPi mName xts cod) -> do
+    (m, WeakTermPi xts cod) -> do
       let (ms, xs, ts) = unzip3 xts
       let ts' = map reduceWeakTermPlus ts
       let cod' = reduceWeakTermPlus cod
-      (m, WeakTermPi mName (zip3 ms xs ts') cod')
-    (_, WeakTermPiIntro Nothing xts (_, WeakTermPiElim e args))
+      (m, WeakTermPi (zip3 ms xs ts') cod')
+    (_, WeakTermPiIntro xts (_, WeakTermPiElim e args))
       | Just ys <- mapM asUpsilon args,
         ys == map (\(_, x, _) -> x) xts ->
         e
-    (m, WeakTermPiIntro info xts e) -> do
-      let info' = fmap (fmap (map reduceWeakTermWeakIdentPlus)) info
+    (m, WeakTermPiIntro xts e) -> do
+      -- let info' = fmap (fmap (map reduceWeakTermWeakIdentPlus)) info
       let (ms, xs, ts) = unzip3 xts
       let ts' = map reduceWeakTermPlus ts
       let e' = reduceWeakTermPlus e
-      (m, WeakTermPiIntro info' (zip3 ms xs ts') e')
+      (m, WeakTermPiIntro (zip3 ms xs ts') e')
     (m, WeakTermPiElim e es) -> do
       let e' = reduceWeakTermPlus e
       let es' = map reduceWeakTermPlus es
       let app = WeakTermPiElim e' es'
       case e' of
-        (mLam, WeakTermPiIntro _ xts body)
+        (mLam, WeakTermPiIntro xts body)
           | length xts == length es',
             metaIsReducible mLam -> do
             let xs = map (\(_, x, _) -> asInt x) xts

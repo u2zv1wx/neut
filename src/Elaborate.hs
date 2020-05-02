@@ -103,25 +103,26 @@ elaborate' term =
       if S.member x' cset
         then return (m, TermConst x')
         else return (m, TermUpsilon x)
-    (m, WeakTermPi mName xts t) -> do
+    (m, WeakTermPi xts t) -> do
       xts' <- mapM elaboratePlus xts
       t' <- elaborate' t
-      return (m, TermPi mName xts' t')
-    (m, WeakTermPiIntro info xts e) -> do
+      return (m, TermPi xts' t')
+    (m, WeakTermPiIntro xts e) -> do
       xts' <- mapM elaboratePlus xts
       e' <- elaborate' e
-      case info of
-        Nothing ->
-          return (m, TermPiIntro Nothing xts' e')
-        Just (indName, consName, args) -> do
-          args' <- mapM elaboratePlus args
-          return (m, TermPiIntro (Just (indName, consName, args')) xts' e')
+      return (m, TermPiIntro xts' e')
+    -- case info of
+    --   Nothing ->
+    --     return (m, TermPiIntro Nothing xts' e')
+    --   Just (indName, consName, args) -> do
+    --     args' <- mapM elaboratePlus args
+    --     return (m, TermPiIntro (Just (indName, consName, args')) xts' e')
     (m, WeakTermPiElim (mh, WeakTermHole (I (_, x))) es) -> do
       sub <- gets substEnv
       case IntMap.lookup x sub of
         Nothing ->
           raiseError mh "couldn't instantiate the hole here"
-        Just (_, WeakTermPiIntro _ xts e)
+        Just (_, WeakTermPiIntro xts e)
           | length xts == length es -> do
             let xs = map (\(_, y, _) -> asInt y) xts
             let s = IntMap.fromList $ zip xs es
@@ -287,7 +288,7 @@ getImpInfo term =
 getArgLen :: TermPlus -> Maybe Int
 getArgLen term =
   case term of
-    (_, TermPi _ xts _) ->
+    (_, TermPi xts _) ->
       return $ length xts
     _ ->
       Nothing
