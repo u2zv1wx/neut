@@ -20,6 +20,8 @@
 
 ?stream.unfold
 
+?stream.fold
+
 (attribute stream.head (implicit 0))
 
 (define stream.tail ((A tau) (x (stream A)))

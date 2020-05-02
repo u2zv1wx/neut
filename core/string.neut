@@ -22,8 +22,6 @@
 
 (define string.print ((str string))
   (witness (product string i64)
-    ;; (let (tuple n content) str) ← こんなふうに書けると嬉しい？
-    ;; (...)
     (destruct str (n content)
       (let len (write hole stdout &content n))
       (tuple (tuple n content) len))))

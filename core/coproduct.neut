@@ -9,8 +9,10 @@
 (section coproduct)
 
 (inductive coproduct ((e tau) (a tau))
-  (left ((_ e)) (coproduct e a))
-  (right ((_ a)) (coproduct e a)))
+  (left ((_ e))
+    (coproduct e a))
+  (right ((_ a))
+    (coproduct e a)))
 
 (define map
   ((e tau)
@@ -19,10 +21,12 @@
    (f (hom a b))
    (m (coproduct e a)))
   (witness (coproduct e b)
-    (case m
-      ((left err)
+    (coproduct.fold m
+      (lambda (_ _)
+        (coproduct e b))
+      (lambda (err)
         (left err))
-      ((right val)
+      (lambda (val)
         (right (f val))))))
 
 (attribute map (implicit 0 1 2))
@@ -40,10 +44,12 @@
    (comp (coproduct e a))
    (k (hom a (coproduct e b))))
   (witness (coproduct e b)
-    (case comp
-      ((left err)
+    (coproduct.fold comp
+      (lambda (_ _)
+        (coproduct e b))
+      (lambda (err)
         (left err))
-      ((right val)
+      (lambda (val)
         (k val)))))
 
 (attribute bind (implicit 0 1 2))

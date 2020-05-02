@@ -14,14 +14,30 @@
   (some ((x a))
     (option a)))
 
+;; (define map
+;;   (witness (functor-form option)
+;;     (lambda (_ _ f m)
+;;       (case m
+;;         ((none)
+;;           (none))
+;;         ((some x)
+;;           (some (f x)))))))
+
 (define map
   (witness (functor-form option)
     (lambda (_ _ f m)
-      (case m
-        ((none)
+      (fold m
+        (lambda (_)
+          hole)
+        (lambda ()
           (none))
-        ((some x)
+        (lambda (x)
           (some (f x)))))))
+        ;; ((none)
+        ;;   (none))
+        ;; ((some x)
+        ;;   (some (f x)))))))
+
 
 ;; (satisfies-functor option), (satisfies-return option)みたいに書いてもいいかも。
 
@@ -33,10 +49,12 @@
 (define bind
   (witness (bind-type option)
     (lambda (_ _ m k)
-      (case m
-        ((none)
+      (fold m
+        (lambda (_)
+          hole)
+        (lambda ()
           (none))
-        ((some x)
+        (lambda (x)
           (k x))))))
 
 (define from-option
@@ -44,10 +62,12 @@
    (x a)
    (m (option a)))
   (witness a
-    (case m
-      ((none)
+    (fold m
+      (lambda (_)
+        a)
+      (lambda ()
         x)
-      ((some y)
+      (lambda (y)
         y))))
 
 (attribute from-option (implicit 0))

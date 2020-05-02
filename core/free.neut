@@ -23,8 +23,6 @@
 
 (use free-internal)
 
-?free-internal.fold
-
 (define free ((g (hom tau tau)))
   (witness (hom tau tau)
     (lambda (a)
@@ -35,13 +33,25 @@
 (define map ((g (hom tau tau)))
   (witness (functor-form (free g))
     (lambda (a b (f (hom a b)) m)
-      (case m
-        ((leaf x)
+      (fold m
+        (lambda (_ _)
+          ((free g) b))
+        (lambda (x)
           (leaf (f x)))
-        ((node (p tau) val (cont (hom p ((free g) a))))
-          (with identity.bind
-            (let f' (lambda (x) ((map g) a b f x)))
-            (node p val (compose hole hole hole cont f'))))))))
+        (lambda (p val (acc (hom p ((free g) b))))
+          (node p val acc))))))
+            ;; (node p val (compose hole hole hole cont f'))))))))
+
+;; (define map ((g (hom tau tau)))
+;;   (witness (functor-form (free g))
+;;     (lambda (a b (f (hom a b)) m)
+;;       (case m
+;;         ((leaf x)
+;;           (leaf (f x)))
+;;         ((node (p tau) val (cont (hom p ((free g) a))))
+;;           (with identity.bind
+;;             (let f' (lambda (x) ((map g) a b f x)))
+;;             (node p val (compose hole hole hole cont f'))))))))
 
 (define witness-functor ((g (hom tau tau)))
   (witness (functor (free g))
@@ -61,15 +71,30 @@
        (b tau)
        (m ((free g) a))
        (k (hom a ((free g) b))))
-      (case m
-        ((leaf x)
+      (fold m
+        (lambda (_ _)
+          ((free g) b))
+        (lambda (x)
           (k x))
-        ((node p val cont)
-          (with identity.bind
-            (let cont-then-k
-              (lambda ((x p))
-                ((bind g) a b (cont x) k)))
-            (node p val cont-then-k)))))))
+        (lambda (p val acc)
+          (node p val acc))))))
+
+;; (define bind ((g (hom tau tau)))
+;;   (witness (bind-type (free g))
+;;     (lambda
+;;       ((a tau)
+;;        (b tau)
+;;        (m ((free g) a))
+;;        (k (hom a ((free g) b))))
+;;       (case m
+;;         ((leaf x)
+;;           (k x))
+;;         ((node p val cont)
+;;           (with identity.bind
+;;             (let cont-then-k
+;;               (lambda ((x p))
+;;                 ((bind g) a b (cont x) k)))
+;;             (node p val cont-then-k)))))))
 
 (define witness-monad ((g (hom tau tau)))
   (witness (monad (free g))

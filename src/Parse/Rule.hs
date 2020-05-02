@@ -122,6 +122,7 @@ generateProjections ts = do
                     ]
                 )
             )
+        -- ここでexternalizeを行うべき、ってこと？
         bt <- discernIdentPlus (mb, asIdent b', (mb, weakTermPi (xts ++ [dom]) cod))
         imp1 <- toStmtImplicit mb b' [0 .. length xts - 1]
         imp2 <- toStmtImplicit mb (a <> nsSep <> "unfold") [0 .. length xts - 1]
