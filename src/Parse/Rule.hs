@@ -53,7 +53,7 @@ parseConnective ::
   Meta ->
   [TreePlus] ->
   ([WeakTextPlus] -> [WeakTextPlus] -> Connective -> WithEnv [WeakStmt]) ->
-  ([WeakTextPlus] -> Connective -> WithEnv [WeakStmt]) ->
+  ([WeakTextPlus] -> [WeakTextPlus] -> Connective -> WithEnv [WeakStmt]) ->
   WithEnv [WeakStmt]
 parseConnective m ts f g = do
   connectiveList <- mapM parseConnective' ts
@@ -62,7 +62,7 @@ parseConnective m ts f g = do
   bts <- concat <$> mapM toInternalRuleList connectiveList
   checkNameSanity m $ ats ++ bts
   connectiveList' <- concat <$> mapM (f ats bts) connectiveList
-  ruleList <- concat <$> mapM (g ats) connectiveList
+  ruleList <- concat <$> mapM (g ats bts) connectiveList
   return $ connectiveList' ++ ruleList
 
 parseConnective' :: TreePlus -> WithEnv Connective
@@ -107,7 +107,7 @@ generateProjections ts = do
                 (xts ++ dom)
                 ( mb,
                   WeakTermPiElim
-                    (mb {metaIsExplicit = True}, WeakTermUpsilon $ asIdent (a <> nsSep <> "fold"))
+                    (mb, WeakTermUpsilon $ asIdent (a <> nsSep <> "fold"))
                     $ map toVar' (xts ++ dom)
                       ++ [ (mb, WeakTermPiIntro xts cod),
                            ( mb,
@@ -123,8 +123,6 @@ generateProjections ts = do
             )
         let b' = a <> nsSep <> b
         bt <- discernIdentPlus (mb, asIdent b', (mb, WeakTermPi (xts ++ dom) cod))
-        -- imp <- toStmtImplicit mb b' [0 .. length xts - 1]
-        -- return [WeakStmtLetWT mb bt e, imp]
         return [WeakStmtLetWT mb bt e]
   return $ concat $ concat stmtListList
 
@@ -187,11 +185,11 @@ toInductive ats bts connective@(m, ai, xts, _) = do
       -- imp
     ]
 
-toInductiveIntroList :: [WeakTextPlus] -> Connective -> WithEnv [WeakStmt]
-toInductiveIntroList ats (_, a, xts, rules) = do
+toInductiveIntroList :: [WeakTextPlus] -> [WeakTextPlus] -> Connective -> WithEnv [WeakStmt]
+toInductiveIntroList ats bts (_, a, xts, rules) = do
   let ats' = map textPlusToWeakIdentPlus ats
-  bts <- mapM ruleAsWeakIdentPlus rules -- fixme: このbtsはmutualな別の部分からもとってくる必要があるはず
-  concat <$> mapM (toInductiveIntro ats' bts xts a) rules
+  let bts' = map textPlusToWeakIdentPlus bts
+  concat <$> mapM (toInductiveIntro ats' bts' xts a) rules
 
 -- represent the introduction rule within CoC
 toInductiveIntro ::
@@ -227,8 +225,6 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
         as <- mapM (\(_, x, _) -> asInt <$> discernText m (asText x)) ats
         insInductive as constructorIdent
         yts' <- mapM (internalize as atsbts) $ drop (length xts') xtsyts
-        p "yts':"
-        p' yts'
         return
           [ WeakStmtLetWT
               m
