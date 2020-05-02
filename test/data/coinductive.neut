@@ -14,9 +14,18 @@
            (_ (F A)))
           (stream A)))
 
+;; (define stream.head ((A tau) (x (stream A)))
+;;   (case x
+;;     ((stream.unfold _ h _ v)
+;;       (h v))))
+
 (define stream.head ((A tau) (x (stream A)))
-  (case x
-    ((stream.unfold _ h _ v) (h v))))
+  (stream.fold x
+    (lambda (_)
+      A)
+    (lambda (F h t v)
+      (h v))))
+    ;; ((stream.unfold _ h _ v) (h v))))
 
 ?stream.unfold
 
@@ -24,11 +33,18 @@
 
 (attribute stream.head (implicit 0))
 
+;; (define stream.tail ((A tau) (x (stream A)))
+;;   (witness (stream A)
+;;     (case x
+;;       ((stream.unfold F h t v)
+;;         (stream.unfold F h t (t v)))))) ;; externalize!
+
 (define stream.tail ((A tau) (x (stream A)))
-  (witness (stream A)
-    (case x
-      ((stream.unfold F h t v)
-        (stream.unfold F h t (t v)))))) ;; externalize!
+  (stream.fold x
+    (lambda (_)
+      (stream A))
+    (lambda (F h t v)
+      (stream.unfold F h t (t v)))))
 
 (attribute stream.tail (implicit 0))
 ;; ?stream.unfold

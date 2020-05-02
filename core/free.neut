@@ -38,7 +38,7 @@
           ((free g) b))
         (lambda (x)
           (leaf (f x)))
-        (lambda (p val (acc (hom p ((free g) b))))
+        (lambda (p val acc)
           (node p val acc))))))
             ;; (node p val (compose hole hole hole cont f'))))))))
 
