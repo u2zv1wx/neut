@@ -19,6 +19,10 @@
 
 (notation Π pi)
 
+(keyword *)
+
+(notation * hole)
+
 (keyword switch)
 
 (notation switch enum-elimination)
