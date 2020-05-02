@@ -28,18 +28,21 @@
     (lambda (a)
       (free-internal g a))))
 
+(define free.fold
+  free-internal.fold)
+
 (section free)
 
 (define map ((g (hom tau tau)))
   (witness (functor-form (free g))
     (lambda (a b (f (hom a b)) m)
-      (fold m
+      (free.fold g a m
         (lambda (_ _)
           ((free g) b))
         (lambda (x)
-          (leaf (f x)))
+          (@leaf g b (f x)))
         (lambda (p val acc)
-          (node p val acc))))))
+          (@node g b p val acc))))))
 
 (define witness-functor ((g (hom tau tau)))
   (witness (functor (free g))
@@ -59,7 +62,7 @@
        (b tau)
        (m ((free g) a))
        (k (hom a ((free g) b))))
-      (fold m
+      (free.fold g a m
         (lambda (_ _)
           ((free g) b))
         (lambda (x)

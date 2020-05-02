@@ -88,7 +88,7 @@ data WeakStmt
   | WeakStmtLetWT Meta WeakIdentPlus WeakTermPlus
   | WeakStmtConstDecl WeakTextPlus
   | WeakStmtVerify Meta WeakTermPlus
-  | WeakStmtImplicit Ident [Int]
+  -- | WeakStmtImplicit Ident [Int]
   deriving (Show)
 
 varWeakTermPlus :: WeakTermPlus -> S.Set Ident

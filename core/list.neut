@@ -39,59 +39,59 @@
   (list.nil))
 
 (notation (list.new a)
-  (list.cons a (thunk (list.nil))))
+  (list.cons * a (thunk * (list.nil *))))
 
 (notation (list.new a rest+)
-  (list.cons a (thunk (list.new rest+))))
+  (list.cons * a (thunk * (list.new rest+))))
 
 (define head
   ((a tau)
    (xs (list a)))
   (witness (option a)
-    (list.fold xs
+    (list.fold a xs
       (lambda (_)
         (option a))
       (lambda ()
-        (none))
+        (none a))
       (lambda (h _)
-        (some h)))))
+        (some a h)))))
 
-(attribute head (implicit 0))
+;; (attribute head (implicit 0))
 
 (define length
   ((a tau)
    (xs (list a)))
   (witness i64
-    (list.fold xs
+    (list.fold a xs
       (lambda (_)
         i64)
       (lambda ()
         0)
       (lambda (_ acc)
-        (add-i64 1 (force acc))))))
+        (add-i64 1 (force i64 acc))))))
 
-(attribute length (implicit 0))
+;; (attribute length (implicit 0))
 
 (define append
   ((a tau)
    (xs (list a))
    (ys (list a)))
   (witness (list a)
-    (list.fold xs
+    (list.fold a xs
       (lambda (_)
         (list a))
       (lambda ()
         ys)
       (lambda (z acc)
-        (cons z acc)))))
+        (cons a z acc)))))
 
-(attribute append (implicit 0))
+;; (attribute append (implicit 0))
 
 (define is-null
   ((a tau)
    (xs (list a)))
   (witness bool
-    (list.fold xs
+    (list.fold a xs
       (lambda (_)
         bool)
       (lambda ()
@@ -100,7 +100,7 @@
         false))))
 
 
-(attribute is-null (implicit 0))
+;; (attribute is-null (implicit 0))
 
 (define map
   ((a tau)
@@ -108,16 +108,16 @@
    (f (hom a b))
    (xs (list a)))
   (witness (list b)
-    (list.fold xs
+    (list.fold a xs
       (lambda (_)
         (list b))
       (lambda ()
-        (nil))
+        (nil b))
       (lambda (y acc)
-        (cons (f y) acc)))))
+        (cons b (f y) acc)))))
 
 
-(attribute map (implicit 0 1))
+;; (attribute map (implicit 0 1))
 
 (define return
   ((a tau)
@@ -125,21 +125,21 @@
   (witness (list a)
     (list.new x)))
 
-(attribute return (implicit 0))
+;; (attribute return (implicit 0))
 
 (define concatenate
   ((a tau)
    (m (list (list a))))
   (witness (list a)
-    (list.fold m
+    (list.fold (list a) m
       (lambda (_)
         (list a))
       (lambda ()
-        (nil))
+        (nil *))
       (lambda (xs acc)
-        (append xs (force acc))))))
+        (append * xs (force * acc))))))
 
-(attribute concatenate (implicit 0))
+;; (attribute concatenate (implicit 0))
 
 (define bind
   ((a tau)
@@ -147,9 +147,9 @@
    (m (list a))
    (k (hom a (list b))))
   (witness (list b)
-    (concatenate (map k m))))
+    (concatenate * (map * * k m))))
 
-(attribute bind (implicit 0 1))
+;; (attribute bind (implicit 0 1))
 
 ;; (provide head)
 

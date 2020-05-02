@@ -46,11 +46,11 @@
    (g (hom b (m c))))
   (witness (hom a (m c))
     (lambda (x)
-      (with (bind M)
+      (with (bind m M)
         (let tmp (f x))
         (g tmp)))))
 
-(attribute monad.compose (implicit 0 1 2 3))
+;; (attribute monad.compose (implicit 0 1 2 3))
 
 (define when
   ((f (hom tau tau))
@@ -60,9 +60,9 @@
   (witness (f top)
     (if condition
       comp
-      ((return M) top top.unit))))
+      ((return f M) top top.unit))))
 
-(attribute monad.when (implicit 0))
+;; (attribute monad.when (implicit 0))
 
 (provide monad.compose)
 

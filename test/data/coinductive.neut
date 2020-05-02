@@ -20,7 +20,7 @@
 ;;       (h v))))
 
 (define stream.head ((A tau) (x (stream A)))
-  (stream.fold x
+  (stream.fold * x
     (lambda (_)
       A)
     (lambda (F h t v)
@@ -31,7 +31,7 @@
 
 ?stream.fold
 
-(attribute stream.head (implicit 0))
+;; (attribute stream.head (implicit 0))
 
 ;; (define stream.tail ((A tau) (x (stream A)))
 ;;   (witness (stream A)
@@ -40,24 +40,24 @@
 ;;         (stream.unfold F h t (t v)))))) ;; externalize!
 
 (define stream.tail ((A tau) (x (stream A)))
-  (stream.fold x
+  (stream.fold * x
     (lambda ((A tau))
       (stream A))
     (lambda (F h t v)
-      (stream.unfold F h t (t v)))))
+      (stream.unfold * F h t (t v)))))
 
-(attribute stream.tail (implicit 0))
+;; (attribute stream.tail (implicit 0))
 ;; ?stream.unfold
 
 (let stream-from-zero
-  (stream.unfold
+  (stream.unfold *
     (lambda ((x tau)) x)
     (lambda ((x i64)) x)
     (lambda ((x i64)) (add-i64 x 1))
     0))
 
 ;; ?stream.tail
-(i64.print (stream.head (stream.tail (stream.tail (stream.tail stream-from-zero)))))
+(i64.print (stream.head * (stream.tail * (stream.tail * (stream.tail * stream-from-zero)))))
 ;; (i64.print (stream.head stream-from-zero))
 
 ;; nested coinductive type
@@ -111,6 +111,6 @@
     (item-3 top.unit)
     (item-2 20)))
 
-(i64.print (my-record.item-1 item))
+(i64.print (my-record.item-1 * item))
 
-(i64.print (my-record.item-2 item))
+(i64.print (my-record.item-2 * item))

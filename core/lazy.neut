@@ -10,22 +10,22 @@
 
 (define thunk ((a tau) (x a))
   (witness (lazy a)
-    (lazy.unfold
+    (lazy.unfold a
       (lambda () x))))
 
-(attribute thunk
-  (implicit 0))
+;; (attribute thunk
+;;   (implicit 0))
 
 (define force ((a tau) (x (lazy a)))
   (witness a
-    (lazy.fold
+    (lazy.fold a
       x
       (lambda (_)
         a)
       (lambda (acc)
         (acc)))))
 
-(attribute force
-  (implicit 0))
+;; (attribute force
+;;   (implicit 0))
 
 (end lazy)

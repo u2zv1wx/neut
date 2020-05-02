@@ -26,10 +26,10 @@
 
 (let k
   (with identity.bind
-    (let a (i64.array-access 0 hole &xs))
+    (let a (i64.array-access 0 * &xs))
     (let b (i64.array-access 1 4 &xs))
     (let c (i64.array-access 2 4 &xs))
-    (let d (i64.array-access 3 hole &xs))
+    (let d (i64.array-access 3 * &xs))
     (erase xs)
     (i64.add a (i64.add b (i64.add c d)))))
 

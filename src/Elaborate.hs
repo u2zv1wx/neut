@@ -58,10 +58,11 @@ elaborateStmt stmt =
         let sec = realToFrac $ diffUTCTime stop start
         note m $ "verification succeeded (" <> T.pack (showFloat' sec) <> " seconds)"
       elaborateStmt cont
-    WeakStmtImplicit x is : cont -> do
-      ienv <- gets impEnv
-      modify (\env -> env {impEnv = IntMap.insertWith (++) (asInt x) is ienv})
-      elaborateStmt cont
+
+-- WeakStmtImplicit x is : cont -> do
+--   ienv <- gets impEnv
+--   modify (\env -> env {impEnv = IntMap.insertWith (++) (asInt x) is ienv})
+--   elaborateStmt cont
 
 elaborateLet ::
   Meta ->
@@ -232,19 +233,21 @@ isUpsilonOrConst term =
 
 getImpInfo :: TermPlus -> WithEnv ([Int], TermPlus)
 getImpInfo term =
-  case term of
-    (m, TermUpsilon x)
-      | not (metaIsExplicit m) -> do
-        ienv <- gets impEnv
-        case IntMap.lookup (asInt x) ienv of
-          Just is ->
-            return (is, term)
-          Nothing ->
-            return ([], term)
-      | otherwise ->
-        return ([], (m, TermUpsilon (I ("@" <> asText x, asInt x))))
-    _ ->
-      return ([], term)
+  return ([], term)
+
+-- case term of
+--   -- (m, TermUpsilon x)
+--   --   | not (metaIsExplicit m) -> do
+--   --     ienv <- gets impEnv
+--   --     case IntMap.lookup (asInt x) ienv of
+--   --       Just is ->
+--   --         return (is, term)
+--   --       Nothing ->
+--   --         return ([], term)
+--   --   | otherwise ->
+--   --     return ([], (m, TermUpsilon (I ("@" <> asText x, asInt x))))
+--   _ ->
+--     return ([], term)
 
 getArgLen :: TermPlus -> Maybe Int
 getArgLen term =

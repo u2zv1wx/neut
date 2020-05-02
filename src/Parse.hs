@@ -75,13 +75,13 @@ parse' stmtTreeList =
       case headStmt of
         (m, TreeNode (leaf@(_, TreeLeaf headAtom) : rest)) ->
           case headAtom of
-            "attribute"
-              | (mx, TreeLeaf x) : attrList <- rest -> do
-                impList <- mapM (parseAttr mx x) attrList
-                cont <- parse' restStmtList
-                return $ impList ++ cont
-              | otherwise ->
-                raiseSyntaxError m "(attribute LEAF TREE ... TREE)"
+            -- "attribute"
+            --   | (mx, TreeLeaf x) : attrList <- rest -> do
+            --     impList <- mapM (parseAttr mx x) attrList
+            --     cont <- parse' restStmtList
+            --     return $ impList ++ cont
+            --   | otherwise ->
+            --     raiseSyntaxError m "(attribute LEAF TREE ... TREE)"
             "notation"
               | [from, to] <- rest -> do
                 checkNotationSanity from
@@ -259,24 +259,24 @@ unuse :: T.Text -> WithEnv ()
 unuse s =
   modify (\e -> e {prefixEnv = filter (/= s) (prefixEnv e)})
 
-parseAttr :: Meta -> T.Text -> TreePlus -> WithEnv WeakStmt
-parseAttr mx x tree =
-  case tree of
-    (m, TreeNode ((_, TreeLeaf headAtom) : rest)) ->
-      case headAtom of
-        "implicit"
-          | Just mxs <- mapM asLeaf rest ->
-            case mapM (readMaybe . T.unpack . snd) mxs of
-              Nothing ->
-                raiseError m "the argument of `implicit` must be an integer"
-              Just is ->
-                toStmtImplicit mx x is
-          | otherwise ->
-            raiseSyntaxError (fst tree) "(implicit LEAF ... LEAF)"
-        _ ->
-          raiseError m $ "unknown attribute: " <> headAtom
-    _ ->
-      raiseSyntaxError (fst tree) "(LEAF TREE ... LEAF)"
+-- parseAttr :: Meta -> T.Text -> TreePlus -> WithEnv WeakStmt
+-- parseAttr mx x tree =
+--   case tree of
+--     (m, TreeNode ((_, TreeLeaf headAtom) : rest)) ->
+--       case headAtom of
+--         "implicit"
+--           | Just mxs <- mapM asLeaf rest ->
+--             case mapM (readMaybe . T.unpack . snd) mxs of
+--               Nothing ->
+--                 raiseError m "the argument of `implicit` must be an integer"
+--               Just is ->
+--                 toStmtImplicit mx x is
+--           | otherwise ->
+--             raiseSyntaxError (fst tree) "(implicit LEAF ... LEAF)"
+--         _ ->
+--           raiseError m $ "unknown attribute: " <> headAtom
+--     _ ->
+--       raiseSyntaxError (fst tree) "(LEAF TREE ... LEAF)"
 
 withSectionPrefix :: T.Text -> WithEnv T.Text
 withSectionPrefix x = do
@@ -476,8 +476,7 @@ isSpecialForm tree =
 keywordSet :: S.Set T.Text
 keywordSet =
   S.fromList
-    [ "attribute",
-      "coinductive",
+    [ "coinductive",
       "constant",
       "define",
       "end",
