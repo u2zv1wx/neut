@@ -174,7 +174,7 @@ And this is the notation that is implemented in Neut. Indeed, the following is a
   (let _ (string.print &str))
   (i64 0))
 #+END_SRC
-where the last =(i64 0)= is to tell the compiler that the type of =0= is =i64= and not, e.g. =i32=. This notation is "borrowing" in Neut. Note that borrowing is nothing but a syntactic translation. Borrowing has nothing to do with, for example, the type system, or the operational semantics, of Neut. Indeed, this syntactic translation is processed in the stage of parsing in the compiler.
+where the last =(i64 0)= is to tell the compiler that the type of =0= is =i64= and not, e.g. =i32=. This notation is "borrowing" in Neut. Note that borrowing in Neut is nothing but a syntactic translation. Borrowing has nothing to do with, for example, the type system, or the operational semantics, of Neut. Indeed, this syntactic translation is processed in the stage of parsing in the compiler.
 
 OK, then, how does the resulting LLVM IR change? Is it faster now? Let us compile the code above by running =$ neut build --no-alloc-cancellation --emit llvm filename.neut=. The output is short enough to include it here:
 #+BEGIN_SRC llvm
