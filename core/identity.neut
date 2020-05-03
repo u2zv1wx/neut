@@ -29,18 +29,19 @@
 
 (let witness-functor
   (witness (functor identity)
-    (record (functor identity)
-      (map
-        identity.map))))
+    (functor.unfold identity
+      identity.map)))
+;; (let witness-functor
+;;   (witness (functor identity)
+;;     (record (functor identity)
+;;       (map
+;;         identity.map))))
 
 (let witness-monad
   (witness (monad identity)
-    (record (monad identity)
-      (witness-functor
-        identity.witness-functor)
-      (return
-        identity.return)
-      (bind
-        identity.bind))))
+    (monad.unfold identity
+      identity.witness-functor
+      identity.return
+      identity.bind)))
 
 (end identity)

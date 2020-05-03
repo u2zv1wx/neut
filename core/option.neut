@@ -62,31 +62,18 @@
 
 (define witness-functor
   (witness (functor option)
-    (record (functor option)
-      (map
-        option.map))))
+    (functor.unfold option
+      option.map)))
 
 ?functor.unfold
-
-(define witfun-2
-  (witness (functor option)
-    (functor.unfold option
-      (lambda (_)
-        i64)
-      (lambda (_)
-        option.map)
-      0)))
 
 ?functor.map
 
 (define witness-monad
   (witness (monad option)
-    (record (monad option)
-      (witness-functor
-        option.witness-functor)
-      (return
-        option.return)
-      (bind
-        option.bind))))
+    (monad.unfold option
+      option.witness-functor
+      option.return
+      option.bind)))
 
 (end option)

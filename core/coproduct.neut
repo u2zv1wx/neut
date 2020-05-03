@@ -95,20 +95,16 @@
 (define witness-functor
   ((e tau))
   (witness (functor (either e))
-    (record (functor (either e))
-      (map
-        (either-map e)))))
+    (functor.unfold (either e)
+      (either-map e))))
 
 (define witness-monad
   ((e tau))
   (witness (monad (either e))
-    (record (monad (either e))
-      (witness-functor
-        (witness-functor e))
-      (return
-        (either-return e))
-      (bind
-        (either-bind e)))))
+    (monad.unfold (either e)
+      (witness-functor e)
+      (either-return e)
+      (either-bind e))))
 
 (provide throw)
 

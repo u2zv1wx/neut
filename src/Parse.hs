@@ -202,17 +202,15 @@ parse' stmtTreeList =
                 stmtList1 <- parseInductive m' rest'
                 stmtList2 <- parse' restStmtList
                 return $ stmtList1 ++ stmtList2
-            "coinductive"
-              | name@(mFun, TreeLeaf _) : xts@(_, TreeNode _) : rest' <- rest ->
-                parse' $ (m, TreeNode [leaf, (mFun, TreeNode (name : xts : rest'))]) : restStmtList
-              | otherwise -> do
-                rest' <- mapM (adjustPhase >=> macroExpand) rest
-                registerLabelInfo rest'
-                rest'' <- asInductive rest'
-                stmtList1 <- parseInductive m rest''
+            "record"
+              | (_, TreeLeaf _) : (_, TreeNode _) : _ <- rest -> do
+                rest' <- mapM (adjustPhase >=> macroExpand) rest >>= asInductive m
+                stmtList1 <- parseInductive m [rest']
                 stmtList2 <- generateProjections rest'
                 stmtList3 <- parse' restStmtList
                 return $ stmtList1 ++ stmtList2 ++ stmtList3
+              | otherwise ->
+                raiseSyntaxError m "(record name (TREE ... TREE) TREE ... TREE)"
             "let"
               | [(mx, TreeLeaf x), t, e] <- rest -> do
                 let xt = (mx, TreeNode [(mx, TreeLeaf x), t])
@@ -476,8 +474,7 @@ isSpecialForm tree =
 keywordSet :: S.Set T.Text
 keywordSet =
   S.fromList
-    [ "coinductive",
-      "constant",
+    [ "constant",
       "define",
       "end",
       "ensure",
@@ -488,6 +485,7 @@ keywordSet =
       "keyword",
       "let",
       "notation",
+      "record",
       "section",
       "statement",
       "unuse",

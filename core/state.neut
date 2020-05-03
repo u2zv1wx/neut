@@ -51,20 +51,16 @@
 (define witness-functor
   ((s tau))
   (witness (functor (state s))
-    (record (functor (state s))
-      (map
-        (state.map s)))))
+    (functor.unfold (state s)
+      (state.map s))))
 
 (define witness-monad
   ((s tau))
   (witness (monad (state s))
-    (record (monad (state s))
-      (witness-functor
-        (state.witness-functor s))
-      (return
-        (state.return s))
-      (bind
-        (state.bind s)))))
+    (monad.unfold (state s)
+      (state.witness-functor s)
+      (state.return s)
+      (state.bind s))))
 
 (end state)
 

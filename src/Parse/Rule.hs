@@ -2,17 +2,14 @@ module Parse.Rule
   ( parseInductive,
     asInductive,
     insForm,
-    registerLabelInfo,
     generateProjections,
   )
 where
 
 import Control.Monad.State.Lazy
 import Data.Env
-import qualified Data.HashMap.Lazy as Map
 import Data.Ident
 import qualified Data.IntMap as IntMap
-import Data.List (find)
 import Data.Meta
 import Data.Namespace
 import qualified Data.Set as S
@@ -75,121 +72,63 @@ parseConnective' inputTree =
     _ ->
       raiseSyntaxError (fst inputTree) "(LEAF (TREE ... TREE) ...)"
 
-toIndInfo :: [TreePlus] -> WithEnv ([WeakTextPlus], [WeakTextPlus])
+toIndInfo :: TreePlus -> WithEnv (WeakTextPlus, [WeakIdentPlus])
 toIndInfo ts = do
-  connectiveList <- mapM parseConnective' ts
-  fs <- mapM formationRuleOf connectiveList
-  ats <- mapM ruleAsWeakTextPlus fs
-  bts <- concat <$> mapM toInternalRuleList connectiveList
-  return (ats, bts)
-
-registerLabelInfo :: [TreePlus] -> WithEnv ()
-registerLabelInfo ts = do
-  (ats, bts) <- toIndInfo ts
-  forM_ ats $ \(_, a, _) -> do
-    let asbs = map (\(_, x, _) -> x) $ ats ++ bts
-    modify (\env -> env {labelEnv = Map.insert a asbs (labelEnv env)})
-
-generateProjections :: [TreePlus] -> WithEnv [WeakStmt]
-generateProjections ts = do
-  (ats, bts) <- toIndInfo ts
-  let bts' = map textPlusToWeakIdentPlus bts
-  stmtList <-
-    forM ats $ \(ma, a, ta) -> do
-      (xts, _) <- separatePi ta
-      forM bts $ \(mb, b, tb) -> do
-        (dom, cod) <- separatePi tb
-        when (length dom /= 1) $ raiseSyntaxError mb "(pi (TREE) TREE)"
-        destructor <-
-          discern
-            ( mb,
-              WeakTermPiIntro
-                (xts ++ dom)
-                ( mb,
-                  WeakTermPiElim
-                    (mb, WeakTermUpsilon $ asIdent (a <> nsSep <> "fold"))
-                    $ map toVar' (xts ++ dom)
-                      ++ [ (mb, WeakTermPiIntro xts cod),
-                           ( mb,
-                             WeakTermPiIntro
-                               ([(ma, asIdent a, ta)] ++ bts' ++ dom)
-                               ( mb,
-                                 WeakTermPiElim (mb, WeakTermUpsilon $ asIdent b) (map toVar' dom)
-                               )
-                           )
-                         ]
-                )
-            )
-        let b' = a <> nsSep <> b
-        bt <- discernIdentPlus (mb, asIdent b', (mb, WeakTermPi (xts ++ dom) cod))
-        case destructor of
-          (_, WeakTermPiIntro xtsdom (_, WeakTermPiElim f args))
-            | (_, WeakTermPiIntro atbtsdom baseTerm) <- last args -> do
-              aOuter <- discernText mb a
-              let i = (\(_, ident, _) -> asInt ident) $ head atbtsdom
-              let sub = IntMap.fromList [(i, (mb, WeakTermUpsilon aOuter))]
-              let xts' = init xtsdom
-              let atbts = init atbtsdom
-              let unfoldArgs = xts' ++ atbts
-              unfold <- discernText mb $ a <> nsSep <> "unfold"
-              ty <- findType b $ tail atbts
-              p "inner:"
-              p' $ head atbtsdom
-              p "outer:"
-              p' aOuter
-              p "sub:"
-              p' sub
-              p "unfoldArgs:"
-              p' $ map (\(_, foo, _) -> foo) unfoldArgs
-              p "unfold:"
-              p' unfold
-              p "the type of base-term:"
-              p $ T.unpack $ toText ty
-              -- p' $ find (\(_, bar, _) -> asText bar == b) $ tail atbts
-              p "baseTerm:"
-              p $ T.unpack $ toText baseTerm
-              let modifier e = (mb, WeakTermPiElim (mb, WeakTermUpsilon unfold) (map toVar' unfoldArgs ++ [e]))
-              baseTerm' <- theta ModeForward sub modifier ty baseTerm
-              p "baseTerm'"
-              p $ T.unpack $ toText baseTerm'
-              p "---------------------------------"
-              -- let args' = init args ++ [(mb, WeakTermPiIntro atbtsdom baseTerm')]
-              return $
-                WeakStmtLetWT
-                  mb
-                  bt
-                  ( mb,
-                    WeakTermPiIntro
-                      xtsdom
-                      ( mb,
-                        WeakTermPiElim f $
-                          init args ++ [(mb, WeakTermPiIntro atbtsdom baseTerm')]
-                      )
-                  )
-          -- return $ WeakStmtLetWT mb bt destructor
-          _ ->
-            raiseCritical mb "generateProjections"
-  return $ concat stmtList
-
-findType :: T.Text -> [WeakIdentPlus] -> WithEnv WeakTermPlus
-findType b bts =
-  case find (\(_, bar, _) -> asText bar == b) bts of
-    Just (_, _, (_, WeakTermPi _ cod)) ->
-      return cod
+  connectiveList <- parseConnective' ts
+  fs <- formationRuleOf connectiveList
+  at <- ruleAsWeakTextPlus fs
+  bts <- toInternalRuleList connectiveList
+  case bts of
+    [(_, "unfold", (_, WeakTermPi xts _))] ->
+      return (at, xts)
     _ ->
-      raiseCritical' "findType"
+      undefined
 
--- foo :: WeakIdentPlus -> WithEnv WeakIdentPlus
--- foo (m, _, t) = do
---   h <- newNameWith'' "h"
---   return (m, h, t)
+-- return (ats, bts)
+
+-- registerLabelInfo :: [TreePlus] -> WithEnv ()
+-- registerLabelInfo ts = do
+--   (ats, bts) <- toIndInfo ts
+--   forM_ ats $ \(_, a, _) -> do
+--     let asbs = map (\(_, x, _) -> x) $ ats ++ bts
+--     modify (\env -> env {labelEnv = Map.insert a asbs (labelEnv env)})
+
+generateProjections :: TreePlus -> WithEnv [WeakStmt]
+generateProjections t = do
+  ((ma, a, ta), bts) <- toIndInfo t
+  (xts, _) <- separatePi ta
+  h <- newNameWith'' "_"
+  let dom = (ma, h, (ma, WeakTermPiElim (ma, WeakTermUpsilon $ asIdent a) (map toVar' xts)))
+  forM bts $ \(mb, b, tb) -> do
+    destructor <-
+      discern
+        ( mb,
+          WeakTermPiIntro
+            (xts ++ [dom])
+            ( mb,
+              WeakTermPiElim
+                (mb, WeakTermUpsilon $ asIdent (a <> nsSep <> "fold"))
+                $ map toVar' (xts ++ [dom])
+                  ++ [ (mb, WeakTermPiIntro xts tb),
+                       ( mb,
+                         WeakTermPiIntro
+                           bts
+                           (mb, WeakTermUpsilon b)
+                       )
+                     ]
+            )
+        )
+    let b' = a <> nsSep <> asText b
+    bt <- discernIdentPlus (mb, asIdent b', (mb, WeakTermPi (xts ++ [dom]) tb))
+    return $ WeakStmtLetWT mb bt destructor
 
 separatePi :: WeakTermPlus -> WithEnv ([WeakIdentPlus], WeakTermPlus)
 separatePi e =
   case e of
     (_, WeakTermPi xts cod) ->
       return (xts, cod)
-    _ ->
+    _ -> do
+      p' e
       raiseSyntaxError (fst e) "(pi (TREE ... TREE) TREE)"
 
 parseRule :: TreePlus -> WithEnv Rule
@@ -231,8 +170,6 @@ toInductive ats bts connective@(m, ai, xts, _) = do
   foldIdent <-
     discernIdentPlus
       (m, asIdent $ ai <> nsSep <> "fold", (m, WeakTermPi indArgs cod))
-  p "toInductive:"
-  p' at'
   return
     [ WeakStmtLetWT m at' indType,
       WeakStmtLetWT m foldIdent fold
@@ -355,66 +292,32 @@ optConcat mNew mOld = do
   -- insert mNew at the end of the list (to respect the structure of ind/coind represented as pi/sigma)
   return $ mOld' ++ mNew'
 
-asInductive :: [TreePlus] -> WithEnv [TreePlus]
-asInductive treeList =
-  case treeList of
-    [] ->
-      return []
-    (t : ts) -> do
-      t' <- asInductive' t
-      ts' <- asInductive ts
-      return $ t' : ts'
+toApp :: Meta -> TreePlus -> [TreePlus] -> WithEnv TreePlus
+toApp m a xts = do
+  argList <- mapM extractArg xts
+  return (m, TreeNode (a : argList))
 
-asInductive' :: TreePlus -> WithEnv TreePlus
-asInductive' t =
-  case t of
-    (m, TreeNode ((_, TreeLeaf a) : (_, TreeNode xts) : rules)) -> do
-      a' <- newTextWith a
-      let sub = (a, a')
-      let xts' = map (substTree sub) xts
-      rules' <- mapM styleRule $ map (substTree sub) rules
-      h <- newTextWith "_"
-      argList <- mapM extractArg xts
+asInductive :: Meta -> [TreePlus] -> WithEnv TreePlus
+asInductive m ts =
+  case ts of
+    (a : (_, TreeNode xts) : rules) -> do
+      app <- toApp m a xts
       return
         ( m,
           TreeNode
-            [ (m, TreeLeaf a),
-              (m, TreeNode xts'),
+            [ a,
+              (m, TreeNode xts),
               ( m,
                 TreeNode
                   [ (m, TreeLeaf "unfold"),
-                    ( m,
-                      TreeNode
-                        ( [ ( m,
-                              TreeNode
-                                [ (m, TreeLeaf a'),
-                                  ( m,
-                                    TreeNode
-                                      [ (m, TreeLeaf "pi"),
-                                        (m, TreeNode xts'),
-                                        (m, TreeLeaf "tau")
-                                      ]
-                                  )
-                                ]
-                            )
-                          ]
-                            ++ rules'
-                            ++ [ ( m,
-                                   TreeNode
-                                     [ (m, TreeLeaf h),
-                                       (m, TreeNode ((m, TreeLeaf a') : argList))
-                                     ]
-                                 )
-                               ]
-                        )
-                    ),
-                    (m, TreeNode ((m, TreeLeaf a) : argList))
+                    (m, TreeNode rules),
+                    app
                   ]
               )
             ]
         )
     _ ->
-      raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) ...)"
+      raiseSyntaxError m "(LEAF (TREE ... TREE) ...)"
 
 extractArg :: TreePlus -> WithEnv TreePlus
 extractArg tree =
@@ -425,20 +328,6 @@ extractArg tree =
       return (m, TreeLeaf x)
     t ->
       raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
-
-styleRule :: TreePlus -> WithEnv TreePlus
-styleRule tree =
-  case tree of
-    (m, TreeNode [(mName, TreeLeaf name), (_, TreeNode xts), t]) ->
-      return
-        ( m,
-          TreeNode
-            [ (mName, TreeLeaf name),
-              (m, TreeNode [(m, TreeLeaf "pi"), (m, TreeNode xts), t])
-            ]
-        )
-    t ->
-      raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) TREE)"
 
 data Mode
   = ModeForward

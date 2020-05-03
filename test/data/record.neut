@@ -1,0 +1,22 @@
+(record my-record ((a tau))
+  (item-1
+    a)
+  (item-2
+    i64)
+  (item-3
+    top))
+
+
+?my-record.item-1
+?my-record.fold
+?my-record.unfold
+
+(let item
+  (my-record.unfold i64
+    10
+    20
+    top.unit))
+
+(i64.print (my-record.item-1 * item))
+
+(i64.print (my-record.item-2 * item))
