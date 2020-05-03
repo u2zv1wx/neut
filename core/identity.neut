@@ -31,11 +31,6 @@
   (witness (functor identity)
     (functor.unfold identity
       identity.map)))
-;; (let witness-functor
-;;   (witness (functor identity)
-;;     (record (functor identity)
-;;       (map
-;;         identity.map))))
 
 (let witness-monad
   (witness (monad identity)

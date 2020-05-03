@@ -14,7 +14,3 @@
 (record functor ((f (hom tau tau)))
   (map
     (functor-form f)))
-
-;; (coinductive functor ((f (hom tau tau)))
-;;   (map ((_ (functor f)))
-;;     (functor-form f)))

@@ -74,10 +74,10 @@
 
 ;; monadic composition
 (define compose
-  ((m hole)
-   (a hole)
-   (b hole)
-   (c hole)
+  ((m (hom tau tau))
+   (a tau)
+   (b tau)
+   (c tau)
    (M (monad m))
    (f (hom a (m b)))
    (g (hom b (m c))))
