@@ -1,6 +1,5 @@
 (no-implicit-core)
 
-;; (include "core/foundation.neut")
 (include "core/notation.neut")
 
 (define functor-form ((m (hom tau tau)))

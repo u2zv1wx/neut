@@ -1,7 +1,6 @@
 module Parse.Rule
   ( parseInductive,
     asInductive,
-    insForm,
     generateProjections,
   )
 where
@@ -90,9 +89,14 @@ generateProjections t = do
   (xts, _) <- separatePi ta
   h <- newNameWith'' "_"
   let dom = (ma, h, (ma, WeakTermPiElim (ma, WeakTermUpsilon $ asIdent a) (map toVar' xts)))
-  forM bts $ \(mb, b, tb) -> do
-    destructor <-
-      discern
+  forM bts $ \(mb, b, tb) ->
+    WeakStmtLetWT mb
+      <$> discernIdentPlus
+        ( mb,
+          asIdent (a <> nsSep <> asText b),
+          (mb, WeakTermPi (xts ++ [dom]) tb)
+        )
+      <*> discern
         ( mb,
           WeakTermPiIntro
             (xts ++ [dom])
@@ -101,17 +105,10 @@ generateProjections t = do
                 (mb, WeakTermUpsilon $ asIdent (a <> nsSep <> "fold"))
                 $ map toVar' (xts ++ [dom])
                   ++ [ (mb, WeakTermPiIntro xts tb),
-                       ( mb,
-                         WeakTermPiIntro
-                           bts
-                           (mb, WeakTermUpsilon b)
-                       )
+                       (mb, WeakTermPiIntro bts (mb, WeakTermUpsilon b))
                      ]
             )
         )
-    let b' = a <> nsSep <> asText b
-    bt <- discernIdentPlus (mb, asIdent b', (mb, WeakTermPi (xts ++ [dom]) tb))
-    return $ WeakStmtLetWT mb bt destructor
 
 separatePi :: WeakTermPlus -> WithEnv ([WeakIdentPlus], WeakTermPlus)
 separatePi e =

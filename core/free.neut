@@ -1,14 +1,14 @@
 (no-implicit-core)
 
-(include library "core/foundation.neut")
+(include "core/foundation.neut")
 
-(include library "core/functor.neut")
+(include "core/functor.neut")
 
-(include library "core/monad.neut")
+(include "core/monad.neut")
 
-(include library "core/base.neut")
+(include "core/base.neut")
 
-(include library "core/identity.neut")
+(include "core/identity.neut")
 
 (inductive free-internal ((g (hom tau tau)) (a tau))
   (leaf
