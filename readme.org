@@ -2,13 +2,13 @@
 Neut is a dependently-typed programming language based on [[https://en.wikipedia.org/wiki/Calculus_of_constructions][the Calculus of Constructions (CoC)]]. The interesting point I believe is that this language determines how to allocate/free memory at compile-time, without extra annotations to the source language. In other words, Neut in its source language is an ordinary lambda-calculus after all (imagine something like Haskell, Coq, Agda, Lean), and at the same time it handles memory without using, for example:
 
 - explicit malloc/free,
-- garbage collection,
+- garbage collection, or
 - region-based memory management.
 
 Theoretically, this is made possible by translating the source language into a dependent-and-linear variant of [[https://www.cs.bham.ac.uk/~pbl/papers/thesisqmwphd.pdf][Call-by-Push-Value]]. The crucial point of the translation is to see that knowing the type of a term is knowning how to eta-expand the term, which in turn means knowing how to copy/discard the term. In the translation, a type is not erased, but *translated into a computationally-meaningful term that copies/discards the terms of the type*.
 # Those who are interested in these theoretical things can find further details in the [[#theoretical-notes][section about the theory of Neut]].
 
-Practically, this means that you can write your program in the ordinary lambda calculus without any extra restrictions/annotations, and at the same time are allowed to pursue performance in the language via e.g. borrowing or linearity. The source code doesn't need esoteric annotations for the compiler to infer how to use resources. Nor does the world stop all of a sudden by GC. You have full control over resource allocation.
+Practically, this means that you can write your program in the ordinary lambda calculus without any extra restrictions or annotations, and at the same time are allowed to pursue performance in the language via e.g. borrowing or linearity. The source code doesn't need esoteric annotations for the compiler to infer how to use resources. Nor does the world stop all of a sudden by GC. You have full control over resource allocation.
 
 Here I briefly summerize the basic properties of Neut before diving into the details:
 
