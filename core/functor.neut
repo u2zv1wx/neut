@@ -1,7 +1,7 @@
 (no-implicit-core)
 
-;; (include library "core/foundation.neut")
-(include library "core/notation.neut")
+;; (include "core/foundation.neut")
+(include "core/notation.neut")
 
 (define functor-form ((m (hom tau tau)))
   (pi

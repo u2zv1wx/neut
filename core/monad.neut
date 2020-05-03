@@ -1,12 +1,12 @@
 (no-implicit-core)
 
-(include library "core/foundation.neut")
+(include "core/foundation.neut")
 
-(include library "core/functor.neut")
+(include "core/functor.neut")
 
-(include library "core/top.neut")
+(include "core/top.neut")
 
-(include library "core/bool.neut")
+(include "core/bool.neut")
 
 (define return-type
   ((m (hom tau tau)))

@@ -1,6 +1,6 @@
 (no-implicit-core)
 
-(include library "core/foundation.neut")
+(include "core/foundation.neut")
 
 (inductive lazy ((a tau))
   (unfold ((x (pi () a)))

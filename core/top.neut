@@ -2,9 +2,9 @@
 
 (enum top unit)
 
-(include library "core/base.neut")
+(include "core/base.neut")
 
-;; (include library "core/identity.neut")
+;; (include "core/identity.neut")
 
 ;; (define execute ((a tau) (x a))
 ;;   (witness top

@@ -138,12 +138,13 @@ parse' stmtTreeList =
               | otherwise ->
                 raiseSyntaxError m "(enum LEAF TREE ... TREE)"
             "include"
-              | [(mPath, TreeLeaf pathString)] <- rest ->
-                includeFile m mPath pathString getCurrentDirPath restStmtList
-              | [(_, TreeLeaf "library"), (mPath, TreeLeaf pathString)] <- rest ->
-                includeFile m mPath pathString getLibraryDirPath restStmtList
+              | [(mPath, TreeLeaf pathString)] <- rest,
+                not (T.null pathString) ->
+                if T.head pathString == '.'
+                  then includeFile m mPath pathString getCurrentDirPath restStmtList
+                  else includeFile m mPath pathString getLibraryDirPath restStmtList
               | otherwise ->
-                raiseSyntaxError m "(include LEAF) | (include library LEAF)"
+                raiseSyntaxError m "(include LEAF)"
             "ensure"
               | [(_, TreeLeaf pkg), (mUrl, TreeLeaf urlStr)] <- rest -> do
                 libDir <- getLibraryDirPath
@@ -541,7 +542,6 @@ includeCore m treeList =
       ( m,
         TreeNode
           [ (m, TreeLeaf "include"),
-            (m, TreeLeaf "library"),
             (m, TreeLeaf "\"core/core.neut\"")
           ]
       )

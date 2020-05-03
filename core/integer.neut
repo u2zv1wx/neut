@@ -1,14 +1,14 @@
 (no-implicit-core)
 
-(include library "core/foundation.neut")
+(include "core/foundation.neut")
 
-(include library "core/base.neut")
+(include "core/base.neut")
 
-(include library "core/top.neut")
+(include "core/top.neut")
 
-(include library "core/bool.neut")
+(include "core/bool.neut")
 
-(include library "core/string.neut")
+(include "core/string.neut")
 
 (section i64)
 

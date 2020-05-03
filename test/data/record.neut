@@ -17,6 +17,12 @@
     20
     top.unit))
 
-(i64.print (my-record.item-1 * item))
+(i64.print (my-record.item-1 i64 item))
 
-(i64.print (my-record.item-2 * item))
+(i64.print (my-record.item-2 i64 item))
+
+(record empty-record ())
+
+?empty-record.fold
+
+?empty-record.unfold

@@ -1,23 +1,23 @@
 (no-implicit-core)
 
-(include library "core/foundation.neut")
+(include "core/foundation.neut")
 
-(include library "core/base.neut")
+(include "core/base.neut")
 
-(include library "core/lazy.neut")
+(include "core/lazy.neut")
 
-(include library "core/top.neut")
+(include "core/top.neut")
 
-(include library "core/bool.neut")
+(include "core/bool.neut")
 
-(include library "core/identity.neut")
+(include "core/identity.neut")
 
-(include library "core/list.neut")
+(include "core/list.neut")
 
-(include library "core/coproduct.neut")
+(include "core/coproduct.neut")
 
-(include library "core/option.neut")
+(include "core/option.neut")
 
-(include library "core/string.neut")
+(include "core/string.neut")
 
-(include library "core/integer.neut")
+(include "core/integer.neut")

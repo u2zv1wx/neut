@@ -1,10 +1,10 @@
 (no-implicit-core)
 
-(include library "core/foundation.neut")
+(include "core/foundation.neut")
 
-(include library "core/top.neut")
+(include "core/top.neut")
 
-(include library "core/identity.neut")
+(include "core/identity.neut")
 
 (define string
   (sigma
