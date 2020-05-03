@@ -1,0 +1,6 @@
+(no-implicit-core)
+
+(inductive vec ((_ i64))
+  (cons
+    ((_ (vec (i64 3))))
+     (vec (i64 3))))
