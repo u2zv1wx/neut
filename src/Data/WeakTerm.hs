@@ -264,8 +264,10 @@ substWeakTermPlus sub term =
       term
     e1@(_, WeakTermHole x) ->
       case IntMap.lookup (asInt x) sub of
-        Nothing -> e1
-        Just e2@(_, e) -> (supMeta (metaOf e1) (metaOf e2), e)
+        Nothing ->
+          e1
+        Just e2@(_, e) ->
+          (supMeta (metaOf e1) (metaOf e2), e)
     (m, WeakTermInt t x) -> do
       let t' = substWeakTermPlus sub t
       (m, WeakTermInt t' x)
