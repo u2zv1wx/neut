@@ -14,6 +14,12 @@
 
 (include "core/lazy.neut")
 
+(include "core/identity.neut")
+
+(include "core/string.neut")
+
+(include "core/integer.neut")
+
 (use option)
 
 (use bool)
@@ -30,7 +36,7 @@
     (list a))
   (cons
     ((_ a)
-     (_ (lazy (list a))))
+     (_ (pi () (list a))))
     (list a)))
 
 (keyword list.new)
@@ -38,23 +44,155 @@
 (notation (list.new)
   (list.nil))
 
+;; (notation (list.new a)
+;;   (list.cons * a (list.nil *)))
+
+;; (notation (list.new a rest+)
+;;   (list.cons * a (list.new rest+)))
+
 (notation (list.new a)
   (list.cons * a (lazy.thunk * (list.nil *))))
 
 (notation (list.new a rest+)
   (list.cons * a (lazy.thunk * (list.new rest+))))
 
+
 (define head
   ((a tau)
    (xs (list a)))
   (witness (option a)
     (list.fold a xs
-      (lambda (_)
+      (λ (_)
         (option a))
-      (lambda ()
+      (λ ()
         (none a))
-      (lambda (h _)
+      (λ (h _)
         (some a h)))))
+
+(inductive choice ((a tau))
+  (left ()
+    (choice a))
+  (right ((_ a) (_ (pi () (list a))))
+    (choice a)))
+
+(define unchoice
+  ((a tau)
+   (xs (choice a)))
+  (witness (list a)
+    (choice.fold a xs
+      (λ (_)
+        (list a))
+      (λ ()
+        (nil a))
+      (λ (y acc)
+        (cons a y acc)))))
+
+;; ;; µF -> FµF
+;; (define iso
+;;   ((a tau)
+;;    (xs (list a)))
+;;   (witness (choice a)
+;;     (list.fold a xs
+;;       (λ (_)
+;;         (choice a))
+;;       (λ ()
+;;         (choice.left a))
+;;       (λ (y acc)
+;;         (with identity.bind
+;;           (let ys
+;;             (thunk *
+;;               (with identity.bind
+;;                 (string.print "foo")
+;;                 (unchoice a (force * acc)))))
+;;           (choice.right a y ys))))))
+
+(define iso-i64
+  ((xs (list i64)))
+  (witness (choice i64)
+    (list.fold i64 xs
+      (λ (_) hole)
+      (λ ()
+        (choice.left i64))
+      (λ (y acc)
+        (with identity.bind
+          (let ys
+            (lambda ()
+              (with identity.bind
+                (i64.print y)
+                (string.print "\n")
+                (unchoice i64 (acc)))))
+          (choice.right i64 y ys))))))
+
+(inductive tree ((A tau))
+  (leaf () (tree A))
+  (node ((_ A) (_ (tree A)) (_ (tree  A))) (tree A)))
+
+?tree.fold
+
+;; acc部分の処理がthunkに包まれているのでこのexamineはただちに終了する
+;; そこのthunkを入れない場合は遅くなるはず。
+;; ……ただちに終了するかわりに、計算がコピーされる (CBNの宿命)。
+
+
+;; (inductive list-strict ((a tau))
+;;   (nil
+;;     ()
+;;     (list-strict a))
+;;   (cons
+;;     ((_ a)
+;;      (_ (list-strict a)))
+;;     (list-strict a)))
+
+;; (inductive choice-strict ((a tau))
+;;   (left ()
+;;     (choice-strict a))
+;;   (right ((_ a) (_ (pi () (list-strict a))))
+;;     (choice-strict a)))
+
+;; (define unchoice-strict
+;;   ((a tau)
+;;    (xs (choice-strict a)))
+;;   (witness (list-strict a)
+;;     (choice-strict.fold a xs
+;;       (λ (_)
+;;         (list-strict a))
+;;       (λ ()
+;;         (list-strict.nil a))
+;;       (λ (y acc)
+;;         (list-strict.cons a y (acc))))))
+
+;; (define lift
+;;   ((a tau)
+;;    (xs (list-strict a)))
+;;   (witness (choice-strict a)
+;;     (list-strict.fold a xs
+;;       (λ (_)
+;;         (choice-strict a))
+;;       (λ ()
+;;         (choice-strict.left a))
+;;       (λ (y acc)
+;;         (with identity.bind
+;;           (let ys-lazy (λ () (unchoice-strict a acc)))
+;;           (choice-strict.right a y ys-lazy))))))
+
+;; (define lift-i64
+;;   ((xs (list-strict i64)))
+;;   (witness (choice-strict i64)
+;;     (list-strict.fold i64 xs
+;;       (λ (_)
+;;         (choice-strict i64))
+;;       (λ ()
+;;         (choice-strict.left i64))
+;;       (λ (y acc)
+;;         (with identity.bind
+;;           (let ys-lazy
+;;             (λ ()
+;;               (with identity.bind
+;;                 (i64.print y)
+;;                 (string.print "\n")
+;;                 (unchoice-strict i64 acc))))
+;;           (choice-strict.right i64 y ys-lazy))))))
+
 
 ;; (attribute head (implicit 0))
 
@@ -63,12 +201,41 @@
    (xs (list a)))
   (witness i64
     (list.fold a xs
-      (lambda (_)
+      (λ (_)
         i64)
-      (lambda ()
+      (λ ()
         0)
-      (lambda (_ acc)
-        (add-i64 1 (force i64 acc))))))
+      (λ (_ acc)
+        (add-i64 1 (acc))))))
+
+(define length-rec-i64
+  ((xs (list i64)))
+  (choice.fold i64 (iso-i64 xs)
+    (λ (_)
+      i64)
+    (λ ()
+      0)
+    (λ (y ys)
+      (with identity.bind
+        (string.print "y : ")
+        (i64.print y)
+        (string.print "\n---\n")
+        (let foo (ys))
+        (string.print "---(after)\n")
+        (add-i64 1 (length-rec-i64 foo))))))
+
+
+;; (define head-rec-strict-i64
+;;   ((xs (list-strict i64)))
+;;   (choice-strict.fold i64 (lift-i64 xs)
+;;     (λ (_)
+;;       *)
+;;     (λ ()
+;;       (none i64))
+;;     (λ (h _)
+;;       (with identity.bind
+;;         (i64.print h)
+;;         (some * h)))))
 
 ;; (attribute length (implicit 0))
 
@@ -78,11 +245,11 @@
    (ys (list a)))
   (witness (list a)
     (list.fold a xs
-      (lambda (_)
+      (λ (_)
         (list a))
-      (lambda ()
+      (λ ()
         ys)
-      (lambda (z acc)
+      (λ (z acc)
         (cons a z acc)))))
 
 ;; (attribute append (implicit 0))
@@ -92,11 +259,11 @@
    (xs (list a)))
   (witness bool
     (list.fold a xs
-      (lambda (_)
+      (λ (_)
         bool)
-      (lambda ()
+      (λ ()
         true)
-      (lambda (_ _)
+      (λ (_ _)
         false))))
 
 
@@ -109,11 +276,11 @@
    (xs (list a)))
   (witness (list b)
     (list.fold a xs
-      (lambda (_)
+      (λ (_)
         (list b))
-      (lambda ()
+      (λ ()
         (nil b))
-      (lambda (y acc)
+      (λ (y acc)
         (cons b (f y) acc)))))
 
 
@@ -132,12 +299,12 @@
    (m (list (list a))))
   (witness (list a)
     (list.fold (list a) m
-      (lambda (_)
+      (λ (_)
         (list a))
-      (lambda ()
+      (λ ()
         (nil *))
-      (lambda (xs acc)
-        (append * xs (force * acc))))))
+      (λ (xs acc)
+        (append * xs (acc))))))
 
 ;; (attribute concatenate (implicit 0))
 
