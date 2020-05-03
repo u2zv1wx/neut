@@ -239,8 +239,10 @@ substWeakTermPlus sub term =
       tau
     e1@(_, WeakTermUpsilon x) ->
       case IntMap.lookup (asInt x) sub of
-        Nothing -> e1
-        Just e2@(_, e) -> (supMeta (metaOf e1) (metaOf e2), e)
+        Nothing ->
+          e1
+        Just e2@(_, e) ->
+          (supMeta (metaOf e1) (metaOf e2), e)
     (m, WeakTermPi xts t) -> do
       let (xts', t') = substWeakTermPlus'' sub xts t
       (m, WeakTermPi xts' t')
