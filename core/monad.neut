@@ -32,43 +32,6 @@
     (return-type m))
   (bind
     (bind-type m)))
-;; (coinductive monad
-;;   ((m (hom tau tau)))
-;;   (witness-functor
-;;     ((_ (monad m)))
-;;     (functor m))
-;;   (return
-;;     ((_ (monad m)))
-;;     (return-type m))
-;;   (bind
-;;     ((_ (monad m)))
-;;     (bind-type m)))
-
-;; (inductive monad-2
-;;   ((m (hom tau tau)))
-;;   (unfold
-;;     ((witness-functor
-;;        (functor m))
-;;      (return
-;;        (return-type m))
-;;      (bind
-;;        (bind-type m)))
-;;     (monad-2 m)))
-
-;; (define monad-2.bind ((m (hom tau tau)) (x (monad-2 m)))
-;;   (monad-2.fold m x
-;;     (lambda (_)
-;;       (bind-type m))
-;;     (lambda (_ _ bind)
-;;       bind)))
-
-;; (structure monad ((m (hom tau tau)))
-;;   (witness-functor
-;;     (functor m))
-;;   (return
-;;     (return-type m))
-;;   (bind
-;;     (bind-type m)))
 
 (section monad)
 
