@@ -84,15 +84,6 @@ toIndInfo ts = do
     _ ->
       undefined
 
--- return (ats, bts)
-
--- registerLabelInfo :: [TreePlus] -> WithEnv ()
--- registerLabelInfo ts = do
---   (ats, bts) <- toIndInfo ts
---   forM_ ats $ \(_, a, _) -> do
---     let asbs = map (\(_, x, _) -> x) $ ats ++ bts
---     modify (\env -> env {labelEnv = Map.insert a asbs (labelEnv env)})
-
 generateProjections :: TreePlus -> WithEnv [WeakStmt]
 generateProjections t = do
   ((ma, a, ta), bts) <- toIndInfo t
