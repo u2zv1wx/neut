@@ -1,6 +1,6 @@
 (no-implicit-core)
 
-(include library "core/foundation.neut")
+(include "core/foundation.neut")
 
 (define text-internal ((length i64))
   (array length i64))

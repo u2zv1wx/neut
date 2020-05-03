@@ -428,7 +428,6 @@ thetaInductiveNested ::
   [WeakIdentPlus] -> -- トップレベルで定義されているコンストラクタたち
   WithEnv WeakTermPlus
 thetaInductiveNested mode isub modifier e va aOuter es bts = do
-  p "theta-ind-nested"
   (xts, (_, aInner, _), btsInner) <- lookupInductive (metaOf va) aOuter
   let es' = map (substWeakTermPlus isub) es
   args <-
