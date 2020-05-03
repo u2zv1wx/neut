@@ -69,8 +69,6 @@ data Env
         prefixEnv :: [T.Text],
         sectionEnv :: [T.Text],
         formationEnv :: IntMap.IntMap (Maybe WeakTermPlus),
-        -- "stream" ~> ["stream", "other-record-type", "head", "tail", "other-destructor"]
-        labelEnv :: Map.HashMap T.Text [T.Text],
         -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
         indEnv :: IntMap.IntMap (Maybe [WeakIdentPlus]),
         intactSet :: S.Set (Meta, T.Text),
@@ -130,7 +128,6 @@ initialEnv =
       sectionEnv = [],
       formationEnv = IntMap.empty,
       indEnv = IntMap.empty,
-      labelEnv = Map.empty,
       weakTypeEnv = IntMap.empty,
       typeEnv = IntMap.empty,
       constTypeEnv = Map.empty,
