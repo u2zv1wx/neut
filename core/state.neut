@@ -1,6 +1,6 @@
 ;; state.neut
 
-(include library "core/functor.neut")
+(include "core/functor.neut")
 
 (use top)
 
@@ -51,13 +51,15 @@
 (define witness-functor
   ((s tau))
   (witness (functor (state s))
-    (functor.unfold (state s)
+    (functor.new
+      (state s)
       (state.map s))))
 
 (define witness-monad
   ((s tau))
   (witness (monad (state s))
-    (monad.unfold (state s)
+    (monad.new
+      (state s)
       (state.witness-functor s)
       (state.return s)
       (state.bind s))))

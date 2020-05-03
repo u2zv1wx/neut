@@ -78,7 +78,7 @@ toIndInfo ts = do
   at <- ruleAsWeakTextPlus fs
   bts <- toInternalRuleList connectiveList
   case bts of
-    [(_, "unfold", (_, WeakTermPi xts _))] ->
+    [(_, "new", (_, WeakTermPi xts _))] ->
       return (at, xts)
     _ ->
       undefined
@@ -297,7 +297,7 @@ asInductive m ts =
               (m, TreeNode xts),
               ( m,
                 TreeNode
-                  [ (m, TreeLeaf "unfold"),
+                  [ (m, TreeLeaf "new"),
                     (m, TreeNode rules),
                     app
                   ]

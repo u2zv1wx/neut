@@ -9,10 +9,11 @@
 
 ?my-record.item-1
 ?my-record.fold
-?my-record.unfold
+?my-record.new
 
 (let item
-  (my-record.unfold i64
+  (my-record.new
+    i64
     10
     20
     top.unit))
@@ -25,4 +26,4 @@
 
 ?empty-record.fold
 
-?empty-record.unfold
+?empty-record.new

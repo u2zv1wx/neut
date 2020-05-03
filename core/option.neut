@@ -56,22 +56,18 @@
 
 ;; (attribute from-option (implicit 0))
 
-?functor.unfold
-
-?monad.unfold
-
 (define witness-functor
   (witness (functor option)
-    (functor.unfold option
+    (functor.new
+      option
       option.map)))
-
-?functor.unfold
 
 ?functor.map
 
 (define witness-monad
   (witness (monad option)
-    (monad.unfold option
+    (monad.new
+      option
       option.witness-functor
       option.return
       option.bind)))

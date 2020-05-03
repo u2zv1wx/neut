@@ -48,7 +48,8 @@
 (define witness-functor
   ((g (hom tau tau)))
   (witness (functor (free g))
-    (functor.unfold (free g)
+    (functor.new
+      (free g)
       (free.map g))))
 
 (define return
@@ -76,7 +77,8 @@
 (define witness-monad
   ((g (hom tau tau)))
   (witness (monad (free g))
-    (monad.unfold (free g)
+    (monad.new
+      (free g)
       (free.witness-functor g)
       (free.return g)
       (free.bind g))))
