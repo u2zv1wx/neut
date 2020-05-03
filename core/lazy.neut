@@ -8,7 +8,9 @@
 
 (section lazy)
 
-(define thunk ((a tau) (x a))
+(define thunk
+  ((a tau)
+   (x a))
   (witness (lazy a)
     (lazy.unfold a
       (lambda () x))))
@@ -16,7 +18,9 @@
 ;; (attribute thunk
 ;;   (implicit 0))
 
-(define force ((a tau) (x (lazy a)))
+(define force
+  ((a tau)
+   (x (lazy a)))
   (witness a
     (lazy.fold a
       x

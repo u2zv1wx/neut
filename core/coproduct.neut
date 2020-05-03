@@ -8,7 +8,9 @@
 
 (section coproduct)
 
-(inductive coproduct ((e tau) (a tau))
+(inductive coproduct
+  ((e tau)
+   (a tau))
   (left ((_ e))
     (coproduct e a))
   (right ((_ a))
@@ -31,7 +33,10 @@
 
 ;; (attribute map (implicit 0 1 2))
 
-(define return ((e tau) (a tau) (x a))
+(define return
+  ((e tau)
+   (a tau)
+   (x a))
   (witness (coproduct e a)
     (right * * x)))
 
@@ -63,33 +68,39 @@
 
 ;; (attribute throw (implicit 0 1))
 
-(define either ((e tau))
+(define either
+  ((e tau))
   (witness (hom tau tau)
     (lambda ((a tau))
       (coproduct e a))))
 
-(define either-map ((e tau))
+(define either-map
+  ((e tau))
   (witness (functor-form (either e))
     (lambda (_ _ f m)
       (coproduct.map * * * f m))))
 
-(define either-return ((e tau))
+(define either-return
+  ((e tau))
   (witness (return-type (either e))
     (lambda (_ x)
       (coproduct.return * * x))))
 
-(define either-bind ((e tau))
+(define either-bind
+  ((e tau))
   (witness (bind-type (either e))
     (lambda (_ _ m k)
       (coproduct.bind * * * m k))))
 
-(define witness-functor ((e tau))
+(define witness-functor
+  ((e tau))
   (witness (functor (either e))
     (record (functor (either e))
       (map
         (either-map e)))))
 
-(define witness-monad ((e tau))
+(define witness-monad
+  ((e tau))
   (witness (monad (either e))
     (record (monad (either e))
       (witness-functor

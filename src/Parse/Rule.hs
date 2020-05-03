@@ -2,7 +2,6 @@ module Parse.Rule
   ( parseInductive,
     asInductive,
     insForm,
-    insInductive,
     registerLabelInfo,
     generateProjections,
   )
@@ -13,6 +12,7 @@ import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import Data.Ident
 import qualified Data.IntMap as IntMap
+import Data.List (find)
 import Data.Meta
 import Data.Namespace
 import qualified Data.Set as S
@@ -94,13 +94,13 @@ generateProjections :: [TreePlus] -> WithEnv [WeakStmt]
 generateProjections ts = do
   (ats, bts) <- toIndInfo ts
   let bts' = map textPlusToWeakIdentPlus bts
-  stmtListList <-
+  stmtList <-
     forM ats $ \(ma, a, ta) -> do
       (xts, _) <- separatePi ta
       forM bts $ \(mb, b, tb) -> do
         (dom, cod) <- separatePi tb
         when (length dom /= 1) $ raiseSyntaxError mb "(pi (TREE) TREE)"
-        e <-
+        destructor <-
           discern
             ( mb,
               WeakTermPiIntro
@@ -114,7 +114,6 @@ generateProjections ts = do
                              WeakTermPiIntro
                                ([(ma, asIdent a, ta)] ++ bts' ++ dom)
                                ( mb,
-                                 -- ここでexternalizeを行うべき？
                                  WeakTermPiElim (mb, WeakTermUpsilon $ asIdent b) (map toVar' dom)
                                )
                            )
@@ -123,8 +122,67 @@ generateProjections ts = do
             )
         let b' = a <> nsSep <> b
         bt <- discernIdentPlus (mb, asIdent b', (mb, WeakTermPi (xts ++ dom) cod))
-        return [WeakStmtLetWT mb bt e]
-  return $ concat $ concat stmtListList
+        case destructor of
+          (_, WeakTermPiIntro xtsdom (_, WeakTermPiElim f args))
+            | (_, WeakTermPiIntro atbtsdom baseTerm) <- last args -> do
+              aOuter <- discernText mb a
+              let i = (\(_, ident, _) -> asInt ident) $ head atbtsdom
+              let sub = IntMap.fromList [(i, (mb, WeakTermUpsilon aOuter))]
+              let xts' = init xtsdom
+              let atbts = init atbtsdom
+              let unfoldArgs = xts' ++ atbts
+              unfold <- discernText mb $ a <> nsSep <> "unfold"
+              ty <- findType b $ tail atbts
+              p "inner:"
+              p' $ head atbtsdom
+              p "outer:"
+              p' aOuter
+              p "sub:"
+              p' sub
+              p "unfoldArgs:"
+              p' $ map (\(_, foo, _) -> foo) unfoldArgs
+              p "unfold:"
+              p' unfold
+              p "the type of base-term:"
+              p $ T.unpack $ toText ty
+              -- p' $ find (\(_, bar, _) -> asText bar == b) $ tail atbts
+              p "baseTerm:"
+              p $ T.unpack $ toText baseTerm
+              let modifier e = (mb, WeakTermPiElim (mb, WeakTermUpsilon unfold) (map toVar' unfoldArgs ++ [e]))
+              baseTerm' <- theta ModeForward sub modifier ty baseTerm
+              p "baseTerm'"
+              p $ T.unpack $ toText baseTerm'
+              p "---------------------------------"
+              -- let args' = init args ++ [(mb, WeakTermPiIntro atbtsdom baseTerm')]
+              return $
+                WeakStmtLetWT
+                  mb
+                  bt
+                  ( mb,
+                    WeakTermPiIntro
+                      xtsdom
+                      ( mb,
+                        WeakTermPiElim f $
+                          init args ++ [(mb, WeakTermPiIntro atbtsdom baseTerm')]
+                      )
+                  )
+          -- return $ WeakStmtLetWT mb bt destructor
+          _ ->
+            raiseCritical mb "generateProjections"
+  return $ concat stmtList
+
+findType :: T.Text -> [WeakIdentPlus] -> WithEnv WeakTermPlus
+findType b bts =
+  case find (\(_, bar, _) -> asText bar == b) bts of
+    Just (_, _, (_, WeakTermPi _ cod)) ->
+      return cod
+    _ ->
+      raiseCritical' "findType"
+
+-- foo :: WeakIdentPlus -> WithEnv WeakIdentPlus
+-- foo (m, _, t) = do
+--   h <- newNameWith'' "h"
+--   return (m, h, t)
 
 separatePi :: WeakTermPlus -> WithEnv ([WeakIdentPlus], WeakTermPlus)
 separatePi e =
@@ -173,6 +231,8 @@ toInductive ats bts connective@(m, ai, xts, _) = do
   foldIdent <-
     discernIdentPlus
       (m, asIdent $ ai <> nsSep <> "fold", (m, WeakTermPi indArgs cod))
+  p "toInductive:"
+  p' at'
   return
     [ WeakStmtLetWT m at' indType,
       WeakStmtLetWT m foldIdent fold
@@ -431,7 +491,9 @@ theta mode isub modifier t e = do
     _ ->
       if isResolved isub t
         then return e
-        else
+        else do
+          p "isub:"
+          p' isub
           raiseError (metaOf t) $
             "malformed inductive/coinductive type definition: " <> toText t
 
@@ -489,6 +551,7 @@ thetaInductiveNested ::
   [WeakIdentPlus] -> -- トップレベルで定義されているコンストラクタたち
   WithEnv WeakTermPlus
 thetaInductiveNested mode isub modifier e va aOuter es bts = do
+  p "theta-ind-nested"
   (xts, (_, aInner, _), btsInner) <- lookupInductive (metaOf va) aOuter
   let es' = map (substWeakTermPlus isub) es
   args <-

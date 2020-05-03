@@ -39,10 +39,10 @@
   (list.nil))
 
 (notation (list.new a)
-  (list.cons * a (thunk * (list.nil *))))
+  (list.cons * a (lazy.thunk * (list.nil *))))
 
 (notation (list.new a rest+)
-  (list.cons * a (thunk * (list.new rest+))))
+  (list.cons * a (lazy.thunk * (list.new rest+))))
 
 (define head
   ((a tau)

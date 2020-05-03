@@ -1,30 +1,51 @@
 ;; simple coinductive type
-;; (coinductive stream ((A tau))
+(coinductive stream ((A tau))
+  (head
+    ((_ (stream A)))
+    A)
+  (tail
+    ((_ (stream A)))
+    (stream A)))
+
+?stream.unfold
+;; (coinductive sample ((A tau))
 ;;   (head
-;;     ((_ (stream A)))
+;;     ((_ (sample A)))
 ;;     A)
 ;;   (tail
-;;     ((_ (stream A)))
-;;     (stream A)))
+;;     ((_ (sample A)))
+;;     (sample A)))
 
-(inductive stream ((A tau))
-  (unfold ((F (hom tau tau))
-           (h (hom (F A) A))
-           (t (hom (F A) (F A)))
-           (_ (F A)))
-          (stream A)))
+;; Sigma [Sample : tau -> tau, H : Sample A -> A, T : Sample A -> Sample A]. Sample A
+;; ==
+;; Pi (z : top -> tau, k : Pi (Sample : tau -> tau, H : Sample A -> A, T : Sample A -> Sample A, _ : Sample A). z @ unit). z @ unit
+
+;; (inductive hoge ()
+;;   (base () (hoge))
+;;   (unfold ((sample (hom tau tau))
+;;            (H (hom (sample i64) i64))
+;;            (T (hom (sample i64) (sample i64)))
+;;            (_ (sample i64)))
+;;           (base)))
+
+;; (inductive stream ((A tau))
+;;   (unfold ((F (hom tau tau))
+;;            (h (hom (F A) A))
+;;            (t (hom (F A) (F A)))
+;;            (_ (F A)))
+;;           (stream A)))
 
 ;; (define stream.head ((A tau) (x (stream A)))
 ;;   (case x
 ;;     ((stream.unfold _ h _ v)
 ;;       (h v))))
 
-(define stream.head ((A tau) (x (stream A)))
-  (stream.fold * x
-    (lambda (_)
-      A)
-    (lambda (F h t v)
-      (h v))))
+;; (define stream.head ((A tau) (x (stream A)))
+;;   (stream.fold * x
+;;     (lambda (_)
+;;       A)
+;;     (lambda (F h t v)
+;;       (h v))))
     ;; ((stream.unfold _ h _ v) (h v))))
 
 ?stream.unfold
@@ -39,7 +60,7 @@
 ;;       ((stream.unfold F h t v)
 ;;         (stream.unfold F h t (t v)))))) ;; externalize!
 
-(define stream.tail ((A tau) (x (stream A)))
+(define tail ((A tau) (x (stream A)))
   (stream.fold * x
     (lambda ((A tau))
       (stream A))
@@ -50,7 +71,7 @@
 ;; ?stream.unfold
 
 (let stream-from-zero
-  (stream.unfold *
+  (stream.unfold i64
     (lambda ((x tau)) x)
     (lambda ((x i64)) x)
     (lambda ((x i64)) (add-i64 x 1))
@@ -61,13 +82,21 @@
 ;; (i64.print (stream.head stream-from-zero))
 
 ;; nested coinductive type
+;; (coinductive foo ((A tau))
+;;   (elim0
+;;     ((_ (foo A)))
+;;     A)
+;;   (elim1
+;;     ((_ (foo A)))
+;;     (stream (list (stream (foo A))))))
+
 (coinductive foo ((A tau))
   (elim0
     ((_ (foo A)))
     A)
   (elim1
     ((_ (foo A)))
-    (stream (list (stream (foo A))))))
+    (stream (foo A))))
 
 ;; mutually coinductive type
 (coinductive

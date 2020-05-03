@@ -33,7 +33,8 @@
 
 (section free)
 
-(define map ((g (hom tau tau)))
+(define map
+  ((g (hom tau tau)))
   (witness (functor-form (free g))
     (lambda (a b (f (hom a b)) m)
       (free.fold g a m
@@ -44,18 +45,21 @@
         (lambda (p val acc)
           (@node g b p val acc))))))
 
-(define witness-functor ((g (hom tau tau)))
+(define witness-functor
+  ((g (hom tau tau)))
   (witness (functor (free g))
     (record (functor (free g))
       (map
         (free.map g)))))
 
-(define return ((g (hom tau tau)))
+(define return
+  ((g (hom tau tau)))
   (witness (return-type (free g))
     (lambda (_ x)
-      (leaf x))))
+      (leaf * * x))))
 
-(define bind ((g (hom tau tau)))
+(define bind
+  ((g (hom tau tau)))
   (witness (bind-type (free g))
     (lambda
       ((a tau)
@@ -68,9 +72,10 @@
         (lambda (x)
           (k x))
         (lambda (p val acc)
-          (node p val acc))))))
+          (node * * p val acc))))))
 
-(define witness-monad ((g (hom tau tau)))
+(define witness-monad
+  ((g (hom tau tau)))
   (witness (monad (free g))
     (record (monad (free g))
       (witness-functor

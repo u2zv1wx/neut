@@ -66,6 +66,19 @@
       (map
         option.map))))
 
+?functor.unfold
+
+(define witfun-2
+  (witness (functor option)
+    (functor.unfold option
+      (lambda (_)
+        i64)
+      (lambda (_)
+        option.map)
+      0)))
+
+?functor.map
+
 (define witness-monad
   (witness (monad option)
     (record (monad option)

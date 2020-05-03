@@ -12,17 +12,20 @@
 
 (section i64)
 
-(define negate ((x i64))
+(define negate
+  ((x i64))
   (witness i64
     (mul-i64 x -1)))
 
-(define print-digit ((x i64))
+(define print-digit
+  ((x i64))
   (witness top
     (with identity.bind
       (print-character (unsafe.cast i64 i8 (add-i64 x 48))))))
 
 ;; とりあえず直接printする。ホントはbufferをつかって実装するべき。
-(define print ((x i64))
+(define print
+  ((x i64))
   (witness top
     (if (icmp-slt-i64 x 0)
       (with identity.bind
