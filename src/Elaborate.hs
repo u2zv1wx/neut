@@ -40,12 +40,8 @@ elaborateStmt stmt =
       insConstraintEnv te t'
       elaborateLet m mx x t' e' cont
     WeakStmtLetWT m (mx, x, t) e : cont -> do
-      (e', te) <- infer e
       t' <- inferType t
-      insConstraintEnv te t'
-      elaborateLet m mx x t' e' cont
-    -- t' <- inferType t
-    -- elaborateLet m mx x t' e cont
+      elaborateLet m mx x t' e cont
     WeakStmtConstDecl (_, c, t) : cont -> do
       t' <- inferType t
       analyze >> synthesize >> refine >> cleanup
