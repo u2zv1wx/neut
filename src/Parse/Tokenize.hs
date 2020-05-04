@@ -285,4 +285,4 @@ incrementColumn =
 raiseTokenizeError :: T.Text -> Tokenizer a
 raiseTokenizeError txt = do
   m <- currentMeta
-  throw $ ErrorRight [logError (getPosInfo m) txt]
+  throw $ Error [logError (getPosInfo m) txt]

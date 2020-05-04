@@ -62,7 +62,6 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#archive][archive]]
   - [[#build][build]]
   - [[#check][check]]
-  - [[#complete][complete]]
 - [[#appendix][Appendix]]
   - [[#llvm-ir-for-the-first-example][LLVM IR for the First Example]]
 
@@ -1545,29 +1544,6 @@ If =--no-color= option is specified, the result of type checking is printed with
 If =--end-of-entry SEPARATOR= is specified, each entry of the result of type checking is followed by =SEPARATOR=.
 
 This subcommand is intended to be used with an editor-side syntax checker like [[https://www.flycheck.org/en/latest/][flycheck]].
-
-** complete
-*** Example
-#+BEGIN_SRC shell
-$ neut complete path/to/file.neut 149 7  # get completion entries at (line, column) = (149, 7)
-#+END_SRC
-*** Notes
-The =complete= subcommand lists completion candidate for given location of given file.
-An example output of this subcommand is as follows:
-#+BEGIN_SRC text
-"admit-internal"
-"bind-type"
-"bool.and"
-"bool.not"
-"bool.or"
-"compose"
-"coproduct"
-"coproduct.bind"
-"coproduct.either"
-"coproduct.either-bind"
-(...)
-#+END_SRC
-This subcommand is intended to be used with a completion engine like [[https://company-mode.github.io/][company-mode]].
 
 # * Where is ...?
 
