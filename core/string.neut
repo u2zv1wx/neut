@@ -18,14 +18,14 @@
   (witness top
     (with identity.bind
       (let char (array-introduction i8 value))
-      (os.write * os.stdout char 1)
+      (os.write 1 os.stdout char 1)
       top.unit)))
 
 (define string.print
   ((str string))
   (witness (product string i64)
     (destruct str (n content)
-      (let len (write hole stdout &content n))
+      (let len (write n stdout &content n))
       (tuple (tuple n content) len))))
 
 (provide print-character)
