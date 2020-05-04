@@ -340,9 +340,6 @@ isResolved sub e = do
   let freeVarSet = S.map asInt $ varWeakTermPlus e
   all (`S.notMember` freeVarSet) outerVarList
 
--- e : Aを受け取って、flipしていないときはIN(A) = BをみたすB型のtermを、
--- また、flipしてるときはOUT(A) = BをみたすB型のtermを、
--- それぞれ構成して返す。IN/OUTはSubstWeakTermによって定まるものとする。
 theta ::
   Mode -> -- to keep track if the current conversion is flipped or not
   SubstWeakTerm -> -- sub : out ~> in (substitution sub := {x1 := x1', ..., xn := xn'})
