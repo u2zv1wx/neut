@@ -38,6 +38,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#inductive][inductive]]
   - [[#introspect][introspect]]
   - [[#keywordnotation][keyword/notation]]
+  - [[#record][record]]
   - [[#useunuse][use/unuse]]
   - [[#sectionend][section/end]]
   - [[#verify][verify]]
@@ -758,6 +759,74 @@ and then replaces =b=, =e1=, and =e2= in the codomain of the notation according 
 This translation is the step-expansion. The keyword environment here is required to determine whether a leaf of the domain of a notation is a variable or an opaque syntactic construct (i.e. "keyword"). In the example above, without the =(keyword if)= statement, we cannot determine if the =if= in =(if b e1 e2)= is a variable or a keyword.
 
 Given this step-expansion, the macro-expansion proceeds as follows. Take =t= to be an input tree. If the tree =t= is of the form =(leaf STRING)=, the compiler returns the result of step-expansion of =t=. If a tree is of the form =(node t1 ... tn)=, the =t1=, ..., =tn= are firstly macro-expanded them into =t1'= , ..., =tn'= , and then the compiler step-expands the tree =(node t1' ... tn')=.
+
+** record
+The =record= statement creates a record type, its elimination rules (destructors), and its introduction rule.
+*** Example
+#+BEGIN_SRC scheme
+(record my-record ((a tau))
+  (item-1
+    a)
+  (item-2
+    i64)
+  (item-3
+    top))
+
+(let item
+  (my-record.new
+    i64
+    10
+    20
+    top.unit))
+
+(i64.print (my-record.item-1 i64 item)) ;; ~> 10
+
+(i64.print (my-record.item-2 i64 item)) ;; ~> 20
+#+END_SRC
+*** Syntax
+#+BEGIN_SRC scheme
+(inductive LEAF ((LEAF TREE) ... (LEAF TREE))
+  (LEAF TREE)
+  ...
+  (LEAF TREE))
+#+END_SRC
+*** Semantics
+When parsed, the =record= statement is translated into =let= statements that defines (1) the record type, (2) the elimination rules (or the destructors of the record type), and (3) the introduction rule. For example, consider the following =record= statement:
+#+BEGIN_SRC scheme
+(record my-record ((a tau))
+  (item-1
+    a)
+  (item-2
+    i64)
+  (item-3
+    top))
+#+END_SRC
+Given this statement, the compiler generates [[#definelet][let]] statements that defines the followings:
+1. The record type =my-record : Pi (a : tau). tau=
+2. The elimination rules (destructors) of the type:
+   - =my-record.item-1 : Pi (a : tau, _ : (my-record a)). a=
+   - =my-record.item-2 : Pi (a : tau, _ : (my-record a)). i64=
+   - =my-record.item-3 : Pi (a : tau, _ : (my-record a)). top=
+3. The introduction rule of the type:
+   - =my-record.new : (Π ((a tau) (_ a) (_ i64) (_ top)) (my-record a))=
+
+Internally, every record statement is translated into the corresponding [[#inductive][inductive]] statement. For example, given the =record= statement above, the compiler translates it into the following =inductive= statement:
+#+BEGIN_SRC scheme
+(inductive my-record ((a tau))
+  (new
+    ((item-1 a)
+     (item-2 i64)
+     (item-3 top))
+    (my-record a)))
+#+END_SRC
+The compiler then processes this statement in the same way ordinary =inductive= statement, generating the record type =my-record= and the introduction rule =my-record.new=, and the elimination rule (as an inductive type) =my-record.fold=. After that, the compiler automatically generates destructors from this definition via =my-record.fold=. For example, the generated definition of =my-record.item-1= is as follows:
+#+BEGIN_SRC scheme
+(define my-record.item-1 ((a tau) (record-value (my-record a)))
+  (my-record.fold a record-value
+    (lambda () a)
+    (lambda (item-1 item-2 item3) item-1)))
+#+END_SRC
+The other destructors are defined similarly.
 
 ** use/unuse
 The =use= / =unuse= statement registers a prefix for name resolution.
