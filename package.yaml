@@ -1,7 +1,7 @@
 name:                neut
 version:             0.1.0.0
 license:             ISC
-license-file:        LICENSE
+license-file:        license.txt
 author:              "u2zv1wx"
 maintainer:          "u2zv1wx@protonmail.ch"
 
