@@ -299,7 +299,6 @@ sigmaIntroString m u8s = do
           WeakTermPiElim
             (m, WeakTermUpsilon k)
             [ (m, WeakTermInt (i64 m) (toInteger $ length u8s)),
-              -- (m, WeakTermEnumIntro (EnumValueInt 64 (toInteger $ length u8s))),
               (m, WeakTermArrayIntro (ArrayKindInt 8) u8s)
             ]
         )

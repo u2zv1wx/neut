@@ -41,7 +41,7 @@ instance Ord Constraint where
 data EnrichedConstraint
   = Enriched
       PreConstraint
-      (S.Set Ident) -- the set of metavariables that cause stuck
+      (S.Set Ident) -- the set of the metavariables that cause stuck
       Constraint
   deriving (Show)
 

@@ -23,7 +23,7 @@
     (with identity.bind
       (print-character (unsafe.cast i64 i8 (add-i64 x 48))))))
 
-;; とりあえず直接printする。ホントはbufferをつかって実装するべき。
+;; just for now. should be implemented via a buffer or something.
 (define print
   ((x i64))
   (witness top

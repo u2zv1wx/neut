@@ -9,8 +9,8 @@
 (let lam-bar
   (lambda ((sample-2.bar tau))
     (with identity.bind
-      (let _ sample-2.bar) ;; こっちは変数のほう
-      (enum-introduction sample-2.bar)))) ;; 定数のほうも参照可能
+      (let _ sample-2.bar)
+      (enum-introduction sample-2.bar))))
 
 (i64.print (unsafe.cast sample-1 i64 sample-1.foo)) ;; 3
 

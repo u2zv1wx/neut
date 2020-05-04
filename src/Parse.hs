@@ -345,11 +345,11 @@ ensureEnvSanity m = do
     _ ->
       return ()
 
--- basic idea:
+-- basic idea (exploits capturing subst):
 --   sub = {
---     x1 := μ x1. e1,
---     x2 := μ x2. e2,
---     x3 := μ x3. e3
+--     x1 := μ x1. e1 (closed w.r.t. x1)
+--     x2 := μ x2. e2 (closed w.r.t. x2)
+--     x3 := μ x3. e3 (closed w.r.t. x3)
 --   }
 --   sub^2 = {
 --     x1 := μ x1. e1 {x2 := μ x2. e2, x3 := μ x3. e3}
@@ -364,21 +364,13 @@ ensureEnvSanity m = do
 parseDef :: [TreePlus] -> WithEnv [WeakStmt]
 parseDef xds = do
   defList <- mapM (adjustPhase >=> prefixFunName >=> macroExpand) xds
-  -- {f1 := def-1, ..., fn := def-n}から{f1, ..., fn}を取り出してトップレベルでdiscernする
-  -- metaNameList <- mapM extractFunName defList
   metaNameList <- mapM (extractFunName >=> uncurry discernIdent) defList
   let nameList = map snd metaNameList
-  -- xiの名前をtopNameEnvに追加した状態でそれぞれの定義をdiscernする
-  -- defList' <- mapM interpretFix defList
   defList' <- mapM (interpretFix >=> discernDef) defList
-  -- sub^nを計算する
   let baseSub = IntMap.fromList $ map defToSub $ zip nameList defList'
-  -- sub^1からスタートだから、sub^nを得るためにはn - 1回追加で合成すればいい
   let sub = selfCompose (length baseSub - 1) baseSub
-  -- 変数を「閉じる」
   let fixSelfVarList = map (uncurry toVar . defToName) defList'
   let aligner = IntMap.fromList $ zip (map asInt nameList) fixSelfVarList
-  -- sub^nをf1, ..., fnに適用する
   let closedSub = IntMap.map (substWeakTermPlus aligner) sub -- capturing substitution
   let typeList = map (\(_, (m, _, t), _, _) -> (m, t)) defList'
   let bodyList = map (substWeakTermPlus closedSub . uncurry toVar) metaNameList

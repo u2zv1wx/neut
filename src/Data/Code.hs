@@ -77,7 +77,7 @@ substDataPlus sub term =
     (m, DataConst x) ->
       (m, DataConst x)
     (m, DataUpsilon s) ->
-      fromMaybe (m, DataUpsilon s) (IntMap.lookup (asInt s) sub) -- ここではsの整数部分を比較したほうがよさそう？
+      fromMaybe (m, DataUpsilon s) (IntMap.lookup (asInt s) sub)
     (m, DataSigmaIntro mk vs) -> do
       let vs' = map (substDataPlus sub) vs
       (m, DataSigmaIntro mk vs')

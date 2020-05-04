@@ -34,7 +34,6 @@
     100
     1000))
 
-;; (ballad of) big nothing
 (define
   (p0 ((a i64)) (p1 a))
   (p1 ((a i64)) (p2 a))

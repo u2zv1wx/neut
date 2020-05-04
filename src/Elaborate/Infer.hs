@@ -116,7 +116,6 @@ infer' ctx term =
     (m, WeakTermArray dom k) -> do
       (dom', tDom) <- infer' ctx dom
       let tDom' = i64 m
-      -- let tDom' = (m, WeakTermEnum (EnumTypeInt 64))
       insConstraintEnv tDom tDom'
       return ((m, WeakTermArray dom' k), (m, WeakTermTau))
     (m, WeakTermArrayIntro k es) -> do

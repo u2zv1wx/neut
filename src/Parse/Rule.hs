@@ -344,25 +344,25 @@ isResolved sub e = do
 -- また、flipしてるときはOUT(A) = BをみたすB型のtermを、
 -- それぞれ構成して返す。IN/OUTはSubstWeakTermによって定まるものとする。
 theta ::
-  Mode -> -- 現在の変換がflipしているかそうでないかの情報
-  SubstWeakTerm -> -- out ~> in (substitution sub := {x1 := x1', ..., xn := xn'})
-  (WeakTermPlus -> WeakTermPlus) ->
+  Mode -> -- to keep track if the current conversion is flipped or not
+  SubstWeakTerm -> -- sub : out ~> in (substitution sub := {x1 := x1', ..., xn := xn'})
+  (WeakTermPlus -> WeakTermPlus) -> -- the function to be used in the base case (thetaInductive)
   WeakTermPlus -> -- a type `A`
   WeakTermPlus -> -- a term `e` of type `A`
-  WithEnv WeakTermPlus
+  WithEnv WeakTermPlus -- a term of type `A {x1 := x1', ..., xn := xn'}`
 theta mode isub modifier t e = do
   ienv <- gets indEnv
   case t of
     (_, WeakTermPi xts cod) ->
       thetaPi mode isub modifier xts cod e
-    (_, WeakTermPiElim va@(_, WeakTermUpsilon ai) es)
+    (_, WeakTermPiElim (_, WeakTermUpsilon ai) es)
       | Just _ <- IntMap.lookup (asInt ai) isub ->
         thetaInductive mode isub ai modifier es e
-      -- nested inductive
+      -- when the inductive type `ai` is defined beforehand and it is not a mutual one
       | Just (Just bts) <- IntMap.lookup (asInt ai) ienv,
         not (all (isResolved isub) es) ->
-        thetaInductiveNested mode isub modifier e va ai es bts
-      -- nestedの外側がmutualであるとき。このときはエラーとする。
+        thetaInductiveNested mode isub modifier e ai es bts
+      -- when the inductive type `ai` is defined beforehand and it is a mutual one
       | Just Nothing <- IntMap.lookup (asInt ai) ienv ->
         thetaInductiveNestedMutual (metaOf t) ai
     _ ->
@@ -385,16 +385,10 @@ thetaPi ::
 thetaPi mode isub modifier xts cod e = do
   (xts', cod') <- renameBinder xts cod
   let (ms', xs', ts') = unzip3 xts'
-  -- eta展開のための変数を用意
   let xs'' = zipWith (\m x -> (m, WeakTermUpsilon x)) ms' xs'
-  -- xsを「逆方向」で変換（実際には逆向きの変換は不可能なので、2回flipされることを期待して変換）
-  -- こうしたあとでx : In(A)と束縛してからthetaでの変換結果を使えば、x' : Out(A)が得られるので
-  -- 引数として与えられるようになる、というわけ。
   xsBackward <- zipWithM (theta (flipMode mode) isub modifier) ts' xs''
-  -- appのほうを「順方向」で変換
   appForward <- theta mode isub modifier cod' (fst e, WeakTermPiElim e xsBackward)
-  -- 結果をまとめる
-  let ts'' = map (substWeakTermPlus isub) ts' -- 引数をinternalizeされたバージョンの型にする
+  let ts'' = map (substWeakTermPlus isub) ts'
   return (fst e, WeakTermPiIntro (zip3 ms' xs' ts'') appForward)
 
 thetaInductive ::
@@ -411,23 +405,23 @@ thetaInductive mode isub a modifier es e
       "found a contravariant occurence of `"
         <> asText a
         <> "` in the antecedent of an introduction rule"
-  -- `list @ i64` のように、中身が処理済みであることをチェック (この場合はes == [i64])
   | all (isResolved isub) es =
     return $ modifier e
   | otherwise =
     raiseError (metaOf e) "found a self-nested inductive type"
 
 thetaInductiveNested ::
-  Mode ->
-  SubstWeakTerm -> -- inductiveのためのaのsubst (outer -> inner)
-  (WeakTermPlus -> WeakTermPlus) ->
-  WeakTermPlus -> -- 変換されるべきterm
-  WeakTermPlus -> -- list Aにおけるlist
-  Ident -> -- list (トップレベルで定義されている名前、つまりouterの名前)
-  [WeakTermPlus] -> -- list AにおけるA
-  [WeakIdentPlus] -> -- トップレベルで定義されているコンストラクタたち
+  Mode -> -- whether current conversion is flipped or not
+  SubstWeakTerm -> -- outer ~> inner
+  (WeakTermPlus -> WeakTermPlus) -> -- to be used in the base case
+  WeakTermPlus -> -- the term to be converted
+  Ident -> -- an inductive type `aOuter` defined already
+  [WeakTermPlus] -> -- arguments of `aOuter`
+  [WeakIdentPlus] -> -- the constructors of `aOuter`
   WithEnv WeakTermPlus
-thetaInductiveNested mode isub modifier e va aOuter es bts = do
+thetaInductiveNested mode isub modifier e aOuter es bts = do
+  let m = fst e
+  let va = (m, WeakTermUpsilon aOuter)
   (xts, (_, aInner, _), btsInner) <- lookupInductive (metaOf va) aOuter
   let es' = map (substWeakTermPlus isub) es
   args <-
@@ -435,7 +429,6 @@ thetaInductiveNested mode isub modifier e va aOuter es bts = do
       (toInternalizedArg mode isub aInner aOuter xts modifier es es')
       bts
       btsInner
-  let m = fst e
   return
     ( m,
       WeakTermPiElim
@@ -470,48 +463,31 @@ lookupInductive m ai = do
     Nothing ->
       raiseCritical m $ "no such inductive type defined: " <> asText ai
 
--- nested inductiveにおける引数をinternalizeする。
--- （これ、recursiveに処理できないの？）
 toInternalizedArg ::
-  Mode ->
-  SubstWeakTerm -> -- inductiveのためのaのsubst (outer -> inner)
-  Ident -> -- innerでのaの名前。listの定義の中に出てくるほうのlist.
-  Ident -> -- outerでのaの名前。listとか。
-  [WeakIdentPlus] -> -- aの引数。
-  (WeakTermPlus -> WeakTermPlus) -> -- base caseでのinternalizeのための情報。
-  [WeakTermPlus] -> -- list @ (e1, ..., en)の引数部分。
-  [WeakTermPlus] -> -- eiをisubでsubstしたもの。
-  WeakIdentPlus -> -- outerでのコンストラクタ。
-  WeakIdentPlus -> -- innerでのコンストラクタ。xts部分の引数だけouterのコンストラクタと型がずれていることに注意。
+  Mode -> -- whether current conversion is flipped or not
+  SubstWeakTerm -> -- {x1 := x1', ..., xn := xn'}
+  Ident -> -- a bound variable that corresponds to `aOuter`
+  Ident -> -- an Inductive type `aOuter' defined already
+  [WeakIdentPlus] -> -- arguments of `aOuter`
+  (WeakTermPlus -> WeakTermPlus) -> -- to be used in the base case
+  [WeakTermPlus] -> -- arguments `es` of `aOuter`
+  [WeakTermPlus] -> -- `es {x1 := x1', ..., xn := xn'}`
+  WeakIdentPlus -> -- a constructor `b` of `aOuter`
+  WeakIdentPlus -> -- a bound variable that corresponds to `b`
   WithEnv WeakTermPlus
 toInternalizedArg mode isub aInner aOuter xts modifier es es' b bInner =
   case bInner of
     (mbInner, _, (_, WeakTermPi ytsInner _)) -> do
       let (ms, ys, ts) = unzip3 ytsInner
       let vxs = map toVar' xts
-      -- 引数の型を適切にsubstする。これによって、aInner (x1, ..., xn)の出現がaOuter (e1', ..., en')へと置き換えられて、
-      -- 結果的にaOuterの中身はすべて処理済みとなる。
-      -- ytsInnerはPiの内部でのコンストラクタの型であるから、substをするときはaInnerからsubstを行なう必要がある。……本当か？
-      -- このsubstを行なうことで結局z @ (aOuter, ARGS)のARGS部分の引数がaOuter関連のもので揃うから正しいはず。
       ts' <- mapM (substRuleType ((aInner, vxs), (aOuter, es'))) ts
-      -- aInner (x1, ..., xn) ~> aOuter (e1', ..., en')が終わったら、こんどは型のxiをeiに置き換える。
-      -- これによって、
-      --   - aOuterの中身はすべて処理済み
-      --   - aOuterの外にはeiが出現しうる
-      -- という状況が実現できる。これはrecursionの停止を与える。
-      let xs = map (\(_, x, _) -> asInt x) xts -- fixme: このへんもrenameBinderでやったほうがいい？
+      let xs = map (\(_, x, _) -> asInt x) xts
       let sub = IntMap.fromList $ zip xs es
       let ts'' = map (substWeakTermPlus sub) ts'
       ys' <- mapM newNameWith ys
-      -- これで引数の型の調整が終わったので、あらためてidentPlusの形に整える
-      -- もしかしたらyって名前を別名に変更したほうがいいかもしれないが。
       let ytsInner' = zip3 ms ys' ts''
-      -- 引数をコンストラクタに渡せるようにするために再帰的にinternalizeをおこなう。
-      -- list (item-outer A)みたいな形だったものは、list (item-inner A)となっているはずなので、thetaは停止する。
-      -- list (list (item-outer A))みたいな形だったものも、list (list (item-inner A))となってthetaは停止する。
       let f (m, y, t) = theta mode isub modifier t (m, WeakTermUpsilon y)
       args <- mapM f ytsInner'
-      -- あとは結果を返すだけ
       return
         ( mbInner,
           WeakTermPiIntro
@@ -534,7 +510,7 @@ renameBinder binder e =
     (m, x, t) : ats -> do
       x' <- newNameWith x
       let sub = IntMap.singleton (asInt x) (m, WeakTermUpsilon x')
-      let (ats', e') = substWeakTermPlus'' sub ats e -- discern済みなのでこれでオーケーのはず
+      let (ats', e') = substWeakTermPlus'' sub ats e
       (ats'', e'') <- renameBinder ats' e'
       return ((m, x', t) : ats'', e'')
 
@@ -567,7 +543,7 @@ substRuleType sub@((a1, es1), (a2, es2)) term =
         case (mapM asUpsilon es1, mapM asUpsilon es) of
           (Just xs', Just ys')
             | xs' == ys' ->
-              return (m, WeakTermPiElim (mx, WeakTermUpsilon a2) es2) -- `aOuter @ (処理済み, ..., 処理済み)` への変換
+              return (m, WeakTermPiElim (mx, WeakTermUpsilon a2) es2)
           _ ->
             raiseError
               m

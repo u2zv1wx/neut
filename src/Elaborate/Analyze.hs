@@ -93,11 +93,11 @@ simp' constraintList =
         (e1@(m1, _), e2@(m2, _)) -> do
           let ms1 = asStuckedTerm e1
           let ms2 = asStuckedTerm e2
-          -- list of stuck reasons (fmvs: free meta-variables)
           sub <- gets substEnv
           let m = supMeta m1 m2
           let hs1 = holeWeakTermPlus e1
           let hs2 = holeWeakTermPlus e2
+          -- list of stuck reasons (fmvs: free meta-variables)
           let fmvs = S.union hs1 hs2
           let fvs1 = varWeakTermPlus e1
           let fvs2 = varWeakTermPlus e2
@@ -172,7 +172,7 @@ simp' constraintList =
                       _ -> do
                         let s = IntMap.fromList $ zip (map asInt zs) es
                         simp $ (substWeakTermPlus s e1', e2') : cs
-                (Just (StuckPiElimHole h1 ies1), _) -- nothingだとi64みたいなconstがきたときにこまる
+                (Just (StuckPiElimHole h1 ies1), _)
                   | xs1 <- concatMap getVarList ies1,
                     occurCheck h1 hs2,
                     [] <- includeCheck xs1 fvs2 ->

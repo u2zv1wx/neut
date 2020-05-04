@@ -18,13 +18,13 @@ data Term
   | TermPiElim TermPlus [TermPlus]
   | TermFix IdentPlus [IdentPlus] TermPlus
   | TermConst T.Text
-  | TermCall Ident -- S4 necessity
+  | TermCall Ident
   | TermInt IntSize Integer
   | TermFloat FloatSize Double
   | TermEnum T.Text
   | TermEnumIntro T.Text
   | TermEnumElim (TermPlus, TermPlus) [(EnumCasePlus, TermPlus)]
-  | TermArray TermPlus ArrayKind -- array n3 u8 ~= n3 -> u8
+  | TermArray TermPlus ArrayKind -- array (LENGTH-in-i64) (KIND)
   | TermArrayIntro ArrayKind [TermPlus]
   | TermArrayElim
       ArrayKind

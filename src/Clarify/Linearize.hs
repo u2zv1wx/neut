@@ -10,7 +10,7 @@ import Data.Env
 import Data.Ident
 import qualified Data.IntMap as IntMap
 
--- insert header for a closed chain
+-- insert an appropriate header for a closed chain
 linearize ::
   [(Ident, CodePlus)] -> -- [(x1, t1), ..., (xn, tn)]  (closed chain)
   CodePlus ->
@@ -54,7 +54,6 @@ withHeader nm x t e =
 --     bind exp := t^# in        --
 --     exp @ (0, x) in           -- AffineApp
 --   e
--- 変数xに型t由来のaffineを適用して破棄する。
 withHeaderAffine :: Ident -> CodePlus -> CodePlus -> WithEnv CodePlus
 withHeaderAffine x t e@(m, _) = do
   hole <- newNameWith' "unit"
@@ -64,7 +63,6 @@ withHeaderAffine x t e@(m, _) = do
 -- withHeaderLinear z x e ~>
 --   bind z := return x in
 --   e
--- renameするだけ。
 withHeaderLinear :: Ident -> Ident -> CodePlus -> WithEnv CodePlus
 withHeaderLinear z x e@(m, _) =
   return (m, CodeUpElim z (m, CodeUpIntro (m, DataUpsilon x)) e)

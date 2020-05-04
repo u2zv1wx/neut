@@ -33,7 +33,7 @@ reduceTermPlus term =
       let app = TermPiElim e' es'
       let valueCond = and $ map isValue es
       case e' of
-        (_, TermPiIntro xts body) -- fixme: reduceできるだけreduceするようにする (partial evaluation)
+        (_, TermPiIntro xts body)
           | length xts == length es',
             valueCond -> do
             let xs = map (\(_, x, _) -> asInt x) xts

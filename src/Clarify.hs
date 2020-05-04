@@ -242,7 +242,6 @@ clarifyArrayAccess tenv m name lowType = do
     _ ->
       raiseCritical m "the type of array-access is wrong"
 
--- ここでclsをつくる計算は省略できる (tryCache的に)
 clarifySyscall ::
   TypeEnv ->
   T.Text -> -- the name of theta
@@ -402,7 +401,6 @@ retWithBorrowedVars tenv m cod xts resultVarName =
       (_, resultType) <- rightmostOf sigArgs
       let xs = map (\(_, x, _) -> x) xts
       let vs = map (\x -> (m, TermUpsilon x)) $ xs ++ [resultVarName]
-      -- resultの型の情報はkpの型の中にあるが。
       let tenv' = insTypeEnv1 (xts ++ [(m, resultVarName, resultType)]) tenv
       clarify'
         tenv'
