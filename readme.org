@@ -36,7 +36,6 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#enum][enum]]
   - [[#include][include]]
   - [[#inductive][inductive]]
-  - [[#coinductive][coinductive]]
   - [[#introspect][introspect]]
   - [[#keywordnotation][keyword/notation]]
   - [[#useunuse][use/unuse]]
@@ -58,7 +57,6 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#hole][hole]]
   - [[#sigma][sigma]]
   - [[#with][with]]
-  - [[#cocaserecord][cocase/record]]
 - [[#compiler-subcommands][Compiler Subcommands]]
   - [[#archive][archive]]
   - [[#build][build]]
@@ -672,104 +670,6 @@ When used in the domain of a constructor, the inductive type being defined must 
 The codomain of each constructor must be of the form =(a e1 ... en)=, where the =a= is the inductive type being defined. If =e1, ..., en= are not the same as the argument of the inductive type, such a constructor is defined to be generalized. An inductive type with at least one generalized constructor is defined to be generalized.
 
 Nested inductive type is allowed if and only if the outer, already-defined inductive type is neither mutual nor generalized.
-
-** coinductive
-The =coinductive= statement defines a coinductive type, its elimination rules (destructors), and its introduction rule (unfold).
-*** Example
-#+BEGIN_SRC scheme
-(coinductive stream ((A tau))
-  (head
-    ((_ (stream A)))
-    A)
-  (tail
-    ((_ (stream A)))
-    (stream A)))
-
-(let stream-from-zero
-  (stream.unfold
-    (lambda ((x tau)) x)
-    (lambda ((x i64)) x)
-    (lambda ((x i64)) (add-i64 x 1))
-    0))
-
-(i64.print (stream.head (stream.tail (stream.tail (stream.tail stream-from-zero)))))
-#+END_SRC
-*** Syntax
-#+BEGIN_SRC scheme
-(coinductive LEAF ((LEAF TREE) ... (LEAF TREE))
-  (LEAF ((LEAF TREE))
-    TREE)
-  ...
-  (LEAF ((LEAF TREE))
-    TREE))
-
-;; n-mutual coinductive type
-(coinductive
-  (LEAF ((LEAF TREE) ... (LEAF TREE))
-    (LEAF ((LEAF TREE))
-      TREE)
-    ...
-    (LEAF ((LEAF TREE))
-      TREE))
-  ...
-  (LEAF ((LEAF TREE) ... (LEAF TREE))
-    (LEAF ((LEAF TREE))
-      TREE)
-    ...
-    (LEAF ((LEAF TREE))
-      TREE)))
-#+END_SRC
-*** Semantics
-When parsed, the =coinductive= statement is translated into =let= statements that defines (1) the coinductive type, (2) the elimination rules (or the destructors of the coinductive type), and (3) the introduction rule (or the "unfold" of the type). For example, consider the following =coinductive= statement:
-#+BEGIN_SRC scheme
-(coinductive stream ((A tau))
-  (head
-    ((_ (stream A)))
-    A)
-  (tail
-    ((_ (stream A)))
-    (stream A)))
-#+END_SRC
-Given this statement, the compiler generates [[#definelet][let]] statements that defines the followings:
-1. The coinductive type =stream : Pi (a : tau). tau=
-2. The elimination rules (destructors) of the type:
-   - =stream.head : Pi (a : tau, _ : stream a). a=, where the =a : tau= is set to be [[#attribute][implicit]].
-   - =stream.tail : Pi (a : tau, _ : stream a). stream a=, where the =a : tau= is set to be [[#attribute][implicit]].
-3. The introduction rule of the type:
-   - =stream.unfold : (Π ((A tau) (F (arrow (tau) tau)) (_ (arrow ((F A)) A)) (_ (arrow ((F A)) (F A))) (_ (F A))) (stream A))=, where the =a : tau= is set to be [[#attribute][implicit]].
-The introduction rule might seem intimidating. In the actual code, however, you don’t have to use that generated term as long as what you need is a degenerated coinductive type (i.e. the record type), since in that case the rule [[#cocaserecord][record]] can be used to construct (introduce) a value of a record type.
-
-When used in the codomain of a destructor, the coinductive type being defined must be occurred covariantly.
-
-The domain of each constructor must be of the form =(a x1 ... xn)=, where the =a= is the inductive type being defined, and =x1, ..., xn= are the argument of the coinductive type. Note that there doesn't exist such a thing like "generalized coinductive type".
-
-Nested coinductive type is allowed if and only if the outer, already-defined coinductive type is not mutual.
-
-As a side note, internally, a =coinductive= statement is implemented via a translation into an =inductive= statement. For example, the example of =stream= above is translated into the following statement:
-#+BEGIN_SRC scheme
-(inductive stream ((A tau))
-  (unfold ((F (hom tau tau))
-           (h (hom (F A) A))
-           (t (hom (F A) (F A)))
-           (_ (F A)))
-          (stream A)))
-#+END_SRC
-with the definitions of corresponding destructors:
-#+BEGIN_SRC scheme
-(define stream.head ((A tau) (x (stream A)))
-  (case x
-    ((stream.unfold _ h _ v) (h v))))
-
-(attribute stream.head (implicit 0))
-
-(define stream.tail ((A tau) (x (stream A)))
-  (witness (stream A)
-    (case x
-      ((stream.unfold F h t v)
-        (stream.unfold F h t (t v))))))
-
-(attribute stream.tail (implicit 0))
-#+END_SRC
 
 ** introspect
 The =introspect= statement introspects the state of the compiler and selects statements by those information.
@@ -1538,84 +1438,6 @@ Note that the =bind= operator is not restricted to the monadic bind; You can set
 
 The =e= in =(let x e)= is automatically surrounded by =with=.
 
-** cocase/record
-The =cocase= / =record= notation is a convenient notation to construct a term of a degenerated coinductive type.
-*** Example
-#+BEGIN_SRC scheme
-(coinductive my-record ((a tau))
-  (item-1 ((_ (my-record a))) a)
-  (item-2 ((_ (my-record a))) i64)
-  (item-3 ((_ (my-record a))) top))
-
-(let rec
-  (record (my-record i64)
-    (item-1 10)
-    (item-3 top.unit)
-    (item-2 20)))
-
-(i64.print (my-record.item-1 rec)) ;; ~> 10
-(i64.print (my-record.item-2 rec)) ;; ~> 20
-
-(let rec2
-  (cocase (my-record i64)
-    ((my-record i64)
-      (item-1 10)
-      (item-3 top.unit)
-      (item-2 20))))
-
-(i64.print (my-record.item-1 rec2)) ;; ~> 10
-(i64.print (my-record.item-2 rec2)) ;; ~> 20
-#+END_SRC
-*** Syntax
-#+BEGIN_SRC scheme
-(record (a e ... e)
-  ((b e)
-   ...
-   (b e)))
-
-(cocase (a e ... e)
-  ((a e ... e)
-   (b e)
-   ...
-   (b e))
-  ((a e ... e)
-   (b e)
-   ...
-   (b e)))
-#+END_SRC
-*** Semantics
-#+BEGIN_SRC scheme
-(record (a e ... e)
-  ((b e)
-   ...
-   (b e)))
-~> (cocase (a e ... e)
-     ((a e ... e)
-      (b e)
-      ...
-      (b e)))
-
-(cocase (ai e ... e)
-  ((a1 e ... e)
-   (b e)
-   ...
-   (b e))
-  ((an e ... e)
-   (b e)
-   ...
-   (b e)))
-~> (ai.unfold
-     a1
-     ...
-     an
-     (lambda (_) e)
-     ...
-     (lambda (_) e)
-     UNSAFEVALUE)
-#+END_SRC
-*** Notes
-The =cocase= / =record= notation constructs a term of a degenerated coinductive type using the fact that every destructor of a degenerated coinductive type always discards the argument. Since the argument is always discarded, we can supply a "fake" value for the argument.
-
 * Compiler Subcommands
 The =neut= binary provides subcommands in this section.
 
@@ -1696,7 +1518,7 @@ This subcommand is intended to be used with a completion engine like [[https://c
 # ** Box Modality, Polarity, and Closure Conversion
 # (to be written later)
 
-# ** Realizing Inductive/Coinductive Types within CoC (including nested, mutual, or higher ones)
+# ** Realizing Inductive Type within CoC (including nested, mutual, or higher ones)
 # (to be written later)
 
 # ** Universe Hierarchy and the Weakly-Normalizing Fragment
