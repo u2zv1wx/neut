@@ -26,11 +26,7 @@ data Term
   | TermEnumElim (TermPlus, TermPlus) [(EnumCasePlus, TermPlus)]
   | TermArray TermPlus ArrayKind -- array (LENGTH-in-i64) (KIND)
   | TermArrayIntro ArrayKind [TermPlus]
-  | TermArrayElim
-      ArrayKind
-      [IdentPlus] -- [(x1, return t1), ..., (xn, return tn)] with xi : ti
-      TermPlus
-      TermPlus
+  | TermArrayElim ArrayKind [IdentPlus] TermPlus TermPlus
   | TermStruct [ArrayKind]
   | TermStructIntro [(TermPlus, ArrayKind)]
   | TermStructElim [(Meta, Ident, ArrayKind)] TermPlus TermPlus

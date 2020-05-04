@@ -26,12 +26,8 @@ data WeakTerm
   | WeakTermEnumElim (WeakTermPlus, WeakTermPlus) [(EnumCasePlus, WeakTermPlus)]
   | WeakTermArray WeakTermPlus ArrayKind -- array n3 u8 ~= n3 -> u8
   | WeakTermArrayIntro ArrayKind [WeakTermPlus]
-  | WeakTermArrayElim
-      ArrayKind
-      [WeakIdentPlus] -- [(x1, return t1), ..., (xn, return tn)] with xi : ti
-      WeakTermPlus
-      WeakTermPlus
-  | WeakTermStruct [ArrayKind] -- e.g. (struct u8 u8 f16 f32 u64)
+  | WeakTermArrayElim ArrayKind [WeakIdentPlus] WeakTermPlus WeakTermPlus
+  | WeakTermStruct [ArrayKind]
   | WeakTermStructIntro [(WeakTermPlus, ArrayKind)]
   | WeakTermStructElim [(Meta, Ident, ArrayKind)] WeakTermPlus WeakTermPlus
   | WeakTermQuestion WeakTermPlus WeakTermPlus -- e : t (output the type `t` as note)
