@@ -1,6 +1,3 @@
 .stack-work/
 neut.cabal
-*~
 .DS_Store
-test/out/*
-prof/
