@@ -29,13 +29,7 @@ showIntSize size =
 
 showFloatSize :: FloatSize -> T.Text
 showFloatSize size =
-  case size of
-    FloatSize16 ->
-      "f16"
-    FloatSize32 ->
-      "f32"
-    FloatSize64 ->
-      "f64"
+  "f" <> T.pack (show $ sizeAsInt size)
 
 sizeAsInt :: FloatSize -> Int
 sizeAsInt size =
