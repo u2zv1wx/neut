@@ -534,17 +534,17 @@ Every enum-value has its internal i64 value (discriminant). Those discriminant v
 
 Discriminant value starts from =0= by default, and increments one by one. The "current" value of this process can be modified by writing, e.g. =(enum foo a (b 100) c d)=. In this example, the discriminant value of =c= is defined to be =101=.
 
-The discriminant values of a enum-type must be distinct.
+The discriminant values of an enum-type must be distinct.
 
 ** include
 The =include= statement temporary transfers the parsing process to the file specified by given path, if necessary.
 *** Example
 #+BEGIN_SRC neut
-(include "relative/path/from/this/file/to/some/file.neut")
+(include "core/free.neut")
 
-(include "relative/path/from/this/file/to/some/file.neut") ;; including an already included file; do nothing
+(include "some-library/some-file.neut")
 
-(include library "relative/path/from/library/dir/to/some/file.neut")
+(include "./relative/path/from/the/dir/path/of/this/file.neut")
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
@@ -555,7 +555,7 @@ The =include= statement temporary transfers the parsing process to the file spec
 *** Semantics
 When parsed, the =(include path)= statement transfers current parsing process to the parsing process of the file specified by the =path=. After the transferred parsing process is finished, the suspended remaining parsing process is resumed.
 
-The path is computed relative to the current file by default. The =(include library path)= statement can be used to set the base path of this path calculation to be the library path of Neut (i.e. =~/.local/share/neut/NEUT_VERSION/library=).
+The path is interpreted as a relative one, and is calculated using the current file's directory as the base path if the first character of the path is dot ("."). Otherwise, the base path of this path calculation is set to be the library path of Neut (i.e. =~/.local/share/neut/NEUT_VERSION/library=).
 
 If the file at the =path= is already included, this statement does nothing.
 
