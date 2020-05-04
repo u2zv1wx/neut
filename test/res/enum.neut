@@ -1,1 +1,0 @@
-(constant is-enum (pi ((_ type)) type))

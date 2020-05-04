@@ -1,9 +1,0 @@
-(let unused-var-1 (i64 10))
-
-(definition unused-var-2 (i64 10))
-
-(definition unused-var-3 () (i64 10))
-
-(definition unused-var-4 ((_ tau)) tau)
-
-(definition unused-var-5 ([_ tau]) tau)
