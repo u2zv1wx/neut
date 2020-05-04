@@ -29,12 +29,14 @@
 
 (let witness-functor
   (witness (functor identity)
-    (functor.new identity
+    (functor.new
+      identity
       identity.map)))
 
 (let witness-monad
   (witness (monad identity)
-    (monad.new identity
+    (monad.new
+      identity
       identity.witness-functor
       identity.return
       identity.bind)))
