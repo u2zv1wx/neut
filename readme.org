@@ -71,7 +71,7 @@ Here I will firstly show an "inefficient" version of some code pieces. After tha
 Note that the code here is written in a rather verbose way to make things as explicit as possible to the readers. You don't have to be that verbose in actual code.
 
 The following code prints the string ="a"= for the three times:
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (with identity.bind
   (let str "a")          ;; define a variable `str : string` with content `"hello"`
   (let _ (string.print str)) ;; you can also write just `(print str)` instead of `(let _ (print str))`
@@ -104,7 +104,7 @@ This is the basics of the behavior of resource copying/discarding in Neut. As yo
 
 ** Manual Optimization via Borrowing
 The point of the workaround is nothing special: If those copying/discarding result from using variables in non-linear way, we just have to use those variables in linear way. Let's go back to the first example code:
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (with identity.bind
   (let str "a")
   (let _ (string.print str))
@@ -162,7 +162,7 @@ let _ := string.print &str;
 #+END_SRC
 
 And this is the notation that is implemented in Neut. Indeed, the following is a valid code of Neut:
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (with identity.bind
   (let str "a")
   (let _ (string.print &str))
@@ -267,7 +267,7 @@ This is how Neut controls resources efficiently, without modifying the type syst
 
 ** Automatic Optimization via malloc/free Cancellation
 Neut's static, type-based malloc/free determination enables not only the "manual" optimization we have just seen, but also another "automatic" optimization. Remember the first example:
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (with identity.bind
   (let str "a")
   (let _ (string.print str))
@@ -370,7 +370,7 @@ A program of Neut is a list of statements. Each statement is one of the followin
 The =constant= statement declares an external constant.
 
 *** Example
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (constant os.file-descriptor tau)
 
 (constant os.stdin os.file-descriptor)
@@ -388,7 +388,7 @@ When evaluated, the =(constant x t)= statement modifies the state of the compile
 The =define= / =let= statement evaluates given term and binds the result to a variable.
 
 *** Example
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (let foo (i64 10)) ;; define a variable `foo` to be `10`
 
 (i64.print foo) ;; ~> 10 (this is equivalent to `(let _ (i64.print foo))`)
@@ -435,7 +435,7 @@ The =define= / =let= statement evaluates given term and binds the result to a va
 (define)
 #+END_SRC
 *** Syntax
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (let (ID TERM) TERM)
 
 (let ID TERM)
@@ -467,7 +467,7 @@ If user input is not parsed as a statement when it is supposed to be, the compil
 The =ensure= statement fetches the content of the specified URL for later use.
 
 *** Example
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 ;; extracts the content of URL into ~/.local/share/neut/NEUT_VERSION/library/some-library/0.2.0.0
 (ensure some-library/0.2.0.0
   "https://example.com/some-library-0.2.0.0.tar.gz")
@@ -490,7 +490,7 @@ Archives specified in =(ensure path "URL")= is intended to be ones created via t
 ** enum
 The =enum= statement declares a new enum-type and its values.
 *** Example
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (enum choice left right) ;; defines choice : tau, choice.left : choice, and choice.right : choice
 
 (let x choice.left)
@@ -539,7 +539,7 @@ The discriminant values of a enum-type must be distinct.
 ** include
 The =include= statement temporary transfers the parsing process to the file specified by given path, if necessary.
 *** Example
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (include "relative/path/from/this/file/to/some/file.neut")
 
 (include "relative/path/from/this/file/to/some/file.neut") ;; including an already included file; do nothing
@@ -547,7 +547,7 @@ The =include= statement temporary transfers the parsing process to the file spec
 (include library "relative/path/from/library/dir/to/some/file.neut")
 #+END_SRC
 *** Syntax
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (include "PATH_TO_FILE")
 
 (include library "PATH_TO_FILE")
@@ -566,7 +566,7 @@ Cyclic inclusion is invalid.
 ** inductive
 The =inductive= statement defines an inductive type, its introduction rules (constructors), and its elimination rule (fold).
 *** Example
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (inductive nat ()
   (zero () (nat))
   (succ (_ (nat)) (nat)))
@@ -591,7 +591,7 @@ The =inductive= statement defines an inductive type, its introduction rules (con
 (i64.print (length xs)) ;; ~> 2
 #+END_SRC
 *** Syntax
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (inductive LEAF ((LEAF TREE) ... (LEAF TREE))
   (LEAF ((LEAF TREE) ... (LEAF TREE))
     TREE)
@@ -617,7 +617,7 @@ The =inductive= statement defines an inductive type, its introduction rules (con
 #+END_SRC
 *** Semantics
 When parsed, the =inductive= statement is translated into =let= statements that defines (1) the inductive type, (2) the introduction rules (or the constructors of the inductive type), and (3) the elimination rule (or the "fold" of the type). For example, consider the following =inductive= statement:
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (inductive list ((a tau))
   (nil ()
     (list a))
@@ -642,7 +642,7 @@ Nested inductive type is allowed if and only if the outer, already-defined induc
 ** introspect
 The =introspect= statement introspects the state of the compiler and selects statements by those information.
 *** Example
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (introspect OS
   (linux
     (include library "constant/linux.neut"))
@@ -650,7 +650,7 @@ The =introspect= statement introspects the state of the compiler and selects sta
     (include library "constant/darwin.neut")))
 #+END_SRC
 *** Syntax
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (introspect COMPILE_TIME_VAR (ID STATEMENT ... STATEMENT) ... (ID STATEMENT ... STATEMENT))
 #+END_SRC
 *** Semantics
@@ -668,7 +668,7 @@ The =var= must be a valid compile-time variable. Valid compile-time variables an
 ** keyword/notation
 The =keyword= statement registers a keyword for notation. The =notation= statement registers a notation.
 *** Example
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (keyword λ)
 
 (notation λ pi-introduction)
@@ -681,7 +681,7 @@ The =keyword= statement registers a keyword for notation. The =notation= stateme
     (bool.false e2)))
 #+END_SRC
 *** Syntax
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (keyword LEAF)
 
 (notation TREE TREE)
@@ -730,7 +730,7 @@ Given this step-expansion, the macro-expansion proceeds as follows. Take =t= to 
 ** record
 The =record= statement creates a record type, its elimination rules (destructors), and its introduction rule.
 *** Example
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (record my-record ((a tau))
   (item-1
     a)
@@ -751,7 +751,7 @@ The =record= statement creates a record type, its elimination rules (destructors
 (i64.print (my-record.item-2 i64 item)) ;; ~> 20
 #+END_SRC
 *** Syntax
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (inductive LEAF ((LEAF TREE) ... (LEAF TREE))
   (LEAF TREE)
   ...
@@ -759,7 +759,7 @@ The =record= statement creates a record type, its elimination rules (destructors
 #+END_SRC
 *** Semantics
 When parsed, the =record= statement is translated into =let= statements that defines (1) the record type, (2) the elimination rules (or the destructors of the record type), and (3) the introduction rule. For example, consider the following =record= statement:
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (record my-record ((a tau))
   (item-1
     a)
@@ -778,7 +778,7 @@ Given this statement, the compiler generates [[#definelet][let]] statements that
    - =my-record.new : (Π ((a tau) (_ a) (_ i64) (_ top)) (my-record a))=
 
 Internally, every record statement is translated into the corresponding [[#inductive][inductive]] statement. For example, given the =record= statement above, the compiler translates it into the following =inductive= statement:
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (inductive my-record ((a tau))
   (new
     ((item-1 a)
@@ -787,7 +787,7 @@ Internally, every record statement is translated into the corresponding [[#induc
     (my-record a)))
 #+END_SRC
 The compiler then processes this statement in the same way ordinary =inductive= statement, generating the record type =my-record= and the introduction rule =my-record.new=, and the elimination rule (as an inductive type) =my-record.fold=. After that, the compiler automatically generates destructors from this definition via =my-record.fold=. For example, the generated definition of =my-record.item-1= is as follows:
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (define my-record.item-1 ((a tau) (record-value (my-record a)))
   (my-record.fold a record-value
     (lambda () a)
@@ -798,7 +798,7 @@ The other destructors are defined similarly.
 ** use/unuse
 The =use= / =unuse= statement registers a prefix for name resolution.
 *** Example
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (let foo.bar.buz (i64 10))
 
 ;; (i64.print buz)      ;; ~> undefined variable: `buz`
@@ -824,7 +824,7 @@ The =use= / =unuse= statement registers a prefix for name resolution.
 (i64.print foo.bar.buz) ;; ~> 10
 #+END_SRC
 *** Syntax
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (use LEAF)
 
 (unuse LEAF)
@@ -838,7 +838,7 @@ The prefix environment modifies [[#upsilon][how the compiler parses a variable]]
 
 ** section/end
 *** Example
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (section pohe)
 
 (let foo (i64 10))
@@ -870,14 +870,14 @@ The prefix environment modifies [[#upsilon][how the compiler parses a variable]]
 (i64.print pohe.qux.bar) ;; ~> 20
 #+END_SRC
 *** Syntax
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (section LEAF)
 
 (end LEAF)
 #+END_SRC
 *** Semantics
 The list of statement
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (section FOO)
 (let x1 e1)
 ...
@@ -885,7 +885,7 @@ The list of statement
 (end FOO)
 #+END_SRC
 is equivalent to:
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (use FOO)
 (let FOO.x1 e1)
 ...
@@ -906,7 +906,7 @@ A term of Neut is a tree of inference rules. Each rule is one of the following r
 ** tau
 The =tau= term is the type of types.
 *** Example
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (define id ((a tau) (x a)) x)
 
 (id i64 10)
@@ -914,7 +914,7 @@ The =tau= term is the type of types.
 (id tau tau) ;; valid since `tau : tau`
 #+END_SRC
 *** Syntax
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 tau
 #+END_SRC
 *** Semantics
@@ -929,7 +929,7 @@ The universe hierarchy is intentionally removed from the source language since t
 ** upsilon
 The =upsilion= term is a term that represents a variable.
 *** Example
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (let x (i64 10))
 
 ;; "explicit" notation
@@ -939,7 +939,7 @@ The =upsilion= term is a term that represents a variable.
 (i64.print x)           ;; ~> 10
 #+END_SRC
 *** Syntax
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (upsilon LEAF)
 LEAF
 #+END_SRC
@@ -956,7 +956,7 @@ If the name of a variable is "_", the compiler automatically generates a fresh v
 ** pi
 The =pi= term is a term that represents the universal quantification.
 *** Example
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 ;; unary pi-introduction
 (let (f2 (pi (x i64) i64))  ;; f2 : Pi (x : i64). i64  (i.e. f2 receives a term of type i64, and returns a term of type i64)
   (pi-introduction ((x i64)) x))
@@ -984,14 +984,14 @@ The =pi= term is a term that represents the universal quantification.
 (i64.print (f3 1 2))
 #+END_SRC
 *** Syntax
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (pi ((x1 A1) ... (xn An)) B)
 (pi-introduction ((x1 A1) ... (xn An)) e)
 (pi-elimination e e1 ... en)
 (e e1 ... en)
 #+END_SRC
 *** Semantics
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (pi-elimination e e1 ... en)
 ~> (pi-elimination v v1 ... vn)  [i.e. reduce e and ei to values v and vi, from left to right]
 
@@ -1006,7 +1006,7 @@ If a tree =(e e1 ... en)= is not parsed into any other terms, the tree is parsed
 Note that the arguments of a lambda abstraction is generalized from unary to n-ary. This enables the compiler to emit more performant code when a lambda abstraction receives multiple arguments; Without that generalization, the argument must be represented as a tuple, discarding the possibility to pass the arguments of a function using multiple registers.
 
 Some additional notations for pi are defined by default:
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (keyword forall)
 
 (notation forall pi)
@@ -1040,7 +1040,7 @@ Some additional notations for pi are defined by default:
 These are in =core/notation.neut=.
 
 Incidentally, I personally recommend you to use the =witness= notation above when defining a function to write the resulting type of the function explicitly. For example, the code
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (define fact ((x i64))
   (witness i64
     (if (icmp-sle-i64 x 0)
@@ -1048,7 +1048,7 @@ Incidentally, I personally recommend you to use the =witness= notation above whe
       (mul-i64 x (fact (sub-i64 x 1))))))
 #+END_SRC
 is preferred to:
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (define fact ((x i64))
   (if (icmp-sle-i64 x 0)
     1
@@ -1058,7 +1058,7 @@ is preferred to:
 ** fix
 The =fix= term is a term that realizes recursion.
 *** Example
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (let fact
   (fix self ((x i64))
     (if (icmp-sle-i64 x 0) ;; i.e. if x <= 0
@@ -1066,13 +1066,13 @@ The =fix= term is a term that realizes recursion.
       (mul-i64 x (self (sub-i64 x 1))))))
 #+END_SRC
 *** Syntax
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (fix LEAFPLUS (LEAFPLUS ... LEAFPLUS) TREE)
 
 LEAFPLUS ::= LEAF | (LEAF TREE)
 #+END_SRC
 *** Semantics
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (pi-elimination (fix self ((x1 A1) ... (xn An)) e) v1 ... vn)
 ~> e {x1 := v1,
       ...,
@@ -1082,11 +1082,11 @@ LEAFPLUS ::= LEAF | (LEAF TREE)
 ** constant
 The =constant= rule is for external constants. Proof-theoretically, this can be understood as admitted axioms.
 *** Example
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (constant os.fork)
 #+END_SRC
 *** Syntax
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (constant LEAF)
 LEAF
 #+END_SRC
@@ -1098,13 +1098,13 @@ If a leaf is declared to be a constant using the [[#constant][constant]] stateme
 ** int
 The =int= term is the one that represents the integer type in LLVM.
 *** Example
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (i64 1)
 (i32 10)
 (i2 100)
 #+END_SRC
 *** Syntax
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 ;; the integer type i{n}
 i{n} [where n is one of 1, 2, ..., 64]
 
@@ -1126,14 +1126,14 @@ An integer without explicit type information is overloaded; it's type is firstly
 ** float
 The =float= term is the one that represents the float type in LLVM.
 *** Example
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (f16 3.8)
 (f32 9.22888)
 (f64 1.23456789)
 (fadd-f64 1.23456 7.89)
 #+END_SRC
 *** Syntax
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 ;; the float type f{n}
 f{n}   [where n is one of 16, 32, 64]
 
@@ -1154,12 +1154,12 @@ The =enum= term represents enumeration as in other language.
 *** Example
 See the example in [[#enum][the section about the enum statement]].
 *** Syntax
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (enum-introduction LEAF)
 LEAF [where this LEAF is already defined to be an enum value]
 #+END_SRC
 *** Semantics
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (enum-elimination (enum-introduction c)
   (c1 e1)
   ...
@@ -1169,7 +1169,7 @@ LEAF [where this LEAF is already defined to be an enum value]
 ** array
 The =array= term represents the array in LLVM.
 *** Example
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 ;; float array
 (let _
   (array-introduction f16 3.28 2.14 2.0 9.82))
@@ -1224,7 +1224,7 @@ You won't use =array-elimination= in actual code; You would use the constant =ar
 ** struct
 The =array= term represents the struct in LLVM.
 *** Example
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (let st
   (struct-introduction
     (f16 3.8)
@@ -1243,7 +1243,7 @@ The =array= term represents the struct in LLVM.
     (i64.add z w))) ;; ~> 40
 #+END_SRC
 *** Syntax
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 ;; the struct type
 (struct LOWTYPE ... LOWTYPE)
 
@@ -1270,7 +1270,7 @@ The struct type is intended to be used for implementation of interfaces of sysca
 ** case
 =case= is for so-called pattern-matching (the composition =µF -> FµF -> A=).
 *** Example
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (inductive bottom ())
 
 (define ex-falso-quodlibet ((a tau) (x (bottom)))
@@ -1292,14 +1292,14 @@ The struct type is intended to be used for implementation of interfaces of sysca
         (i64.add 1 (my-nat-to-i64 m))))))
 #+END_SRC
 *** Syntax
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (case TREE
   ((LEAF LEAF ... LEAF) TREE)
   ...
   ((LEAF LEAF ... LEAF) TREE))
 #+END_SRC
 *** Semantics
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (case (ci v1i ... vn{i}i)
   ((c1 x11 ... xn{1}1) e1)
    ...
@@ -1311,7 +1311,7 @@ The struct type is intended to be used for implementation of interfaces of sysca
 ** hole
 The =hole= term is a placeholder that should be inferred.
 *** Example
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (define id ((a tau) (x a)) x)
 
 (enum foo value)
@@ -1323,7 +1323,7 @@ The =hole= term is a placeholder that should be inferred.
 (id hole foo.value) ;; ~> foo.value (the `hole` part is inferred to be `foo`)
 #+END_SRC
 *** Syntax
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 hole
 #+END_SRC
 *** Semantics
@@ -1332,7 +1332,7 @@ The =hole= term doesn't have any operational semantics.
 The =hole= term can be used as a placeholder that must be resolved by the compiler using the constraints generated in its type inference procedure.
 
 If the type is not determined, the compiler raises an error; For example, the type of =x= in the following code is not determined:
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (let x 10)
 #+END_SRC
 since the =10= cannot be determined to be =i32=, =i16=, or =i64=, etc.
@@ -1340,7 +1340,7 @@ since the =10= cannot be determined to be =i32=, =i16=, or =i64=, etc.
 ** sigma
 The =sigma= term is a term that represents the existential quantification.
 *** Example
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 ;; binary sigma-intro without dependence
 (let pair
   (sigma-introduction (i64 2) (lambda ((x tau)) x)))
@@ -1356,7 +1356,7 @@ The =sigma= term is a term that represents the existential quantification.
   (sigma-introduction)
 #+END_SRC
 *** Syntax
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (sigma ((x1 A1) ... (xn An)) B)
 
 (sigma-introduction e1 ... en)
@@ -1395,7 +1395,7 @@ A sigma-type without dependence is the familiar product type; =(sigma ((_ A1) ..
 ** with
 =with= is a do-notation with the bind operation made explicit.
 *** Example
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (with identity.bind
   (let str "foo")
   (let _ (string.print &str))
@@ -1415,7 +1415,7 @@ A sigma-type without dependence is the familiar product type; =(sigma ((_ A1) ..
   len)
 #+END_SRC
 *** Syntax
-#+BEGIN_SRC scheme
+#+BEGIN_SRC neut
 (with TREE TREE ... TREE)
 #+END_SRC
 *** Semantics
