@@ -7,8 +7,6 @@
   ?id
 
   (i64.print (id i64 10))
-
-  ;; (attribute id (implicit 0))
   )
 
 ?id

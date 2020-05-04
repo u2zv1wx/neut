@@ -16,8 +16,6 @@
   (witness B
     (unsafe.cast A B x)))
 
-;; (attribute unsafe.cast-to (implicit 0))
-
 
 ;; (define admit-implicit ([a tau])
 ;;   (os.exit a 1))
@@ -26,8 +24,6 @@
   ((a tau))
   (witness a
     (os.exit a 1)))
-
-;; (attribute admit-internal (implicit 0))
 
 (provide admit-internal)
 

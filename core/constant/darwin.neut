@@ -18,9 +18,6 @@
      (len i64))
     (product (array A i8) i64)))
 
-
-;; (attribute read (implicit 0))
-
 (constant write
   (pi
     ((A i64)
@@ -28,8 +25,6 @@
      (str (array A i8))
      (len i64))
     (product (array A i8) i64)))
-
-;; (attribute write (implicit 0))
 
 (constant exit
   (pi
@@ -44,8 +39,6 @@
      (flags i64)
      (mode i64))
     (product (array A i8) file-descriptor)))
-
-;; (attribute open (implicit 0))
 
 (constant close
   (pi

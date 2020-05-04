@@ -76,8 +76,6 @@ data Env
         --
         -- elaborate
         --
-        -- const ~> (index of implicit arguments of the const)
-        -- impEnv :: IntMap.IntMap [Int],
         weakTypeEnv :: IntMap.IntMap WeakTermPlus,
         constTypeEnv :: Map.HashMap T.Text TermPlus,
         constraintEnv :: [PreConstraint],
@@ -131,7 +129,6 @@ initialEnv =
       weakTypeEnv = IntMap.empty,
       typeEnv = IntMap.empty,
       constTypeEnv = Map.empty,
-      -- impEnv = IntMap.empty,
       codeEnv = Map.empty,
       chainEnv = IntMap.empty,
       llvmEnv = Map.empty,

@@ -31,16 +31,12 @@
       (lambda (val)
         (right * * (f val))))))
 
-;; (attribute map (implicit 0 1 2))
-
 (define return
   ((e tau)
    (a tau)
    (x a))
   (witness (coproduct e a)
     (right * * x)))
-
-;; (attribute return (implicit 0 1))
 
 (define bind
   ((e tau)
@@ -57,16 +53,12 @@
       (lambda (val)
         (k val)))))
 
-;; (attribute bind (implicit 0 1 2))
-
 (define throw
   ((e tau)
    (a tau)
    (err e))
   (witness (coproduct e a)
     (left * * err)))
-
-;; (attribute throw (implicit 0 1))
 
 (define either
   ((e tau))

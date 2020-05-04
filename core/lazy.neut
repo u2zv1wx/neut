@@ -18,9 +18,6 @@
 ;;     (lazy.unfold a
 ;;       (lambda () x))))
 
-;; (attribute thunk
-;;   (implicit 0))
-
 (define force ((a tau) (x (pi () a)))
   (x))
 
@@ -34,8 +31,5 @@
 ;;         a)
 ;;       (lambda (acc)
 ;;         (acc)))))
-
-;; (attribute force
-;;   (implicit 0))
 
 (end lazy)

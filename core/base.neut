@@ -12,8 +12,6 @@
     (lambda ((x a))
       (g (f x)))))
 
-;; (attribute compose (implicit 0 1 2))
-
 ;; (define let-bind ((a tau) (b tau) (x a) (k (hom a b)))
 ;;   (witness b
 ;;     (k x)))

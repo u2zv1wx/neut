@@ -54,8 +54,6 @@
       (lambda (y)
         y))))
 
-;; (attribute from-option (implicit 0))
-
 (define witness-functor
   (witness (functor option)
     (functor.new

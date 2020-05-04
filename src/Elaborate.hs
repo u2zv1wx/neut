@@ -63,11 +63,6 @@ elaborateStmt stmt =
         note m $ "verification succeeded (" <> T.pack (showFloat' sec) <> " seconds)"
       elaborateStmt cont
 
--- WeakStmtImplicit x is : cont -> do
---   ienv <- gets impEnv
---   modify (\env -> env {impEnv = IntMap.insertWith (++) (asInt x) is ienv})
---   elaborateStmt cont
-
 elaborateLet ::
   Meta ->
   Meta ->
@@ -213,69 +208,10 @@ elaborate' term =
       e' <- elaborate' e
       whenCheck $ do
         t' <- elaborate' t
-        case (getArgLen t', isUpsilonOrConst e') of
-          (Just len, True) -> do
-            (is, e'') <- getImpInfo e'
-            let form = toText (weaken e'') : showFormArgs 0 is [0 .. len - 1]
-            let formStr = inParen $ showItems form
-            note m $ toText (weaken t') <> "\n-\n" <> formStr
-          _ ->
-            note m $ toText (weaken t')
+        note m $ toText (weaken t')
       return e'
     (_, WeakTermErase _ e) ->
       elaborate' e
-
-isUpsilonOrConst :: TermPlus -> Bool
-isUpsilonOrConst term =
-  case term of
-    (_, TermUpsilon _) ->
-      True
-    (_, TermConst _) ->
-      True
-    _ ->
-      False
-
-getImpInfo :: TermPlus -> WithEnv ([Int], TermPlus)
-getImpInfo term =
-  return ([], term)
-
--- case term of
---   -- (m, TermUpsilon x)
---   --   | not (metaIsExplicit m) -> do
---   --     ienv <- gets impEnv
---   --     case IntMap.lookup (asInt x) ienv of
---   --       Just is ->
---   --         return (is, term)
---   --       Nothing ->
---   --         return ([], term)
---   --   | otherwise ->
---   --     return ([], (m, TermUpsilon (I ("@" <> asText x, asInt x))))
---   _ ->
---     return ([], term)
-
-getArgLen :: TermPlus -> Maybe Int
-getArgLen term =
-  case term of
-    (_, TermPi xts _) ->
-      return $ length xts
-    _ ->
-      Nothing
-
-showFormArgs :: Int -> [Int] -> [Int] -> [T.Text]
-showFormArgs k impList idxList =
-  case idxList of
-    [] ->
-      []
-    [i]
-      | i `elem` impList ->
-        ["*"]
-      | otherwise ->
-        ["#" <> T.pack (show k)]
-    (i : is)
-      | i `elem` impList ->
-        "*" : showFormArgs k impList is
-      | otherwise ->
-        "#" <> T.pack (show k) : showFormArgs (k + 1) impList is
 
 elaboratePlus :: (Meta, a, WeakTermPlus) -> WithEnv (Meta, a, TermPlus)
 elaboratePlus (m, x, t) = do

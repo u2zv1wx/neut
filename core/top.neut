@@ -11,5 +11,3 @@
 ;;     (with identity.bind
 ;;       x
 ;;       top.unit)))
-
-;; (attribute execute (implicit 0))

@@ -50,8 +50,6 @@
         (let tmp (f x))
         (g tmp)))))
 
-;; (attribute monad.compose (implicit 0 1 2 3))
-
 (define when
   ((f (hom tau tau))
    (M (monad f))
@@ -61,8 +59,6 @@
     (if condition
       comp
       ((return f M) top top.unit))))
-
-;; (attribute monad.when (implicit 0))
 
 (provide monad.compose)
 

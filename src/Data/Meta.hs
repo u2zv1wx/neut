@@ -18,8 +18,7 @@ data Meta
   = Meta
       { metaFileName :: Path Abs File,
         metaLocation :: Loc,
-        metaIsReducible :: Bool,
-        metaIsExplicit :: Bool
+        metaIsReducible :: Bool
       }
 
 -- required to derive the eqality on WeakTerm
@@ -52,8 +51,7 @@ supMeta m1 m2 =
   Meta
     { metaFileName = supFileName m1 m2,
       metaLocation = supLocation m1 m2,
-      metaIsReducible = metaIsReducible m1 && metaIsReducible m2,
-      metaIsExplicit = metaIsExplicit m1 || metaIsExplicit m2
+      metaIsReducible = metaIsReducible m1 && metaIsReducible m2
     }
 
 supFileName :: Meta -> Meta -> Path Abs File
@@ -73,8 +71,7 @@ newMeta l c path =
   Meta
     { metaFileName = path,
       metaLocation = (0, l, c),
-      metaIsReducible = True,
-      metaIsExplicit = False
+      metaIsReducible = True
     }
 
 type PosInfo =

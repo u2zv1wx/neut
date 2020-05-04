@@ -69,8 +69,6 @@
       (λ (h _)
         (some a h)))))
 
-;; (attribute head (implicit 0))
-
 (define length
   ((a tau)
    (xs (list a)))
@@ -82,8 +80,6 @@
         0)
       (λ (_ acc)
         (add-i64 1 (acc))))))
-
-;; (attribute length (implicit 0))
 
 (define append
   ((a tau)
@@ -98,8 +94,6 @@
       (λ (z acc)
         (cons a z acc)))))
 
-;; (attribute append (implicit 0))
-
 (define is-null
   ((a tau)
    (xs (list a)))
@@ -111,9 +105,6 @@
         true)
       (λ (_ _)
         false))))
-
-
-;; (attribute is-null (implicit 0))
 
 (define map
   ((a tau)
@@ -129,16 +120,11 @@
       (λ (y acc)
         (cons b (f y) acc)))))
 
-
-;; (attribute map (implicit 0 1))
-
 (define return
   ((a tau)
    (x a))
   (witness (list a)
     (list.new x)))
-
-;; (attribute return (implicit 0))
 
 (define concatenate
   ((a tau)
@@ -152,8 +138,6 @@
       (λ (xs acc)
         (append * xs (acc))))))
 
-;; (attribute concatenate (implicit 0))
-
 (define bind
   ((a tau)
    (b tau)
@@ -161,8 +145,6 @@
    (k (hom a (list b))))
   (witness (list b)
     (concatenate * (map * * k m))))
-
-;; (attribute bind (implicit 0 1))
 
 ;; (provide head)
 

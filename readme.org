@@ -29,7 +29,6 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#summary][Summary]]
 - [[#installation][Installation]]
 - [[#syntax-and-semantics-of-statements][Syntax and Semantics of Statements]]
-  - [[#attribute][attribute]]
   - [[#constant][constant]]
   - [[#definelet][define/let]]
   - [[#ensure][ensure]]
@@ -368,36 +367,6 @@ A program of Neut is a list of statements. Each statement is one of the followin
 
 # Every example in this section is a valid program in itself. You can [[#build][build]] and run the code to check the behavior.
 
-** attribute
-The =attribute= statement modifies the state of the compiler so that given identifier has given attributes.
-
-*** Example
-#+BEGIN_SRC scheme
-(define id ((a tau) (x a)) x)
-
-(id top top.unit) ;; ~> top.unit
-
-;; (id top.unit) ;; ~> type error
-
-(attribute id (implicit 0)) ;; => Set the first argument of `id` to be implicit
-
-;; (id top top.unit) ;; ~> type error
-
-(id top.unit) ;; ~> {translated into `(id hole top.unit)`} ~> results in top.unit
-
-(@id top top.unit) ;; ~> top.unit
-#+END_SRC
-*** Syntax
-#+BEGIN_SRC neut
-(attribute ID ATTR)
-#+END_SRC
-*** Semantics
-When evaluated, the =(attribute x attr)= statement modifies the state of compiler so that the [[#upsilon][variable]] =x= has specified attribute =attr=. Currently, the only attribute that can be specified is =(implicit NUM ... NUM)=.
-
-If the implicit information of a variable =x= is set to be =(implicit NUM ... NUM)=, the compiler inserts [[#hole][holes]] at the specified indices of the arguments of [[#pi][function-application]] =(x e1 ... en)=.
-
-If a variable is prefixed by =@= when its used, its implicit information is ignored.
-
 ** constant
 The =constant= statement declares an external constant.
 
@@ -659,10 +628,10 @@ When parsed, the =inductive= statement is translated into =let= statements that 
 Given this statement, the compiler generates [[#definelet][let]] statements that defines the followings:
 1. The inductive type =list : Pi (a : tau). tau=
 2. The introduction rules (constructors) of the type:
-   - =list.nil : Pi (a : tau). list a=, where the =a : tau= is set to be [[#attribute][implicit]].
-   - =list.cons : Pi (a : tau, _ : a, _ : list a). list a=, where the =a : tau= is set to be [[#attribute][implicit]].
+   - =list.nil : Pi (a : tau). list a=
+   - =list.cons : Pi (a : tau, _ : a, _ : list a). list a=
 3. The elimination rule of the type:
-   - =list.fold : (Π ((a tau) (_ (list a)) (list (arrow (tau) tau)) (_ (arrow () (F a))) (_ (arrow (a (F a)) (F a)))) (F a))=, where the =a : tau= is set to be [[#attribute][implicit]].
+   - =list.fold : (Π ((a tau) (_ (list a)) (list (arrow (tau) tau)) (_ (arrow () (F a))) (_ (arrow (a (F a)) (F a)))) (F a))=
 The elimination rule might seem intimidating. In the actual code, however, you don't have to use that generated term since the rule [[#case][case]] can be used in harmony with the rule [[#fix][fix]] to achieve the expressiveness of =fold=, as in the function =length= in the example code above.
 
 When used in the domain of a constructor, the inductive type being defined must be occurred covariantly.

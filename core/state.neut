@@ -65,8 +65,3 @@
       (state.bind s))))
 
 (end state)
-
-
-;; (@admit i64 1)
-
-;; (os.exit i64 ((@state.foo i64 10)))
