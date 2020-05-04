@@ -14,7 +14,6 @@
   (leaf
     ((_ a))
     (free-internal g a))
-  ;; left Kan extension
   (node
     ((b tau)
      (_ (g b))
