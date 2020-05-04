@@ -86,8 +86,11 @@ getDataDir = do
 
 isSourceFile :: Path Abs File -> IO Bool
 isSourceFile path =
-  isSourceFile' path `catch` \(_ :: PathException) ->
-    return False
+  isSourceFile' path `catch` returnFalse
+
+returnFalse :: PathException -> IO Bool
+returnFalse _ =
+  return False
 
 isSourceFile' :: Path Abs File -> IO Bool
 isSourceFile' path = do

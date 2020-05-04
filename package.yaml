@@ -6,11 +6,10 @@ author:              "u2zv1wx"
 maintainer:          "u2zv1wx@protonmail.ch"
 
 extra-source-files:
-  - readme.org
+- readme.org
 
 default-extensions:
 - OverloadedStrings
-- ScopedTypeVariables
 
 dependencies:
 - ansi-terminal

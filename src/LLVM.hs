@@ -568,4 +568,8 @@ commConv x llvm cont2 =
 
 lookupTypeEnvMaybe :: Meta -> T.Text -> WithEnv (Maybe TermPlus)
 lookupTypeEnvMaybe m x =
-  catch (lookupConstTypeEnv m x >>= \e -> return (Just e)) (\(_ :: Error) -> return Nothing)
+  catch (lookupConstTypeEnv m x >>= \e -> return (Just e)) returnNothing
+
+returnNothing :: Error -> WithEnv (Maybe a)
+returnNothing _ =
+  return Nothing

@@ -92,7 +92,11 @@ tryPlanList m planList =
     [plan] ->
       plan
     plan : rest ->
-      catch plan (\(_ :: Error) -> tryPlanList m rest)
+      catch plan $ tryPlanList' m rest
+
+tryPlanList' :: Meta -> [WithEnv a] -> Error -> WithEnv a
+tryPlanList' m rest _ =
+  tryPlanList m rest
 
 deleteMin :: WithEnv ()
 deleteMin =

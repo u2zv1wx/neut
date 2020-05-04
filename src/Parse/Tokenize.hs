@@ -31,8 +31,9 @@ tokenize input = do
   let env = TEnv {text = input, line = 1, column = 1, filePath = path}
   resultOrError <- liftIO $ try $ runStateT (skip' >> program []) env
   case resultOrError of
-    Left (err :: Error) ->
-      throw err
+    Left err ->
+      -- Left (err :: Error) ->
+      throw (err :: Error)
     Right (result, _) ->
       return result
 
@@ -183,13 +184,17 @@ sepEndBy f g =
 
 sepEndBy' :: Tokenizer (Either [a] a) -> Tokenizer () -> [a] -> Tokenizer [a]
 sepEndBy' f g acc = do
-  itemOrResult <- catch f (\(_ :: Error) -> return $ Left $ reverse acc)
+  itemOrResult <- catch f (finalize acc)
   g
   case itemOrResult of
     Right item ->
       sepEndBy' f g (item : acc)
     Left result ->
       return result
+
+finalize :: [a] -> Error -> Tokenizer (Either [a] a)
+finalize acc _ =
+  return $ Left $ reverse acc
 
 symbol :: Tokenizer T.Text
 symbol = do
