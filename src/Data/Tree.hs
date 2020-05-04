@@ -44,14 +44,3 @@ replaceMeta m tree =
     (mt, TreeNode ts) -> do
       let ts' = map (replaceMeta m) ts
       (supMeta m mt, TreeNode ts')
-
-substTree :: (T.Text, T.Text) -> TreePlus -> TreePlus
-substTree sub@(from, to) tree =
-  case tree of
-    (m, TreeLeaf x)
-      | x == from ->
-        (m, TreeLeaf to)
-      | otherwise ->
-        (m, TreeLeaf x)
-    (m, TreeNode ts) ->
-      (m, TreeNode $ map (substTree sub) ts)
