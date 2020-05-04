@@ -94,7 +94,7 @@ define i64 @main() {
   ;;   <memory deallocation for the string>
 }
 #+END_SRC
-The non-schematic, actual output can also be be found in the [[#llvm-ir-for-the-first-example][appendix]]. I chose not to write the IR here since the output is a bit long (59 lines).
+The non-schematic, actual output can also be found in the [[#llvm-ir-for-the-first-example][appendix]]. I chose not to write the IR here since the output is a bit long (59 lines).
 
 The resulting LLVM IR creates a string in memory, print it, and free it for the three times. In other words, the IR creates two copies of the original string. This is because the variable =str= is used for the three times; The content of a variable is copied to create n instances when the variable is used for the n times. If the variable isn't used at all (n = 0), the content of the variable is discarded (deallocated). If the variable is used exactly once, or linearly (n = 0), the content of the variable is used without any discarding/copying operation.
 
