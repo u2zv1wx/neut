@@ -214,14 +214,6 @@ parse' stmtTreeList =
                 return $ WeakStmtLet m' xt' e' : defList
               | otherwise ->
                 raiseSyntaxError m "(let LEAF TREE TREE) | (let TREE TREE)"
-            "verify"
-              | [e] <- rest -> do
-                e' <- adjustPhase e >>= macroExpand >>= interpret >>= discern
-                m' <- adjustPhase' m
-                defList <- parse' restStmtList
-                return $ WeakStmtVerify m' e' : defList
-              | otherwise ->
-                raiseSyntaxError m "(verify LEAF) | (verify library LEAF)"
             _ ->
               interpretAux headStmt restStmtList
         _ ->

@@ -15,12 +15,10 @@ import Data.Meta
 import qualified Data.Set as S
 import Data.Term
 import qualified Data.Text as T
-import Data.Time
 import Data.WeakTerm
 import Elaborate.Analyze
 import Elaborate.Infer
 import Elaborate.Synthesize
-import Numeric
 import Reduce.Term
 import Reduce.WeakTerm
 
@@ -48,16 +46,6 @@ elaborateStmt stmt =
       t'' <- reduceTermPlus <$> elaborate' t'
       insConstTypeEnv c t''
       elaborateStmt cont
-    WeakStmtVerify m e : cont -> do
-      whenCheck $ do
-        (e', _) <- infer e
-        e'' <- elaborate' e'
-        start <- liftIO getCurrentTime
-        _ <- normalize e''
-        stop <- liftIO getCurrentTime
-        let sec = realToFrac $ diffUTCTime stop start
-        note m $ "verification succeeded (" <> T.pack (showFloat' sec) <> " seconds)"
-      elaborateStmt cont
 
 elaborateLet ::
   Meta ->
@@ -83,10 +71,6 @@ cleanup =
 refine :: WithEnv ()
 refine =
   modify (\env -> env {substEnv = IntMap.map reduceWeakTermPlus (substEnv env)})
-
-showFloat' :: Float -> String
-showFloat' x =
-  showFFloat Nothing x ""
 
 elaborate' :: WeakTermPlus -> WithEnv TermPlus
 elaborate' term =

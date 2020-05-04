@@ -40,7 +40,6 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#record][record]]
   - [[#useunuse][use/unuse]]
   - [[#sectionend][section/end]]
-  - [[#verify][verify]]
 - [[#syntax-and-semantics-of-terms][Syntax and Semantics of Terms]]
   - [[#tau][tau]]
   - [[#upsilon][upsilon]]
@@ -900,33 +899,6 @@ In other words, the =section= / =end= statement
 
 Each =section= statement must be paired with an =end= statement with the corresponding name.
 
-** verify
-The =verify= statement normalizes given term.
-*** Example
-#+BEGIN_SRC scheme
-(verify ((λ ((x tau)) x) top)) ;; ~> verification succeeded (0.000027 seconds)
-
-;; a proof for: forall proposition A, A implies A
-(let some-theorem
-  (Π ((A tau))
-    (hom A A))
-  (assume (_)
-    (assume (x) x)))
-
-;; check if the proof of the theorem is weakly-normalizing
-(verify some-theorem) ;; ~> verification succeeded (0.000003 seconds)
-#+END_SRC
-*** Syntax
-#+BEGIN_SRC scheme
-(verify TERM)
-#+END_SRC
-*** Semantics
-The =verify= statement normalizes given term after type checking. The term is reduced so that it doesn't contain any redexes. If the term doesn't terminate, this normalization doesn't terminate.
-
-The evaluation strategy of the normalization process is the applicative order; the call-by-value strategy cannot be used here since it might "overlook" redexes in a lambda abstraction.
-
-This statement can be used to check if the given term is contained in the weakly-normalizing fragment of the CoC without the universe hierarchy.
-
 * Syntax and Semantics of Terms
 A term of Neut is a tree of inference rules. Each rule is one of the following rules described in this section.
  # Each statement is one of the following statements described in this section.
@@ -951,7 +923,8 @@ The =tau= rule doesn't have any operational semantics.
 *** Notes
 The =tau= type is the type of types. In other words, a term =e= is defined to be a type if and only if =e : tau=. Obviously, =tau= is also a type since =tau : tau= holds.
 
-The universe hierarchy is intentionally removed from the source language since (1) the source language already contains the =fix= operator, and (2) we can check if a term is subsumed in the weakly-normalizing fragment of the type system, which is consistent, by using the [[#verify][verify]] statement.
+The universe hierarchy is intentionally removed from the source language since the source language already contains the =fix= operator.
+# The universe hierarchy is intentionally removed from the source language since (1) the source language already contains the =fix= operator, and (2) we can check if a term is subsumed in the weakly-normalizing fragment of the type system, which is consistent, by using the [[#verify][verify]] statement.
 
 ** upsilon
 The =upsilion= term is a term that represents a variable.

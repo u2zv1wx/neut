@@ -94,13 +94,3 @@
 ;;   (switch b
 ;;     (bool:true e1)
 ;;     (bool:false e2)))
-
-;; (keyword verify)
-
-;; ;; (notation (verify e)
-;; ;;   (let _ e))
-
-;; (notation (verify e)
-;;   (statement
-;;     e
-;;     (string:print "verified")))
