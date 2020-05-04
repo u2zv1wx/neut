@@ -31,7 +31,7 @@ data Term
       [IdentPlus] -- [(x1, return t1), ..., (xn, return tn)] with xi : ti
       TermPlus
       TermPlus
-  | TermStruct [ArrayKind] -- e.g. (struct u8 u8 f16 f32 u64)
+  | TermStruct [ArrayKind]
   | TermStructIntro [(TermPlus, ArrayKind)]
   | TermStructElim [(Meta, Ident, ArrayKind)] TermPlus TermPlus
   deriving (Show)
