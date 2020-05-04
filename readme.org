@@ -70,7 +70,7 @@ Here I will firstly show an "inefficient" version of some code pieces. After tha
 
 Note that the code here is written in a rather verbose way to make things as explicit as possible to the readers. You don't have to be that verbose in actual code.
 
-The following code prints the string ="a"= for the three times:
+The following code prints the string "a" for the three times:
 #+BEGIN_SRC neut
 (with identity.bind
   (let str "a")          ;; define a variable `str : string` with content `"hello"`
