@@ -18,7 +18,6 @@ data Term
   | TermPiElim TermPlus [TermPlus]
   | TermFix IdentPlus [IdentPlus] TermPlus
   | TermConst T.Text
-  | TermCall Ident
   | TermInt IntSize Integer
   | TermFloat FloatSize Double
   | TermEnum T.Text
@@ -47,11 +46,6 @@ type SubstTerm =
 type IdentPlus =
   (Meta, Ident, TermPlus)
 
-data Stmt
-  = StmtReturn Meta
-  | StmtLet Meta IdentPlus TermPlus Stmt
-  deriving (Show)
-
 asUpsilon :: TermPlus -> Maybe Ident
 asUpsilon term =
   case term of
@@ -78,8 +72,6 @@ varTermPlus term =
     (_, TermFix (_, x, t) xts e) ->
       varTermPlus t ++ filter (/= x) (varTermPlus' xts [e])
     (_, TermConst _) ->
-      []
-    (_, TermCall _) ->
       []
     (_, TermInt _ _) ->
       []
@@ -142,8 +134,6 @@ substTermPlus sub term =
       let (xts', e') = substTermPlus'' sub' xts e
       (m, TermFix (mx, x, t') xts' e')
     e@(_, TermConst _) ->
-      e
-    e@(_, TermCall _) ->
       e
     e@(_, TermInt _ _) ->
       e
@@ -226,8 +216,6 @@ weaken term =
       (m, WeakTermFix (mx, x, t') xts' e')
     (m, TermConst x) ->
       (m, WeakTermConst x)
-    (m, TermCall x) ->
-      (m, WeakTermCall x)
     (m, TermInt size x) ->
       (m, WeakTermInt (m, WeakTermConst (showIntSize size)) x)
     (m, TermFloat size x) ->

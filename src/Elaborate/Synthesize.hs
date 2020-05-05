@@ -240,8 +240,6 @@ unravel term =
       return (m, WeakTermFix (mx, x', t) xts' e')
     (m, WeakTermConst x) ->
       return (m, WeakTermConst x)
-    (m, WeakTermCall x) ->
-      return (m, WeakTermCall x)
     (m, WeakTermHole h) -> do
       h' <- unravelHole h
       return (m, WeakTermHole h')

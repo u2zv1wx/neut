@@ -53,8 +53,6 @@ clarify' tenv term =
       retClosureFix tenv x fvs m mxts e'
     (m, TermConst x) ->
       clarifyConst tenv m x
-    (m, TermCall x) ->
-      return (m, CodePiElimDownElim (m, DataConst $ asText'' x) [])
     (m, TermInt size l) ->
       return (m, CodeUpIntro (m, DataInt size l))
     (m, TermFloat size l) ->
@@ -535,8 +533,6 @@ chainTermPlus tenv term =
       xs2 <- chainTermPlus' (insTypeEnv' (asInt x) t tenv) xts [e]
       return $ xs1 ++ filter (\(_, y, _) -> y /= x) xs2
     (_, TermConst _) ->
-      return []
-    (_, TermCall _) ->
       return []
     (_, TermInt _ _) ->
       return []

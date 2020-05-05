@@ -82,8 +82,6 @@ infer' ctx term =
       | otherwise -> do
         t <- lookupConstTypeEnv m x
         return ((m, WeakTermConst x), (m, snd $ weaken t))
-    (m, WeakTermCall _) ->
-      raiseCritical m "`infer'` for call"
     (m, WeakTermInt t i) -> do
       t' <- inferType' [] t -- ctx == [] since t' should be i64, i8, etc. (i.e. t must be closed)
       return ((m, WeakTermInt t' i), t')

@@ -18,7 +18,6 @@ data WeakTerm
   | WeakTermFix WeakIdentPlus [WeakIdentPlus] WeakTermPlus
   | WeakTermHole Ident
   | WeakTermConst T.Text
-  | WeakTermCall Ident
   | WeakTermInt WeakTermPlus Integer
   | WeakTermFloat WeakTermPlus Double
   | WeakTermEnum T.Text
@@ -106,8 +105,6 @@ varWeakTermPlus term =
       S.union set1 set2
     (_, WeakTermConst _) ->
       S.empty
-    (_, WeakTermCall _) ->
-      S.empty
     (_, WeakTermHole _) ->
       S.empty
     (_, WeakTermInt t _) ->
@@ -177,8 +174,6 @@ holeWeakTermPlus term =
     (_, WeakTermHole h) ->
       S.singleton h
     (_, WeakTermConst _) ->
-      S.empty
-    (_, WeakTermCall _) ->
       S.empty
     (_, WeakTermInt t _) ->
       holeWeakTermPlus t
@@ -253,8 +248,6 @@ substWeakTermPlus sub term =
       let (xts', e') = substWeakTermPlus'' sub' xts e
       (m, WeakTermFix (mx, x, t') xts' e')
     (_, WeakTermConst _) ->
-      term
-    (_, WeakTermCall _) ->
       term
     e1@(_, WeakTermHole x) ->
       case IntMap.lookup (asInt x) sub of
@@ -380,8 +373,6 @@ toText term =
       showCons ["μ", asText' x, argStr, toText e]
     (_, WeakTermConst x) ->
       x
-    (_, WeakTermCall x) ->
-      asText x
     (_, WeakTermHole (I (_, i))) ->
       "?M" <> T.pack (show i)
     (_, WeakTermInt _ a) ->
