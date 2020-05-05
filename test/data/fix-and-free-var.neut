@@ -1,0 +1,17 @@
+(no-implicit-core)
+
+(include "core/notation.neut")
+
+(include "core/top.neut")
+
+(enum bool (true 1) (false 0))
+
+(let app
+  (lambda ((_ (pi () top)))
+    top.unit))
+
+(let segfault
+  (fix self ()
+    (app (lambda () (self)))))
+
+(segfault)
