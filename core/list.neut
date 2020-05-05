@@ -146,6 +146,234 @@
   (witness (list b)
     (concatenate * (map * * k m))))
 
+;; 結果を区別するアプローチ
+;; (inductive foo ((_ choice) (a tau))
+;;   (nil
+;;     ()
+;;     (foo choice.right a))
+;;   (cons-for-nil
+;;     ((_ a)
+;;      (_ (foo choice.right a)))
+;;     (foo choice.left a))
+;;   (cons-for-cons
+;;     ((_ a)
+;;      (_ (foo choice.left a)))
+;;     (foo choice.left a))
+;;   (in
+;;     ((_ (foo choice.right a)))
+;;     (foo choice.left a)))
+
+
+;; ?foo.fold
+
+;; (define in
+;;   ((a tau)
+;;    (xs (foo choice.right a)))
+;;   (witness (foo choice.left a)
+;;     (unsafe.cast * * xs)))
+    ;; (foo.fold * a xs
+    ;;   (lambda (_ _)
+    ;;     (foo choice.left a))
+    ;;   (lambda ()
+    ;;     (foo.nil a))
+    ;;   (lambda (y ys)
+    ;;     admit))))
+
+;; (define foo-length
+;;   ((a tau)
+;;    (xs (foo choice.right a)))
+;;   (witness i64
+;;     (foo.fold choice.right a xs
+;;       (λ (i _)
+;;         (switch i
+;;           (choice.right i64)
+;;           (choice.left (foo choice.left a))))
+;;       (λ ()
+;;         (i64 0))
+;;       (λ ()
+;;         (foo.nil-cont *))
+;;       (λ (_ rest)
+;;         (add-i64 1 (foo-length a admit))
+;;         )
+;;       (λ (y rest)
+;;         (foo.cons-cont * y rest)))))
+;; (λ (acc)
+;;         (with identity.bind
+;;           ?acc
+;;           (foo.nil *))
+;;         ))))
+
+(inductive µ ((f (hom tau tau)))
+  (left-Kan-extension
+    ((b tau)
+     (_ (f b))
+     (_ (hom b (µ f))))
+    (µ f)))
+
+;; FµF -> µF
+(define µ.in
+  ((f (hom tau tau))
+   (x (f (µ f))))
+  (witness (µ f)
+    (µ.left-Kan-extension
+      f
+      (µ f)
+      x
+      (λ (y) y))))
+
+?µ.fold
+
+;; f bとb -> µ fがgivenで、これをf b -> f (µ f)にliftしたい、と。
+
+;; the universal property of a left kan extension
+;; µf -> FµF
+(define µ.out
+  ((f (hom tau tau))
+   (F (functor f))
+   (x (µ f)))
+  (witness (f (µ f))
+    (µ.fold f x
+      (λ (_)
+        (f (µ f)))
+      (λ (b v k)
+        ((functor.map f F)
+          b
+          (µ f)
+          (λ (value) (µ.in f (k value)))
+          v)))))
+
+;; µ.outはO(1)なのか？ だって、C @ (1, C @ (2, C @ (3, N @ ())))みたいな形ではないんだから。
+;; K @ (B, v, lam (x). (...))みたいな構造なのであり。
+;; vの全体にfunctor的にmapするから結局遅いのかな？
+(inductive list-f ((a tau) (r tau))
+  (nil ()
+    (list-f a r))
+  (cons ((_ a) (_ r))
+    (list-f a r)))
+
+(define L ((a tau))
+  (lambda (r) (list-f a r)))
+
+(define L.map ((a tau))
+  (witness (functor-form (L a))
+    (lambda (from to f (m ((L a) from)))
+      (witness ((L a) to)
+        (list-f.fold
+          a
+          from
+          m
+          (λ (_ _)
+            ((L a) to))
+          (λ ()
+            (list-f.nil a to))
+          (λ (y ys)
+            (list-f.cons * * y (f ys))))))))
+
+(define L.functor ((a tau))
+  (witness (functor (L a))
+    (functor.new
+      (L a)
+      (L.map a))))
+
+(define list-m ((a tau))
+  (µ (L a)))
+
+?list-f.nil
+
+(define my-nil ((a tau))
+  (witness (list-m a)
+    (µ.in (L a) (list-f.nil a (list-m a)))))
+
+?my-nil
+
+(define my-cons ((a tau) (x a) (xs (list-m a)))
+  (witness (list-m a)
+   (µ.in (L a) (list-f.cons a (list-m a) x xs))))
+
+(define my-length ((a tau) (xs (list-m a)))
+  (witness i64
+    (with identity.bind
+      (list-f.fold
+        a
+        (list-m a)
+        (µ.out (L a) (L.functor a) xs)
+        (lambda (_ _)
+          i64)
+        (lambda ()
+          0)
+        (lambda (y ys)
+          (add-i64 1 (my-length a ys)))))))
+
+
+;; ?µ.fold
+
+;; ?µ
+
+;; ;; µ.neut, ν.neutを作りたくなってくる。
+
+;; ;; 逆は？µ g -> b -> g b -> b -> µ gがほしい、はず。
+;; ;; list-m i64とかの場合だと、g bのgは(lambda (r) (list-f i64 r))になっている。
+;; (define µ.out
+;;   ((g (hom tau tau))
+;;    (x (µ g)))
+;;   (witness
+;;     (pi
+;;       ((b tau)
+;;        (_ b)
+;;        (_ (g b))
+;;        )
+;;       (µ g))
+;;     (lambda
+;;       (b base v)
+;;         (µ.fold g x µ
+;;           (lambda (q r s)
+;;             (µ.in g q r s))))))
+
+;; ?list-f.fold
+
+
+
+
+;; (define hoge
+;;   ((g (hom tau tau))
+;;    (b tau)
+;;    (_ (g b))
+;;    (_ (hom b (µ g))))
+;;   (witness (g (µ g))
+;;     admit))
+
+;; ;; 仮にこのµ.outが書けたとして？というか、書けた。
+;; ;; で、これ、どうやって使うんだ？
+;; ;; list-m a ~> list-f a rにしたいのか。
+;; (define pohe ((a tau) (xs (list-m a)))
+;;   (witness (list-f a (list-m a))
+;;     (with identity.bind
+;;       (µ.fold
+;;         (list-f-partial a)
+;;         xs
+;;         (lambda (_)
+;;           (list-f a (list-m a)))
+;;         (lambda (q w s)
+;;           (lambda (F on-nil on-cons)
+;;             ?admit))))))
+
+;; (define my-length ((a tau) (xs (list-m a)))
+;;   (witness i64
+;;     (with identity.bind
+;;       (list-f.fold
+;;         a
+;;         (list-m a)
+;;         ((pohe a xs) (list-m a))
+;;         (lambda (_ _) i64)
+;;         (lambda ()
+;;           0)
+;;         (lambda (_ ys)
+;;           (add-i64 1 (my-length a ys)))))))
+;;       ;; (let foo (µ.out (list-f-partial a) xs))
+;;       ;; (foo (list-m a) admit
+;;       ;;   (lambda (F on-nil on-cons) admit))
+;;       ;; admit)))
+
 ;; (provide head)
 
 ;; (provide length)
