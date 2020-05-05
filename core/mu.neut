@@ -1,0 +1,40 @@
+(no-implicit-core)
+
+(include "core/notation.neut")
+
+(include "core/functor.neut")
+
+(inductive mu ((f (hom tau tau)))
+  (lan
+    ((b tau)
+     (_ (f b))
+     (_ (hom b (mu f))))
+    (mu f)))
+
+;; F (mu F) -> muF
+(define mu.in
+  ((f (hom tau tau))
+   (x (f (mu f))))
+  (witness (mu f)
+    (mu.lan
+      f
+      (mu f)
+      x
+      (λ (y) y))))
+
+;; mu F -> F (mu F)
+(define mu.out
+  ((f (hom tau tau))
+   (F (functor f))
+   (x (mu f)))
+  (witness (f (mu f))
+    (with identity.bind
+      (mu.fold f x
+        (λ (_)
+          (f (mu f)))
+        (λ (b v k)
+          ((functor.map f F)
+            b
+            (mu f)
+            (λ (value) (mu.in f (k value)))
+            v))))))
