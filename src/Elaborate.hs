@@ -23,14 +23,8 @@ import Reduce.Term
 import Reduce.WeakTerm
 
 elaborate :: [WeakStmt] -> WithEnv TermPlus
-elaborate ss = do
-  e <- reduceTermPlus <$> elaborateStmt ss
-  p $ T.unpack $ toText $ weaken e
-  return e
-
--- elaborate :: [WeakStmt] -> WithEnv TermPlus
--- elaborate =
---   elaborateStmt
+elaborate ss =
+  reduceTermPlus <$> elaborateStmt ss
 
 elaborateStmt :: [WeakStmt] -> WithEnv TermPlus
 elaborateStmt stmt =
@@ -53,31 +47,6 @@ elaborateStmt stmt =
       insConstTypeEnv c t''
       elaborateStmt cont
 
--- elaborateStmt :: [WeakStmt] -> WithEnv Stmt
--- elaborateStmt stmt =
---   case stmt of
---     [] ->
---       -- warnUnusedVar
---       StmtReturn . newMeta 1 1 <$> getCurrentFilePath
---     WeakStmtLet m (mx, x, t) e : cont -> do
---       (e', te) <- infer e
---       t' <- inferType t
---       insConstraintEnv te t'
---       elaborateLet m mx x t' e' cont
---     WeakStmtLetWT m (mx, x, t) e : cont -> do
---       (e', te) <- infer e
---       t' <- inferType t
---       insConstraintEnv te t'
---       elaborateLet m mx x t' e' cont
---     -- t' <- inferType t
---     -- elaborateLet m mx x t' e cont
---     WeakStmtConstDecl (_, c, t) : cont -> do
---       t' <- inferType t
---       analyze >> synthesize >> refine >> cleanup
---       t'' <- reduceTermPlus <$> elaborate' t'
---       insConstTypeEnv c t''
---       elaborateStmt cont
-
 elaborateLet ::
   Meta ->
   Meta ->
@@ -95,25 +64,6 @@ elaborateLet m mx x t e cont = do
   modify (\env -> env {defEnv = IntMap.insert (asInt x) e' (defEnv env)})
   cont' <- elaborateStmt cont
   return (m, TermPiElim (m, TermPiIntro [(mx, x, t')] cont') [e'])
-
--- StmtLet m (mx, x, t') e' <$> elaborateStmt cont
-
--- elaborateLet ::
---   Meta ->
---   Meta ->
---   Ident ->
---   WeakTermPlus ->
---   WeakTermPlus ->
---   [WeakStmt] ->
---   WithEnv Stmt
--- elaborateLet m mx x t e cont = do
---   analyze >> synthesize >> refine >> cleanup
---   e' <- reduceTermPlus <$> elaborate' e
---   t' <- reduceTermPlus <$> elaborate' t
---   insWeakTypeEnv x $ weaken t'
---   modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e') (substEnv env)})
---   modify (\env -> env {defEnv = IntMap.insert (asInt x) e' (defEnv env)})
---   StmtLet m (mx, x, t') e' <$> elaborateStmt cont
 
 cleanup :: WithEnv ()
 cleanup =
