@@ -25,30 +25,9 @@ import Data.Term
 import qualified Data.Text as T
 import Reduce.Term
 
--- clarify :: Stmt -> WithEnv CodePlus
--- clarify =
---   clarifyStmt IntMap.empty
-
 clarify :: TermPlus -> WithEnv CodePlus
 clarify =
   clarify' IntMap.empty
-
--- clarifyStmt :: SubstTerm -> Stmt -> WithEnv CodePlus
--- clarifyStmt sub stmt =
---   case stmt of
---     StmtReturn m ->
---       return (m, CodeUpIntro (m, DataInt 64 0))
---     StmtLet m (_, x, t) e cont -> do
---       tenv <- gets typeEnv
---       e' <- clarify' tenv $ substTermPlus sub e
---       t' <- clarify' tenv $ substTermPlus sub t
---       constName <- newNameWith x
---       let sub' = IntMap.insert (asInt x) (m, TermCall constName) sub
---       cont' <- clarifyStmt sub' cont
---       h <- newNameWith'' "_"
---       cont'' <- withHeaderAffine h t' cont' -- free the result of e'
---       insCodeEnv (asText'' constName) [] e'
---       return (m, CodeUpElim h e' cont'')
 
 clarify' :: TypeEnv -> TermPlus -> WithEnv CodePlus
 clarify' tenv term =
@@ -128,12 +107,8 @@ clarify' tenv term =
           (m, CodeUpIntro (m, DataStructIntro (zip vs ks)))
     (m, TermStructElim xks e1 e2) -> do
       e1' <- clarify' tenv e1
-      p "struct-elim. xks:"
-      p' xks
       let (ms, xs, ks) = unzip3 xks
       ts <- mapM (inferKind m) ks
-      p "ts:"
-      p' ts
       e2' <- clarify' (insTypeEnv1 (zip3 ms xs ts) tenv) e2
       (struct, structVar) <- newDataUpsilonWith m "struct"
       return $ bindLet [(struct, e1')] (m, CodeStructElim (zip xs ks) structVar e2')
