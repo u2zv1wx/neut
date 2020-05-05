@@ -24,6 +24,8 @@ import Reduce.WeakTerm
 
 elaborate :: [WeakStmt] -> WithEnv TermPlus
 elaborate ss =
+  -- elaborateStmt ss
+
   reduceTermPlus <$> elaborateStmt ss
 
 elaborateStmt :: [WeakStmt] -> WithEnv TermPlus
