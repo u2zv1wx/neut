@@ -25,8 +25,8 @@ import Reduce.Code
 toLLVM :: CodePlus -> WithEnv LLVM
 toLLVM mainTerm@(m, _) = do
   modify (\env -> env {nameSet = S.empty})
-  mainTerm' <- reduceCodePlus mainTerm
-  -- let mainTerm' = mainTerm
+  -- mainTerm' <- reduceCodePlus mainTerm
+  let mainTerm' = mainTerm
   modify (\env -> env {nameSet = S.empty})
   mainTerm'' <- llvmCode mainTerm'
   -- the result of "main" must be i64, not i8*

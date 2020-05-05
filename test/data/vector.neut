@@ -1,5 +1,7 @@
 (no-implicit-core)
 
+(enum bool (true 1) (false 0))
+
 (inductive vec ((_ i64))
   (cons
     ((_ (vec (i64 3))))

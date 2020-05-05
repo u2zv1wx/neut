@@ -4,7 +4,7 @@
 
 (include "core/functor.neut")
 
-(include "core/string.neut")
+;; (include "core/string.neut")
 
 (inductive µ ((f (hom tau tau)))
   (lan

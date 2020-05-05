@@ -41,7 +41,7 @@ clarify' tenv term =
     (m, TermPiIntro mxts e) -> do
       fvs <- nubFVS <$> chainTermPlus tenv term
       e' <- clarify' (insTypeEnv1 mxts tenv) e
-      retClosure tenv Nothing fvs (m {metaIsReducible = True}) mxts e'
+      retClosure tenv Nothing fvs m mxts e'
     (m, TermPiElim e es) -> do
       es' <- mapM (clarifyPlus tenv) es
       e' <- clarify' tenv e
@@ -529,8 +529,8 @@ chainTermPlus tenv term =
       return []
     (m, TermUpsilon x) ->
       obtainChain m x tenv
-    (_, TermPi xts t) ->
-      chainTermPlus' tenv xts [t]
+    (_, TermPi {}) ->
+      return []
     (_, TermPiIntro xts e) ->
       chainTermPlus' tenv xts [e]
     (_, TermPiElim e es) -> do
@@ -557,8 +557,8 @@ chainTermPlus tenv term =
       let es = map snd les
       xs2 <- concat <$> mapM (chainTermPlus tenv) es
       return $ xs0 ++ xs1 ++ xs2
-    (_, TermArray dom _) ->
-      chainTermPlus tenv dom
+    (_, TermArray {}) ->
+      return []
     (_, TermArrayIntro _ es) ->
       concat <$> mapM (chainTermPlus tenv) es
     (_, TermArrayElim _ xts e1 e2) -> do
