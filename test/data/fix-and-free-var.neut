@@ -10,8 +10,8 @@
   (lambda ((_ (pi () top)))
     top.unit))
 
-(let segfault
+(let f
   (fix self ()
     (app (lambda () (self)))))
 
-(segfault)
+(f)
