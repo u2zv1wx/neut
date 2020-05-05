@@ -27,12 +27,12 @@ cartesianSigma mName m k mxts =
       (args, e) <- makeSwitcher m (affineSigma m k mxts) (relevantSigma m k mxts)
       i <- newCount
       let h = "sigma-" <> T.pack (show i)
-      insCodeEnv h args e
+      insCodeEnv h False args e
       return (m, DataConst h)
     Just name ->
       tryCache m name $ do
         (args, e) <- makeSwitcher m (affineSigma m k mxts) (relevantSigma m k mxts)
-        insCodeEnv name args e
+        insCodeEnv name False args e
 
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
 -- affineSigma NAME LOC [(x1, t1), ..., (xn, tn)]   ~>
@@ -163,10 +163,13 @@ cartClsName =
 returnClosureType :: Meta -> WithEnv CodePlus
 returnClosureType m = do
   (env, envVar) <- newDataUpsilonWith m "env"
+  -- i <- newCount
+  -- let name = "cartesian-closure-" <> T.pack (show i)
   retImmType <- returnCartesianImmediate m
   t <-
     cartesianSigma
-      (Just cartClsName)
+      -- (Just name)
+      Nothing
       m
       arrVoidPtr
       [Right (env, retImmType), Left (m, CodeUpIntro envVar), Left retImmType]

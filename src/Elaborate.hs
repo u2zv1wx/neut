@@ -23,10 +23,16 @@ import Reduce.Term
 import Reduce.WeakTerm
 
 elaborate :: [WeakStmt] -> WithEnv TermPlus
-elaborate ss =
-  -- elaborateStmt ss
+elaborate ss = do
+  elaborateStmt ss
 
-  reduceTermPlus <$> elaborateStmt ss
+-- p $ T.unpack $ toText $ weaken e
+-- return e
+
+-- reduceTermPlus <$> elaborateStmt ss
+
+-- p "done"
+-- return e
 
 elaborateStmt :: [WeakStmt] -> WithEnv TermPlus
 elaborateStmt stmt =

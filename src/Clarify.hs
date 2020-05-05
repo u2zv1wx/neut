@@ -23,6 +23,7 @@ import Data.Primitive
 import Data.Syscall
 import Data.Term
 import qualified Data.Text as T
+-- import Reduce.Code
 import Reduce.Term
 
 clarify :: TermPlus -> WithEnv CodePlus
@@ -50,7 +51,8 @@ clarify' tenv term =
       let tenv' = insTypeEnv' (asInt x) t tenv
       e' <- clarify' (insTypeEnv1 mxts tenv') e
       fvs <- nubFVS <$> chainTermPlus tenv term
-      retClosureFix tenv x fvs m mxts e'
+      cls <- makeClosureFix' tenv x fvs m mxts e'
+      return (m, CodeUpIntro cls)
     (m, TermConst x) ->
       clarifyConst tenv m x
     (m, TermInt size l) ->
@@ -262,16 +264,16 @@ clarifyBinder tenv binder =
       xts' <- clarifyBinder (insTypeEnv' (asInt x) t tenv) xts
       return $ (m, x, t') : xts'
 
-knot :: Meta -> Ident -> DataPlus -> WithEnv ()
-knot m z cls = do
-  cenv <- gets codeEnv
-  case Map.lookup (asText'' z) cenv of
-    Nothing ->
-      raiseCritical m "knot"
-    Just (Definition _ args body) -> do
-      let body' = substCodePlus (IntMap.fromList [(asInt z, cls)]) body
-      let def' = Definition (IsFixed True) args body'
-      modify (\env -> env {codeEnv = Map.insert (asText'' z) def' cenv})
+-- knot :: Meta -> Ident -> DataPlus -> WithEnv ()
+-- knot m z cls = do
+--   cenv <- gets codeEnv
+--   case Map.lookup (asText'' z) cenv of
+--     Nothing ->
+--       raiseCritical m "knot"
+--     Just (Definition _ args body) -> do
+--       let body' = substCodePlus (IntMap.fromList [(asInt z, cls)]) body
+--       let def' = Definition (IsFixed True) args body'
+--       modify (\env -> env {codeEnv = Map.insert (asText'' z) def' cenv})
 
 toHeaderInfo ::
   Meta ->
@@ -419,7 +421,7 @@ makeClosure mName mxts2 m mxts1 e = do
   let vs = map (\(mx, x, _) -> (mx, DataUpsilon x)) mxts2
   let fvEnv = (m, sigmaIntro vs)
   name <- toName mName
-  registerIfNecessary m name xts1 xts2 e
+  registerIfNecessary m name False xts1 xts2 e
   return (m, sigmaIntro [envExp, fvEnv, (m, DataConst name)])
 
 toName :: Maybe T.Text -> WithEnv T.Text
@@ -434,15 +436,16 @@ toName mName =
 registerIfNecessary ::
   Meta ->
   T.Text ->
+  Bool ->
   [(Ident, CodePlus)] ->
   [(Ident, CodePlus)] ->
   CodePlus ->
   WithEnv ()
-registerIfNecessary m name xts1 xts2 e = do
+registerIfNecessary m name isFixed xts1 xts2 e = do
   cenv <- gets codeEnv
   when (not $ name `Map.member` cenv) $ do
     (args, body) <- toLamInfo m xts1 xts2 e
-    insCodeEnv name args body
+    insCodeEnv name isFixed args body
 
 toLamInfo ::
   Meta ->
@@ -470,6 +473,37 @@ makeClosure' tenv mName fvs m xts e = do
   xts' <- clarifyBinder tenv xts
   makeClosure mName fvs' m xts' e
 
+makeClosureFix ::
+  Ident ->
+  [(Meta, Ident, CodePlus)] -> -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
+  Meta -> -- meta of lambda
+  [(Meta, Ident, CodePlus)] -> -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
+  CodePlus -> -- the `e` in `lam (x1, ..., xn). e`
+  WithEnv DataPlus
+makeClosureFix name mxts2 m mxts1 e = do
+  let xts1 = dropFst mxts1
+  let xts2 = dropFst mxts2
+  envExp <- cartesianSigma Nothing m arrVoidPtr $ map Right xts2
+  let vs = map (\(mx, x, _) -> (mx, DataUpsilon x)) mxts2
+  let fvEnv = (m, sigmaIntro vs)
+  let cls = (m, sigmaIntro [envExp, fvEnv, (m, DataConst $ asText'' name)])
+  let e' = substCodePlus (IntMap.fromList [(asInt name, cls)]) e
+  registerIfNecessary m (asText'' name) True xts1 xts2 e'
+  return cls
+
+makeClosureFix' ::
+  TypeEnv ->
+  Ident -> -- the name of newly created closure
+  [IdentPlus] -> -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
+  Meta -> -- meta of lambda
+  [IdentPlus] -> -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
+  CodePlus -> -- the `e` in `lam (x1, ..., xn). e`
+  WithEnv DataPlus
+makeClosureFix' tenv mName fvs m xts e = do
+  fvs' <- clarifyBinder tenv fvs
+  xts' <- clarifyBinder tenv xts
+  makeClosureFix mName fvs' m xts' e
+
 retClosure ::
   TypeEnv ->
   Maybe T.Text -> -- the name of newly created closure
@@ -482,18 +516,18 @@ retClosure tenv mName fvs m xts e = do
   cls <- makeClosure' tenv mName fvs m xts e
   return (m, CodeUpIntro cls)
 
-retClosureFix ::
-  TypeEnv ->
-  Ident -> -- the name of newly created closure
-  [IdentPlus] -> -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
-  Meta -> -- meta of lambda
-  [IdentPlus] -> -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
-  CodePlus -> -- the `e` in `lam (x1, ..., xn). e`
-  WithEnv CodePlus
-retClosureFix tenv x fvs m xts e = do
-  cls <- makeClosure' tenv (Just $ asText'' x) fvs m xts e
-  knot m x cls
-  return (m, CodeUpIntro cls)
+-- retClosureFix ::
+--   TypeEnv ->
+--   Ident -> -- the name of newly created closure
+--   [IdentPlus] -> -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
+--   Meta -> -- meta of lambda
+--   [IdentPlus] -> -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
+--   CodePlus -> -- the `e` in `lam (x1, ..., xn). e`
+--   WithEnv CodePlus
+-- retClosureFix tenv x fvs m xts e = do
+--   cls <- makeClosure' tenv (Just $ asText'' x) fvs m xts e
+--   knot m x cls
+--   return (m, CodeUpIntro cls)
 
 callClosure ::
   Meta -> CodePlus -> [(Ident, CodePlus, DataPlus)] -> WithEnv CodePlus

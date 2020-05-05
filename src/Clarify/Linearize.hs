@@ -1,6 +1,7 @@
 module Clarify.Linearize
   ( linearize,
     withHeaderAffine,
+    distinguishCode,
   )
 where
 
@@ -15,9 +16,14 @@ linearize ::
   [(Ident, CodePlus)] -> -- [(x1, t1), ..., (xn, tn)]  (closed chain)
   CodePlus ->
   WithEnv CodePlus
-linearize xts e = do
-  (nm, e') <- distinguishCode (map fst xts) e
-  linearize' nm (reverse xts) e'
+linearize xts =
+  linearize' IntMap.empty (reverse xts)
+
+-- (nm, e') <- distinguishCode (map fst xts) e
+-- linearize' nm (reverse xts) e'
+
+-- (nm, e') <- distinguishCode (map fst xts) e
+-- linearize' nm (reverse xts) e'
 
 type NameMap = IntMap.IntMap [Ident]
 
@@ -31,22 +37,43 @@ linearize' nm binder e =
     [] ->
       return e
     (x, t) : xts -> do
-      (nmT, t') <- distinguishCode (map fst xts) t
-      let newNm = merge [nmT, nm]
-      e' <- withHeader newNm x t' e
-      linearize' newNm xts e'
+      (nmE, e') <- distinguishCode [x] e
+      let newNm = merge [nmE, nm]
+      e'' <- withHeader newNm x t e'
+      linearize' newNm xts e''
+
+-- (nmE, e'') <- distinguishCode (map fst xts) e'
+-- -- (nmT, t') <- distinguishCode (map fst xts) t
+-- linearize' (merge [nmE, nm]) xts e''
+
+-- (nmT, t') <- distinguishCode (map fst xts) t
+-- let newNm = merge [nmT, nm]
+-- e' <- withHeader newNm x t' e
+-- linearize' newNm xts e'
 
 -- insert header for a variable
 withHeader :: NameMap -> Ident -> CodePlus -> CodePlus -> WithEnv CodePlus
 withHeader nm x t e =
   case IntMap.lookup (asInt x) nm of
     Nothing ->
+      -- p "affine:"
+      -- p' x
+      -- p "in:"
+      -- p' e
       withHeaderAffine x t e
     Just [] ->
       raiseCritical' $ "impossible. x: " <> asText' x
     Just [z] ->
+      -- p "linear:"
+      -- p' x
+      -- p "in:"
+      -- p' e
       withHeaderLinear z x e
     Just (z1 : z2 : zs) ->
+      -- p "relevant:"
+      -- p' x
+      -- p "in:"
+      -- p' e
       withHeaderRelevant x t z1 z2 zs e
 
 -- withHeaderAffine x t e ~>

@@ -88,7 +88,7 @@ makeSwitcher ::
   WithEnv ([Ident], CodePlus)
 makeSwitcher m compAff compRel = do
   (switchVarName, switchVar) <- newDataUpsilonWith m "switch"
-  (argVarName, argVar) <- newDataUpsilonWith m "argimm"
+  (argVarName, argVar) <- newDataUpsilonWith m "arg"
   aff <- compAff argVar
   rel <- compRel argVar
   return
@@ -102,10 +102,13 @@ makeSwitcher m compAff compRel = do
     )
 
 cartesianImmediate :: Meta -> WithEnv DataPlus
-cartesianImmediate m =
-  tryCache m cartImmName $ do
+cartesianImmediate m = do
+  -- i <- newCount
+  -- let key = cartImmName <> "-" <> T.pack (show i)
+  let key = cartImmName
+  tryCache m key $ do
     (args, e) <- makeSwitcher m affineImmediate relevantImmediate
-    insCodeEnv cartImmName args e
+    insCodeEnv key False args e
 
 affineImmediate :: DataPlus -> WithEnv CodePlus
 affineImmediate (m, _) =
@@ -120,7 +123,7 @@ cartesianStruct m ks = do
   (args, e) <- makeSwitcher m (affineStruct ks) (relevantStruct ks)
   i <- newCount
   let name = "cartesian-struct-" <> T.pack (show i)
-  insCodeEnv name args e
+  insCodeEnv name False args e
   return (m, DataConst name)
 
 affineStruct :: [ArrayKind] -> DataPlus -> WithEnv CodePlus
@@ -144,9 +147,9 @@ relevantStruct ks argVar@(m, _) = do
         )
     )
 
-insCodeEnv :: T.Text -> [Ident] -> CodePlus -> WithEnv ()
-insCodeEnv name args e = do
-  let def = Definition (IsFixed False) args e
+insCodeEnv :: T.Text -> Bool -> [Ident] -> CodePlus -> WithEnv ()
+insCodeEnv name isFixed args e = do
+  let def = Definition (IsFixed isFixed) args e
   modify (\env -> env {codeEnv = Map.insert name def (codeEnv env)})
 
 {-# INLINE boolTrue #-}

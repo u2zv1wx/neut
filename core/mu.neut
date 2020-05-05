@@ -4,6 +4,8 @@
 
 (include "core/functor.neut")
 
+(include "core/string.neut")
+
 (inductive µ ((f (hom tau tau)))
   (lan
     ((b tau)
@@ -33,8 +35,10 @@
         (λ (_)
           (f (µ f)))
         (λ (b v k)
-          ((functor.map f F)
-            b
-            (µ f)
-            (λ (value) (µ.in f (k value)))
-            v))))))
+          (with identity.bind
+            (string.print "here\n")
+            ((functor.map f F)
+              b
+              (µ f)
+              (λ (value) (µ.in f (k value)))
+              v)))))))

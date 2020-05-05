@@ -370,7 +370,7 @@ toText term =
       showCons $ map toText $ e : es
     (_, WeakTermFix (_, x, _) xts e) -> do
       let argStr = inParen $ showItems $ map showArg xts
-      showCons ["μ", asText' x, argStr, toText e]
+      showCons ["fix", asText' x, argStr, toText e]
     (_, WeakTermConst x) ->
       x
     (_, WeakTermHole (I (_, i))) ->
