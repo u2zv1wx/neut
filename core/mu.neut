@@ -36,7 +36,6 @@
           (f (µ f)))
         (λ (b v k)
           (with identity.bind
-            (string.print "here\n")
             ((functor.map f F)
               b
               (µ f)

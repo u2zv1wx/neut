@@ -28,7 +28,6 @@ elaborate ss = do
 
 -- p $ T.unpack $ toText $ weaken e
 -- return e
-
 -- reduceTermPlus <$> elaborateStmt ss
 
 -- p "done"

@@ -150,7 +150,8 @@ returnArrayType m = do
   retImmType <- returnCartesianImmediate m
   t <-
     cartesianSigma
-      (Just cartArrayName)
+      -- (Just cartArrayName)
+      Nothing
       m
       arrVoidPtr
       [Right (arr, retImmType), Left (m, CodeUpIntro arrVar)]

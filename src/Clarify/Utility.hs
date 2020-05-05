@@ -103,9 +103,9 @@ makeSwitcher m compAff compRel = do
 
 cartesianImmediate :: Meta -> WithEnv DataPlus
 cartesianImmediate m = do
-  -- i <- newCount
-  -- let key = cartImmName <> "-" <> T.pack (show i)
-  let key = cartImmName
+  i <- newCount
+  let key = cartImmName <> "-" <> T.pack (show i)
+  -- let key = cartImmName
   tryCache m key $ do
     (args, e) <- makeSwitcher m affineImmediate relevantImmediate
     insCodeEnv key False args e
