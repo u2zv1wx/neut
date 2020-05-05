@@ -1,3 +1,7 @@
+(no-implicit-core)
+
+(include "core/integer.neut")
+
 (let a
   (struct f16 i8 i16 f32 i64 i64 f64 i8))
 

@@ -112,6 +112,8 @@ isValue term =
       True
     (_, TermConst x) ->
       isValueConst x
+    (_, TermInt _ _) ->
+      True
     (_, TermFloat _ _) ->
       True
     (_, TermEnum _) ->

@@ -596,14 +596,6 @@ insTypeEnv1 xts tenv =
 
 obtainChain :: Meta -> Ident -> TypeEnv -> WithEnv [IdentPlus]
 obtainChain m x tenv = do
-  cenv <- gets chainEnv
-  case IntMap.lookup (asInt x) cenv of
-    -- Just xtst ->
-    --   return xtst
-    -- Nothing -> do
-    _ -> do
-      t <- lookupTypeEnv' m x tenv
-      xts <- chainTermPlus tenv t
-      let chain = xts ++ [(m, x, t)]
-      modify (\env -> env {chainEnv = IntMap.insert (asInt x) chain cenv})
-      return chain
+  t <- lookupTypeEnv' m x tenv
+  xts <- chainTermPlus tenv t
+  return $ xts ++ [(m, x, t)]
