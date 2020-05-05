@@ -395,7 +395,7 @@ toText term =
     (_, WeakTermEnumElim (e, _) mles) -> do
       let (mls, es) = unzip mles
       let les = zip (map snd mls) es
-      showCons ["case", toText e, showItems (map showClause les)]
+      showCons ["switch", toText e, showItems (map showClause les)]
     (_, WeakTermArray dom k) ->
       showCons ["array", toText dom, showArrayKind k]
     (_, WeakTermArrayIntro _ es) ->
