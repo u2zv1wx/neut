@@ -4,37 +4,37 @@
 
 (include "core/functor.neut")
 
-(inductive mu ((f (hom tau tau)))
+(inductive µ ((f (hom tau tau)))
   (lan
     ((b tau)
      (_ (f b))
-     (_ (hom b (mu f))))
-    (mu f)))
+     (_ (hom b (µ f))))
+    (µ f)))
 
-;; F (mu F) -> muF
-(define mu.in
+;; F (µ F) -> µF
+(define µ.in
   ((f (hom tau tau))
-   (x (f (mu f))))
-  (witness (mu f)
-    (mu.lan
+   (x (f (µ f))))
+  (witness (µ f)
+    (µ.lan
       f
-      (mu f)
+      (µ f)
       x
       (λ (y) y))))
 
-;; mu F -> F (mu F)
-(define mu.out
+;; µ F -> F (µ F)
+(define µ.out
   ((f (hom tau tau))
    (F (functor f))
-   (x (mu f)))
-  (witness (f (mu f))
+   (x (µ f)))
+  (witness (f (µ f))
     (with identity.bind
-      (mu.fold f x
+      (µ.fold f x
         (λ (_)
-          (f (mu f)))
+          (f (µ f)))
         (λ (b v k)
           ((functor.map f F)
             b
-            (mu f)
-            (λ (value) (mu.in f (k value)))
+            (µ f)
+            (λ (value) (µ.in f (k value)))
             v))))))
