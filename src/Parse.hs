@@ -10,8 +10,6 @@ import Data.ByteString.Builder
 import qualified Data.ByteString.Lazy as L
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
-import Data.Ident
-import qualified Data.IntMap as IntMap
 import Data.Meta
 import Data.Namespace
 import Data.Platform
@@ -175,15 +173,6 @@ parse' stmtTreeList =
                 return $ WeakStmtConstDecl (m', name', t') : defList
               | otherwise ->
                 raiseSyntaxError m "(constant LEAF TREE)"
-            "define"
-              | [name@(_, TreeLeaf _), body] <- rest ->
-                parse' $ (m, TreeNode [(m, TreeLeaf "let"), name, body]) : restStmtList
-              | name@(mFun, TreeLeaf _) : xts@(_, TreeNode _) : body : rest' <- rest ->
-                parse' $ (m, TreeNode [leaf, (mFun, TreeNode (name : xts : body : rest'))]) : restStmtList
-              | otherwise -> do
-                ss1 <- parseDef rest
-                ss2 <- parse' restStmtList
-                return $ ss1 ++ ss2
             "inductive"
               | name@(mFun, TreeLeaf _) : xts@(_, TreeNode _) : es' <- rest ->
                 parse' $ (m, TreeNode [leaf, (mFun, TreeNode (name : xts : es'))]) : restStmtList
@@ -308,49 +297,6 @@ ensureEnvSanity m = do
     _ ->
       return ()
 
--- basic idea (exploits capturing subst):
---   sub = {
---     x1 := μ x1. e1 (closed w.r.t. x1)
---     x2 := μ x2. e2 (closed w.r.t. x2)
---     x3 := μ x3. e3 (closed w.r.t. x3)
---   }
---   sub^2 = {
---     x1 := μ x1. e1 {x2 := μ x2. e2, x3 := μ x3. e3}
---     x2 := μ x2. e2 {x3 := μ x3. e3, x1 := μ x1. e1}
---     x3 := μ x3. e3 {x1 := μ x1. e1, x2 := μ x2. e2}
---   }
---   sub^3 = {
---     x1 := μ x1. e1 {x2 := μ x2. e2 {x3 := ...}, x3 := μ x3. e3 {x2 := ...}} (closed w.r.t. x1, x2, x3)
---     x2 := μ x2. e2 {x3 := μ x3. e3 {x1 := ...}, x1 := μ x1. e1 {x2 := ...}} (closed w.r.t. x1, x2, x3)
---     x3 := μ x3. e3 {x1 := μ x1. e1 {x2 := ...}, x2 := μ x2. e2 {x1 := ...}} (closed w.r.t. x1, x2, x3)
---   }
-parseDef :: [TreePlus] -> WithEnv [WeakStmt]
-parseDef xds = do
-  defList <- mapM (adjustPhase >=> prefixFunName >=> macroExpand) xds
-  metaNameList <- mapM (extractFunName >=> uncurry discernIdent) defList
-  let nameList = map snd metaNameList
-  defList' <- mapM (interpretFix >=> discernDef) defList
-  let baseSub = IntMap.fromList $ map defToSub $ zip nameList defList'
-  let sub = selfCompose (length baseSub - 1) baseSub
-  let fixSelfVarList = map (uncurry toVar . defToName) defList'
-  let aligner = IntMap.fromList $ zip (map asInt nameList) fixSelfVarList
-  let closedSub = IntMap.map (substWeakTermPlus aligner) sub -- capturing substitution
-  let typeList = map (\(_, (m, _, t), _, _) -> (m, t)) defList'
-  let bodyList = map (substWeakTermPlus closedSub . uncurry toVar) metaNameList
-  toLetList $ zip3 nameList typeList bodyList
-
-defToName :: Def -> (Meta, Ident)
-defToName (_, (m, x, _), _, _) = (m, x)
-
-prefixFunName :: TreePlus -> WithEnv TreePlus
-prefixFunName tree =
-  case tree of
-    (m, TreeNode [xt, xts, body]) -> do
-      xt' <- prefixTextPlus xt
-      return (m, TreeNode [xt', xts, body])
-    t ->
-      raiseSyntaxError (fst t) "(TREE TREE TREE)"
-
 prefixTextPlus :: TreePlus -> WithEnv TreePlus
 prefixTextPlus tree =
   case tree of
@@ -367,39 +313,6 @@ prefixTextPlus tree =
       return (m, TreeNode [(mx, TreeLeaf x'), t])
     t ->
       raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
-
-extractFunName :: TreePlus -> WithEnv (Meta, Ident)
-extractFunName tree =
-  case tree of
-    (_, TreeNode ((m, TreeLeaf x) : _)) ->
-      return (m, asIdent x)
-    (_, TreeNode ((_, TreeNode [(m, TreeLeaf x), _]) : _)) ->
-      return (m, asIdent x)
-    t ->
-      raiseSyntaxError (fst t) "(LEAF ...) | ((LEAF TREE) ...)"
-
-toLetList :: [(Ident, (Meta, WeakTermPlus), WeakTermPlus)] -> WithEnv [WeakStmt]
-toLetList defList =
-  case defList of
-    [] ->
-      return []
-    ((x, (m, t), e) : rest) -> do
-      rest' <- toLetList rest
-      return $ WeakStmtLet m (m, x, t) e : rest'
-
-defToSub :: (Ident, Def) -> (Int, WeakTermPlus)
-defToSub (dom, (m, xt, xts, e)) =
-  (asInt dom, (m, WeakTermFix xt xts e))
-
-selfCompose :: Int -> SubstWeakTerm -> SubstWeakTerm
-selfCompose i sub =
-  if i == 0
-    then sub
-    else compose sub $ selfCompose (i - 1) sub
-
-compose :: SubstWeakTerm -> SubstWeakTerm -> SubstWeakTerm
-compose s1 s2 =
-  IntMap.union (IntMap.map (substWeakTermPlus s1) s2) s1
 
 parseStmtClause :: TreePlus -> WithEnv (T.Text, [TreePlus])
 parseStmtClause tree =
@@ -431,7 +344,7 @@ keywordSet :: S.Set T.Text
 keywordSet =
   S.fromList
     [ "constant",
-      "define",
+      -- "define",
       "end",
       "ensure",
       "enum",

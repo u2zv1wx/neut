@@ -1,5 +1,7 @@
 (no-implicit-core)
 
+(include "core/notation.neut")
+
 (section os)
 
 (constant file-descriptor tau)

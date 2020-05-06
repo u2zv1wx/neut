@@ -80,6 +80,14 @@
     (bool.false
       e2)))
 
+(keyword define)
+
+(notation (define f xts e)
+  (let f (fix f xts e)))
+
+(notation (define f e)
+  (let f e))
+
 ;; (notation (if b e1 e2)
 ;;   (switch b
 ;;     (1 e1)
