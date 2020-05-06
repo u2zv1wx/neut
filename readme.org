@@ -384,8 +384,8 @@ The =constant= statement declares an external constant.
 *** Semantics
 When evaluated, the =(constant x t)= statement modifies the state of the compiler so that a [[#constant][constant]] =x= of type =t= is available for later use. Declared constants can then be available for use as in the same way of ordinary [[#upsilon][variables]]. Every constant must have distinct names. This statement is currently intended for internal use, such as for implementation of syscalls. External constants (FFI) might also be supported in future release via this statement.
 
-** define/let
-The =define= / =let= statement evaluates given term and binds the result to a variable.
+** let
+The =let= statement evaluates given term and binds the result to a variable.
 
 *** Example
 #+BEGIN_SRC neut
@@ -393,9 +393,20 @@ The =define= / =let= statement evaluates given term and binds the result to a va
 
 (i64.print foo) ;; ~> 10 (this is equivalent to `(let _ (i64.print foo))`)
 
-(let (bar i64) 20) ;; define with type annotation
+(let (bar i64) 20) ;; `let` with type annotation
 
 (i64.print bar) ;; ~> 20
+
+;; `define` is defined in `core/notation.neut` as follows:
+;;
+;; (keyword define)
+;;
+;; (notation (define f xts e)
+;;   (let f (fix f xts e)))
+;;
+;; (notation (define f e)
+;;   (let f e))
+;;
 
 ;; ordinary definition (i.e. 1-mutual definition)
 (define fact ((x i64))
@@ -405,61 +416,48 @@ The =define= / =let= statement evaluates given term and binds the result to a va
 
 (i64.print (fact foo)) ;; ~> 3628800 (= 10!)
 
-;; 2-mutual definition
-(define
-  (even (n)      ;; argument without type annotation
-    (if (icmp-eq-i64 n 0) ;; compare (by equal) two `i64`s
-      true
-      (odd (sub-i64 n 1))))
-  (odd ((n i64)) ;; argument with type annotation
-    (if (icmp-eq-i64 n 0)
-      false
-      (even (sub-i64 n 1)))))
+;; the definition of `fact` above is equivalent to the following:
+(let fact
+  (fix fact ((x i64))
+    (if (icmp-sle-i64 x 0)
+      1
+      (mul-i64 x (fact (sub-i64 x 1))))))
+;; which is alpha-equivalent to:
+(let fact
+  (fix self ((x i64))
+    (if (icmp-sle-i64 x 0)
+      1
+      (mul-i64 x (self (sub-i64 x 1))))))
+
+;; mutual recursion can be realized as in the ordinary way:
+(define even-f ((f (hom i64 bool)) (n i64))
+  (if (icmp-eq-i64 n 0)
+    true
+    (f (sub-i64 n 1))))
+
+(define odd ((n i64))
+  (if (icmp-eq-i64 n 0)
+    false
+    (even-f odd (sub-i64 n 1))))
+
+(define even ((n i64))
+  (even-f odd n))
 
 (i64.print
   (if (even 10)
     100
     1000)) ;; ~> 100
-
-;; 1-mutual definition (i.e. generalized notation of "ordinary" definition)
-(define
-  (fact ((x i64))
-    (if (icmp-sle-i64 x 0)
-      1
-      (mul-i64 x (fact (sub-i64 x 1))))))
-
-(i64.print (fact 10)) ;; ~> 3628800
-
-
-;; 0-mutual definition is also valid
-(define)
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
 (let (ID TERM) TERM)
 
 (let ID TERM)
-
-(define
-  (ID ((ID TERM) ... (ID TERM))
-    TERM)
-  ...
-  (ID ((ID TERM) ... (ID TERM))
-    TERM))
-
-;; alternative notation for (define (ID ((ID TERM) ... (ID TERM)) TERM))
-(define ID ((ID TERM) ... (ID TERM)) TERM)
 #+END_SRC
 *** Semantics
 When parsed, the =(let x e)= statement does nothing.
 
 When evaluated, the =(let x e)= statement checks the type of the term =e=, evaluates the term =e=, then defines a variable =x= with =e= as its content. =x= is available in the remaining program. The type of =x= can be specified to be =t= by writing =(let (x t) e)=.
-
-The 0-mutual definition does nothing.
-
-When parsed, 1-mutual definitions =(define (f ((x A) ... (x A)) e))= are translated into =(let f (fix f ((x A) ... (x A)) e))=, and then evaluated as ordinary let statement. Convenient 1-mutual definitions =(define f ((x A) ... (x A)) e)= are translated into =(define (f ((x A) ... (x A)) e))=, and then processed as ordinary 1-mutual definitions.
-
-When parsed, n-mutual definitions (n >= 2) are also translated into appropriate let-and-fix.
 
 If user input is not parsed as a statement when it is supposed to be, the compiler firstly interpret it as a term =e=, and then processes a statement =(let _ e)=.
 
