@@ -1512,9 +1512,6 @@ This subcommand is intended to be used with an editor-side syntax checker like [
 # ** "Unified" Pattern Resolution in Dependent Type Inference
 # (to be written later)
 
-# ** A Simple Implementation of Mutually-Recursive Functions
-# (to be written later)
-
 # * Contribution
 
 # ** To Implementation
