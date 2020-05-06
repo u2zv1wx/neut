@@ -3,7 +3,7 @@ module Emit
   )
 where
 
-import Control.Concurrent.Async.Lifted
+-- import Control.Concurrent.Async.Lifted
 import Control.Monad.State.Lazy
 import Data.ByteString.Builder
 import Data.Env
@@ -25,16 +25,19 @@ import Reduce.LLVM
 emit :: LLVM -> WithEnv Builder
 emit mainTerm = do
   g <- emitDeclarations
-  zsAsync <- async $ do
-    mainTerm' <- reduceLLVM IntMap.empty Map.empty mainTerm
-    emitDefinition "i64" "main" [] mainTerm'
+  -- zsAsync <- async $ do
+  --   mainTerm' <- reduceLLVM IntMap.empty Map.empty mainTerm
+  --   emitDefinition "i64" "main" [] mainTerm'
+  mainTerm' <- reduceLLVM IntMap.empty Map.empty mainTerm
+  zs <- emitDefinition "i64" "main" [] mainTerm'
   lenv <- gets llvmEnv
   xs <-
-    forConcurrently (HashMap.toList lenv) $ \(name, (args, body)) -> do
+    forM (HashMap.toList lenv) $ \(name, (args, body)) -> do
+      -- forConcurrently (HashMap.toList lenv) $ \(name, (args, body)) -> do
       let args' = map (showLLVMData . LLVMDataLocal) args
       body' <- reduceLLVM IntMap.empty Map.empty body
       emitDefinition "i8*" (TE.encodeUtf8Builder name) args' body'
-  zs <- wait zsAsync
+  -- zs <- wait zsAsync
   return $ unlinesL $ g : zs <> concat xs
 
 emitDeclarations :: WithEnv Builder
@@ -348,7 +351,7 @@ showRegList regList =
 
 showBranchList :: LowType -> [(Int, Ident)] -> Builder
 showBranchList lowType xs =
-  "[" <> showItems (uncurry (showBranch lowType)) xs <> "]"
+  "[" <> unwordsL (map (uncurry (showBranch lowType)) xs) <> "]"
 
 showIndex :: [(LLVMData, LowType)] -> Builder
 showIndex idxList =
