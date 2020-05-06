@@ -75,23 +75,17 @@ reduceCodePlus term =
             (_, CodeUpIntro (_, DataUpsilon y))
               | x == y -> return e1' -- eta-reduce
             _ -> return (m, CodeUpElim x e1' e2')
-    (m, CodeEnumElim varInfo v les) ->
+    (m, CodeEnumElim v les) ->
       case v of
         (_, DataEnumIntro l)
           | Just body <- lookup (EnumCaseLabel l) les ->
-            reduceCodePlus $ substCodePlus varInfo body
+            reduceCodePlus body
           | Just body <- lookup EnumCaseDefault les ->
-            reduceCodePlus $ substCodePlus varInfo body
-        -- case lookup (EnumCaseLabel l) les of
-        --   Just body -> reduceCodePlus $ substCodePlus varInfo body
-        --   Nothing ->
-        --     case lookup EnumCaseDefault les of
-        --       Just body -> reduceCodePlus $ substCodePlus varInfo body
-        --       Nothing -> return (m, CodeEnumElim varInfo v les)
+            reduceCodePlus body
         _ -> do
           let (ls, es) = unzip les
           es' <- mapM reduceCodePlus es
-          return (m, CodeEnumElim varInfo v (zip ls es'))
+          return (m, CodeEnumElim v (zip ls es'))
     (m, CodeStructElim xks d e) -> do
       let (xs, ks1) = unzip xks
       case d of

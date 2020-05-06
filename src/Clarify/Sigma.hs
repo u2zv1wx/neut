@@ -150,8 +150,7 @@ returnArrayType m = do
   retImmType <- returnCartesianImmediate m
   t <-
     cartesianSigma
-      -- (Just cartArrayName)
-      Nothing
+      (Just cartArrayName)
       m
       arrVoidPtr
       [Right (arr, retImmType), Left (m, CodeUpIntro arrVar)]
@@ -164,13 +163,10 @@ cartClsName =
 returnClosureType :: Meta -> WithEnv CodePlus
 returnClosureType m = do
   (env, envVar) <- newDataUpsilonWith m "env"
-  -- i <- newCount
-  -- let name = "cartesian-closure-" <> T.pack (show i)
   retImmType <- returnCartesianImmediate m
   t <-
     cartesianSigma
-      -- (Just name)
-      Nothing
+      (Just cartClsName)
       m
       arrVoidPtr
       [Right (env, retImmType), Left (m, CodeUpIntro envVar), Left retImmType]

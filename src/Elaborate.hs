@@ -23,12 +23,13 @@ import Reduce.Term
 import Reduce.WeakTerm
 
 elaborate :: [WeakStmt] -> WithEnv TermPlus
-elaborate ss = do
-  elaborateStmt ss
+elaborate ss =
+  -- e <- elaborateStmt ss
+  -- -- p "resulting term:"
+  -- -- p $ T.unpack $ toText $ weaken e
+  -- return e
 
--- p $ T.unpack $ toText $ weaken e
--- return e
--- reduceTermPlus <$> elaborateStmt ss
+  reduceTermPlus <$> elaborateStmt ss
 
 -- p "done"
 -- return e
@@ -45,8 +46,12 @@ elaborateStmt stmt =
       insConstraintEnv te t'
       elaborateLet m mx x t' e' cont
     WeakStmtLetWT m (mx, x, t) e : cont -> do
+      (e', te) <- infer e
       t' <- inferType t
-      elaborateLet m mx x t' e cont
+      insConstraintEnv te t'
+      elaborateLet m mx x t' e' cont
+    -- t' <- inferType t
+    -- elaborateLet m mx x t' e cont
     WeakStmtConstDecl (_, c, t) : cont -> do
       t' <- inferType t
       analyze >> synthesize >> refine >> cleanup
@@ -64,8 +69,10 @@ elaborateLet ::
   WithEnv TermPlus
 elaborateLet m mx x t e cont = do
   analyze >> synthesize >> refine >> cleanup
-  e' <- reduceTermPlus <$> elaborate' e
-  t' <- reduceTermPlus <$> elaborate' t
+  -- e' <- reduceTermPlus <$> elaborate' e
+  -- t' <- reduceTermPlus <$> elaborate' t
+  e' <- elaborate' e
+  t' <- elaborate' t
   insWeakTypeEnv x $ weaken t'
   modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e') (substEnv env)})
   modify (\env -> env {defEnv = IntMap.insert (asInt x) e' (defEnv env)})

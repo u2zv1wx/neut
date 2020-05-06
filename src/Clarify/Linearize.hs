@@ -19,12 +19,6 @@ linearize ::
 linearize xts =
   linearize' IntMap.empty (reverse xts)
 
--- (nm, e') <- distinguishCode (map fst xts) e
--- linearize' nm (reverse xts) e'
-
--- (nm, e') <- distinguishCode (map fst xts) e
--- linearize' nm (reverse xts) e'
-
 type NameMap = IntMap.IntMap [Ident]
 
 linearize' ::
@@ -42,38 +36,17 @@ linearize' nm binder e =
       e'' <- withHeader newNm x t e'
       linearize' newNm xts e''
 
--- (nmE, e'') <- distinguishCode (map fst xts) e'
--- -- (nmT, t') <- distinguishCode (map fst xts) t
--- linearize' (merge [nmE, nm]) xts e''
-
--- (nmT, t') <- distinguishCode (map fst xts) t
--- let newNm = merge [nmT, nm]
--- e' <- withHeader newNm x t' e
--- linearize' newNm xts e'
-
 -- insert header for a variable
 withHeader :: NameMap -> Ident -> CodePlus -> CodePlus -> WithEnv CodePlus
 withHeader nm x t e =
   case IntMap.lookup (asInt x) nm of
     Nothing ->
-      -- p "affine:"
-      -- p' x
-      -- p "in:"
-      -- p' e
       withHeaderAffine x t e
     Just [] ->
       raiseCritical' $ "impossible. x: " <> asText' x
     Just [z] ->
-      -- p "linear:"
-      -- p' x
-      -- p "in:"
-      -- p' e
       withHeaderLinear z x e
     Just (z1 : z2 : zs) ->
-      -- p "relevant:"
-      -- p' x
-      -- p "in:"
-      -- p' e
       withHeaderRelevant x t z1 z2 zs e
 
 -- withHeaderAffine x t e ~>
@@ -221,22 +194,16 @@ distinguishCode zs term =
         else do
           (vs2, e2') <- distinguishCode zs e2
           return (merge [vs1, vs2], (ml, CodeUpElim x e1' e2'))
-    (ml, CodeEnumElim varInfo d branchList) -> do
-      (vs, varInfo', d') <- distinguishBranch zs varInfo d
-      return (vs, (ml, CodeEnumElim varInfo' d' branchList))
+    (ml, CodeEnumElim d branchList) -> do
+      (vs, d') <- distinguishData zs d
+      let (cs, es) = unzip branchList
+      (vss, es') <- unzip <$> mapM (distinguishCode zs) es
+      return (merge $ vs : vss, (ml, CodeEnumElim d' (zip cs es')))
     (ml, CodeStructElim xts d e) -> do
       (vs1, d') <- distinguishData zs d
       let zs' = filter (`notElem` map fst xts) zs
       (vs2, e') <- distinguishCode zs' e
       return (merge [vs1, vs2], (ml, CodeStructElim xts d' e'))
-
-distinguishBranch :: [Ident] -> SubstDataPlus -> DataPlus -> WithEnv (NameMap, SubstDataPlus, DataPlus)
-distinguishBranch zs varInfo d = do
-  (vs, d') <- distinguishData zs d
-  let (from, to) = unzip $ IntMap.toList varInfo
-  (vss, to') <- unzip <$> mapM (distinguishData zs) to
-  let varInfo' = IntMap.fromList $ zip from to'
-  return (merge (vs : vss), varInfo', d')
 
 distinguishPrimitive :: [Ident] -> Primitive -> WithEnv (NameMap, Primitive)
 distinguishPrimitive zs term =

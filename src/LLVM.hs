@@ -25,8 +25,8 @@ import Reduce.Code
 toLLVM :: CodePlus -> WithEnv LLVM
 toLLVM mainTerm@(m, _) = do
   modify (\env -> env {nameSet = S.empty})
-  -- mainTerm' <- reduceCodePlus mainTerm
-  let mainTerm' = mainTerm
+  mainTerm' <- reduceCodePlus mainTerm
+  -- let mainTerm' = mainTerm
   modify (\env -> env {nameSet = S.empty})
   mainTerm'' <- llvmCode mainTerm'
   -- the result of "main" must be i64, not i8*
@@ -60,8 +60,15 @@ llvmCode term =
       e1' <- llvmCode e1
       e2' <- llvmCode e2
       commConv x e1' e2'
-    (_, CodeEnumElim sub v branchList) ->
-      prepareBranch sub branchList >>= llvmCodeEnumElim v
+    (_, CodeEnumElim v branchList) -> do
+      m <- constructSwitch branchList
+      case m of
+        Nothing ->
+          return LLVMUnreachable
+        Just (defaultCase, caseList) -> do
+          let t = LowTypeInt 64
+          (cast, castThen) <- llvmCast (Just "enum-base") v t
+          castThen $ LLVMSwitch (cast, t) defaultCase caseList
     (_, CodeStructElim xks v e) -> do
       let (xs, ks) = unzip xks
       let ts = map arrayKindToLowType ks
@@ -70,16 +77,6 @@ llvmCode term =
       let idxList = map (\i -> (LLVMDataInt i, i32)) [0 ..]
       ys <- mapM newNameWith xs
       loadContent v bt (zip idxList (zip ys xts)) e
-
-prepareBranch :: SubstDataPlus -> [(a, CodePlus)] -> WithEnv [(a, CodePlus)]
-prepareBranch sub branchList = do
-  let (ls, es) = unzip branchList
-  let es' = map (substCodePlus sub) es
-  ns <- gets nameSet
-  modify (\env -> env {nameSet = S.empty})
-  es'' <- mapM reduceCodePlus es'
-  modify (\env -> env {nameSet = ns})
-  return $ zip ls es''
 
 uncastList :: [(Ident, (Ident, LowType))] -> CodePlus -> WithEnv LLVM
 uncastList args e =
@@ -407,17 +404,6 @@ constructSwitch switch =
     (EnumCaseDefault, code) : _ -> do
       code' <- llvmCode code
       return $ Just (code', [])
-
-llvmCodeEnumElim :: DataPlus -> [(EnumCase, CodePlus)] -> WithEnv LLVM
-llvmCodeEnumElim v branchList = do
-  m <- constructSwitch branchList
-  case m of
-    Nothing ->
-      return LLVMUnreachable
-    Just (defaultCase, caseList) -> do
-      let t = LowTypeInt 64
-      (cast, castThen) <- llvmCast (Just "enum-base") v t
-      castThen $ LLVMSwitch (cast, t) defaultCase caseList
 
 data AggPtrType
   = AggPtrTypeArray Int LowType

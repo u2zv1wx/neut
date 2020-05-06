@@ -27,7 +27,7 @@ data Code
   | CodeSigmaElim ArrayKind [Ident] DataPlus CodePlus
   | CodeUpIntro DataPlus
   | CodeUpElim Ident CodePlus CodePlus
-  | CodeEnumElim SubstDataPlus DataPlus [(EnumCase, CodePlus)]
+  | CodeEnumElim DataPlus [(EnumCase, CodePlus)]
   | CodeStructElim [(Ident, ArrayKind)] DataPlus CodePlus
   deriving (Show)
 
@@ -115,10 +115,11 @@ substCodePlus sub term =
       let sub' = IntMap.delete (asInt x) sub
       let e2' = substCodePlus sub' e2
       (m, CodeUpElim x e1' e2')
-    (m, CodeEnumElim fvInfo v branchList) -> do
-      let fvInfo' = IntMap.map (substDataPlus sub) fvInfo
+    (m, CodeEnumElim v branchList) -> do
       let v' = substDataPlus sub v
-      (m, CodeEnumElim fvInfo' v' branchList)
+      let (cs, es) = unzip branchList
+      let es' = map (substCodePlus sub) es
+      (m, CodeEnumElim v' (zip cs es'))
     (m, CodeStructElim xks v e) -> do
       let v' = substDataPlus sub v
       let sub' = foldr IntMap.delete sub (map (asInt . fst) xks)

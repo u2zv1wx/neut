@@ -66,9 +66,8 @@ clarify' tenv term =
       let (cs, es) = unzip bs
       fvs <- constructEnumFVS tenv es
       es' <- (mapM (clarify' tenv) >=> alignFVS tenv m fvs) es
-      let sub = IntMap.fromList $ map (\(mx, x, _) -> (asInt x, (mx, DataUpsilon x))) fvs
       (y, e', yVar) <- clarifyPlus tenv e
-      return $ bindLet [(y, e')] (m, CodeEnumElim sub yVar (zip (map snd cs) es'))
+      return $ bindLet [(y, e')] (m, CodeEnumElim yVar (zip (map snd cs) es'))
     (m, TermArray {}) ->
       returnArrayType m
     (m, TermArrayIntro k es) -> do
@@ -432,21 +431,11 @@ registerIfNecessary ::
 registerIfNecessary m name isFixed xts1 xts2 e = do
   cenv <- gets codeEnv
   when (not $ name `Map.member` cenv) $ do
-    (args, body) <- toLamInfo m xts1 xts2 e
+    e' <- linearize (xts2 ++ xts1) e
+    (envVarName, envVar) <- newDataUpsilonWith m "env"
+    let args = map fst xts1 ++ [envVarName]
+    let body = (m, sigmaElim (map fst xts2) envVar e')
     insCodeEnv name isFixed args body
-
-toLamInfo ::
-  Meta ->
-  [(Ident, CodePlus)] ->
-  [(Ident, CodePlus)] ->
-  CodePlus ->
-  WithEnv ([Ident], CodePlus)
-toLamInfo m xts1 xts2 e = do
-  e' <- linearize (xts2 ++ xts1) e
-  (envVarName, envVar) <- newDataUpsilonWith m "env"
-  let args = map fst xts1 ++ [envVarName]
-  let body = (m, sigmaElim (map fst xts2) envVar e')
-  return (args, body)
 
 makeClosure' ::
   TypeEnv ->
@@ -504,8 +493,7 @@ retClosure tenv mName fvs m xts e = do
   cls <- makeClosure' tenv mName fvs m xts e
   return (m, CodeUpIntro cls)
 
-callClosure ::
-  Meta -> CodePlus -> [(Ident, CodePlus, DataPlus)] -> WithEnv CodePlus
+callClosure :: Meta -> CodePlus -> [(Ident, CodePlus, DataPlus)] -> WithEnv CodePlus
 callClosure m e zexes = do
   let (zs, es', xs) = unzip3 zexes
   (clsVarName, clsVar) <- newDataUpsilonWith m "closure"
@@ -597,7 +585,9 @@ insTypeEnv1 xts tenv =
     [] ->
       tenv
     (_, x, t) : rest ->
-      insTypeEnv' (asInt x) t $ insTypeEnv1 rest tenv
+      insTypeEnv1 rest $ insTypeEnv' (asInt x) t tenv
+
+-- insTypeEnv' (asInt x) t $ insTypeEnv1 rest tenv
 
 obtainChain :: Meta -> Ident -> TypeEnv -> WithEnv [IdentPlus]
 obtainChain m x tenv = do

@@ -4,7 +4,7 @@
 
 (include "core/functor.neut")
 
-;; (include "core/string.neut")
+(include "core/string.neut")
 
 (inductive µ ((f (hom tau tau)))
   (lan
@@ -18,11 +18,16 @@
   ((f (hom tau tau))
    (x (f (µ f))))
   (witness (µ f)
+    (with identity.bind
+    (string.print "µ.in\n")
     (µ.lan
       f
       (µ f)
       x
-      (λ (y) y))))
+      (λ (y)
+        (with identity.bind
+        (string.print "in\n")
+        y))))))
 
 ;; µ F -> F (µ F)
 (define µ.out
@@ -36,8 +41,12 @@
           (f (µ f)))
         (λ (b v k)
           (with identity.bind
+            (string.print "here\n")
             ((functor.map f F)
               b
               (µ f)
-              (λ (value) (µ.in f (k value)))
+              (λ (value)
+              (with identity.bind
+                (string.print "inner\n")
+                (µ.in f (k value))))
               v)))))))

@@ -6,7 +6,6 @@ import Data.EnumCase
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import Data.Ident
-import qualified Data.IntMap as IntMap
 import Data.LowType
 import Data.Meta
 import Data.Namespace
@@ -15,14 +14,9 @@ import qualified Data.Text as T
 
 type Context = [(Ident, TermPlus)]
 
--- toAffineApp meta x t ~>
---   bind exp := t in
---   exp @ (0, x)
---
--- {} toAffineApp {}
-toAffineApp :: Meta -> Ident -> CodePlus -> WithEnv CodePlus
-toAffineApp m x t = do
-  (expVarName, expVar) <- newDataUpsilonWith m "aff-app-exp"
+toApp :: T.Text -> Meta -> Ident -> CodePlus -> WithEnv CodePlus
+toApp switcher m x t = do
+  (expVarName, expVar) <- newDataUpsilonWith m "exp"
   return
     ( m,
       CodeUpElim
@@ -31,28 +25,23 @@ toAffineApp m x t = do
         ( m,
           CodePiElimDownElim
             expVar
-            [(m, DataEnumIntro boolFalse), (m, DataUpsilon x)]
+            [(m, DataEnumIntro switcher), (m, DataUpsilon x)]
         )
     )
+
+-- toAffineApp meta x t ~>
+--   bind exp := t in
+--   exp @ (0, x)
+toAffineApp :: Meta -> Ident -> CodePlus -> WithEnv CodePlus
+toAffineApp =
+  toApp boolFalse
 
 -- toRelevantApp meta x t ~>
 --   bind exp := t in
 --   exp @ (1, x)
---
 toRelevantApp :: Meta -> Ident -> CodePlus -> WithEnv CodePlus
-toRelevantApp m x t = do
-  (expVarName, expVar) <- newDataUpsilonWith m "rel-app-exp"
-  return
-    ( m,
-      CodeUpElim
-        expVarName
-        t
-        ( m,
-          CodePiElimDownElim
-            expVar
-            [(m, DataEnumIntro boolTrue), (m, DataUpsilon x)]
-        )
-    )
+toRelevantApp =
+  toApp boolTrue
 
 bindLet :: [(Ident, CodePlus)] -> CodePlus -> CodePlus
 bindLet binder cont =
@@ -95,20 +84,16 @@ makeSwitcher m compAff compRel = do
     ( [switchVarName, argVarName],
       ( m,
         CodeEnumElim
-          (IntMap.fromList [(asInt argVarName, argVar)])
           switchVar
           (switch aff rel)
       )
     )
 
 cartesianImmediate :: Meta -> WithEnv DataPlus
-cartesianImmediate m = do
-  i <- newCount
-  let key = cartImmName <> "-" <> T.pack (show i)
-  -- let key = cartImmName
-  tryCache m key $ do
+cartesianImmediate m =
+  tryCache m cartImmName $ do
     (args, e) <- makeSwitcher m affineImmediate relevantImmediate
-    insCodeEnv key False args e
+    insCodeEnv cartImmName False args e
 
 affineImmediate :: DataPlus -> WithEnv CodePlus
 affineImmediate (m, _) =
