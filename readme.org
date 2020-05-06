@@ -30,13 +30,13 @@ Here I briefly summerize the basic properties of Neut before diving into the det
 - [[#installation][Installation]]
 - [[#syntax-and-semantics-of-statements][Syntax and Semantics of Statements]]
   - [[#constant][constant]]
-  - [[#let][let]]
   - [[#ensure][ensure]]
   - [[#enum][enum]]
   - [[#include][include]]
   - [[#inductive][inductive]]
   - [[#introspect][introspect]]
   - [[#keywordnotation][keyword/notation]]
+  - [[#let][let]]
   - [[#record][record]]
   - [[#useunuse][use/unuse]]
   - [[#sectionend][section/end]]
@@ -384,83 +384,6 @@ The =constant= statement declares an external constant.
 *** Semantics
 When evaluated, the =(constant x t)= statement modifies the state of the compiler so that a [[#constant][constant]] =x= of type =t= is available for later use. Declared constants can then be available for use as in the same way of ordinary [[#upsilon][variables]]. Every constant must have distinct names. This statement is currently intended for internal use, such as for implementation of syscalls. External constants (FFI) might also be supported in future release via this statement.
 
-** let
-The =let= statement evaluates given term and binds the result to a variable.
-
-*** Example
-#+BEGIN_SRC neut
-(let foo (i64 10)) ;; define a variable `foo` to be `10`
-
-(i64.print foo) ;; ~> 10 (this is equivalent to `(let _ (i64.print foo))`)
-
-(let (bar i64) 20) ;; `let` with type annotation
-
-(i64.print bar) ;; ~> 20
-
-;; `define` is defined in `core/notation.neut` as follows:
-;;
-;; (keyword define)
-;;
-;; (notation (define f xts e)
-;;   (let f (fix f xts e)))
-;;
-;; (notation (define f e)
-;;   (let f e))
-;;
-
-;; ordinary definition (i.e. 1-mutual definition)
-(define fact ((x i64))
-  (if (icmp-sle-i64 x 0) ;; compare (by less-than-or-equal) two `i64`s as signed integers
-    1
-    (mul-i64 x (fact (sub-i64 x 1))))) ;; the self-referential variable "fact" is available in its function body
-
-(i64.print (fact foo)) ;; ~> 3628800 (= 10!)
-
-;; the definition of `fact` above is equivalent to the following:
-(let fact
-  (fix fact ((x i64))
-    (if (icmp-sle-i64 x 0)
-      1
-      (mul-i64 x (fact (sub-i64 x 1))))))
-;; which is alpha-equivalent to:
-(let fact
-  (fix self ((x i64))
-    (if (icmp-sle-i64 x 0)
-      1
-      (mul-i64 x (self (sub-i64 x 1))))))
-
-;; mutual recursion can be realized as in the ordinary way:
-(define even-f ((f (hom i64 bool)) (n i64))
-  (if (icmp-eq-i64 n 0)
-    true
-    (f (sub-i64 n 1))))
-
-(define odd ((n i64))
-  (if (icmp-eq-i64 n 0)
-    false
-    (even-f odd (sub-i64 n 1))))
-
-(define even ((n i64))
-  (even-f odd n))
-
-(i64.print
-  (if (even 10)
-    100
-    1000)) ;; ~> 100
-#+END_SRC
-*** Syntax
-#+BEGIN_SRC neut
-(let (ID TERM) TERM)
-
-(let ID TERM)
-#+END_SRC
-*** Semantics
-When parsed, the =(let x e)= statement does nothing.
-
-When evaluated, the =(let x e)= statement checks the type of the term =e=, evaluates the term =e=, then defines a variable =x= with =e= as its content. =x= is available in the remaining program. The type of =x= can be specified to be =t= by writing =(let (x t) e)=.
-
-If user input is not parsed as a statement when it is supposed to be, the compiler firstly interpret it as a term =e=, and then processes a statement =(let _ e)=.
-
 ** ensure
 The =ensure= statement fetches the content of the specified URL for later use.
 
@@ -724,6 +647,83 @@ and then replaces =b=, =e1=, and =e2= in the codomain of the notation according 
 This translation is the step-expansion. The keyword environment here is required to determine whether a leaf of the domain of a notation is a variable or an opaque syntactic construct (i.e. "keyword"). In the example above, without the =(keyword if)= statement, we cannot determine if the =if= in =(if b e1 e2)= is a variable or a keyword.
 
 Given this step-expansion, the macro-expansion proceeds as follows. Take =t= to be an input tree. If the tree =t= is of the form =(leaf STRING)=, the compiler returns the result of step-expansion of =t=. If a tree is of the form =(node t1 ... tn)=, the =t1=, ..., =tn= are firstly macro-expanded them into =t1'= , ..., =tn'= , and then the compiler step-expands the tree =(node t1' ... tn')=.
+
+** let
+The =let= statement evaluates given term and binds the result to a variable.
+
+*** Example
+#+BEGIN_SRC neut
+(let foo (i64 10)) ;; define a variable `foo` to be `10`
+
+(i64.print foo) ;; ~> 10 (this is equivalent to `(let _ (i64.print foo))`)
+
+(let (bar i64) 20) ;; `let` with type annotation
+
+(i64.print bar) ;; ~> 20
+
+;; `define` is defined in `core/notation.neut` as follows:
+;;
+;; (keyword define)
+;;
+;; (notation (define f xts e)
+;;   (let f (fix f xts e)))
+;;
+;; (notation (define f e)
+;;   (let f e))
+;;
+
+;; ordinary definition (i.e. 1-mutual definition)
+(define fact ((x i64))
+  (if (icmp-sle-i64 x 0) ;; compare (by less-than-or-equal) two `i64`s as signed integers
+    1
+    (mul-i64 x (fact (sub-i64 x 1))))) ;; the self-referential variable "fact" is available in its function body
+
+(i64.print (fact foo)) ;; ~> 3628800 (= 10!)
+
+;; the definition of `fact` above is equivalent to the following:
+(let fact
+  (fix fact ((x i64))
+    (if (icmp-sle-i64 x 0)
+      1
+      (mul-i64 x (fact (sub-i64 x 1))))))
+;; which is alpha-equivalent to:
+(let fact
+  (fix self ((x i64))
+    (if (icmp-sle-i64 x 0)
+      1
+      (mul-i64 x (self (sub-i64 x 1))))))
+
+;; mutual recursion can be realized as in the ordinary way:
+(define even-f ((f (hom i64 bool)) (n i64))
+  (if (icmp-eq-i64 n 0)
+    true
+    (f (sub-i64 n 1))))
+
+(define odd ((n i64))
+  (if (icmp-eq-i64 n 0)
+    false
+    (even-f odd (sub-i64 n 1))))
+
+(define even ((n i64))
+  (even-f odd n))
+
+(i64.print
+  (if (even 10)
+    100
+    1000)) ;; ~> 100
+#+END_SRC
+*** Syntax
+#+BEGIN_SRC neut
+(let (ID TERM) TERM)
+
+(let ID TERM)
+#+END_SRC
+*** Semantics
+When parsed, the =(let x e)= statement does nothing.
+
+When evaluated, the =(let x e)= statement checks the type of the term =e=, evaluates the term =e=, then defines a variable =x= with =e= as its content. =x= is available in the remaining program. The type of =x= can be specified to be =t= by writing =(let (x t) e)=.
+
+If user input is not parsed as a statement when it is supposed to be, the compiler firstly interpret it as a term =e=, and then processes a statement =(let _ e)=.
 
 ** record
 The =record= statement creates a record type, its elimination rules (destructors), and its introduction rule.
