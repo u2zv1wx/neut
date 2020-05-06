@@ -30,7 +30,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
 - [[#installation][Installation]]
 - [[#syntax-and-semantics-of-statements][Syntax and Semantics of Statements]]
   - [[#constant][constant]]
-  - [[#definelet][define/let]]
+  - [[#let][let]]
   - [[#ensure][ensure]]
   - [[#enum][enum]]
   - [[#include][include]]
