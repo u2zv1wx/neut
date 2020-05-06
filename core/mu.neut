@@ -19,14 +19,12 @@
    (x (f (µ f))))
   (witness (µ f)
     (with identity.bind
-    (string.print "µ.in\n")
     (µ.lan
       f
       (µ f)
       x
       (λ (y)
         (with identity.bind
-        (string.print "in\n")
         y))))))
 
 ;; µ F -> F (µ F)
@@ -41,12 +39,10 @@
           (f (µ f)))
         (λ (b v k)
           (with identity.bind
-            (string.print "here\n")
             ((functor.map f F)
               b
               (µ f)
               (λ (value)
               (with identity.bind
-                (string.print "inner\n")
                 (µ.in f (k value))))
               v)))))))

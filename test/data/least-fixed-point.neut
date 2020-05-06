@@ -1,0 +1,107 @@
+(no-implicit-core)
+
+(include "core/notation.neut")
+
+(include "core/identity.neut")
+
+(include "core/integer.neut")
+
+(inductive µ ((f (hom tau tau)))
+  (lan
+    ((b tau)
+     (_ (f b))
+     (_ (hom b (µ f))))
+    (µ f)))
+
+;; F (µ F) -> µF
+(define µ.in
+  ((f (hom tau tau))
+   (x (f (µ f))))
+  (witness (µ f)
+    (with identity.bind
+    (µ.lan
+      f
+      (µ f)
+      x
+      (λ (y)
+        (with identity.bind
+        y))))))
+
+;; µ F -> F (µ F)
+(define µ.out
+  ((f (hom tau tau))
+   (F (functor f))
+   (x (µ f)))
+  (witness (f (µ f))
+    (with identity.bind
+      (µ.fold f x
+        (λ (_)
+          (f (µ f)))
+        (λ (b v k)
+          (with identity.bind
+            ((functor.map f F)
+              b
+              (µ f)
+              (λ (value)
+              (with identity.bind
+                (µ.in f (k value))))
+              v)))))))
+
+(inductive list-f ((a tau) (r tau))
+  (nil ()
+    (list-f a r))
+  (cons ((_ a) (_ r))
+    (list-f a r)))
+
+(define list-f# ((a tau))
+  (lambda (r) (list-f a r)))
+
+(define list ((a tau))
+  (µ (list-f# a)))
+
+(define list.nil ((a tau))
+  (witness (list a)
+    (µ.in (list-f# a) (list-f.nil a (list a)))))
+
+(define list.cons ((a tau) (x a) (xs (list a)))
+  (witness (list a)
+    (µ.in (list-f# a) (list-f.cons a (list a) x xs))))
+
+(define list-f.map ((a tau))
+  (witness (functor-form (list-f# a))
+    (λ (from to f m)
+      (witness (list-f a to)
+        (list-f.fold
+          a
+          from
+          m
+          (λ (_ _)
+            (list-f a to))
+          (λ ()
+            (list-f.nil a to))
+          (λ (y ys)
+            (list-f.cons a to y (f ys))))))))
+
+(define list-f.as-functor ((a tau))
+  (witness (functor (lambda (r) (list-f a r)))
+    (functor.new
+      (lambda (r) (list-f a r))
+      (list-f.map a))))
+
+(define my-length ((a tau) (xs (list a)))
+  (witness i64
+    (with identity.bind
+      (list-f.fold
+        a
+        (list a)
+        (µ.out (list-f# a) (list-f.as-functor a) xs)
+        (λ (_ _)
+          i64)
+        (λ ()
+          0)
+        (λ (y ys)
+          (add-i64 1 (my-length a ys)))))))
+
+(let xs (list.cons i64 0 (list.cons * 1 (list.cons * 2 (list.nil *)))))
+
+(i64.print (my-length i64 xs))
