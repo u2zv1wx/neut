@@ -1,6 +1,5 @@
 module Parse.Discern
   ( discern,
-    discernIdent,
     discernIdentPlus,
     discernDef,
     discernText,
@@ -133,19 +132,21 @@ discern' nenv term =
       let nenv' = Map.filterWithKey (\k _ -> k `notElem` xs) nenv
       discern' nenv' e
 
-discernIdent :: Meta -> Ident -> WithEnv (Meta, Ident)
-discernIdent m x = do
-  x' <- newDefinedNameWith m x
-  modify (\env -> env {topNameEnv = Map.insert (asText x) x' (topNameEnv env)})
-  return (m, x')
-
 discernIdentPlus :: WeakIdentPlus -> WithEnv WeakIdentPlus
 discernIdentPlus (m, x, t) = do
+  sanityCheck m x
   nenv <- gets topNameEnv
   t' <- discern' nenv t
   x' <- newDefinedNameWith m x
   modify (\env -> env {topNameEnv = Map.insert (asText x) x' (topNameEnv env)})
   return (m, x', t')
+
+sanityCheck :: Meta -> Ident -> WithEnv ()
+sanityCheck m x = do
+  nenv <- gets topNameEnv
+  when (Map.member (asText x) nenv)
+    $ raiseError m
+    $ "the variable " <> asText x <> " is already defined"
 
 discernBinder ::
   NameEnv ->

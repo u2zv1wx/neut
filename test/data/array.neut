@@ -24,7 +24,7 @@
 
 (i64.print k) ;; -7
 
-(let k
+(let l
   (with identity.bind
     (let a (i64.array-access 0 * &xs))
     (let b (i64.array-access 1 4 &xs))
@@ -33,4 +33,4 @@
     (erase xs)
     (i64.add a (i64.add b (i64.add c d)))))
 
-(i64.print k) ;; -7
+(i64.print l) ;; -7
