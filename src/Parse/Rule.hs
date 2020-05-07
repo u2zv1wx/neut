@@ -203,7 +203,6 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
         insInductive as constructorIdent
         yts' <- mapM (internalize as atsbts) $ drop (length xts') xtsyts
         return
-          -- [ WeakStmtLetWT
           [ WeakStmtLet
               m
               constructorIdent
@@ -356,24 +355,12 @@ theta mode isub modifier t e = do
     (_, WeakTermPiElim (_, WeakTermUpsilon ai) es)
       | Just _ <- IntMap.lookup (asInt ai) isub ->
         return $ modifier e
-        -- thetaInductive mode isub ai modifier es e
       -- when the inductive type `ai` is defined beforehand and it is not a mutual one
       | Just (Just bts) <- IntMap.lookup (asInt ai) ienv,
         not (all (isResolved isub) es) ->
         thetaInductiveNested mode isub modifier e ai es bts
-      -- when the inductive type `ai` is defined beforehand and it is a mutual one
-      -- | Just Nothing <- IntMap.lookup (asInt ai) ienv ->
-      --   thetaInductiveNestedMutual (metaOf t) ai
     _ ->
       return e
-
--- if isResolved isub t
---   then return e
---   else do
---     p "isub:"
---     p' isub
---     raiseError (metaOf t) $
---       "malformed inductive/coinductive type definition: " <> toText t
 
 thetaPi ::
   Mode ->
@@ -391,28 +378,6 @@ thetaPi mode isub modifier xts cod e = do
   appForward <- theta mode isub modifier cod' (fst e, WeakTermPiElim e xsBackward)
   let ts'' = map (substWeakTermPlus isub) ts'
   return (fst e, WeakTermPiIntro (zip3 ms' xs' ts'') appForward)
-
--- thetaInductive ::
---   Mode ->
---   SubstWeakTerm ->
---   Ident ->
---   (WeakTermPlus -> WeakTermPlus) ->
---   [WeakTermPlus] ->
---   WeakTermPlus ->
---   WithEnv WeakTermPlus
--- thetaInductive _ _ _ modifier _ e =
---   return $ modifier e
-  -- | ModeBackward <- mode =
-  --   raiseError (metaOf e) $
-  --     "found a contravariant occurence of `"
-  --       <> asText a
-  --       <> "` in the antecedent of an introduction rule"
-  -- | all (isResolved isub) es =
-  --   return $ modifier e
-  -- | otherwise =
-  --   raiseError (metaOf e) "found a self-nested inductive type"
-  -- | otherwise =
-  --   return $ modifier e
 
 thetaInductiveNested ::
   Mode -> -- whether current conversion is flipped or not
@@ -439,13 +404,6 @@ thetaInductiveNested mode isub modifier e aOuter es bts = do
         e
         ((m, WeakTermPiIntro xts (m, WeakTermPiElim va es')) : args)
     )
-
--- thetaInductiveNestedMutual :: Meta -> Ident -> WithEnv WeakTermPlus
--- thetaInductiveNestedMutual m ai =
---   raiseError m $
---     "mutual inductive type `"
---       <> asText ai
---       <> "` cannot be used to construct a nested inductive type"
 
 lookupInductive ::
   Meta ->

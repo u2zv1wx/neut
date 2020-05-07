@@ -70,6 +70,35 @@
      (_ (item A)))
     (item A)))
 
+;; (inductive shallow ((A tau))
+;;   (cons ()
+;;     (shallow A))
+;;   (cons0
+;;     ((_ (shallow A))
+;;      (_ (shallow A)))
+;;     (shallow A))
+;;   (cons1
+;;     ((_ (shallow A))
+;;      (_ (list (shallow A))))
+;;     (shallow A))
+;;   (cons2
+;;     ((_ (shallow A))
+;;      (_ (list2 (shallow A))))
+;;     (shallow A))
+;;   (cons3
+;;     ((_ (shallow A))
+;;      (_ (list (shallow A))))
+;;     (shallow A))
+;;   (cons4
+;;     ((_ (shallow A))
+;;      (_ (list2 (shallow A))))
+;;     (shallow A))
+;;   (cons5
+;;     ((_ A)
+;;      (_ (shallow A)))
+;;     (shallow A)))
+
+
 ;; mutually inductive type
 (inductive
   (even ((_ (nat)))
