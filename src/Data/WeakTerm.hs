@@ -80,7 +80,6 @@ type Connective =
 
 data WeakStmt
   = WeakStmtLet Meta WeakIdentPlus WeakTermPlus
-  | WeakStmtLetWT Meta WeakIdentPlus WeakTermPlus
   | WeakStmtConstDecl WeakTextPlus
   deriving (Show)
 

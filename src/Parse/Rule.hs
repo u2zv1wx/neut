@@ -90,7 +90,7 @@ generateProjections t = do
   h <- newNameWith'' "_"
   let dom = (ma, h, (ma, WeakTermPiElim (ma, WeakTermUpsilon $ asIdent a) (map toVar' xts)))
   forM bts $ \(mb, b, tb) ->
-    WeakStmtLetWT mb
+    WeakStmtLet mb
       <$> discernIdentPlus
         ( mb,
           asIdent (a <> nsSep <> asText b),
@@ -159,8 +159,8 @@ toInductive ats bts connective@(m, ai, xts, _) = do
     discernIdentPlus
       (m, asIdent $ ai <> nsSep <> "fold", (m, WeakTermPi indArgs cod))
   return
-    [ WeakStmtLetWT m at' indType,
-      WeakStmtLetWT m foldIdent fold
+    [ WeakStmtLet m at' indType,
+      WeakStmtLet m foldIdent fold
     ]
 
 toInductiveIntroList :: [WeakTextPlus] -> [WeakTextPlus] -> Connective -> WithEnv [WeakStmt]
