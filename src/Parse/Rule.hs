@@ -181,7 +181,7 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
   | (_, WeakTermPiElim (_, WeakTermUpsilon a') es) <- cod,
     ai == asText a',
     length xts == length es = do
-    let vs = varWeakTermPlus (m, WeakTermPi yts cod)
+    let vs = varWeakTermPlus' (yts ++ ats ++ bts) []
     let xts' = filter (\(_, x, _) -> x `S.member` vs) xts
     constructor <-
       discern
