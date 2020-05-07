@@ -63,21 +63,6 @@ i64 :: Meta -> WeakTermPlus
 i64 m =
   (m, WeakTermConst (showIntSize 64))
 
-type Rule = -- inference rule
-  ( Meta, -- location of the name
-    T.Text, -- the name of the rule
-    Meta, -- location of the rule
-    [WeakIdentPlus], -- the antecedents of the inference rule (e.g. [(x, A), (xs, list A)])
-    WeakTermPlus -- the consequent of the inference rule
-  )
-
-type Connective =
-  ( Meta, -- location of the connective
-    T.Text, -- the name of the connective (e.g. nat, list)
-    [WeakIdentPlus], -- parameter of the connective (e.g. the `A` in `list A`)
-    [Rule] -- list of introduction rule when inductive / list of elimination rule when coinductive
-  )
-
 data WeakStmt
   = WeakStmtLet Meta WeakIdentPlus WeakTermPlus
   | WeakStmtConstDecl WeakTextPlus
