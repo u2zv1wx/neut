@@ -348,22 +348,6 @@ toText term =
       asText' x
     (_, WeakTermPi xts cod) ->
       showCons ["Π", inParen $ showTypeArgs xts cod, toText cod]
-      -- case extractSigmaArg term of
-      --   Just yts ->
-      --     case splitLast yts of
-      --       Just (zts, (_, _, t))
-      --         | isDependent zts t ->
-      --           showCons ["Σ", inParen $ showTypeArgs zts t, toText t]
-      --         | otherwise -> do
-      --           let (_, _, ts) = unzip3 zts
-      --           showCons $ "product" : map toText (ts ++ [t])
-      --       Nothing -> "(product)"
-      --   Nothing
-      -- | isDependent xts cod ->
-      --   showCons ["Π", inParen $ showTypeArgs xts cod, toText cod]
-      -- | otherwise -> do
-      --   let (_, _, ts) = unzip3 xts
-      --   showCons ["arrow", showCons $ map toText ts, toText cod]
     (_, WeakTermPiIntro xts e) -> do
       let argStr = inParen $ showItems $ map showArg xts
       showCons ["λ", argStr, toText e]
@@ -433,30 +417,11 @@ showTypeArgs args cod =
     [] ->
       T.empty
     [(_, x, t)] ->
-      -- | x `S.member` varWeakTermPlus cod ->
-        inParen $ asText' x <> " " <> toText t
-      -- | otherwise ->
-      --   inParen $ "_" <> " " <> toText t
+      inParen $ asText' x <> " " <> toText t
     (_, x, t) : xts -> do
-      -- | x `S.member` varWeakTermPlus' xts [cod] -> do
-        let s1 = inParen $ asText' x <> " " <> toText t
-        let s2 = showTypeArgs xts cod
-        s1 <> " " <> s2
-      -- | otherwise -> do
-      --   let s1 = inParen $ "_" <> " " <> toText t
-      --   let s2 = showTypeArgs xts cod
-      --   s1 <> " " <> s2
-
-isDependent :: [WeakIdentPlus] -> WeakTermPlus -> Bool
-isDependent binder cod =
-  case binder of
-    [] ->
-      False
-    (_, x, _) : xts
-      | x `S.member` varWeakTermPlus' xts [cod] ->
-        True
-      | otherwise ->
-        isDependent xts cod
+      let s1 = inParen $ asText' x <> " " <> toText t
+      let s2 = showTypeArgs xts cod
+      s1 <> " " <> s2
 
 showClause :: (EnumCase, WeakTermPlus) -> T.Text
 showClause (c, e) =
