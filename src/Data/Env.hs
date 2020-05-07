@@ -81,7 +81,6 @@ data Env
         constraintEnv :: [PreConstraint],
         constraintQueue :: ConstraintQueue,
         substEnv :: IntMap.IntMap WeakTermPlus,
-        defEnv :: IntMap.IntMap TermPlus,
         holeEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus),
         --
         -- clarify
@@ -140,7 +139,6 @@ initialEnv =
       constraintEnv = [],
       constraintQueue = Q.empty,
       substEnv = IntMap.empty,
-      defEnv = IntMap.empty,
       holeEnv = IntMap.empty,
       nameSet = S.empty,
       nopFreeSet = S.empty

@@ -67,7 +67,6 @@ elaborateLet m mx x t e cont = do
   t' <- elaborate' t
   insWeakTypeEnv x $ weaken t'
   modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e') (substEnv env)})
-  modify (\env -> env {defEnv = IntMap.insert (asInt x) e' (defEnv env)})
   cont' <- elaborateStmt cont
   return (m, TermPiElim (m, TermPiIntro [(mx, x, t')] cont') [e'])
 
