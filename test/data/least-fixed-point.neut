@@ -2,12 +2,10 @@
 
 (include "core/notation.neut")
 
-(include "core/identity.neut")
-
 (include "core/integer.neut")
 
 (inductive µ ((f (hom tau tau)))
-  (lan
+  (lan ;; left-kan-extension
     ((b tau)
      (_ (f b))
      (_ (hom b (µ f))))
@@ -18,14 +16,12 @@
   ((f (hom tau tau))
    (x (f (µ f))))
   (witness (µ f)
-    (with identity.bind
     (µ.lan
       f
       (µ f)
       x
       (λ (y)
-        (with identity.bind
-        y))))))
+        y))))
 
 ;; µ F -> F (µ F)
 (define µ.out
@@ -33,19 +29,16 @@
    (F (functor f))
    (x (µ f)))
   (witness (f (µ f))
-    (with identity.bind
-      (µ.fold f x
-        (λ (_)
-          (f (µ f)))
-        (λ (b v k)
-          (with identity.bind
-            ((functor.map f F)
-              b
-              (µ f)
-              (λ (value)
-              (with identity.bind
-                (µ.in f (k value))))
-              v)))))))
+    (µ.fold f x
+      (λ (_)
+        (f (µ f)))
+      (λ (b v k)
+        ((functor.map f F)
+          b
+          (µ f)
+          (λ (value)
+            (µ.in f (k value)))
+          v)))))
 
 (inductive list-f ((a tau) (r tau))
   (nil ()
@@ -83,24 +76,23 @@
             (list-f.cons a to y (f ys))))))))
 
 (define list-f.as-functor ((a tau))
-  (witness (functor (lambda (r) (list-f a r)))
+  (witness (functor (λ (r) (list-f a r)))
     (functor.new
-      (lambda (r) (list-f a r))
+      (λ (r) (list-f a r))
       (list-f.map a))))
 
 (define my-length ((a tau) (xs (list a)))
   (witness i64
-    (with identity.bind
-      (list-f.fold
-        a
-        (list a)
-        (µ.out (list-f# a) (list-f.as-functor a) xs)
-        (λ (_ _)
-          i64)
-        (λ ()
-          0)
-        (λ (y ys)
-          (add-i64 1 (my-length a ys)))))))
+    (list-f.fold
+      a
+      (list a)
+      (µ.out (list-f# a) (list-f.as-functor a) xs)
+      (λ (_ _)
+        i64)
+      (λ ()
+        0)
+      (λ (y ys)
+        (add-i64 1 (my-length a ys))))))
 
 (let xs (list.cons i64 0 (list.cons * 1 (list.cons * 2 (list.nil *)))))
 
