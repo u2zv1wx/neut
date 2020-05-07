@@ -18,14 +18,11 @@
   ((f (hom tau tau))
    (x (f (µ f))))
   (witness (µ f)
-    (with identity.bind
     (µ.lan
       f
       (µ f)
       x
-      (λ (y)
-        (with identity.bind
-        y))))))
+      (λ (y) y))))
 
 ;; µ F -> F (µ F)
 (define µ.out
@@ -33,16 +30,13 @@
    (F (functor f))
    (x (µ f)))
   (witness (f (µ f))
-    (with identity.bind
-      (µ.fold f x
-        (λ (_)
-          (f (µ f)))
-        (λ (b v k)
-          (with identity.bind
-            ((functor.map f F)
-              b
-              (µ f)
-              (λ (value)
-              (with identity.bind
-                (µ.in f (k value))))
-              v)))))))
+    (µ.fold f x
+      (λ (_)
+        (f (µ f)))
+      (λ (b v k)
+        ((functor.map f F)
+          b
+          (µ f)
+          (λ (value)
+            (µ.in f (k value)))
+          v)))))
