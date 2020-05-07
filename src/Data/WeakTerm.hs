@@ -208,14 +208,14 @@ holeWeakTermPlus' binder es =
 substWeakTermPlus :: SubstWeakTerm -> WeakTermPlus -> WeakTermPlus
 substWeakTermPlus sub term =
   case term of
-    tau@(_, WeakTermTau) ->
-      tau
-    e1@(_, WeakTermUpsilon x) ->
+    (_, WeakTermTau) ->
+      term
+    (_, WeakTermUpsilon x) ->
       case IntMap.lookup (asInt x) sub of
         Nothing ->
-          e1
+          term
         Just e2@(_, e) ->
-          (supMeta (metaOf e1) (metaOf e2), e)
+          (supMeta (metaOf term) (metaOf e2), e)
     (m, WeakTermPi xts t) -> do
       let (xts', t') = substWeakTermPlus'' sub xts t
       (m, WeakTermPi xts' t')
@@ -233,12 +233,12 @@ substWeakTermPlus sub term =
       (m, WeakTermFix (mx, x, t') xts' e')
     (_, WeakTermConst _) ->
       term
-    e1@(_, WeakTermHole x) ->
+    (_, WeakTermHole x) ->
       case IntMap.lookup (asInt x) sub of
         Nothing ->
-          e1
+          term
         Just e2@(_, e) ->
-          (supMeta (metaOf e1) (metaOf e2), e)
+          (supMeta (metaOf term) (metaOf e2), e)
     (m, WeakTermInt t x) -> do
       let t' = substWeakTermPlus sub t
       (m, WeakTermInt t' x)
@@ -359,14 +359,14 @@ toText term =
     (_, WeakTermArray dom k) ->
       showCons ["array", toText dom, showArrayKind k]
     (_, WeakTermArrayIntro _ es) ->
-      showArray $ map toText es
+      showCons $ "array-introduction" : map toText es
     (_, WeakTermArrayElim _ xts e1 e2) -> do
       let argStr = inParen $ showItems $ map showArg xts
       showCons ["array-elimination", argStr, toText e1, toText e2]
     (_, WeakTermStruct ks) ->
       showCons $ "struct" : map showArrayKind ks
     (_, WeakTermStructIntro ets) ->
-      showStruct $ map (toText . fst) ets
+      showCons $ "struct-introduction" : map (toText . fst) ets
     (_, WeakTermStructElim xts e1 e2) -> do
       let argStr = inParen $ showItems $ map (\(_, x, _) -> asText x) xts
       showCons ["struct-elimination", argStr, toText e1, toText e2]
@@ -440,14 +440,6 @@ showCons =
 showTuple :: [T.Text] -> T.Text
 showTuple =
   inAngle . T.intercalate " "
-
-showArray :: [T.Text] -> T.Text
-showArray =
-  inBracket . T.intercalate " "
-
-showStruct :: [T.Text] -> T.Text
-showStruct =
-  inBrace . T.intercalate " "
 
 extractSigmaArg :: WeakTermPlus -> Maybe [WeakIdentPlus]
 extractSigmaArg term =
