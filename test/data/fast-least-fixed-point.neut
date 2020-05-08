@@ -4,30 +4,20 @@
 
 (include "core/integer.neut")
 
-(define µ ((f (hom tau tau)))
+(define µ
+  ((f (hom tau tau)))
   (pi
     ((F (hom (hom tau tau) tau))
      (_ (pi ((b tau) (_ (f b))) (F f))))
     (F f)))
 
-(define µ.new ((f (hom tau tau)) (b tau) (x (f b)))
-  (witness (µ f)
-    (λ (F k)
-      (k b x))))
-
-;; F (µ F) -> µF
 (define µ.in
   ((f (hom tau tau))
    (x (f (µ f))))
   (witness (µ f)
-    (µ.new
-      f
-      (µ f)
-      x)))
+    (λ (_ k)
+      (k (µ f) x))))
 
-(erase µ.new)
-
-;; µ F -> F (µ F)
 (define µ.out
   ((f (hom tau tau))
    (x (µ f)))
@@ -36,34 +26,43 @@
       (λ (_)
         (f (µ f)))
       (λ (b v)
-        (unsafe.cast (f b) (f (µ f)) v))))) ;; (Lambek's lemma)
+        (unsafe.cast
+          (f b)
+          (f (µ f))
+          v)))))
 
-(inductive list-f ((a tau) (r tau))
+(inductive list-f
+  ((a tau)
+   (r tau))
   (nil ()
     (list-f a r))
   (cons ((_ a) (_ r))
     (list-f a r)))
 
-(define list-f# ((a tau))
-  (lambda (r) (list-f a r)))
+(define list
+  ((a tau))
+  (µ (list-f a _)))
 
-(define list ((a tau))
-  (µ (list-f# a)))
-
-(define list.nil ((a tau))
+(define list.nil
+  ((a tau))
   (witness (list a)
-    (µ.in (list-f# a) (list-f.nil a (list a)))))
+    (µ.in (list-f a _) (list-f.nil a (list a)))))
 
-(define list.cons ((a tau) (x a) (xs (list a)))
+(define list.cons
+  ((a tau)
+   (x a)
+   (xs (list a)))
   (witness (list a)
-    (µ.in (list-f# a) (list-f.cons a (list a) x xs))))
+    (µ.in (list-f a _) (list-f.cons a (list a) x xs))))
 
-(define length ((a tau) (xs (list a)))
+(define length
+  ((a tau)
+   (xs (list a)))
   (witness i64
     (list-f.fold
       a
       (list a)
-      (µ.out (list-f# a) xs)
+      (µ.out (list-f a _) xs)
       (λ (_ _)
         i64)
       (λ ()

@@ -46,22 +46,19 @@
   (cons ((_ a) (_ r))
     (list-f a r)))
 
-(define list-f# ((a tau))
-  (lambda (r) (list-f a r)))
-
 (define list ((a tau))
-  (µ (list-f# a)))
+  (µ (list-f a _)))
 
 (define list.nil ((a tau))
   (witness (list a)
-    (µ.in (list-f# a) (list-f.nil a (list a)))))
+    (µ.in (list-f a _) (list-f.nil a (list a)))))
 
 (define list.cons ((a tau) (x a) (xs (list a)))
   (witness (list a)
-    (µ.in (list-f# a) (list-f.cons a (list a) x xs))))
+    (µ.in (list-f a _) (list-f.cons a (list a) x xs))))
 
 (define list-f.map ((a tau))
-  (witness (functor-form (list-f# a))
+  (witness (functor-form (list-f a _))
     (λ (from to f m)
       (witness (list-f a to)
         (list-f.fold
@@ -86,7 +83,7 @@
     (list-f.fold
       a
       (list a)
-      (µ.out (list-f# a) (list-f.as-functor a) xs)
+      (µ.out (list-f a _) (list-f.as-functor a) xs)
       (λ (_ _)
         i64)
       (λ ()
