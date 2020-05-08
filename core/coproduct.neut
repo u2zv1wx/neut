@@ -60,48 +60,20 @@
   (witness (coproduct e a)
     (left * * err)))
 
-(define either
-  ((e tau))
-  (witness (hom tau tau)
-    (lambda ((a tau))
-      (coproduct e a))))
-
-(define either-map
-  ((e tau))
-  (witness (functor-form (either e))
-    (lambda (_ _ f m)
-      (coproduct.map * * * f m))))
-
-(define either-return
-  ((e tau))
-  (witness (return-type (either e))
-    (lambda (_ x)
-      (coproduct.return * * x))))
-
-(define either-bind
-  ((e tau))
-  (witness (bind-type (either e))
-    (lambda (_ _ m k)
-      (coproduct.bind * * * m k))))
-
 (define witness-functor
   ((e tau))
-  (witness (functor (either e))
+  (witness (functor (coproduct e _))
     (functor.new
-      (either e)
-      (either-map e))))
+      (coproduct e _)
+      (coproduct.map e _ _ _ _))))
 
 (define witness-monad
   ((e tau))
-  (witness (monad (either e))
+  (witness (monad (coproduct e _))
     (monad.new
-      (either e)
+      (coproduct e _)
       (witness-functor e)
-      (either-return e)
-      (either-bind e))))
-
-(provide throw)
-
-(provide witness-monad)
+      (coproduct.return e _ _)
+      (coproduct.bind e _ _ _ _))))
 
 (end coproduct)
