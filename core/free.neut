@@ -38,8 +38,8 @@
 
 ;; f (Free f a) -> Free f aがほしいが。
 ;; fに構造がないと無理そう？……いけた。
-(define in ((f (hom tau tau)) (a tau) (x (f ((free f _) a))))
-  (witness ((free f _) a)
+(define in ((f (hom tau tau)) (a tau) (x (f (free f a))))
+  (witness (free f a)
     (free.node
       f
       a
@@ -47,31 +47,25 @@
       x
       (lambda (y) y))))
 
-;; Free f a -> f (Free f a)
-?free.fold
-
-;; free fがfunctorであることを利用してなんかうまくやれないか？
-;; fのところにfree fを自動で与えるようにすればいいだけか？x : free (free f) aとする、ってわけ。
-;; その場合は結果のほうはfree f (free (free f) a)みたいになるが。fについてのfoldが使えないから微妙では？
 (define out
   ((f (hom tau tau))
    (M (monad f))
    (a tau)
-   (x ((free f _) a)))
-  (witness (f ((free f _) a))
+   (x (free f a)))
+  (witness (f (free f a))
     (free.fold f a x
       (lambda (_ _)
-        (f ((free f _) a)))
+        (f (free f a)))
       (lambda (x)
         ((functor.map f (monad.witness-functor f M))
            a
-           ((free f _) a)
+           (free f a)
            (lambda (val) (free.leaf f a val))
            ((monad.return f M) a x)))
       (lambda (b v k)
         ((functor.map f (monad.witness-functor f M))
           b
-          ((free f _) a)
+          (free f a)
           (λ (value) (free.in f a (k value)))
           v)))))
 
@@ -94,11 +88,11 @@
     (lambda
       ((a tau)
        (b tau)
-       (m ((free g _) a))
-       (k (hom a ((free g _) b))))
+       (m (free g a))
+       (k (hom a (free g b))))
       (free.fold g a m
         (lambda (_ _)
-          ((free g _) b))
+          (free g b))
         (lambda (x)
           (k x))
         (lambda (p val acc)
