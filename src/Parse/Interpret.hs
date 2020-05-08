@@ -236,10 +236,27 @@ interpretAux m es =
       interpretPiElim m f args
 
 interpretPiElim :: Meta -> TreePlus -> [TreePlus] -> WithEnv WeakTermPlus
-interpretPiElim m f args = do
+interpretPiElim m f es = do
   f' <- interpret f
-  args' <- mapM interpret args
-  return (m, WeakTermPiElim f' args')
+  (xts, args) <- interpretArg es
+  if null xts
+    then return (m, WeakTermPiElim f' args)
+    else return (m, WeakTermPiIntro xts (m, WeakTermPiElim f' args))
+
+interpretArg :: [TreePlus] -> WithEnv ([WeakIdentPlus], [WeakTermPlus])
+interpretArg es =
+  case es of
+    [] ->
+      return ([], [])
+    tree : treeList -> do
+      (xts, args) <- interpretArg treeList
+      case tree of
+        (_, TreeLeaf "_") -> do
+          xt@(m, h, _) <- interpretIdentPlus tree
+          return (xt : xts, (m, WeakTermUpsilon h) : args)
+        _ -> do
+          e <- interpret tree
+          return (xts, e : args)
 
 sigmaIntro :: Meta -> [WeakTermPlus] -> WithEnv WeakTermPlus
 sigmaIntro m es = do
