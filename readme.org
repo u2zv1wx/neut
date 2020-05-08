@@ -319,7 +319,7 @@ define TYPE @FUNCTION_NAME(...) {
   (...)
 }
 #+END_SRC
-In other words, the compiler can cancel the memory deallocation at =(*1)= and the allocation at =(*2)=, reusing the allocated memory in its continuation. This is automatic malloc/free cancellation. By this "fallback" optimization, the compiler can emit performant code even if a user wrote code in an "inefficient" way.
+In other words, the compiler can cancel the memory deallocation at =(*1)= and the allocation at =(*2)=, reusing the allocated memory in its continuation. This is automatic malloc/free cancellation. By this fallback optimization, the compiler can emit performant code even if a user wrote code in an inefficient way.
 
 Note that the "create the string" parts are not optimized away from the resulting LLVM IR, in contrast to the one of borrowing:
 #+BEGIN_SRC llvm
