@@ -4,11 +4,16 @@
 
 (include "core/integer.neut")
 
-(inductive µ ((f (hom tau tau)))
-  (new
-    ((b tau)
-     (_ (f b)))
-    (µ f)))
+(define µ ((f (hom tau tau)))
+  (pi
+    ((F (hom (hom tau tau) tau))
+     (_ (pi ((b tau) (_ (f b))) (F f))))
+    (F f)))
+
+(define µ.new ((f (hom tau tau)) (b tau) (x (f b)))
+  (witness (µ f)
+    (λ (F k)
+      (k b x))))
 
 ;; F (µ F) -> µF
 (define µ.in
@@ -27,7 +32,7 @@
   ((f (hom tau tau))
    (x (µ f)))
   (witness (f (µ f))
-    (µ.fold f x
+    (x
       (λ (_)
         (f (µ f)))
       (λ (b v)
