@@ -255,14 +255,6 @@ formationRuleOf :: Connective -> WithEnv Rule
 formationRuleOf (m, a, xts, _) =
   return (m, a, m, xts, (m, WeakTermTau))
 
--- formationRuleOf' :: Connective -> WithEnv Rule
--- formationRuleOf' (m, x, xts, rules) = do
---   -- let bs = map (\(_, b, _, _, _) -> b) rules
---   -- let bis = zip bs [0 ..]
---   -- register "nat" ~> [("zero", 0), ("succ", 1)], "list" ~> [("nil", 0), ("cons", 1)], etc.
---   -- insEnumEnv m x bis
---   return (m, x, m, xts, (m, WeakTermTau))
-
 toInternalRuleList :: Connective -> WithEnv [WeakTextPlus]
 toInternalRuleList (_, _, _, rules) =
   mapM ruleAsWeakTextPlus rules
