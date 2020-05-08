@@ -39,7 +39,7 @@ clarify' tenv term =
     (m, TermPi {}) ->
       returnClosureType m
     (m, TermPiIntro mxts e) -> do
-      fvs <- nubFVS <$> chainTermPlus tenv term
+      fvs <- nubFVS <$> chainOf tenv term
       e' <- clarify' (insTypeEnv1 mxts tenv) e
       retClosure tenv Nothing fvs m mxts e'
     (m, TermPiElim e es) -> do
@@ -49,7 +49,7 @@ clarify' tenv term =
     (m, TermFix (_, x, t) mxts e) -> do
       let tenv' = insTypeEnv' (asInt x) t tenv
       e' <- clarify' (insTypeEnv1 mxts tenv') e
-      fvs <- nubFVS <$> chainTermPlus tenv term
+      fvs <- nubFVS <$> chainOf tenv term
       cls <- makeClosureFix' tenv x fvs m mxts e'
       return (m, CodeUpIntro cls)
     (m, TermConst x) ->
@@ -119,7 +119,7 @@ clarifyPlus tenv e@(m, _) = do
 
 constructEnumFVS :: TypeEnv -> [TermPlus] -> WithEnv [IdentPlus]
 constructEnumFVS tenv es =
-  nubFVS <$> concat <$> mapM (chainTermPlus tenv) es
+  nubFVS <$> concat <$> mapM (chainOf tenv) es
 
 alignFVS :: TypeEnv -> Meta -> [IdentPlus] -> [CodePlus] -> WithEnv [CodePlus]
 alignFVS tenv m fvs es = do
@@ -510,24 +510,26 @@ callClosure m e zexes = do
           (m, CodePiElimDownElim lamVar (xs ++ [envVar]))
       )
 
-chainTermPlus :: TypeEnv -> TermPlus -> WithEnv [IdentPlus]
-chainTermPlus tenv term =
+chainOf :: TypeEnv -> TermPlus -> WithEnv [IdentPlus]
+chainOf tenv term =
   case term of
     (_, TermTau) ->
       return []
-    (m, TermUpsilon x) ->
-      obtainChain m x tenv
+    (m, TermUpsilon x) -> do
+      t <- lookupTypeEnv' m x tenv
+      xts <- chainOf tenv t
+      return $ xts ++ [(m, x, t)]
     (_, TermPi {}) ->
       return []
     (_, TermPiIntro xts e) ->
-      chainTermPlus' tenv xts [e]
+      chainOf' tenv xts [e]
     (_, TermPiElim e es) -> do
-      xs1 <- chainTermPlus tenv e
-      xs2 <- concat <$> mapM (chainTermPlus tenv) es
+      xs1 <- chainOf tenv e
+      xs2 <- concat <$> mapM (chainOf tenv) es
       return $ xs1 ++ xs2
     (_, TermFix (_, x, t) xts e) -> do
-      xs1 <- chainTermPlus tenv t
-      xs2 <- chainTermPlus' (insTypeEnv' (asInt x) t tenv) xts [e]
+      xs1 <- chainOf tenv t
+      xs2 <- chainOf' (insTypeEnv' (asInt x) t tenv) xts [e]
       return $ xs1 ++ filter (\(_, y, _) -> y /= x) xs2
     (_, TermConst _) ->
       return []
@@ -540,38 +542,38 @@ chainTermPlus tenv term =
     (_, TermEnumIntro _) ->
       return []
     (_, TermEnumElim (e, t) les) -> do
-      xs0 <- chainTermPlus tenv t
-      xs1 <- chainTermPlus tenv e
+      xs0 <- chainOf tenv t
+      xs1 <- chainOf tenv e
       let es = map snd les
-      xs2 <- concat <$> mapM (chainTermPlus tenv) es
+      xs2 <- concat <$> mapM (chainOf tenv) es
       return $ xs0 ++ xs1 ++ xs2
     (_, TermArray {}) ->
       return []
     (_, TermArrayIntro _ es) ->
-      concat <$> mapM (chainTermPlus tenv) es
+      concat <$> mapM (chainOf tenv) es
     (_, TermArrayElim _ xts e1 e2) -> do
-      xs1 <- chainTermPlus tenv e1
-      xs2 <- chainTermPlus' tenv xts [e2]
+      xs1 <- chainOf tenv e1
+      xs2 <- chainOf' tenv xts [e2]
       return $ xs1 ++ xs2
     (_, TermStruct _) ->
       return []
     (_, TermStructIntro eks) ->
-      concat <$> mapM (chainTermPlus tenv . fst) eks
+      concat <$> mapM (chainOf tenv . fst) eks
     (m, TermStructElim xks e1 e2) -> do
-      xs1 <- chainTermPlus tenv e1
+      xs1 <- chainOf tenv e1
       let (ms, xs, ks) = unzip3 xks
       ts <- mapM (inferKind m) ks
-      xs2 <- chainTermPlus (insTypeEnv1 (zip3 ms xs ts) tenv) e2
+      xs2 <- chainOf (insTypeEnv1 (zip3 ms xs ts) tenv) e2
       return $ xs1 ++ filter (\(_, y, _) -> y `notElem` xs) xs2
 
-chainTermPlus' :: TypeEnv -> [IdentPlus] -> [TermPlus] -> WithEnv [IdentPlus]
-chainTermPlus' tenv binder es =
+chainOf' :: TypeEnv -> [IdentPlus] -> [TermPlus] -> WithEnv [IdentPlus]
+chainOf' tenv binder es =
   case binder of
     [] ->
-      concat <$> mapM (chainTermPlus tenv) es
+      concat <$> mapM (chainOf tenv) es
     (_, x, t) : xts -> do
-      xs1 <- chainTermPlus tenv t
-      xs2 <- chainTermPlus' (insTypeEnv' (asInt x) t tenv) xts es
+      xs1 <- chainOf tenv t
+      xs2 <- chainOf' (insTypeEnv' (asInt x) t tenv) xts es
       return $ xs1 ++ filter (\(_, y, _) -> y /= x) xs2
 
 dropFst :: [(a, b, c)] -> [(b, c)]
@@ -586,9 +588,3 @@ insTypeEnv1 xts tenv =
       tenv
     (_, x, t) : rest ->
       insTypeEnv1 rest $ insTypeEnv' (asInt x) t tenv
-
-obtainChain :: Meta -> Ident -> TypeEnv -> WithEnv [IdentPlus]
-obtainChain m x tenv = do
-  t <- lookupTypeEnv' m x tenv
-  xts <- chainTermPlus tenv t
-  return $ xts ++ [(m, x, t)]
