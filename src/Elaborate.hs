@@ -56,8 +56,6 @@ elaborateLet m mx x t e cont = do
   analyze >> synthesize >> refine >> cleanup
   e' <- reduceTermPlus <$> elaborate' e
   t' <- reduceTermPlus <$> elaborate' t
-  -- e' <- elaborate' e
-  -- t' <- elaborate' t
   insWeakTypeEnv x $ weaken t'
   modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e') (substEnv env)})
   cont' <- elaborateStmt cont
@@ -219,21 +217,3 @@ lookupEnumSet m name = do
       raiseError m $ "no such enum defined: " <> name
     Just xis ->
       return $ map fst xis
--- warnUnusedVar :: WithEnv ()
--- warnUnusedVar =
---   whenCheck $ do
---     set <- gets intactSet
---     let set' = S.map (\(m, x) -> (getPosInfo m, x)) set
---     warnUnusedVar' $ S.toList set'
-
--- warnUnusedVar' :: [(PosInfo, T.Text)] -> WithEnv ()
--- warnUnusedVar' infoList =
---   case infoList of
---     [] ->
---       return ()
---     ((pos, x) : pxs)
---       | T.all (`S.notMember` S.fromList "()") x -> do
---         warn pos $ "defined but not used: `" <> x <> "`"
---         warnUnusedVar' pxs
---       | otherwise ->
---         warnUnusedVar' pxs
