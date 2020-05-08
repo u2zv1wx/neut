@@ -21,7 +21,7 @@
 
 (i64.print (fact' 5)) ;; 120
 
-;; https.//mathworld.wolfram.com/TAKFunction.html
+;; https://mathworld.wolfram.com/TAKFunction.html
 (let tak
   (fix self (x y z)
     (if (icmp-sle-i64 x y)
