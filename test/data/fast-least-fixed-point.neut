@@ -20,6 +20,8 @@
       (µ f)
       x)))
 
+(erase µ.new)
+
 ;; µ F -> F (µ F)
 (define µ.out
   ((f (hom tau tau))
