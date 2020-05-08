@@ -10,35 +10,35 @@
 
 (include "core/identity.neut")
 
-(inductive free-internal ((g (hom tau tau)) (a tau))
+(inductive free ((g (hom tau tau)) (a tau))
   (leaf
     ((_ a))
-    (free-internal g a))
+    (free g a))
   (node
     ((b tau)
      (_ (g b))
-     (_ (hom b (free-internal g a))))
-    (free-internal g a)))
+     (_ (hom b (free g a))))
+    (free g a)))
 
-(use free-internal)
+(use free)
 
-(define free ((g (hom tau tau)))
-  (witness (hom tau tau)
-    (lambda (a)
-      (free-internal g a))))
+;; (define free ((g (hom tau tau)))
+;;   (witness (hom tau tau)
+;;     (lambda (a)
+;;       (free g a))))
 
-(define free.fold
-  free-internal.fold)
+;; (define free.fold
+;;   free.fold)
 
 (section free)
 
 (define map
   ((g (hom tau tau)))
-  (witness (functor-form (free g))
+  (witness (functor-form (free g _))
     (lambda (a b (f (hom a b)) m)
       (free.fold g a m
         (lambda (_ _)
-          ((free g) b))
+          ((free g _) b))
         (lambda (x)
           (leaf g b (f x)))
         (lambda (p val acc)
@@ -46,12 +46,12 @@
 
 ;; f (Free f a) -> Free f aがほしいが。
 ;; fに構造がないと無理そう？……いけた。
-(define in ((f (hom tau tau)) (a tau) (x (f ((free f) a))))
-  (witness ((free f) a)
-    (free-internal.node
+(define in ((f (hom tau tau)) (a tau) (x (f ((free f _) a))))
+  (witness ((free f _) a)
+    (free.node
       f
       a
-      ((free f) a)
+      ((free f _) a)
       x
       (lambda (y) y))))
 
@@ -65,48 +65,48 @@
   ((f (hom tau tau))
    (M (monad f))
    (a tau)
-   (x ((free f) a)))
-  (witness (f ((free f) a))
+   (x ((free f _) a)))
+  (witness (f ((free f _) a))
     (free.fold f a x
       (lambda (_ _)
-        (f ((free f) a)))
+        (f ((free f _) a)))
       (lambda (x)
         ((functor.map f (monad.witness-functor f M))
            a
-           ((free f) a)
-           (lambda (val) (free-internal.leaf f a val))
+           ((free f _) a)
+           (lambda (val) (free.leaf f a val))
            ((monad.return f M) a x)))
       (lambda (b v k)
         ((functor.map f (monad.witness-functor f M))
           b
-          ((free f) a)
+          ((free f _) a)
           (λ (value) (free.in f a (k value)))
           v)))))
 
 (define witness-functor
   ((g (hom tau tau)))
-  (witness (functor (free g))
+  (witness (functor (free g _))
     (functor.new
-      (free g)
+      (free g _)
       (free.map g))))
 
 (define return
   ((g (hom tau tau)))
-  (witness (return-type (free g))
+  (witness (return-type (free g _))
     (lambda (_ x)
       (leaf * * x))))
 
 (define bind
   ((g (hom tau tau)))
-  (witness (bind-type (free g))
+  (witness (bind-type (free g _))
     (lambda
       ((a tau)
        (b tau)
-       (m ((free g) a))
-       (k (hom a ((free g) b))))
+       (m ((free g _) a))
+       (k (hom a ((free g _) b))))
       (free.fold g a m
         (lambda (_ _)
-          ((free g) b))
+          ((free g _) b))
         (lambda (x)
           (k x))
         (lambda (p val acc)
@@ -114,9 +114,9 @@
 
 (define witness-monad
   ((g (hom tau tau)))
-  (witness (monad (free g))
+  (witness (monad (free g _))
     (monad.new
-      (free g)
+      (free g _)
       (free.witness-functor g)
       (free.return g)
       (free.bind g))))
