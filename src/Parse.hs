@@ -10,6 +10,7 @@ import Data.ByteString.Builder
 import qualified Data.ByteString.Lazy as L
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import Data.Ident
 import Data.Meta
 import Data.Namespace
 import Data.Platform
@@ -121,6 +122,14 @@ parse' stmtTreeList =
                 parse' restStmtList
               | otherwise ->
                 raiseSyntaxError m "(enum LEAF TREE ... TREE)"
+            "erase"
+              | [(ms, TreeLeaf s)] <- rest -> do
+                nenv <- gets topNameEnv
+                s' <- asText <$> discernText ms s
+                modify (\env -> env {topNameEnv = Map.filterWithKey (\k _ -> k /= s') nenv})
+                parse' restStmtList
+              | otherwise ->
+                raiseSyntaxError m "(erase LEAF)"
             "include"
               | [(mPath, TreeLeaf pathString)] <- rest,
                 not (T.null pathString) ->
