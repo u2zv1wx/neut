@@ -22,14 +22,6 @@
 
 (use free)
 
-;; (define free ((g (hom tau tau)))
-;;   (witness (hom tau tau)
-;;     (lambda (a)
-;;       (free g a))))
-
-;; (define free.fold
-;;   free.fold)
-
 (section free)
 
 (define map
