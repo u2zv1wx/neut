@@ -587,8 +587,6 @@ insTypeEnv1 xts tenv =
     (_, x, t) : rest ->
       insTypeEnv1 rest $ insTypeEnv' (asInt x) t tenv
 
--- insTypeEnv' (asInt x) t $ insTypeEnv1 rest tenv
-
 obtainChain :: Meta -> Ident -> TypeEnv -> WithEnv [IdentPlus]
 obtainChain m x tenv = do
   t <- lookupTypeEnv' m x tenv
