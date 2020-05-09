@@ -28,8 +28,4 @@
       (let len (write n stdout &content n))
       (tuple (tuple n content) len))))
 
-(provide print-character)
-
-(provide string.print)
-
 (unuse os)

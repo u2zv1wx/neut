@@ -5,31 +5,23 @@
 (include "core/integer.neut")
 
 (define µ
-  ((f (hom tau tau)))
-  (pi
-    ((F (hom (hom tau tau) tau))
-     (_ (pi ((b tau) (_ (f b))) (F f))))
+  ((f (Π ((_ tau)) tau)))
+  (Π
+    ((F (Π ((_ (Π ((_ tau)) tau))) tau))
+     (_ (Π ((b tau) (_ (f b))) (F f))))
     (F f)))
 
 (define µ.in
   ((f (hom tau tau))
    (x (f (µ f))))
   (witness (µ f)
-    (λ (_ k)
-      (k (µ f) x))))
+    (unsafe.cast (f (µ f)) (µ f) x)))
 
 (define µ.out
   ((f (hom tau tau))
    (x (µ f)))
   (witness (f (µ f))
-    (x
-      (λ (_)
-        (f (µ f)))
-      (λ (b v)
-        (unsafe.cast
-          (f b)
-          (f (µ f))
-          v)))))
+    (unsafe.cast (µ f) (f (µ f)) x)))
 
 (inductive list-f
   ((a tau)

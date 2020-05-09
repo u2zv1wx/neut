@@ -30,7 +30,7 @@
     (lambda (a b (f (hom a b)) m)
       (free.fold g a m
         (lambda (_ _)
-          ((free g _) b))
+          (free g b))
         (lambda (x)
           (leaf g b (f x)))
         (lambda (p val acc)
@@ -43,7 +43,7 @@
     (free.node
       f
       a
-      ((free f _) a)
+      (free f a)
       x
       (lambda (y) y))))
 
@@ -106,15 +106,5 @@
       (free.witness-functor g)
       (free.return g)
       (free.bind g))))
-
-(provide map)
-
-(provide return)
-
-(provide bind)
-
-(provide witness-functor)
-
-(provide witness-monad)
 
 (end free)

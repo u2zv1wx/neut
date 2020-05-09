@@ -42,33 +42,62 @@
     (vec A (nat.succ m))))
 
 ;; nested inductive type
-(inductive item ((A tau))
+;; (inductive item ((A tau))
+;;   (cons ()
+;;     (item A))
+;;   (cons0
+;;     ((_ (item A))
+;;      (_ (list (list2 (list (item A))))))
+;;     (item A))
+;;   (cons1
+;;     ((_ (item A))
+;;      (_ (list (item A))))
+;;     (item A))
+;;   (cons2
+;;     ((_ (item A))
+;;      (_ (list (list (list2 (item A))))))
+;;     (item A))
+;;   (cons3
+;;     ((_ (item A))
+;;      (_ (list (list (item A)))))
+;;     (item A))
+;;   (cons4
+;;     ((_ (item A))
+;;      (_ (list2 (list (item A)))))
+;;     (item A))
+;;   (cons5
+;;     ((_ A)
+;;      (_ (item A)))
+;;     (item A)))
+
+(inductive item2 ((A tau) (self tau))
   (cons ()
-    (item A))
+    (item2 A self))
   (cons0
-    ((_ (item A))
-     (_ (list (list2 (list (item A))))))
-    (item A))
+    ((_ self)
+     (_ (list (list2 (list self)))))
+    (item2 A self))
   (cons1
-    ((_ (item A))
-     (_ (list (item A))))
-    (item A))
+    ((_ self)
+     (_ (list self)))
+    (item2 A self))
   (cons2
-    ((_ (item A))
-     (_ (list (list (list2 (item A))))))
-    (item A))
+    ((_ self)
+     (_ (list (list (list2 self)))))
+    (item2 A self))
   (cons3
-    ((_ (item A))
-     (_ (list (list (item A)))))
-    (item A))
+    ((_ self)
+     (_ (list (list self))))
+    (item2 A self))
   (cons4
-    ((_ (item A))
-     (_ (list2 (list (item A)))))
-    (item A))
+    ((_ self)
+     (_ (list2 (list self))))
+    (item2 A self))
   (cons5
     ((_ A)
-     (_ (item A)))
-    (item A)))
+     (_ self))
+    (item2 A self)))
+
 
 ;; (inductive shallow ((A tau))
 ;;   (cons ()

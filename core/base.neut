@@ -16,8 +16,6 @@
 ;;   (witness b
 ;;     (k x)))
 
-(provide compose)
-
 ;; (provide let-bind)
 ;; (define let-bind ([a tau] [b tau] (x a) (k (hom a b)))
 ;;   (witness b
