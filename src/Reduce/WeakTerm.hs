@@ -18,10 +18,6 @@ reduceWeakTermPlus term =
       let ts' = map reduceWeakTermPlus ts
       let cod' = reduceWeakTermPlus cod
       (m, WeakTermPi (zip3 ms xs ts') cod')
-    (_, WeakTermPiIntro xts (_, WeakTermPiElim e args))
-      | Just ys <- mapM asUpsilon args,
-        ys == map (\(_, x, _) -> x) xts ->
-        e
     (m, WeakTermPiIntro xts e) -> do
       let (ms, xs, ts) = unzip3 xts
       let ts' = map reduceWeakTermPlus ts
