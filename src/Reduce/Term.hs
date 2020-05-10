@@ -7,6 +7,7 @@ import Data.EnumCase
 import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.LowType
+import Data.Namespace
 import Data.Primitive
 import Data.Term
 import qualified Data.Text as T
@@ -139,11 +140,11 @@ isValueConst x
     True
   | Just _ <- asBinaryOpMaybe x =
     True
-  | x == "os:stdin" =
+  | x == "os" <> nsSep <> "stdin" =
     True
-  | x == "os:stdout" =
+  | x == "os" <> nsSep <> "stdout" =
     True
-  | x == "os:stderr" =
+  | x == "os" <> nsSep <> "stderr" =
     True
   | otherwise =
     False
