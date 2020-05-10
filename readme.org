@@ -148,7 +148,7 @@ let foo := string.print &str;
 #+END_SRC
 into:
 #+BEGIN_SRC text
-let (foo, str) := string.print &str;
+let (foo, str) := string.print str;
 #+END_SRC
 
 With this notation, our running example is rewritten as follows:
