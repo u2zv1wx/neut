@@ -3,36 +3,46 @@
 ;; define basic notations
 
 ;; synonyms
-(notation type tau)
+(notation type
+  tau)
 
-(notation universe tau)
+(notation universe
+  tau)
 
-(notation forall pi)
+(notation forall
+  pi)
 
-(notation Π pi)
+(notation Π
+  pi)
 
-(notation * hole)
+(notation *
+  hole)
 
-(notation switch enum-elimination)
+(notation switch
+  enum-elimination)
 
-(notation lambda pi-introduction)
+(notation lambda
+  pi-introduction)
 
-(notation λ pi-introduction)
+(notation λ
+  pi-introduction)
 
 (notation (witness t e)
-  ((lambda ((x t)) x) e))
+  ((λ ((x t)) x) e))
 
-(notation (hom t) t)
+(notation (hom t)
+  t)
 
 (notation (hom t rest+)
-  (pi
+  (Π
     ((_ t))
     (hom rest+)))
 
 (notation (theorem x t e)
   (let (x t) e))
 
-(notation assume lambda)
+(notation assume
+  pi-introduction)
 
 (notation (if b e1 e2)
   (switch b
@@ -59,7 +69,8 @@
      (_ (Π (xt+ (_ t)) c)))
     c))
 
-(notation ∑ sigma)
+(notation ∑
+  sigma)
 
 (notation (product t+)
   (Π
@@ -91,9 +102,11 @@
 (notation (sigma-elimination (xt+) e1 e2)
   (e1 * (λ (xt+) e2)))
 
-(notation tuple sigma-introduction)
+(notation tuple
+  sigma-introduction)
 
-(notation construct sigma-introduction)
+(notation construct
+  sigma-introduction)
 
 (notation (destruct e xts rest+)
   (sigma-elimination xts e (with identity.bind rest+)))
