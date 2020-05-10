@@ -15,7 +15,7 @@ type MacroSubst = [(T.Text, TreePlus)]
 
 macroExpand :: TreePlus -> WithEnv TreePlus
 macroExpand =
-  recurM (macroExpand1 . splice)
+  recurM (stepExpand . splice)
 
 recurM :: (Monad m) => (TreePlus -> m TreePlus) -> TreePlus -> m TreePlus
 recurM f tree =
@@ -26,8 +26,8 @@ recurM f tree =
       ts' <- mapM (recurM f) ts
       f (m, TreeNode ts')
 
-macroExpand1 :: TreePlus -> WithEnv TreePlus
-macroExpand1 t@(i, _) = do
+stepExpand :: TreePlus -> WithEnv TreePlus
+stepExpand t@(i, _) = do
   nenv <- gets notationEnv
   kenv <- gets keywordEnv
   if atomListOf t `S.disjoint` kenv
