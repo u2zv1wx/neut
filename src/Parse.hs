@@ -172,8 +172,8 @@ parse' stmtTreeList =
                 raiseSyntaxError m "(let LEAF TREE TREE) | (let TREE TREE)"
             "notation"
               | [from, to] <- rest -> do
-                checkNotationSanity from
-                modify (\e -> e {notationEnv = (from, to) : notationEnv e})
+                name <- checkNotationSanity from
+                modify (\env -> env {notationEnv = Map.insertWith (++) name [(from, to)] (notationEnv env)})
                 parse' restStmtList
               | otherwise ->
                 raiseSyntaxError m "(notation TREE TREE)"

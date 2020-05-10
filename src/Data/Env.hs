@@ -55,7 +55,7 @@ data Env
         -- list of reserved keywords
         keywordEnv :: S.Set T.Text,
         -- macro transformers
-        notationEnv :: [(TreePlus, TreePlus)],
+        notationEnv :: Map.HashMap T.Text [(TreePlus, TreePlus)],
         constantSet :: S.Set T.Text,
         fileEnv :: Map.HashMap (Path Abs File) VisitInfo,
         traceEnv :: [Path Abs File],
@@ -108,7 +108,7 @@ initialEnv =
       endOfEntry = "",
       phase = 0,
       target = Nothing,
-      notationEnv = [],
+      notationEnv = Map.empty,
       keywordEnv = S.empty,
       constantSet = S.empty,
       enumEnv = Map.empty,

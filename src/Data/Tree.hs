@@ -1,7 +1,6 @@
 module Data.Tree where
 
 import Data.Meta
-import qualified Data.Set as S
 import qualified Data.Text as T
 
 data Tree
@@ -20,13 +19,15 @@ asLeaf tree =
     _ ->
       Nothing
 
-atomListOf :: TreePlus -> S.Set T.Text
-atomListOf tree =
+headAtomOf :: TreePlus -> Maybe T.Text
+headAtomOf tree =
   case tree of
     (_, TreeLeaf x) ->
-      S.singleton x
-    (_, TreeNode ts) ->
-      S.unions $ map atomListOf ts
+      return x
+    (_, TreeNode ((_, TreeLeaf x) : _)) ->
+      return x
+    (_, TreeNode _) ->
+      Nothing
 
 showAsSExp :: TreePlus -> T.Text
 showAsSExp tree =
