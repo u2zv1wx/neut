@@ -67,7 +67,7 @@ parse' :: [TreePlus] -> WithEnv [WeakStmt]
 parse' stmtTreeList =
   case stmtTreeList of
     [] -> leave
-    (headStmt : restStmtList) ->
+    headStmt : restStmtList ->
       case headStmt of
         (m, TreeNode (leaf@(_, TreeLeaf headAtom) : rest)) ->
           case headAtom of
