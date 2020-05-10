@@ -32,13 +32,9 @@ stepExpand t@(i, _) = do
   nenv <- gets notationEnv
   case headAtomOf t of
     Just headAtom
-      | Just nenv' <- Map.lookup headAtom nenv -> do
-        mMatch <- try (macroMatch t) nenv'
-        case mMatch of
-          Just (sub, skel) ->
-            macroExpand $ applySubst sub $ replaceMeta i skel
-          Nothing ->
-            return t
+      | Just nenv' <- Map.lookup headAtom nenv,
+        Just (sub, skel) <- try (macroMatch t) nenv' ->
+        macroExpand $ applySubst sub $ replaceMeta i skel
     _ ->
       return t
 
@@ -48,47 +44,56 @@ type Notation =
 macroMatch ::
   TreePlus -> -- input tree
   Notation -> -- registered notation
-  WithEnv (Maybe MacroSubst) -- {symbols in a pattern} -> {trees}
+  Maybe MacroSubst -- {symbols in a pattern} -> {trees}
 macroMatch t1 t2 =
   case (t1, t2) of
-    ((_, TreeLeaf s1), (_, TreeLeaf s2)) -> do
-      kenv <- gets keywordEnv
-      case s2 `S.member` kenv of
-        True
-          | s1 == s2 ->
-            return $ Just Map.empty
-          | otherwise ->
-            return Nothing
-        False ->
-          return $ Just $ Map.singleton s2 t1
-    ((_, TreeNode _), (_, TreeLeaf s2)) -> do
-      kenv <- gets keywordEnv
-      case s2 `S.member` kenv of
-        True ->
-          return Nothing
-        False ->
-          return $ Just $ Map.singleton s2 t1
-    ((_, TreeLeaf _), (_, TreeNode _)) ->
-      return Nothing
-    ((_, TreeNode []), (_, TreeNode [])) ->
-      return $ Just Map.empty
-    ((_, TreeNode _), (_, TreeNode [])) ->
-      return Nothing
-    ((_, TreeNode []), (_, TreeNode _)) ->
-      return Nothing
-    ((m1, TreeNode ts1), (_, TreeNode ts2))
-      | (_, TreeLeaf s2) <- last ts2,
-        T.last s2 == '+',
-        length ts1 >= length ts2 -> do
-        let (xs, rest) = splitAt (length ts2 - 1) ts1
-        let ys = take (length ts2 - 1) ts2
-        mzs <- sequence <$> zipWithM macroMatch xs ys
-        return $ mzs >>= \zs -> Just $ Map.insert s2 (toSpliceTree m1 rest) $ Map.unions zs
-      | length ts1 == length ts2 -> do
-        mzs <- sequence <$> zipWithM macroMatch ts1 ts2
-        return $ mzs >>= \zs -> Just $ Map.unions zs
+    ((_, TreeLeaf s1), (_, TreeLeaf s2))
+      | s1 == s2 ->
+        return Map.empty
       | otherwise ->
-        return Nothing
+        Nothing
+    ((_, TreeNode _), (_, TreeLeaf _)) ->
+      Nothing
+    ((_, TreeLeaf _), (_, TreeNode _)) ->
+      Nothing
+    ((_, TreeNode ts1), (_, TreeNode ts2)) ->
+      case (ts1, ts2) of
+        ((_, TreeLeaf s1) : rest1, (_, TreeLeaf s2) : rest2)
+          | s1 == s2 ->
+            macroMatch' rest1 rest2
+        _ ->
+          Nothing
+
+macroMatch' :: [TreePlus] -> [TreePlus] -> Maybe MacroSubst
+macroMatch' ts1 ts2 =
+  case (ts1, ts2) of
+    (_, [(_, TreeLeaf s2)])
+      | T.last s2 == '+',
+        length ts1 > 0 -> do
+        let m1 = fst (head ts1)
+        return $ Map.singleton s2 $ toSpliceTree m1 ts1
+    ([], []) ->
+      return Map.empty
+    (_ : _, []) ->
+      Nothing
+    ([], _ : _) ->
+      Nothing
+    (t1 : rest1, t2 : rest2) -> do
+      sub1 <- macroMatch'' t1 t2
+      sub2 <- macroMatch' rest1 rest2
+      return $ Map.union sub1 sub2
+
+macroMatch'' :: TreePlus -> TreePlus -> Maybe MacroSubst
+macroMatch'' t1 t2 =
+  case (t1, t2) of
+    ((_, TreeLeaf _), (_, TreeLeaf x)) ->
+      return $ Map.singleton x t1
+    ((_, TreeNode _), (_, TreeLeaf x)) ->
+      return $ Map.singleton x t1
+    ((_, TreeLeaf _), (_, TreeNode _)) ->
+      Nothing
+    ((_, TreeNode ts1), (_, TreeNode ts2)) ->
+      macroMatch' ts1 ts2
 
 applySubst :: MacroSubst -> Notation -> TreePlus
 applySubst sub notationTree =
@@ -154,19 +159,14 @@ checkPlusCondition notationTree =
         ts' ->
           checkPlusCondition ts'
 
-splice :: TreePlus -> TreePlus
-splice =
-  splice'
-
 -- (a b (splice (c (splice (p q)) e)) f) ~> (a b c p q d e)
-splice' :: TreePlus -> TreePlus
-splice' tree =
+splice :: TreePlus -> TreePlus
+splice tree =
   case tree of
     t@(_, TreeLeaf _) ->
       t
-    (m, TreeNode ts) -> do
-      let ts' = map splice' ts
-      (m, TreeNode $ expandSplice $ map findSplice ts')
+    (m, TreeNode ts) ->
+      (m, TreeNode $ expandSplice $ map (findSplice . splice) ts)
 
 findSplice :: TreePlus -> Either TreePlus [TreePlus]
 findSplice tree =
@@ -186,16 +186,14 @@ expandSplice itemList =
     Right ts : rest ->
       ts ++ expandSplice rest
 
--- returns the first "Just"
-try :: (Monad m) => (a -> m (Maybe b)) -> [(a, c)] -> m (Maybe (b, c))
+try :: (a -> Maybe b) -> [(a, c)] -> Maybe (b, c)
 try f candidateList =
   case candidateList of
     [] ->
-      return Nothing
-    ((s, t) : as) -> do
-      mx <- f s
-      case mx of
+      Nothing
+    ((s, t) : as) ->
+      case f s of
         Nothing ->
           try f as
         Just x ->
-          return $ Just (x, t)
+          return (x, t)
