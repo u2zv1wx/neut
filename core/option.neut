@@ -17,7 +17,7 @@
 (define map
   (witness (functor-form option)
     (λ (a b f m)
-      (option.case (option b) a m
+      (option.case * * m
         (λ ()
           (none b))
         (λ (x)

@@ -5,7 +5,7 @@
 (include "core/integer.neut")
 
 (inductive µ ((f (hom tau tau)))
-  (lan ;; left-kan-extension
+  (lan
     ((b tau)
      (_ (f b))
      (_ (hom b (µ f))))
@@ -30,15 +30,11 @@
    (x (µ f)))
   (witness (f (µ f))
     (µ.case (f (µ f)) f x
-      ;; (λ (_)
-      ;;   (f (µ f)))
       (λ (b v k)
         ((functor.map f F)
           b
           (µ f)
           k
-          ;; (λ (value)
-          ;;   (µ.in f (k value)))
           v)))))
 
 (inductive list-f ((a tau) (r tau))
@@ -67,8 +63,6 @@
           a
           from
           m
-          ;; (λ (_ _)
-          ;;   (list-f a to))
           (λ ()
             (list-f.nil a to))
           (λ (y ys)
@@ -87,8 +81,6 @@
       a
       (list a)
       (µ.out (list-f a _) (list-f.as-functor a) xs)
-      ;; (λ (_ _)
-      ;;   i64)
       (λ ()
         0)
       (λ (y ys)
