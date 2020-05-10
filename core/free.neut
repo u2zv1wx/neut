@@ -20,8 +20,6 @@
      (_ (hom b (free g a))))
     (free g a)))
 
-(use free)
-
 (section free)
 
 (define map
@@ -54,11 +52,7 @@
 (define bind
   ((g (hom tau tau)))
   (witness (bind-type (free g _))
-    (λ
-      ((a tau)
-       (b tau)
-       (m (free g a))
-       (k (hom a (free g b))))
+    (λ (a b m k)
       (free.case (free g b) g a m
         (λ (x)
           (k x))
