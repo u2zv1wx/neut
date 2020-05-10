@@ -68,9 +68,9 @@ data Env
         revNameEnv :: IntMap.IntMap Int,
         prefixEnv :: [T.Text],
         sectionEnv :: [T.Text],
-        formationEnv :: IntMap.IntMap (Maybe WeakTermPlus),
+        -- formationEnv :: IntMap.IntMap (Maybe WeakTermPlus),
         -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
-        indEnv :: IntMap.IntMap (Maybe [WeakIdentPlus]),
+        -- indEnv :: IntMap.IntMap (Maybe [WeakIdentPlus]),
         intactSet :: S.Set (Meta, T.Text),
         topNameEnv :: Map.HashMap T.Text Ident,
         --
@@ -81,6 +81,7 @@ data Env
         constraintEnv :: [PreConstraint],
         constraintQueue :: ConstraintQueue,
         substEnv :: IntMap.IntMap WeakTermPlus,
+        opaqueEnv :: S.Set Ident,
         holeEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus),
         --
         -- clarify
@@ -123,8 +124,8 @@ initialEnv =
       topNameEnv = Map.empty,
       prefixEnv = [],
       sectionEnv = [],
-      formationEnv = IntMap.empty,
-      indEnv = IntMap.empty,
+      -- formationEnv = IntMap.empty,
+      -- indEnv = IntMap.empty,
       weakTypeEnv = IntMap.empty,
       typeEnv = IntMap.empty,
       constTypeEnv = Map.empty,
@@ -139,6 +140,7 @@ initialEnv =
       constraintEnv = [],
       constraintQueue = Q.empty,
       substEnv = IntMap.empty,
+      opaqueEnv = S.empty,
       holeEnv = IntMap.empty,
       nameSet = S.empty,
       nopFreeSet = S.empty

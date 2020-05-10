@@ -8,7 +8,7 @@
 
 
 ?my-record.item-1
-?my-record.fold
+;; ?my-record.fold
 ?my-record.new
 
 (let item
@@ -24,6 +24,6 @@
 
 (record empty-record ())
 
-?empty-record.fold
+;; ?empty-record.fold
 
 ?empty-record.new

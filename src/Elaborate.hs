@@ -37,6 +37,9 @@ elaborateStmt stmt =
       t' <- inferType t
       insConstraintEnv te t'
       elaborateLet m mx x t' e' cont
+    WeakStmtLetBypass m (mx, x, t) e : cont -> do
+      t' <- inferType t
+      elaborateLet m mx x t' e cont
     WeakStmtConstDecl (_, c, t) : cont -> do
       t' <- inferType t
       analyze >> synthesize >> refine >> cleanup
@@ -57,7 +60,9 @@ elaborateLet m mx x t e cont = do
   e' <- reduceTermPlus <$> elaborate' e
   t' <- reduceTermPlus <$> elaborate' t
   insWeakTypeEnv x $ weaken t'
-  modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e') (substEnv env)})
+  if metaIsReducible m
+    then modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e') (substEnv env)})
+    else modify (\env -> env {opaqueEnv = S.insert x (opaqueEnv env)})
   cont' <- elaborateStmt cont
   return (m, TermPiElim (m, TermPiIntro [(mx, x, t')] cont') [e'])
 

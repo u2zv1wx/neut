@@ -29,15 +29,16 @@
    (F (functor f))
    (x (µ f)))
   (witness (f (µ f))
-    (µ.fold f x
-      (λ (_)
-        (f (µ f)))
+    (µ.case (f (µ f)) f x
+      ;; (λ (_)
+      ;;   (f (µ f)))
       (λ (b v k)
         ((functor.map f F)
           b
           (µ f)
-          (λ (value)
-            (µ.in f (k value)))
+          k
+          ;; (λ (value)
+          ;;   (µ.in f (k value)))
           v)))))
 
 (inductive list-f ((a tau) (r tau))
@@ -61,12 +62,13 @@
   (witness (functor-form (list-f a _))
     (λ (from to f m)
       (witness (list-f a to)
-        (list-f.fold
+        (list-f.case
+          (list-f a to)
           a
           from
           m
-          (λ (_ _)
-            (list-f a to))
+          ;; (λ (_ _)
+          ;;   (list-f a to))
           (λ ()
             (list-f.nil a to))
           (λ (y ys)
@@ -80,12 +82,13 @@
 
 (define my-length ((a tau) (xs (list a)))
   (witness i64
-    (list-f.fold
+    (list-f.case
+      i64
       a
       (list a)
       (µ.out (list-f a _) (list-f.as-functor a) xs)
-      (λ (_ _)
-        i64)
+      ;; (λ (_ _)
+      ;;   i64)
       (λ ()
         0)
       (λ (y ys)

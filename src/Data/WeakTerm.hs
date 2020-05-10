@@ -65,6 +65,7 @@ i64 m =
 
 data WeakStmt
   = WeakStmtLet Meta WeakIdentPlus WeakTermPlus
+  | WeakStmtLetBypass Meta WeakIdentPlus WeakTermPlus
   | WeakStmtConstDecl WeakTextPlus
   deriving (Show)
 

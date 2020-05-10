@@ -23,9 +23,7 @@
    (f (hom a b))
    (m (coproduct e a)))
   (witness (coproduct e b)
-    (coproduct.fold * * m
-      (lambda (_ _)
-        (coproduct e b))
+    (coproduct.case (coproduct e b) * * m
       (lambda (err)
         (left * * err))
       (lambda (val)
@@ -45,9 +43,7 @@
    (comp (coproduct e a))
    (k (hom a (coproduct e b))))
   (witness (coproduct e b)
-    (coproduct.fold * * comp
-      (lambda (_ _)
-        (coproduct e b))
+    (coproduct.case (coproduct e b) * * comp
       (lambda (err)
         (left * * err))
       (lambda (val)

@@ -99,8 +99,9 @@ simp' constraintList =
           let hs2 = holeWeakTermPlus e2
           -- list of stuck reasons (fmvs: free meta-variables)
           let fmvs = S.union hs1 hs2
-          let fvs1 = varWeakTermPlus e1
-          let fvs2 = varWeakTermPlus e2
+          oenv <- gets opaqueEnv
+          let fvs1 = S.difference (varWeakTermPlus e1) oenv
+          let fvs2 = S.difference (varWeakTermPlus e2) oenv
           case lookupAny (S.toList fmvs) sub of
             Just (h, e) -> do
               let s = IntMap.singleton (asInt h) e

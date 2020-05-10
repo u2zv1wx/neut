@@ -51,12 +51,13 @@
   ((a tau)
    (xs (list a)))
   (witness i64
-    (list-f.fold
+    (list-f.case
+      i64
       a
       (list a)
       (µ.out (list-f a _) xs)
-      (λ (_ _)
-        i64)
+      ;; (λ (_ _)
+      ;;   i64)
       (λ ()
         0)
       (λ (y ys)

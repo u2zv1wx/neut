@@ -27,47 +27,49 @@
 (define map
   ((g (hom tau tau)))
   (witness (functor-form (free g _))
-    (lambda (a b (f (hom a b)) m)
-      (free.fold g a m
-        (lambda (_ _)
-          (free g b))
-        (lambda (x)
+    (λ (a b f m)
+      (free.case (free g b) g a m
+        (λ (x)
           (leaf g b (f x)))
-        (lambda (p val acc)
-          (node g b p val acc))))))
+        (λ (p val k)
+          (with identity.bind
+            (let f'
+              (λ ((z p))
+                ((map g) a b f (k z))))
+            (node g b p val f')))))))
 
-;; f (Free f a) -> Free f aがほしいが。
-;; fに構造がないと無理そう？……いけた。
-(define in ((f (hom tau tau)) (a tau) (x (f (free f a))))
-  (witness (free f a)
-    (free.node
-      f
-      a
-      (free f a)
-      x
-      (lambda (y) y))))
+;; ;; f (Free f a) -> Free f aがほしいが。
+;; ;; fに構造がないと無理そう？……いけた。
+;; (define in ((f (hom tau tau)) (a tau) (x (f (free f a))))
+;;   (witness (free f a)
+;;     (free.node
+;;       f
+;;       a
+;;       (free f a)
+;;       x
+;;       (λ (y) y))))
 
-(define out
-  ((f (hom tau tau))
-   (M (monad f))
-   (a tau)
-   (x (free f a)))
-  (witness (f (free f a))
-    (free.fold f a x
-      (lambda (_ _)
-        (f (free f a)))
-      (lambda (x)
-        ((functor.map f (monad.witness-functor f M))
-           a
-           (free f a)
-           (lambda (val) (free.leaf f a val))
-           ((monad.return f M) a x)))
-      (lambda (b v k)
-        ((functor.map f (monad.witness-functor f M))
-          b
-          (free f a)
-          (λ (value) (free.in f a (k value)))
-          v)))))
+;; (define out
+;;   ((f (hom tau tau))
+;;    (M (monad f))
+;;    (a tau)
+;;    (x (free f a)))
+;;   (witness (f (free f a))
+;;     (free.case f a x
+;;       (λ (_ _)
+;;         (f (free f a)))
+;;       (λ (x)
+;;         ((functor.map f (monad.witness-functor f M))
+;;            a
+;;            (free f a)
+;;            (λ (val) (free.leaf f a val))
+;;            ((monad.return f M) a x)))
+;;       (λ (b v k)
+;;         ((functor.map f (monad.witness-functor f M))
+;;           b
+;;           (free f a)
+;;           (λ (value) (free.in f a (k value)))
+;;           v)))))
 
 (define witness-functor
   ((g (hom tau tau)))
@@ -79,24 +81,24 @@
 (define return
   ((g (hom tau tau)))
   (witness (return-type (free g _))
-    (lambda (_ x)
-      (leaf * * x))))
+    (λ (a x)
+      (leaf g a x))))
 
 (define bind
   ((g (hom tau tau)))
   (witness (bind-type (free g _))
-    (lambda
+    (λ
       ((a tau)
        (b tau)
        (m (free g a))
        (k (hom a (free g b))))
-      (free.fold g a m
-        (lambda (_ _)
-          (free g b))
-        (lambda (x)
+      (free.case (free g b) g a m
+        (λ (x)
           (k x))
-        (lambda (p val acc)
-          (node * * p val acc))))))
+        (λ (p val k')
+          (node g b p val
+            (λ ((v p))
+              ((bind g) a b (k' v) k))))))))
 
 (define witness-monad
   ((g (hom tau tau)))

@@ -36,7 +36,7 @@
     (list a))
   (cons
     ((_ a)
-     (_ (pi () (list a))))
+     (_ (list a)))
     (list a)))
 
 (keyword list.new)
@@ -44,26 +44,24 @@
 (notation (list.new)
   (list.nil))
 
-;; (notation (list.new a)
-;;   (list.cons * a (list.nil *)))
-
-;; (notation (list.new a rest+)
-;;   (list.cons * a (list.new rest+)))
-
 (notation (list.new a)
-  (list.cons * a (lazy.thunk * (list.nil *))))
+  (list.cons * a (list.nil *)))
 
 (notation (list.new a rest+)
-  (list.cons * a (lazy.thunk * (list.new rest+))))
+  (list.cons * a (list.new rest+)))
+
+;; (notation (list.new a)
+;;   (list.cons * a (lazy.thunk * (list.nil *))))
+
+;; (notation (list.new a rest+)
+;;   (list.cons * a (lazy.thunk * (list.new rest+))))
 
 
 (define head
   ((a tau)
    (xs (list a)))
   (witness (option a)
-    (list.fold a xs
-      (λ (_)
-        (option a))
+    (list.case * * xs
       (λ ()
         (none a))
       (λ (h _)
@@ -73,34 +71,28 @@
   ((a tau)
    (xs (list a)))
   (witness i64
-    (list.fold a xs
-      (λ (_)
-        i64)
+    (list.case i64 a xs
       (λ ()
         0)
-      (λ (_ acc)
-        (add-i64 1 (acc))))))
+      (λ (_ ys)
+        (add-i64 1 (length a ys))))))
 
 (define append
   ((a tau)
    (xs (list a))
    (ys (list a)))
   (witness (list a)
-    (list.fold a xs
-      (λ (_)
-        (list a))
+    (list.case (list a) a xs
       (λ ()
         ys)
-      (λ (z acc)
-        (cons a z acc)))))
+      (λ (z zs)
+        (cons a z (append a zs ys))))))
 
 (define is-null
   ((a tau)
    (xs (list a)))
   (witness bool
-    (list.fold a xs
-      (λ (_)
-        bool)
+    (list.case bool a xs
       (λ ()
         true)
       (λ (_ _)
@@ -112,13 +104,11 @@
    (f (hom a b))
    (xs (list a)))
   (witness (list b)
-    (list.fold a xs
-      (λ (_)
-        (list b))
+    (list.case (list b) a xs
       (λ ()
         (nil b))
       (λ (y acc)
-        (cons b (f y) acc)))))
+        (cons b (f y) (map a b f acc))))))
 
 (define return
   ((a tau)
@@ -130,13 +120,11 @@
   ((a tau)
    (m (list (list a))))
   (witness (list a)
-    (list.fold (list a) m
-      (λ (_)
-        (list a))
+    (list.case (list a) (list a) m
       (λ ()
         (nil *))
-      (λ (xs acc)
-        (append * xs (acc))))))
+      (λ (xs xss)
+        (append * xs (concatenate a xss))))))
 
 (define bind
   ((a tau)

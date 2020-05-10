@@ -16,29 +16,25 @@
 
 (define map
   (witness (functor-form option)
-    (lambda (a b f m)
-      (option.fold a m
-        (lambda (_)
-          (option b))
-        (lambda ()
+    (λ (a b f m)
+      (option.case (option b) a m
+        (λ ()
           (none b))
-        (lambda (x)
+        (λ (x)
           (some b (f x)))))))
 
 (define return
   (witness (return-type option)
-    (lambda (a x)
+    (λ (a x)
       (some a x))))
 
 (define bind
   (witness (bind-type option)
-    (lambda (a b m k)
-      (option.fold a m
-        (lambda (_)
-          (option b))
-        (lambda ()
+    (λ (a b m k)
+      (option.case (option b) a m
+        (λ ()
           (none b))
-        (lambda (x)
+        (λ (x)
           (k x))))))
 
 (define from-option
@@ -46,12 +42,10 @@
    (x a)
    (m (option a)))
   (witness a
-    (option.fold a m
-      (lambda (_)
-        a)
-      (lambda ()
+    (option.case a a m
+      (λ ()
         x)
-      (lambda (y)
+      (λ (y)
         y))))
 
 (define witness-functor
