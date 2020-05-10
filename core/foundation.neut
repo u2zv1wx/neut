@@ -25,12 +25,8 @@
   (witness a
     (os.exit a 1)))
 
-(keyword admit)
-
 (notation admit
   (admit-internal hole))
-
-(keyword ?admit)
 
 (notation ?admit
   (question admit))

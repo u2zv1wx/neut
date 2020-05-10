@@ -158,13 +158,6 @@ parse' stmtTreeList =
                     parse' $ as1 ++ restStmtList
               | otherwise ->
                 raiseSyntaxError m "(introspect LEAF TREE*)"
-            "keyword"
-              | [(_, TreeLeaf s)] <- rest -> do
-                checkKeywordSanity m s
-                modify (\e -> e {keywordEnv = S.insert s (keywordEnv e)})
-                parse' restStmtList
-              | otherwise ->
-                raiseSyntaxError m "(keyword LEAF)"
             "let"
               | [(mx, TreeLeaf x), t, e] <- rest -> do
                 let xt = (mx, TreeNode [(mx, TreeLeaf x), t])
@@ -359,7 +352,6 @@ keywordSet =
       "include",
       "inductive",
       "introspect",
-      "keyword",
       "let",
       "notation",
       "record",
@@ -368,15 +360,6 @@ keywordSet =
       "unuse",
       "use"
     ]
-
-checkKeywordSanity :: Meta -> T.Text -> WithEnv ()
-checkKeywordSanity m x
-  | x == "" =
-    raiseError m "empty string for a keyword"
-  | T.last x == '+' =
-    raiseError m "A +-suffixed name cannot be a keyword"
-  | otherwise =
-    return ()
 
 showCyclicPath :: [Path Abs File] -> T.Text
 showCyclicPath pathList =

@@ -39,8 +39,6 @@
      (_ (list a)))
     (list a)))
 
-(keyword list.new)
-
 (notation (list.new)
   (list.nil))
 

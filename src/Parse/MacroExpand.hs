@@ -104,17 +104,32 @@ toSpliceTree :: Meta -> [TreePlus] -> TreePlus
 toSpliceTree m ts =
   (m, TreeNode [(m, TreeLeaf "splice"), (m, TreeNode ts)])
 
+extractHeadAtom :: TreePlus -> WithEnv T.Text
+extractHeadAtom tree@(m, _) =
+  case tree of
+    (_, TreeLeaf atom) -> do
+      checkKeywordSanity m atom
+      return atom
+    (_, TreeNode ((_, TreeLeaf atom) : _)) -> do
+      checkKeywordSanity m atom
+      return atom
+    _ ->
+      raiseError m "malformed notation"
+
+checkKeywordSanity :: Meta -> T.Text -> WithEnv ()
+checkKeywordSanity m x
+  | x == "" =
+    raiseError m "empty string for a keyword"
+  | T.last x == '+' =
+    raiseError m "A +-suffixed name cannot be a keyword"
+  | otherwise =
+    return ()
+
 checkNotationSanity :: Notation -> WithEnv ()
 checkNotationSanity t = do
-  checkKeywordCondition t
   checkPlusCondition t
-
-checkKeywordCondition :: Notation -> WithEnv ()
-checkKeywordCondition t = do
-  kenv <- gets keywordEnv
-  if not $ null $ kenv `S.intersection` atomListOf t
-    then return ()
-    else raiseError (fst t) "A notation must include at least one keyword"
+  notationName <- extractHeadAtom t
+  modify (\e -> e {keywordEnv = S.insert notationName (keywordEnv e)})
 
 checkPlusCondition :: Notation -> WithEnv ()
 checkPlusCondition notationTree =
