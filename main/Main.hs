@@ -11,7 +11,7 @@ import Data.Log
 import Elaborate
 import Emit
 import GHC.IO.Handle
-import LLVM
+import Lower
 import Options.Applicative
 import Parse
 import Path
@@ -238,7 +238,7 @@ constructOutputArchivePath inputPath mPath =
 
 runBuild :: Path Abs File -> WithEnv Builder
 runBuild =
-  parse >=> elaborate >=> clarify >=> toLLVM >=> emit
+  parse >=> elaborate >=> clarify >=> lower >=> emit
 
 runCheck :: Path Abs File -> WithEnv ()
 runCheck =
