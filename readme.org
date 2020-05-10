@@ -34,7 +34,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#include][include]]
   - [[#inductive][inductive]]
   - [[#introspect][introspect]]
-  - [[#keywordnotation][keyword/notation]]
+  - [[#notation][notation]]
   - [[#let][let]]
   - [[#record][record]]
   - [[#useunuse][use/unuse]]
@@ -585,15 +585,11 @@ The =var= must be a valid compile-time variable. Valid compile-time variables an
 | OS                    | linux, darwin   |
 | architecture          | x64             |
 
-** keyword/notation
-The =keyword= statement registers a keyword for notation. The =notation= statement registers a notation.
+** notation
+The =notation= statement registers a notation.
 *** Example
 #+BEGIN_SRC neut
-(keyword λ)
-
 (notation λ pi-introduction)
-
-(keyword if)
 
 (notation (if b e1 e2)
   (enum-elimination b
@@ -602,13 +598,9 @@ The =keyword= statement registers a keyword for notation. The =notation= stateme
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
-(keyword LEAF)
-
 (notation TREE TREE)
 #+END_SRC
 *** Semantics
-When parsed, the statement =(keyword x)= modifies the state of the compiler so that the =x= is treated as a keyword. This affects the result of macro expansion in the succeeding code.
-
 When parsed, the statement =(notation FROM TO)= modifies the state of the compiler so that the mapping =FROM ~> TO= is recognized as a notation. This affects the result of macro expansion in the succeeding code.
 
 # See [[#macroexpansion][the section on macro expansion]] for the details of keywords and notations.
@@ -622,10 +614,8 @@ After this translation, the resulting ASTs are *macro-expanded*, and then interp
 
 In short, the macro-expansion of an AST in Neut is a call-by-value-like recursive application of the *step-expansion*.
 
-I believe the step-expansion process is best explained by an example. Consider we have defined a keyword and a notation as follows:
+I believe the step-expansion process is best explained by an example. Consider we have defined a notation as follows:
 #+BEGIN_SRC text
-(keyword if)
-
 (notation (if b e1 e2)
   (switch b
     (bool.true e1)
@@ -643,7 +633,7 @@ and then replaces =b=, =e1=, and =e2= in the codomain of the notation according 
   (bool.true (i64.print 10))
   (bool.false (string.print "hello")))
 #+END_SRC
-This translation is the step-expansion. The keyword environment here is required to determine whether a leaf of the domain of a notation is a variable or an opaque syntactic construct (i.e. "keyword"). In the example above, without the =(keyword if)= statement, we cannot determine if the =if= in =(if b e1 e2)= is a variable or a keyword.
+# This translation is the step-expansion. The keyword environment here is required to determine whether a leaf of the domain of a notation is a variable or an opaque syntactic construct (i.e. "keyword"). In the example above, without the =(keyword if)= statement, we cannot determine if the =if= in =(if b e1 e2)= is a variable or a keyword.
 
 Given this step-expansion, the macro-expansion proceeds as follows. Take =t= to be an input tree. If the tree =t= is of the form =(leaf STRING)=, the compiler returns the result of step-expansion of =t=. If a tree is of the form =(node t1 ... tn)=, the =t1=, ..., =tn= are firstly macro-expanded them into =t1'= , ..., =tn'= , and then the compiler step-expands the tree =(node t1' ... tn')=.
 
