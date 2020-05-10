@@ -260,6 +260,7 @@ clangBaseOpt :: Path Abs File -> [String]
 clangBaseOpt outputPath =
   [ "-xir",
     "-Wno-override-module",
+    "-O2",
     "-",
     "-o",
     toFilePath outputPath

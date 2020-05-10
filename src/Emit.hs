@@ -59,7 +59,7 @@ emitDefinition retType name args asm = do
 
 sig :: Builder -> Builder -> [Builder] -> Builder
 sig retType name args =
-  "define " <> retType <> " @" <> name <> showLocals args
+  "define fastcc " <> retType <> " @" <> name <> showLocals args
 
 emitBlock :: Builder -> Ident -> LLVM -> WithEnv [Builder]
 emitBlock funName (I (_, i)) asm = do
