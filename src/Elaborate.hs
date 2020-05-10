@@ -201,16 +201,8 @@ elaboratePlus (m, x, t) = do
 caseCheckEnumIdent :: Meta -> T.Text -> [EnumCase] -> WithEnv ()
 caseCheckEnumIdent m x ls = do
   es <- lookupEnumSet m x
-  caseCheckEnumIdent' m (length es) ls
-
-caseCheckEnumIdent' :: Meta -> Int -> [EnumCase] -> WithEnv ()
-caseCheckEnumIdent' m i labelList = do
-  let len = length (nub labelList)
-  throwIfFalse m $ i <= len || EnumCaseDefault `elem` labelList
-
-throwIfFalse :: Meta -> Bool -> WithEnv ()
-throwIfFalse m b =
-  if b
+  let len = length (nub ls)
+  if length es <= len || EnumCaseDefault `elem` ls
     then return ()
     else raiseError m "non-exhaustive pattern"
 
