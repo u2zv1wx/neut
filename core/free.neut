@@ -38,39 +38,6 @@
                 ((map g) a b f (k z))))
             (node g b p val f')))))))
 
-;; ;; f (Free f a) -> Free f aがほしいが。
-;; ;; fに構造がないと無理そう？……いけた。
-;; (define in ((f (hom tau tau)) (a tau) (x (f (free f a))))
-;;   (witness (free f a)
-;;     (free.node
-;;       f
-;;       a
-;;       (free f a)
-;;       x
-;;       (λ (y) y))))
-
-;; (define out
-;;   ((f (hom tau tau))
-;;    (M (monad f))
-;;    (a tau)
-;;    (x (free f a)))
-;;   (witness (f (free f a))
-;;     (free.case f a x
-;;       (λ (_ _)
-;;         (f (free f a)))
-;;       (λ (x)
-;;         ((functor.map f (monad.witness-functor f M))
-;;            a
-;;            (free f a)
-;;            (λ (val) (free.leaf f a val))
-;;            ((monad.return f M) a x)))
-;;       (λ (b v k)
-;;         ((functor.map f (monad.witness-functor f M))
-;;           b
-;;           (free f a)
-;;           (λ (value) (free.in f a (k value)))
-;;           v)))))
-
 (define witness-functor
   ((g (hom tau tau)))
   (witness (functor (free g _))
