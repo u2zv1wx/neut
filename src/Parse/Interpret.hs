@@ -21,6 +21,7 @@ import Data.Size
 import qualified Data.Text as T
 import Data.Tree
 import Data.WeakTerm
+import Parse.MacroExpand
 import Text.Read (readMaybe)
 
 interpret :: TreePlus -> WithEnv WeakTermPlus
@@ -79,26 +80,6 @@ interpret inputTree =
             interpretPiElim m e es
           | otherwise ->
             raiseSyntaxError m "(pi-elimination TREE TREE*)" -- e' <- interpret e
-        "sigma"
-          | [(_, TreeNode xts), t] <- rest -> do
-            xts' <- mapM interpretWeakIdentPlus xts
-            t' <- interpret t
-            placeholder <- newNameWith'' "cod"
-            weakTermSigma m $ xts' ++ [(fst t', placeholder, t')]
-          | otherwise ->
-            raiseSyntaxError m "(sigma (TREE*) TREE)"
-        "sigma-introduction" -> do
-          es' <- mapM interpret rest
-          sigmaIntro m es'
-        "sigma-elimination"
-          | [(_, TreeNode xts), e1, e2] <- rest -> do
-            xts' <- mapM interpretWeakIdentPlus xts
-            e1' <- interpret e1
-            e2' <- interpret e2
-            h <- newHole m
-            return $ sigmaElim m h xts' e1' e2'
-          | otherwise ->
-            raiseSyntaxError m "(sigma-elimination (TREE*) TREE TREE)"
         "fix"
           | [xt, xts@(_, TreeNode _), e] <- rest -> do
             (m', xt', xts', e') <- interpretFix (m, TreeNode [xt, xts, e])
@@ -211,11 +192,6 @@ interpret inputTree =
             return ((fst e') {metaIsReducible = False}, snd e')
           | otherwise ->
             raiseSyntaxError m "(irreducible TREE)"
-        "product" -> do
-          ts' <- mapM interpret rest
-          let ms = map fst ts'
-          xs <- mapM (const $ newNameWith'' "sig") ts'
-          weakTermSigma m (zip3 ms xs ts')
         "with" ->
           interpretWith inputTree
         _
@@ -258,22 +234,6 @@ interpretArg es =
           e <- interpret tree
           return (xts, e : args)
 
-sigmaIntro :: Meta -> [WeakTermPlus] -> WithEnv WeakTermPlus
-sigmaIntro m es = do
-  z <- newNameWith'' "sigma"
-  k <- newNameWith'' "sigma"
-  ts <- mapM (const (newHole m)) es
-  xs <- mapM (const (newNameWith'' "hole")) es
-  let xts = zipWith (\x t -> (m, x, t)) xs ts
-  return
-    ( m,
-      WeakTermPiIntro
-        [ (m, z, (m, WeakTermTau)),
-          (m, k, (m, WeakTermPi xts (m, WeakTermUpsilon z)))
-        ]
-        (m, WeakTermPiElim (m, WeakTermUpsilon k) es)
-    )
-
 -- (definition string
 --   (Σ
 --     ((len u64))
@@ -314,16 +274,6 @@ sigmaIntroString m u8s = do
             ]
         )
     )
-
-sigmaElim ::
-  Meta ->
-  WeakTermPlus ->
-  [WeakIdentPlus] ->
-  WeakTermPlus ->
-  WeakTermPlus ->
-  WeakTermPlus
-sigmaElim m t xts e1 e2 =
-  (m, WeakTermPiElim e1 [t, (m, WeakTermPiIntro xts e2)])
 
 interpretWeakIdentPlus :: TreePlus -> WithEnv WeakIdentPlus
 interpretWeakIdentPlus tree =
@@ -504,7 +454,7 @@ interpretWith tree =
       if not (null borrowVarList)
         then do
           sig <- newTextWith "borrow"
-          interpretWith
+          macroExpand >=> interpretWith $
             ( m,
               TreeNode
                 [ with,

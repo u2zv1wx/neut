@@ -58,19 +58,6 @@
 
 (notation assume lambda)
 
-(keyword tuple)
-
-(notation tuple sigma-introduction)
-
-(keyword construct)
-
-(notation construct sigma-introduction)
-
-(keyword destruct)
-
-(notation (destruct e xts rest+)
-  (sigma-elimination xts e (with identity.bind rest+)))
-
 (keyword if)
 
 (notation (if b e1 e2)
@@ -87,6 +74,82 @@
 
 (notation (define f e)
   (let f e))
+
+(keyword to-type-list)
+
+(notation (to-type-list t)
+  ((_ t)))
+
+(notation (to-type-list t t+)
+  ((_ t) (splice (to-type-list t+))))
+
+;; (keyword arrow)
+
+;; (notation (arrow (t+) cod)
+;;   (pi (to-type-list t+) cod))
+
+(keyword sigma)
+
+(notation (sigma (xt+) t)
+  (Π
+    ((c tau)
+     (_ (Π (xt+ (_ t)) c)))
+    c))
+
+(keyword ∑)
+
+(notation ∑ sigma)
+
+(keyword product)
+
+(notation (product t+)
+  (Π
+    ((c tau)
+     (_ (Π (to-type-list t+) c)))
+    c))
+
+(keyword to-hole-list)
+
+(notation (to-hole-list e)
+  ((_ *)))
+
+(notation (to-hole-list e e+)
+  ((_ *) (splice (to-hole-list e+))))
+
+(keyword sigma-introduction)
+
+(notation (sigma-introduction)
+  (λ
+    ((elim-result-type tau)
+     (k (Π () elim-result-type)))
+    (k)))
+
+(notation (sigma-introduction e+)
+  (λ
+    ((elim-result-type tau)
+     (k (Π (to-hole-list e+) elim-result-type)))
+    (k e+)))
+
+(keyword sigma-elimination)
+
+(notation (sigma-elimination () e1 e2)
+  (e1 * (λ () e2)))
+
+(notation (sigma-elimination (xt+) e1 e2)
+  (e1 * (λ (xt+) e2)))
+
+(keyword tuple)
+
+(notation tuple sigma-introduction)
+
+(keyword construct)
+
+(notation construct sigma-introduction)
+
+(keyword destruct)
+
+(notation (destruct e xts rest+)
+  (sigma-elimination xts e (with identity.bind rest+)))
 
 ;; (notation (if b e1 e2)
 ;;   (switch b
