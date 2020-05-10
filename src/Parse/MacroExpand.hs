@@ -32,8 +32,8 @@ stepExpand t@(i, _) = do
   nenv <- gets notationEnv
   case headAtomOf t of
     Just headAtom
-      | Just nenv' <- Map.lookup headAtom nenv,
-        Just (sub, skel) <- try (macroMatch t) nenv' ->
+      | Just candidateList <- Map.lookup headAtom nenv,
+        Just (sub, skel) <- try (match t) candidateList ->
         macroExpand $ applySubst sub $ replaceMeta i skel
     _ ->
       return t
@@ -41,11 +41,11 @@ stepExpand t@(i, _) = do
 type Notation =
   TreePlus
 
-macroMatch ::
+match ::
   TreePlus -> -- input tree
   Notation -> -- registered notation
   Maybe MacroSubst -- {symbols in a pattern} -> {trees}
-macroMatch t1 t2 =
+match t1 t2 =
   case (t1, t2) of
     ((_, TreeLeaf s1), (_, TreeLeaf s2))
       | s1 == s2 ->
@@ -60,12 +60,12 @@ macroMatch t1 t2 =
       case (ts1, ts2) of
         ((_, TreeLeaf s1) : rest1, (_, TreeLeaf s2) : rest2)
           | s1 == s2 ->
-            macroMatch' rest1 rest2
+            match' rest1 rest2
         _ ->
           Nothing
 
-macroMatch' :: [TreePlus] -> [TreePlus] -> Maybe MacroSubst
-macroMatch' ts1 ts2 =
+match' :: [TreePlus] -> [TreePlus] -> Maybe MacroSubst
+match' ts1 ts2 =
   case (ts1, ts2) of
     (_, [(_, TreeLeaf s2)])
       | T.last s2 == '+',
@@ -79,12 +79,12 @@ macroMatch' ts1 ts2 =
     ([], _ : _) ->
       Nothing
     (t1 : rest1, t2 : rest2) -> do
-      sub1 <- macroMatch'' t1 t2
-      sub2 <- macroMatch' rest1 rest2
+      sub1 <- match'' t1 t2
+      sub2 <- match' rest1 rest2
       return $ Map.union sub1 sub2
 
-macroMatch'' :: TreePlus -> TreePlus -> Maybe MacroSubst
-macroMatch'' t1 t2 =
+match'' :: TreePlus -> TreePlus -> Maybe MacroSubst
+match'' t1 t2 =
   case (t1, t2) of
     ((_, TreeLeaf _), (_, TreeLeaf x)) ->
       return $ Map.singleton x t1
@@ -93,7 +93,7 @@ macroMatch'' t1 t2 =
     ((_, TreeLeaf _), (_, TreeNode _)) ->
       Nothing
     ((_, TreeNode ts1), (_, TreeNode ts2)) ->
-      macroMatch' ts1 ts2
+      match' ts1 ts2
 
 applySubst :: MacroSubst -> Notation -> TreePlus
 applySubst sub notationTree =
