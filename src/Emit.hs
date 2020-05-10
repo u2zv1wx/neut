@@ -42,7 +42,7 @@ emitDeclarations = do
 declToBuilder :: (T.Text, ([LowType], LowType)) -> Builder
 declToBuilder (name, (dom, cod)) = do
   let name' = TE.encodeUtf8Builder name
-  "declare "
+  "declare fastcc "
     <> showLowType cod
     <> " @"
     <> name'
