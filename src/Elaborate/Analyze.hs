@@ -43,15 +43,9 @@ simp' constraintList =
         ((_, e1), (_, e2))
           | e1 == e2 ->
             simp cs
-        ((m1, WeakTermPi xts1 cod1), (m2, WeakTermPi xts2 cod2)) ->
+        (e1@(m1, WeakTermPi xts1 cod1), e2@(m2, WeakTermPi xts2 cod2)) ->
           if length xts1 /= length xts2
-            then do
-              let m = supMeta m1 m2
-              case snd (getPosInfo m1) `compare` snd (getPosInfo m2) of
-                LT ->
-                  throwArityError m (length xts2) (length xts1)
-                _ ->
-                  throwArityError m (length xts1) (length xts2)
+            then insConstraintQueue $ Enriched (e1, e2) S.empty ConstraintOther
             else do
               xt1 <- asWeakIdentPlus m1 cod1
               xt2 <- asWeakIdentPlus m2 cod2
@@ -386,12 +380,3 @@ lookupAll is sub =
       v <- IntMap.lookup (asInt j) sub
       vs <- lookupAll js sub
       return $ v : vs
-
-throwArityError :: Meta -> Int -> Int -> WithEnv a
-throwArityError m i1 i2 =
-  raiseError m $
-    "the arity of the term is "
-      <> T.pack (show i1)
-      <> ", but found "
-      <> T.pack (show i2)
-      <> " arguments"
