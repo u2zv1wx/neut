@@ -50,13 +50,6 @@
 (notation (list.new a rest+)
   (list.cons * a (list.new rest+)))
 
-;; (notation (list.new a)
-;;   (list.cons * a (lazy.thunk * (list.nil *))))
-
-;; (notation (list.new a rest+)
-;;   (list.cons * a (lazy.thunk * (list.new rest+))))
-
-
 (define head
   ((a tau)
    (xs (list a)))

@@ -68,9 +68,6 @@ data Env
         revNameEnv :: IntMap.IntMap Int,
         prefixEnv :: [T.Text],
         sectionEnv :: [T.Text],
-        -- formationEnv :: IntMap.IntMap (Maybe WeakTermPlus),
-        -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
-        -- indEnv :: IntMap.IntMap (Maybe [WeakIdentPlus]),
         intactSet :: S.Set (Meta, T.Text),
         topNameEnv :: Map.HashMap T.Text Ident,
         --
@@ -124,8 +121,6 @@ initialEnv =
       topNameEnv = Map.empty,
       prefixEnv = [],
       sectionEnv = [],
-      -- formationEnv = IntMap.empty,
-      -- indEnv = IntMap.empty,
       weakTypeEnv = IntMap.empty,
       typeEnv = IntMap.empty,
       constTypeEnv = Map.empty,
