@@ -253,14 +253,7 @@ sigmaIntroString m u8s = do
             ( m,
               WeakTermPi
                 [ (m, lenVar, (m, WeakTermConst (showIntSize 64))),
-                  ( m,
-                    arrVar,
-                    ( m,
-                      WeakTermArray
-                        (m, WeakTermUpsilon lenVar)
-                        (ArrayKindInt 8)
-                    )
-                  )
+                  (m, arrVar, (m, WeakTermArray (m, WeakTermUpsilon lenVar) (ArrayKindInt 8)))
                 ]
                 (m, WeakTermUpsilon z)
             )
