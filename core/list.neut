@@ -12,8 +12,6 @@
 
 (include "core/bool.neut")
 
-(include "core/lazy.neut")
-
 (include "core/identity.neut")
 
 (include "core/string.neut")
