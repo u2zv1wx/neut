@@ -43,8 +43,7 @@ visit path = do
   modify (\env -> env {fileEnv = Map.insert path VisitInfoActive (fileEnv env)})
   modify (\env -> env {phase = 1 + phase env})
   content <- liftIO $ TIO.readFile $ toFilePath path
-  treeList <- tokenize content
-  parse' $ includeCore (newMeta 1 1 path) treeList
+  tokenize content >>= parse'
 
 leave :: WithEnv [WeakStmt]
 leave = do
@@ -392,20 +391,6 @@ ensureFileExistence m path = do
 extract :: L.ByteString -> Path Abs Dir -> WithEnv ()
 extract bytestr pkgPath =
   liftIO $ Tar.unpack (toFilePath pkgPath) $ Tar.read $ GZip.decompress bytestr
-
-includeCore :: Meta -> [TreePlus] -> [TreePlus]
-includeCore m treeList =
-  case treeList of
-    ((_, TreeNode [(_, TreeLeaf "no-implicit-core")]) : rest) ->
-      rest
-    _ ->
-      ( m,
-        TreeNode
-          [ (m, TreeLeaf "include"),
-            (m, TreeLeaf "\"core/core.neut\"")
-          ]
-      )
-        : treeList
 
 adjustPhase :: TreePlus -> WithEnv TreePlus
 adjustPhase tree =

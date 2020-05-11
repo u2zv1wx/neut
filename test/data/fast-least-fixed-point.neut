@@ -1,8 +1,11 @@
-(no-implicit-core)
+;; (no-implicit-core)
 
-(include "core/notation.neut")
+(ensure core/0.1.0.0
+  "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz") ;; dummy URL
 
-(include "core/integer.neut")
+(include "core/0.1.0.0/notation.neut")
+
+(include "core/0.1.0.0/integer.neut")
 
 (define µ
   ((f (Π ((_ tau)) tau)))

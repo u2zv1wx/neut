@@ -1,5 +1,3 @@
-(no-implicit-core)
-
 (enum bool (true 1) (false 0))
 
 ;; simple inductive

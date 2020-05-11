@@ -1,6 +1,7 @@
-(no-implicit-core)
+(ensure core/0.1.0.0
+  "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz") ;; dummy URL
 
-(include "core/integer.neut")
+(include "core/0.1.0.0/integer.neut")
 
 (let a
   (struct f16 i8 i16 f32 i64 i64 f64 i8))
