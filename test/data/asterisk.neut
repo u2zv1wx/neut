@@ -1,0 +1,8 @@
+(let (x *) (i64 1))
+
+(let (y *)
+  (with identity.bind
+    (let (z *) x)
+    z))
+
+?y
