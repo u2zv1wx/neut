@@ -50,8 +50,7 @@ clarify' tenv term =
       let tenv' = insTypeEnv' (asInt x) t tenv
       e' <- clarify' (insTypeEnv1 mxts tenv') e
       fvs <- nubFVS <$> chainOf tenv term
-      cls <- makeClosure' tenv (Just x) fvs m mxts e'
-      return (m, CodeUpIntro cls)
+      retClosure tenv (Just x) fvs m mxts e'
     (m, TermConst x) ->
       clarifyConst tenv m x
     (m, TermInt size l) ->
