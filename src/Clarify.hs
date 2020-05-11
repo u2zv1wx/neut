@@ -50,7 +50,7 @@ clarify' tenv term =
       let tenv' = insTypeEnv' (asInt x) t tenv
       e' <- clarify' (insTypeEnv1 mxts tenv') e
       fvs <- nubFVS <$> chainOf tenv term
-      cls <- makeClosureFix' tenv x fvs m mxts e'
+      cls <- makeClosure' tenv (Just x) fvs m mxts e'
       return (m, CodeUpIntro cls)
     (m, TermConst x) ->
       clarifyConst tenv m x
@@ -395,7 +395,7 @@ sigToPi m tPi =
       raiseCritical m "the type of sigma-intro is wrong"
 
 makeClosure ::
-  Maybe T.Text ->
+  Maybe Ident ->
   [(Meta, Ident, CodePlus)] -> -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
   Meta -> -- meta of lambda
   [(Meta, Ident, CodePlus)] -> -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
@@ -407,18 +407,17 @@ makeClosure mName mxts2 m mxts1 e = do
   envExp <- cartesianSigma Nothing m arrVoidPtr $ map Right xts2
   let vs = map (\(mx, x, _) -> (mx, DataUpsilon x)) mxts2
   let fvEnv = (m, sigmaIntro vs)
-  name <- toName mName
-  registerIfNecessary m name False xts1 xts2 e
-  return (m, sigmaIntro [envExp, fvEnv, (m, DataConst name)])
-
-toName :: Maybe T.Text -> WithEnv T.Text
-toName mName =
   case mName of
-    Just name ->
-      return name
     Nothing -> do
       i <- newCount
-      return $ "thunk-" <> T.pack (show i)
+      let name = "thunk-" <> T.pack (show i)
+      registerIfNecessary m name False xts1 xts2 e
+      return (m, sigmaIntro [envExp, fvEnv, (m, DataConst name)])
+    Just name -> do
+      let cls = (m, sigmaIntro [envExp, fvEnv, (m, DataConst $ asText'' name)])
+      let e' = substCodePlus (IntMap.fromList [(asInt name, cls)]) e
+      registerIfNecessary m (asText'' name) True xts1 xts2 e'
+      return cls
 
 registerIfNecessary ::
   Meta ->
@@ -439,7 +438,7 @@ registerIfNecessary m name isFixed xts1 xts2 e = do
 
 makeClosure' ::
   TypeEnv ->
-  Maybe T.Text -> -- the name of newly created closure
+  Maybe Ident -> -- the name of newly created closure
   [IdentPlus] -> -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
   Meta -> -- meta of lambda
   [IdentPlus] -> -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
@@ -450,40 +449,9 @@ makeClosure' tenv mName fvs m xts e = do
   xts' <- clarifyBinder tenv xts
   makeClosure mName fvs' m xts' e
 
-makeClosureFix ::
-  Ident ->
-  [(Meta, Ident, CodePlus)] -> -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
-  Meta -> -- meta of lambda
-  [(Meta, Ident, CodePlus)] -> -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
-  CodePlus -> -- the `e` in `lam (x1, ..., xn). e`
-  WithEnv DataPlus
-makeClosureFix name mxts2 m mxts1 e = do
-  let xts1 = dropFst mxts1
-  let xts2 = dropFst mxts2
-  envExp <- cartesianSigma Nothing m arrVoidPtr $ map Right xts2
-  let vs = map (\(mx, x, _) -> (mx, DataUpsilon x)) mxts2
-  let fvEnv = (m, sigmaIntro vs)
-  let cls = (m, sigmaIntro [envExp, fvEnv, (m, DataConst $ asText'' name)])
-  let e' = substCodePlus (IntMap.fromList [(asInt name, cls)]) e
-  registerIfNecessary m (asText'' name) True xts1 xts2 e'
-  return cls
-
-makeClosureFix' ::
-  TypeEnv ->
-  Ident -> -- the name of newly created closure
-  [IdentPlus] -> -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
-  Meta -> -- meta of lambda
-  [IdentPlus] -> -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
-  CodePlus -> -- the `e` in `lam (x1, ..., xn). e`
-  WithEnv DataPlus
-makeClosureFix' tenv mName fvs m xts e = do
-  fvs' <- clarifyBinder tenv fvs
-  xts' <- clarifyBinder tenv xts
-  makeClosureFix mName fvs' m xts' e
-
 retClosure ::
   TypeEnv ->
-  Maybe T.Text -> -- the name of newly created closure
+  Maybe Ident -> -- the name of newly created closure
   [IdentPlus] -> -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
   Meta -> -- meta of lambda
   [IdentPlus] -> -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
