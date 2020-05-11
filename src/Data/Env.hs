@@ -86,7 +86,6 @@ data Env
         typeEnv :: TypeEnv,
         codeEnv :: Map.HashMap T.Text Definition,
         nameSet :: S.Set T.Text,
-        chainEnv :: IntMap.IntMap [IdentPlus],
         --
         -- LLVM
         --
@@ -123,7 +122,6 @@ initialEnv =
       typeEnv = IntMap.empty,
       constTypeEnv = Map.empty,
       codeEnv = Map.empty,
-      chainEnv = IntMap.empty,
       llvmEnv = Map.empty,
       declEnv =
         Map.fromList
