@@ -29,7 +29,7 @@ tokenize input = do
   modify (\env -> env {count = 1 + count env})
   path <- getCurrentFilePath
   let env = TEnv {text = input, line = 1, column = 1, filePath = path}
-  resultOrError <- liftIO $ try $ runStateT (skip' >> program []) env
+  resultOrError <- liftIO $ try $ runStateT (program []) env
   case resultOrError of
     Left err ->
       throw (err :: Error)
@@ -105,28 +105,6 @@ char c = do
             <> T.singleton c
             <> "'"
 
-switchByHyphen :: Tokenizer () -> Tokenizer () -> Tokenizer ()
-switchByHyphen f g = do
-  s <- gets text
-  case T.uncons s of
-    Just ('-', rest) ->
-      updateStreamC 1 rest >> f
-    _ ->
-      g
-
-switchByNewline :: Tokenizer () -> Tokenizer () -> Tokenizer ()
-switchByNewline f g = do
-  s <- gets text
-  case T.uncons s of
-    Just ('\n', rest) ->
-      updateStreamL rest >> f
-    _ ->
-      g
-
-switchBySep :: Tokenizer () -> Tokenizer () -> Tokenizer ()
-switchBySep f g =
-  switchByHyphen (switchByNewline f g) g
-
 skip :: Tokenizer ()
 skip = do
   s <- gets text
@@ -135,31 +113,11 @@ skip = do
       | c == ';' ->
         comment
       | c `S.member` newlineSet ->
-        updateStreamL rest >> skip'
+        updateStreamL rest >> skip
       | c `S.member` spaceSet ->
         updateStreamC 1 rest >> skip
     _ ->
       return ()
-
-skipDoc :: Tokenizer ()
-skipDoc = do
-  s <- gets text
-  case T.uncons s of
-    Just (c, rest)
-      | c `S.member` newlineSet ->
-        updateStreamL rest >> skipDoc'
-      | otherwise ->
-        updateStreamC 1 rest >> skipDoc
-    _ ->
-      return ()
-
-skip' :: Tokenizer ()
-skip' =
-  switchBySep skipDoc skip
-
-skipDoc' :: Tokenizer ()
-skipDoc' =
-  switchBySep skip skipDoc
 
 comment :: Tokenizer ()
 comment = do
@@ -167,7 +125,7 @@ comment = do
   case T.uncons s of
     Just (c, rest)
       | c `S.member` newlineSet ->
-        updateStreamL rest >> skip'
+        updateStreamL rest >> skip
       | otherwise ->
         updateStreamC 1 rest >> comment
     Nothing ->
