@@ -65,7 +65,6 @@ data Env
         revEnumEnv :: Map.HashMap T.Text (T.Text, Int),
         nameEnv :: Map.HashMap T.Text T.Text,
         -- [("foo.13", "foo"), ...] (as corresponding int)
-        revNameEnv :: IntMap.IntMap Int,
         prefixEnv :: [T.Text],
         sectionEnv :: [T.Text],
         intactSet :: S.Set (Meta, T.Text),
@@ -116,7 +115,6 @@ initialEnv =
       traceEnv = [],
       revEnumEnv = Map.empty,
       nameEnv = Map.empty,
-      revNameEnv = IntMap.empty,
       intactSet = S.empty,
       topNameEnv = Map.empty,
       prefixEnv = [],
@@ -208,8 +206,8 @@ newTextWith s = do
 {-# INLINE newAster #-}
 newAster :: Meta -> WithEnv WeakTermPlus
 newAster m = do
-  h <- newNameWith'' "*"
-  return (m, WeakTermAster h)
+  i <- newCount
+  return (m, WeakTermAster i)
 
 getTarget :: WithEnv Target
 getTarget = do

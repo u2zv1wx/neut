@@ -13,8 +13,8 @@ type FixInfo =
 
 data Constraint
   = ConstraintAnalyzable
-  | ConstraintQuasiPattern Ident [[WeakTermPlus]] WeakTermPlus
-  | ConstraintFlexRigid Ident [[WeakTermPlus]] WeakTermPlus
+  | ConstraintQuasiPattern Int [[WeakTermPlus]] WeakTermPlus
+  | ConstraintFlexRigid Int [[WeakTermPlus]] WeakTermPlus
   | ConstraintOther
   deriving (Show)
 
@@ -41,7 +41,7 @@ instance Ord Constraint where
 data EnrichedConstraint
   = Enriched
       PreConstraint
-      (S.Set Ident) -- the set of the metavariables that cause stuck
+      (S.Set Int) -- the set of the metavariables that cause stuck
       Constraint
   deriving (Show)
 

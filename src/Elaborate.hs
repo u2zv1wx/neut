@@ -93,7 +93,7 @@ elaborate' term =
       xts' <- mapM elaboratePlus xts
       e' <- elaborate' e
       return (m, TermPiIntro xts' e')
-    (m, WeakTermPiElim (mh, WeakTermAster (I (_, x))) es) -> do
+    (m, WeakTermPiElim (mh, WeakTermAster x) es) -> do
       sub <- gets substEnv
       case IntMap.lookup x sub of
         Nothing ->

@@ -98,7 +98,7 @@ simp' constraintList =
           let fvs2 = S.difference (varWeakTermPlus e2) oenv
           case lookupAny (S.toList fmvs) sub of
             Just (h, e) -> do
-              let s = IntMap.singleton (asInt h) e
+              let s = IntMap.singleton h e
               let e1' = substWeakTermPlus s (m, snd e1)
               let e2' = substWeakTermPlus s (m, snd e2)
               simp $ (e1', e2') : cs
@@ -197,27 +197,27 @@ simpBinder' sub args1 args2 =
       return ()
 
 simpPattern ::
-  Ident ->
+  Int ->
   [[WeakTermPlus]] ->
   WeakTermPlus ->
   WeakTermPlus ->
   S.Set Ident ->
   [PreConstraint] ->
   WithEnv ()
-simpPattern h1@(I (_, i)) ies1 _ e2 fvs2 cs = do
+simpPattern i ies1 _ e2 fvs2 cs = do
   xss <- mapM (toVarList fvs2) ies1
   let lam = bindFormalArgs e2 xss
   -- p $ "resolve: " <> T.unpack (asText' h1) <> " ~> " <> T.unpack (toText lam)
   modify (\env -> env {substEnv = IntMap.insert i lam (substEnv env)})
-  visit h1
+  visit i
   simp cs
 
 simpQuasiPattern ::
-  Ident ->
+  Int ->
   [[WeakTermPlus]] ->
   WeakTermPlus ->
   WeakTermPlus ->
-  S.Set Ident ->
+  S.Set Int ->
   [PreConstraint] ->
   WithEnv ()
 simpQuasiPattern h1 ies1 e1 e2 fmvs cs = do
@@ -225,11 +225,11 @@ simpQuasiPattern h1 ies1 e1 e2 fmvs cs = do
   simp cs
 
 simpFlexRigid ::
-  Ident ->
+  Int ->
   [[WeakTermPlus]] ->
   WeakTermPlus ->
   WeakTermPlus ->
-  S.Set Ident ->
+  S.Set Int ->
   [PreConstraint] ->
   WithEnv ()
 simpFlexRigid h1 ies1 e1 e2 fmvs cs = do
@@ -260,8 +260,8 @@ asPairList list1 list2 =
 
 data Stuck
   = StuckPiElimUpsilon Ident Meta [(Meta, [WeakTermPlus])]
-  | StuckPiElimAster Ident [[WeakTermPlus]]
-  | StuckPiElimAsterStrict Ident [[WeakTermPlus]]
+  | StuckPiElimAster Int [[WeakTermPlus]]
+  | StuckPiElimAsterStrict Int [[WeakTermPlus]]
   | StuckPiElimFix FixInfo [(Meta, [WeakTermPlus])]
   | StuckPiElimConst T.Text Meta [(Meta, [WeakTermPlus])]
 
@@ -297,7 +297,7 @@ asStuckedTerm term =
     _ ->
       Nothing
 
-occurCheck :: Ident -> S.Set Ident -> Bool
+occurCheck :: Int -> S.Set Int -> Bool
 occurCheck h fmvs =
   h `S.notMember` fmvs
 
@@ -321,7 +321,7 @@ insConstraintQueue :: EnrichedConstraint -> WithEnv ()
 insConstraintQueue c =
   modify (\env -> env {constraintQueue = Q.insert c (constraintQueue env)})
 
-visit :: Ident -> WithEnv ()
+visit :: Int -> WithEnv ()
 visit h = do
   q <- gets constraintQueue
   let (q1, q2) = Q.partition (\(Enriched _ hs _) -> h `S.member` hs) q
@@ -359,13 +359,13 @@ bindFormalArgs e args =
       let e' = bindFormalArgs e xtss
       (metaOf e', WeakTermPiIntro xts e')
 
-lookupAny :: [Ident] -> IntMap.IntMap a -> Maybe (Ident, a)
+lookupAny :: [Int] -> IntMap.IntMap a -> Maybe (Int, a)
 lookupAny is sub =
   case is of
     [] ->
       Nothing
     j : js ->
-      case IntMap.lookup (asInt j) sub of
+      case IntMap.lookup j sub of
         Just v ->
           Just (j, v)
         _ ->

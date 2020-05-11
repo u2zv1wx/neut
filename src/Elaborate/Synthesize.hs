@@ -39,10 +39,9 @@ synthesize = do
     _ ->
       throwTypeErrors
 
-resolveStuck ::
-  WeakTermPlus -> WeakTermPlus -> Ident -> WeakTermPlus -> WithEnv ()
+resolveStuck :: WeakTermPlus -> WeakTermPlus -> Int -> WeakTermPlus -> WithEnv ()
 resolveStuck e1 e2 h e = do
-  let s = IntMap.singleton (asInt h) e
+  let s = IntMap.singleton h e
   let e1' = substWeakTermPlus s e1
   let e2' = substWeakTermPlus s e2
   deleteMin
@@ -60,7 +59,7 @@ resolveStuck e1 e2 h e = do
 -- If the given pattern is a flex-rigid pattern like ?M @ x @ x @ e1 @ y == e,
 -- this function replaces all the arguments that are not variable by
 -- fresh variables, and try to resolve the new quasi-pattern ?M @ x @ x @ z @ y == e.
-resolvePiElim :: Ident -> [[WeakTermPlus]] -> WeakTermPlus -> WithEnv ()
+resolvePiElim :: Int -> [[WeakTermPlus]] -> WeakTermPlus -> WithEnv ()
 resolvePiElim h ess e = do
   let lengthInfo = map length ess
   let es = concat ess
@@ -70,11 +69,11 @@ resolvePiElim h ess e = do
   deleteMin
   tryPlanList (metaOf e) $ map (resolveIdent h) lamList
 
-resolveIdent :: Ident -> WeakTermPlus -> WithEnv ()
-resolveIdent h@(I (_, i)) e = do
+resolveIdent :: Int -> WeakTermPlus -> WithEnv ()
+resolveIdent i e = do
   modify (\env -> env {substEnv = IntMap.insert i e (substEnv env)})
   q <- gets constraintQueue
-  let (q1, q2) = Q.partition (\(Enriched _ hs _) -> h `elem` hs) q
+  let (q1, q2) = Q.partition (\(Enriched _ hs _) -> i `elem` hs) q
   let q1' = Q.mapU asAnalyzable q1
   modify (\env -> env {constraintQueue = q1' `Q.union` q2})
   synthesize
@@ -240,9 +239,8 @@ unravel term =
       return (m, WeakTermFix (mx, x', t) xts' e')
     (m, WeakTermConst x) ->
       return (m, WeakTermConst x)
-    (m, WeakTermAster h) -> do
-      h' <- unravelAster h
-      return (m, WeakTermAster h')
+    (m, WeakTermAster h) ->
+      return (m, WeakTermAster h)
     (m, WeakTermInt t x) ->
       return (m, WeakTermInt t x)
     (m, WeakTermFloat t x) ->
@@ -290,17 +288,6 @@ unravelUpsilon (I (s, i)) = do
       let s' = T.pack $ "var" ++ show j
       modify (\e -> e {nameEnv = Map.insert s s' nenv})
       return $ I (s', i)
-
-unravelAster :: Ident -> WithEnv Ident
-unravelAster (I (s, i)) = do
-  rnenv <- gets revNameEnv
-  case IntMap.lookup i rnenv of
-    Just j ->
-      return $ I (s, j)
-    Nothing -> do
-      j <- newCountPP
-      modify (\env -> env {revNameEnv = IntMap.insert i j rnenv})
-      return $ I (s, j)
 
 unravelBinder ::
   [WeakIdentPlus] ->

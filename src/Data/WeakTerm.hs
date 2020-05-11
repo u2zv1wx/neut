@@ -16,7 +16,7 @@ data WeakTerm
   | WeakTermPiIntro [WeakIdentPlus] WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
   | WeakTermFix WeakIdentPlus [WeakIdentPlus] WeakTermPlus
-  | WeakTermAster Ident
+  | WeakTermAster Int
   | WeakTermConst T.Text
   | WeakTermInt WeakTermPlus Integer
   | WeakTermFloat WeakTermPlus Double
@@ -137,7 +137,7 @@ varWeakTermPlus' binder es =
       let hs2 = varWeakTermPlus' xts es
       S.union hs1 $ S.filter (/= x) hs2
 
-asterWeakTermPlus :: WeakTermPlus -> S.Set Ident
+asterWeakTermPlus :: WeakTermPlus -> S.Set Int
 asterWeakTermPlus term =
   case term of
     (_, WeakTermTau) ->
@@ -196,7 +196,7 @@ asterWeakTermPlus term =
     (_, WeakTermErase _ e) ->
       asterWeakTermPlus e
 
-asterWeakTermPlus' :: [WeakIdentPlus] -> [WeakTermPlus] -> S.Set Ident
+asterWeakTermPlus' :: [WeakIdentPlus] -> [WeakTermPlus] -> S.Set Int
 asterWeakTermPlus' binder es =
   case binder of
     [] ->
@@ -235,7 +235,7 @@ substWeakTermPlus sub term =
     (_, WeakTermConst _) ->
       term
     (_, WeakTermAster x) ->
-      case IntMap.lookup (asInt x) sub of
+      case IntMap.lookup x sub of
         Nothing ->
           term
         Just e2@(_, e) ->
