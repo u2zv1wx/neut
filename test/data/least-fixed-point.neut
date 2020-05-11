@@ -55,7 +55,7 @@
     (µ.in (list-f a _) (list-f.cons a (list a) x xs))))
 
 (define list-f.map ((a tau))
-  (witness (functor-form (list-f a _))
+  (witness (functor-type (list-f a _))
     (λ (from to f m)
       (witness (list-f a to)
         (list-f.case
