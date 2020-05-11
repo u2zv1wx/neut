@@ -87,7 +87,7 @@ parse' stmtTreeList =
                 case ns of
                   [] ->
                     raiseError m "there is no section to end"
-                  (s' : ns')
+                  s' : ns'
                     | s == s' -> do
                       getCurrentSection >>= unuse
                       modify (\e -> e {sectionEnv = ns'})
