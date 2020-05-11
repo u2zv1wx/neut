@@ -9,6 +9,7 @@ import qualified Data.IntMap as IntMap
 import Data.LowType
 import Data.Namespace
 import Data.Primitive
+import qualified Data.Set as S
 import Data.Term
 import qualified Data.Text as T
 
@@ -40,7 +41,7 @@ reduceTermPlus term =
         _ ->
           (m, app)
     (m, TermFix (mx, x, t) xts e)
-      | x `notElem` varTermPlus e ->
+      | asInt x `S.notMember` varTermPlus e ->
         reduceTermPlus (m, TermPiIntro xts e)
       | otherwise -> do
         let t' = reduceTermPlus t

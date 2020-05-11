@@ -6,6 +6,7 @@ import qualified Data.IntMap as IntMap
 import Data.LowType
 import Data.Maybe (fromMaybe)
 import Data.Meta
+import qualified Data.Set as S
 import Data.Size
 import qualified Data.Text as T
 import Data.WeakTerm
@@ -54,62 +55,65 @@ asUpsilon term =
     _ ->
       Nothing
 
-varTermPlus :: TermPlus -> [Ident]
+varTermPlus :: TermPlus -> S.Set Int
 varTermPlus term =
   case term of
     (_, TermTau) ->
-      []
+      S.empty
     (_, TermUpsilon x) ->
-      [x]
+      S.singleton (asInt x)
     (_, TermPi xts t) ->
       varTermPlus' xts [t]
     (_, TermPiIntro xts e) ->
       varTermPlus' xts [e]
     (_, TermPiElim e es) -> do
       let xs1 = varTermPlus e
-      let xs2 = concatMap varTermPlus es
-      xs1 ++ xs2
-    (_, TermFix (_, x, t) xts e) ->
-      varTermPlus t ++ filter (/= x) (varTermPlus' xts [e])
+      let xs2 = S.unions $ map varTermPlus es
+      S.union xs1 xs2
+    (_, TermFix (_, x, t) xts e) -> do
+      let set1 = varTermPlus t
+      let set2 = S.filter (/= asInt x) (varTermPlus' xts [e])
+      S.union set1 set2
     (_, TermConst _) ->
-      []
+      S.empty
     (_, TermInt _ _) ->
-      []
+      S.empty
     (_, TermFloat _ _) ->
-      []
+      S.empty
     (_, TermEnum _) ->
-      []
+      S.empty
     (_, TermEnumIntro _) ->
-      []
+      S.empty
     (_, TermEnumElim (e, t) les) -> do
-      let xs0 = varTermPlus t
-      let xs1 = varTermPlus e
-      let es = map snd les
-      let xs2 = concatMap varTermPlus es
-      xs0 ++ xs1 ++ xs2
+      let xs = varTermPlus t
+      let ys = varTermPlus e
+      let zs = S.unions $ map (varTermPlus . snd) les
+      S.unions [xs, ys, zs]
     (_, TermArray dom _) ->
       varTermPlus dom
     (_, TermArrayIntro _ es) ->
-      concatMap varTermPlus es
+      S.unions $ map varTermPlus es
     (_, TermArrayElim _ xts d e) ->
-      varTermPlus d ++ varTermPlus' xts [e]
+      varTermPlus d `S.union` varTermPlus' xts [e]
     (_, TermStruct {}) ->
-      []
+      S.empty
     (_, TermStructIntro ets) ->
-      concatMap (varTermPlus . fst) ets
+      S.unions $ map (varTermPlus . fst) ets
     (_, TermStructElim xts d e) -> do
-      let xs = map (\(_, x, _) -> x) xts
-      varTermPlus d ++ filter (`notElem` xs) (varTermPlus e)
+      let xs = map (\(_, x, _) -> asInt x) xts
+      let set1 = varTermPlus d
+      let set2 = S.filter (`notElem` xs) (varTermPlus e)
+      S.union set1 set2
 
-varTermPlus' :: [IdentPlus] -> [TermPlus] -> [Ident]
+varTermPlus' :: [IdentPlus] -> [TermPlus] -> S.Set Int
 varTermPlus' binder es =
   case binder of
     [] ->
-      concatMap varTermPlus es
+      S.unions $ map varTermPlus es
     ((_, x, t) : xts) -> do
-      let xs1 = varTermPlus t
-      let xs2 = varTermPlus' xts es
-      xs1 ++ filter (/= x) xs2
+      let set1 = varTermPlus t
+      let set2 = varTermPlus' xts es
+      S.union set1 $ S.filter (/= asInt x) set2
 
 substTermPlus :: SubstTerm -> TermPlus -> TermPlus
 substTermPlus sub term =
