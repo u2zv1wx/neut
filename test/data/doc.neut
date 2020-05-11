@@ -1,11 +1,11 @@
+-
+documentational comment at the beginning of a file.
+-
+
 (ensure core/0.1.0.0
   "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz") ;; dummy URL
 
 (include "core/0.1.0.0/core.neut")
-
--
-documentational comment at the beginning of a file.
--
 
 ;; ordinary comment
 -
