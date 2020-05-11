@@ -32,14 +32,8 @@ data Term
   | TermStructElim [(Meta, Ident, ArrayKind)] TermPlus TermPlus
   deriving (Show)
 
-type TextPlus =
-  (Meta, T.Text, TermPlus)
-
 type TermPlus =
   (Meta, Term)
-
-type Clause =
-  (((Meta, Ident), [IdentPlus]), TermPlus)
 
 type SubstTerm =
   IntMap.IntMap TermPlus
