@@ -337,7 +337,11 @@ toText term =
       let argStr = inParen $ showItems $ map showArg xts
       showCons ["λ", argStr, toText e]
     (_, WeakTermPiElim e es) ->
-      showCons $ map toText $ e : es
+      case e of
+        (_, WeakTermAster _) ->
+          "*"
+        _ ->
+          showCons $ map toText $ e : es
     (_, WeakTermFix (_, x, _) xts e) -> do
       let argStr = inParen $ showItems $ map showArg xts
       showCons ["fix", asText' x, argStr, toText e]
