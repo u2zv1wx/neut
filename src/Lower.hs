@@ -543,10 +543,6 @@ commConv x llvm cont2 =
       let caseList' = zip ds es'
       defaultCase' <- commConv x defaultCase cont2
       return $ LLVMSwitch (d, t) defaultCase' caseList'
-    LLVMBranch d onTrue onFalse -> do
-      onTrue' <- commConv x onTrue cont2
-      onFalse' <- commConv x onFalse cont2
-      return $ LLVMBranch d onTrue' onFalse'
     LLVMCall d ds ->
       return $ LLVMLet x (LLVMOpCall d ds) cont2
     LLVMUnreachable ->

@@ -20,7 +20,6 @@ data LLVM
   | LLVMLet Ident LLVMOp LLVM -- UpElim
   | LLVMCont LLVMOp LLVM -- LLVMLet that discards the result of LLVMOp
   | LLVMSwitch (LLVMData, LowType) LLVM [(Int, LLVM)] -- EnumElim
-  | LLVMBranch LLVMData LLVM LLVM
   | LLVMCall LLVMData [LLVMData]
   | LLVMUnreachable -- for empty case analysis
   deriving (Show)

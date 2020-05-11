@@ -60,11 +60,6 @@ reduceLLVM sub sizeMap llvm = do
       defaultBranch' <- reduceLLVM sub sizeMap defaultBranch
       es' <- mapM (reduceLLVM sub sizeMap) es
       return $ LLVMSwitch (d', t) defaultBranch' (zip ls es')
-    LLVMBranch d onTrue onFalse -> do
-      let d' = substLLVMData sub d
-      onTrue' <- reduceLLVM sub sizeMap onTrue
-      onFalse' <- reduceLLVM sub sizeMap onFalse
-      return $ LLVMBranch d' onTrue' onFalse'
     LLVMCall d ds -> do
       let d' = substLLVMData sub d
       let ds' = map (substLLVMData sub) ds
