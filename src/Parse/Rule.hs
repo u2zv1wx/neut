@@ -190,47 +190,36 @@ toCaseBranchType univVar (mx, x, t) =
       raiseCritical' "toCaseBranchType"
 
 toInductiveIntroList :: [WeakTextPlus] -> [WeakTextPlus] -> Connective -> WithEnv [WeakStmt]
-toInductiveIntroList ats bts (_, a, xts, rules) = do
+toInductiveIntroList ats bts (_, _, xts, rules) = do
   let ats' = map textPlusToWeakIdentPlus ats
   let bts' = map textPlusToWeakIdentPlus bts
-  concat <$> mapM (toInductiveIntro ats' bts' xts a) rules
+  concat <$> mapM (toInductiveIntro ats' bts' xts) rules
 
 -- represent the introduction rule within CoC
 toInductiveIntro ::
   [WeakIdentPlus] ->
   [WeakIdentPlus] ->
   [WeakIdentPlus] ->
-  T.Text ->
   Rule ->
   WithEnv [WeakStmt]
-toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
-  | (_, WeakTermPiElim (_, WeakTermUpsilon a') es) <- cod,
-    ai == asText a',
-    length xts == length es = do
-    let vs = varWeakTermPlus' (yts ++ ats ++ bts) []
-    let xts' = filter (\(_, x, _) -> x `S.member` vs) xts
-    constructor <-
-      discern
-        ( m,
-          WeakTermPiIntro
-            (xts' ++ yts)
-            ( m,
-              WeakTermPiIntro
-                (ats ++ bts)
-                (m, WeakTermPiElim (mb, WeakTermUpsilon (asIdent bi)) (map toVar' yts)) -- ill-typed!
-            )
-        )
-    constructorIdent <-
-      discernIdentPlus
-        (mb, asIdent bi, (m, WeakTermPi (xts' ++ yts) cod))
-    return [WeakStmtLetBypass m constructorIdent constructor]
-  | otherwise =
-    raiseError m $
-      "the succedent of an introduction rule of `"
-        <> ai
-        <> "` must be of the form `("
-        <> showItems (ai : map (const "_") xts)
-        <> ")`"
+toInductiveIntro ats bts xts (mb, bi, m, yts, cod) = do
+  let vs = varWeakTermPlus' (yts ++ ats ++ bts) []
+  let xts' = filter (\(_, x, _) -> x `S.member` vs) xts
+  constructor <-
+    discern
+      ( m,
+        WeakTermPiIntro
+          (xts' ++ yts)
+          ( m,
+            WeakTermPiIntro
+              (ats ++ bts)
+              (m, WeakTermPiElim (mb, WeakTermUpsilon (asIdent bi)) (map toVar' yts)) -- ill-typed!
+          )
+      )
+  constructorIdent <-
+    discernIdentPlus
+      (mb, asIdent bi, (m, WeakTermPi (xts' ++ yts) cod))
+  return [WeakStmtLetBypass m constructorIdent constructor]
 
 ruleAsWeakIdentPlus :: Rule -> WithEnv WeakIdentPlus
 ruleAsWeakIdentPlus (mb, b, m, xts, t) =
