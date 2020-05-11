@@ -347,8 +347,8 @@ toText term =
       showCons ["fix", asText' x, argStr, toText e]
     (_, WeakTermConst x) ->
       x
-    (_, WeakTermAster (I (_, i))) ->
-      "?M" <> T.pack (show i)
+    (_, WeakTermAster _) ->
+      "*"
     (_, WeakTermInt _ a) ->
       T.pack $ show a
     (_, WeakTermFloat _ a) ->
@@ -383,18 +383,6 @@ toText term =
 inParen :: T.Text -> T.Text
 inParen s =
   "(" <> s <> ")"
-
-inAngle :: T.Text -> T.Text
-inAngle s =
-  "<" <> s <> ">"
-
-inBrace :: T.Text -> T.Text
-inBrace s =
-  "{" <> s <> "}"
-
-inBracket :: T.Text -> T.Text
-inBracket s =
-  "[" <> s <> "]"
 
 showArg :: (Meta, Ident, WeakTermPlus) -> T.Text
 showArg (_, x, t) =
@@ -442,10 +430,6 @@ showCons :: [T.Text] -> T.Text
 showCons =
   inParen . T.intercalate " "
 
-showTuple :: [T.Text] -> T.Text
-showTuple =
-  inAngle . T.intercalate " "
-
 extractSigmaArg :: WeakTermPlus -> Maybe [WeakIdentPlus]
 extractSigmaArg term =
   case term of
@@ -454,14 +438,3 @@ extractSigmaArg term =
         z == z'' ->
         return xts
     _ -> Nothing
-
-splitLast :: [a] -> Maybe ([a], a)
-splitLast input =
-  case input of
-    [] ->
-      Nothing
-    [x] ->
-      return ([], x)
-    (x : xs) -> do
-      (xs', z) <- splitLast xs
-      return (x : xs', z)
