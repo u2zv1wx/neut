@@ -133,9 +133,7 @@ parse' stmtTreeList =
             "include"
               | [(mPath, TreeLeaf pathString)] <- rest,
                 not (T.null pathString) ->
-                if T.head pathString == '.'
-                  then includeFile m mPath pathString getCurrentDirPath restStmtList
-                  else includeFile m mPath pathString getLibraryDirPath restStmtList
+                includeFile m mPath pathString restStmtList
               | otherwise ->
                 raiseSyntaxError m "(include LEAF)"
             "inductive"
@@ -263,15 +261,18 @@ includeFile ::
   Meta ->
   Meta ->
   T.Text ->
-  WithEnv (Path Abs Dir) ->
   [TreePlus] ->
   WithEnv [WeakStmt]
-includeFile m mPath pathString computeDirPath as = do
+includeFile m mPath pathString as = do
   m' <- adjustPhase' m
   mPath' <- adjustPhase' mPath
   ensureEnvSanity m'
   path <- readStrOrThrow mPath' pathString
-  dirPath <- computeDirPath
+  when (null path) $ raiseError m "found an empty path"
+  dirPath <-
+    if head path == '.'
+      then getCurrentDirPath
+      else getLibraryDirPath
   newPath <- resolveFile dirPath path
   ensureFileExistence m' newPath
   denv <- gets fileEnv
