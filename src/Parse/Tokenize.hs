@@ -32,7 +32,6 @@ tokenize input = do
   resultOrError <- liftIO $ try $ runStateT (skip' >> program []) env
   case resultOrError of
     Left err ->
-      -- Left (err :: Error) ->
       throw (err :: Error)
     Right (result, _) ->
       return result
