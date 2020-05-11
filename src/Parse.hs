@@ -219,7 +219,7 @@ interpretAux headStmt restStmtList = do
       e <- interpret headStmt' >>= discern
       h <- newNameWith'' "_"
       m' <- adjustPhase' $ metaOf e
-      t <- newHole m'
+      t <- newAster m'
       defList <- parse' restStmtList
       return $ WeakStmtLet m' (m', h, t) e : defList
 

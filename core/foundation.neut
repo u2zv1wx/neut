@@ -26,7 +26,7 @@
     (os.exit a 1)))
 
 (notation admit
-  (admit-internal hole))
+  (admit-internal *))
 
 (notation ?admit
   (question admit))

@@ -4,7 +4,7 @@ module Elaborate.Infer
     inferSigma,
     insConstraintEnv,
     insWeakTypeEnv,
-    newTypeHoleInCtx,
+    newTypeAsterInCtx,
     Context,
   )
 where
@@ -59,15 +59,15 @@ infer' ctx term =
       let piType = (m, WeakTermPi xts' tCod)
       insConstraintEnv piType t'
       return ((m, WeakTermFix (mx, x, t') xts' e'), piType)
-    (m, WeakTermHole x) -> do
-      zenv <- gets holeEnv
+    (m, WeakTermAster x) -> do
+      zenv <- gets asterEnv
       case IntMap.lookup (asInt x) zenv of
-        Just hole ->
-          return hole
+        Just z ->
+          return z
         Nothing -> do
-          (app, higherApp) <- newHoleInCtx ctx m
+          (app, higherApp) <- newAsterInCtx ctx m
           modify
-            (\env -> env {holeEnv = IntMap.insert (asInt x) (app, higherApp) zenv})
+            (\env -> env {asterEnv = IntMap.insert (asInt x) (app, higherApp) zenv})
           return (app, higherApp)
     (m, WeakTermConst x)
       -- i64, f16, etc.
@@ -100,7 +100,7 @@ infer' ctx term =
       insConstraintEnv tEnum t'
       if null ces
         then do
-          h <- newTypeHoleInCtx ctx m
+          h <- newTypeAsterInCtx ctx m
           return ((m, WeakTermEnumElim (e', t') []), h) -- ex falso quodlibet
         else do
           let (cs, es) = unzip ces
@@ -247,8 +247,8 @@ inferPiElim ctx m (e, t) ets = do
         return ((m, WeakTermPiElim e es), cod')
     _ -> do
       ys <- mapM (const $ newNameWith' "arg") es
-      yts <- newTypeHoleListInCtx ctx $ zip ys (map metaOf es)
-      cod <- newTypeHoleInCtx (ctx ++ yts) m
+      yts <- newTypeAsterListInCtx ctx $ zip ys (map metaOf es)
+      cod <- newTypeAsterInCtx (ctx ++ yts) m
       insConstraintEnv t (metaOf e, WeakTermPi yts cod)
       cod' <- inferArgs m ets yts cod
       return ((m, WeakTermPiElim e es), cod')
@@ -258,26 +258,26 @@ inferPiElim ctx m (e, t) ets = do
 --   ?Mt : Pi (x1 : A1, ..., xn : An). Univ
 -- and return ?M @ (x1, ..., xn) : ?Mt @ (x1, ..., xn).
 -- Note that we can't just set `?M : Pi (x1 : A1, ..., xn : An). Univ` since
--- WeakTermHole might be used as an ordinary term, that is, a term which is not a type.
-newHoleInCtx :: Context -> Meta -> WithEnv (WeakTermPlus, WeakTermPlus)
-newHoleInCtx ctx m = do
-  higherHole <- newHole m
+-- WeakTermAster might be used as an ordinary term, that is, a term which is not a type.
+newAsterInCtx :: Context -> Meta -> WithEnv (WeakTermPlus, WeakTermPlus)
+newAsterInCtx ctx m = do
+  higherAster <- newAster m
   let varSeq = map (\(_, x, _) -> (m, WeakTermUpsilon x)) ctx
-  let higherApp = (m, WeakTermPiElim higherHole varSeq)
-  hole <- newHole m
-  let app = (m, WeakTermPiElim hole varSeq)
+  let higherApp = (m, WeakTermPiElim higherAster varSeq)
+  aster <- newAster m
+  let app = (m, WeakTermPiElim aster varSeq)
   return (app, higherApp)
 
 -- In a context (x1 : A1, ..., xn : An), this function creates a metavariable
 --   ?M  : Pi (x1 : A1, ..., xn : An). Univ{i}
 -- and return ?M @ (x1, ..., xn) : Univ{i}.
-newTypeHoleInCtx :: Context -> Meta -> WithEnv WeakTermPlus
-newTypeHoleInCtx ctx m = do
+newTypeAsterInCtx :: Context -> Meta -> WithEnv WeakTermPlus
+newTypeAsterInCtx ctx m = do
   let varSeq = map (\(_, x, _) -> (m, WeakTermUpsilon x)) ctx
-  hole <- newHole m
-  return (m, WeakTermPiElim hole varSeq)
+  aster <- newAster m
+  return (m, WeakTermPiElim aster varSeq)
 
--- In context ctx == [x1, ..., xn], `newTypeHoleListInCtx ctx [y1, ..., ym]` generates
+-- In context ctx == [x1, ..., xn], `newTypeAsterListInCtx ctx [y1, ..., ym]` generates
 -- the following list:
 --
 --   [(y1,   ?M1   @ (x1, ..., xn)),
@@ -286,15 +286,15 @@ newTypeHoleInCtx ctx m = do
 --    (y{m}, ?M{m} @ (x1, ..., xn, y1, ..., y{m-1}))]
 --
 -- inserting type information `yi : ?Mi @ (x1, ..., xn, y1, ..., y{i-1})
-newTypeHoleListInCtx :: Context -> [(Ident, Meta)] -> WithEnv [WeakIdentPlus]
-newTypeHoleListInCtx ctx ids =
+newTypeAsterListInCtx :: Context -> [(Ident, Meta)] -> WithEnv [WeakIdentPlus]
+newTypeAsterListInCtx ctx ids =
   case ids of
     [] ->
       return []
     ((x, m) : rest) -> do
-      t <- newTypeHoleInCtx ctx m
+      t <- newTypeAsterInCtx ctx m
       insWeakTypeEnv x t
-      ts <- newTypeHoleListInCtx (ctx ++ [(m, x, t)]) rest
+      ts <- newTypeAsterListInCtx (ctx ++ [(m, x, t)]) rest
       return $ (m, x, t) : ts
 
 inferEnumCase :: Context -> EnumCasePlus -> WithEnv (EnumCasePlus, WeakTermPlus)
@@ -304,7 +304,7 @@ inferEnumCase ctx weakCase =
       k <- lookupKind m name
       return (weakCase, (m, WeakTermEnum k))
     (m, EnumCaseDefault) -> do
-      h <- newTypeHoleInCtx ctx m
+      h <- newTypeAsterInCtx ctx m
       return ((m, EnumCaseDefault), h)
 
 constrainList :: [WeakTermPlus] -> WithEnv ()

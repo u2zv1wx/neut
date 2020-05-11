@@ -79,7 +79,7 @@ data Env
         constraintQueue :: ConstraintQueue,
         substEnv :: IntMap.IntMap WeakTermPlus,
         opaqueEnv :: S.Set Ident,
-        holeEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus),
+        asterEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus),
         --
         -- clarify
         --
@@ -136,7 +136,7 @@ initialEnv =
       constraintQueue = Q.empty,
       substEnv = IntMap.empty,
       opaqueEnv = S.empty,
-      holeEnv = IntMap.empty,
+      asterEnv = IntMap.empty,
       nameSet = S.empty,
       nopFreeSet = S.empty
     }
@@ -205,11 +205,11 @@ newTextWith s = do
   i <- newCount
   return $ "(" <> s <> "-" <> T.pack (show i) <> ")"
 
-{-# INLINE newHole #-}
-newHole :: Meta -> WithEnv WeakTermPlus
-newHole m = do
-  h <- newNameWith'' "hole"
-  return (m, WeakTermHole h)
+{-# INLINE newAster #-}
+newAster :: Meta -> WithEnv WeakTermPlus
+newAster m = do
+  h <- newNameWith'' "*"
+  return (m, WeakTermAster h)
 
 getTarget :: WithEnv Target
 getTarget = do

@@ -49,7 +49,7 @@ resolveStuck e1 e2 h e = do
   simp [(e1', e2')]
   synthesize
 
--- synthesize `hole @ arg-1 @ ... @ arg-n = e`, where arg-i is a variable.
+-- synthesize `aster @ arg-1 @ ... @ arg-n = e`, where arg-i is a variable.
 -- Suppose that we received a quasi-pattern ?M @ x @ x @ y @ z == e.
 -- What this function do is to try two alternatives in this case:
 --   (1) ?M == lam x. lam _. lam y. lam z. e
@@ -162,7 +162,7 @@ discardInactive xs indexList =
         | i == j ->
           return (mx, x, t)
       _ -> do
-        y <- newNameWith' "hole"
+        y <- newNameWith' "aster"
         return (mx, y, t)
 
 -- takeByCount [1, 3, 2] [a, b, c, d, e, f, g, h] ~> [[a], [b, c, d], [e, f]]
@@ -240,9 +240,9 @@ unravel term =
       return (m, WeakTermFix (mx, x', t) xts' e')
     (m, WeakTermConst x) ->
       return (m, WeakTermConst x)
-    (m, WeakTermHole h) -> do
-      h' <- unravelHole h
-      return (m, WeakTermHole h')
+    (m, WeakTermAster h) -> do
+      h' <- unravelAster h
+      return (m, WeakTermAster h')
     (m, WeakTermInt t x) ->
       return (m, WeakTermInt t x)
     (m, WeakTermFloat t x) ->
@@ -291,8 +291,8 @@ unravelUpsilon (I (s, i)) = do
       modify (\e -> e {nameEnv = Map.insert s s' nenv})
       return $ I (s', i)
 
-unravelHole :: Ident -> WithEnv Ident
-unravelHole (I (s, i)) = do
+unravelAster :: Ident -> WithEnv Ident
+unravelAster (I (s, i)) = do
   rnenv <- gets revNameEnv
   case IntMap.lookup i rnenv of
     Just j ->

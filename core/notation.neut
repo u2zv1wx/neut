@@ -15,9 +15,6 @@
 (notation Π
   pi)
 
-(notation *
-  hole)
-
 (notation switch
   enum-elimination)
 
@@ -78,11 +75,11 @@
      (_ (Π (to-type-list t+) c)))
     c))
 
-(notation (to-hole-list e)
+(notation (to-asterisk-list e)
   ((_ *)))
 
-(notation (to-hole-list e e+)
-  ((_ *) (splice (to-hole-list e+))))
+(notation (to-asterisk-list e e+)
+  ((_ *) (splice (to-asterisk-list e+))))
 
 (notation (sigma-introduction)
   (λ
@@ -93,7 +90,7 @@
 (notation (sigma-introduction e+)
   (λ
     ((elim-result-type tau)
-     (k (Π (to-hole-list e+) elim-result-type)))
+     (k (Π (to-asterisk-list e+) elim-result-type)))
     (k e+)))
 
 (notation (sigma-elimination () e1 e2)

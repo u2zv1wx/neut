@@ -30,13 +30,13 @@ interpret inputTree =
     (m, TreeLeaf atom)
       | atom == "tau" ->
         return (m, WeakTermTau)
-      | atom == "hole" ->
-        newHole m
+      | atom == "*" ->
+        newAster m
       | Just x' <- readMaybe $ T.unpack atom -> do
-        h <- newHole m
+        h <- newAster m
         return (m, WeakTermInt h x')
       | Just x' <- readMaybe $ T.unpack atom -> do
-        h <- newHole m
+        h <- newAster m
         return (m, WeakTermFloat h x')
       | Just str <- readMaybe $ T.unpack atom -> do
         u8s <- forM (encode str) $ \u ->
@@ -52,7 +52,7 @@ interpret inputTree =
                 then raiseError m "found a note-variable with empty identifier"
                 else do
                   e <- interpret (m, TreeLeaf rest)
-                  h <- newHole m
+                  h <- newAster m
                   return (m, WeakTermQuestion e h)
             | otherwise ->
               return (m, WeakTermUpsilon $ asIdent atom)
@@ -132,7 +132,7 @@ interpret inputTree =
           | e : cs <- rest -> do
             e' <- interpret e
             cs' <- mapM interpretClause cs
-            h <- newHole m
+            h <- newAster m
             return (m, WeakTermEnumElim (e', h) cs')
           | otherwise ->
             raiseSyntaxError m "(enum-elimination TREE TREE*)"
@@ -175,7 +175,7 @@ interpret inputTree =
         "question"
           | [e] <- rest -> do
             e' <- interpret e
-            h <- newHole m
+            h <- newAster m
             return (m, WeakTermQuestion e' h)
           | otherwise ->
             raiseSyntaxError m "(question TREE)"
@@ -273,7 +273,7 @@ interpretWeakIdentPlus tree =
   case tree of
     leaf@(_, TreeLeaf _) -> do
       (m, x') <- interpretLeaf leaf
-      h <- newHole m
+      h <- newAster m
       return (m, x', h)
     (_, TreeNode [x, t]) -> do
       (m, x') <- interpretLeaf x
@@ -308,7 +308,7 @@ interpretIdentPlus tree =
   case tree of
     leaf@(_, TreeLeaf _) -> do
       (m, x') <- interpretLeafText leaf
-      h <- newHole m
+      h <- newAster m
       return (m, asIdent x', h)
     (_, TreeNode [x, t]) -> do
       (m, x') <- interpretLeafText x
@@ -465,8 +465,8 @@ interpretWith tree =
             )
         else do
           bind' <- interpret bind
-          h1 <- newHole m
-          h2 <- newHole m
+          h1 <- newAster m
+          h2 <- newAster m
           e' <- interpretWith (m, TreeNode (with : bind : es'))
           xt' <- interpretWeakIdentPlus xt
           rest' <- interpretWith (m, TreeNode (with : bind : rest))

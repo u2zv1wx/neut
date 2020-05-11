@@ -16,7 +16,7 @@ data WeakTerm
   | WeakTermPiIntro [WeakIdentPlus] WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
   | WeakTermFix WeakIdentPlus [WeakIdentPlus] WeakTermPlus
-  | WeakTermHole Ident
+  | WeakTermAster Ident
   | WeakTermConst T.Text
   | WeakTermInt WeakTermPlus Integer
   | WeakTermFloat WeakTermPlus Double
@@ -90,7 +90,7 @@ varWeakTermPlus term =
       S.union set1 set2
     (_, WeakTermConst _) ->
       S.empty
-    (_, WeakTermHole _) ->
+    (_, WeakTermAster _) ->
       S.empty
     (_, WeakTermInt t _) ->
       varWeakTermPlus t
@@ -137,73 +137,73 @@ varWeakTermPlus' binder es =
       let hs2 = varWeakTermPlus' xts es
       S.union hs1 $ S.filter (/= x) hs2
 
-holeWeakTermPlus :: WeakTermPlus -> S.Set Ident
-holeWeakTermPlus term =
+asterWeakTermPlus :: WeakTermPlus -> S.Set Ident
+asterWeakTermPlus term =
   case term of
     (_, WeakTermTau) ->
       S.empty
     (_, WeakTermUpsilon _) ->
       S.empty
     (_, WeakTermPi xts t) ->
-      holeWeakTermPlus' xts [t]
+      asterWeakTermPlus' xts [t]
     (_, WeakTermPiIntro xts e) ->
-      holeWeakTermPlus' xts [e]
+      asterWeakTermPlus' xts [e]
     (_, WeakTermPiElim e es) -> do
-      let set1 = holeWeakTermPlus e
-      let set2 = S.unions $ map holeWeakTermPlus es
+      let set1 = asterWeakTermPlus e
+      let set2 = S.unions $ map asterWeakTermPlus es
       S.union set1 set2
     (_, WeakTermFix (_, _, t) xts e) -> do
-      let set1 = holeWeakTermPlus t
-      let set2 = holeWeakTermPlus' xts [e]
+      let set1 = asterWeakTermPlus t
+      let set2 = asterWeakTermPlus' xts [e]
       S.union set1 set2
-    (_, WeakTermHole h) ->
+    (_, WeakTermAster h) ->
       S.singleton h
     (_, WeakTermConst _) ->
       S.empty
     (_, WeakTermInt t _) ->
-      holeWeakTermPlus t
+      asterWeakTermPlus t
     (_, WeakTermFloat t _) ->
-      holeWeakTermPlus t
+      asterWeakTermPlus t
     (_, WeakTermEnum _) ->
       S.empty
     (_, WeakTermEnumIntro _) ->
       S.empty
     (_, WeakTermEnumElim (e, t) les) -> do
-      let set1 = holeWeakTermPlus e
-      let set2 = holeWeakTermPlus t
-      let set3 = S.unions $ map (\(_, body) -> holeWeakTermPlus body) les
+      let set1 = asterWeakTermPlus e
+      let set2 = asterWeakTermPlus t
+      let set3 = S.unions $ map (\(_, body) -> asterWeakTermPlus body) les
       S.unions [set1, set2, set3]
     (_, WeakTermArray dom _) ->
-      holeWeakTermPlus dom
+      asterWeakTermPlus dom
     (_, WeakTermArrayIntro _ es) ->
-      S.unions $ map holeWeakTermPlus es
+      S.unions $ map asterWeakTermPlus es
     (_, WeakTermArrayElim _ xts d e) -> do
-      let set1 = holeWeakTermPlus d
-      let set2 = holeWeakTermPlus' xts [e]
+      let set1 = asterWeakTermPlus d
+      let set2 = asterWeakTermPlus' xts [e]
       S.union set1 set2
     (_, WeakTermStruct {}) ->
       S.empty
     (_, WeakTermStructIntro ets) ->
-      S.unions $ map (holeWeakTermPlus . fst) ets
+      S.unions $ map (asterWeakTermPlus . fst) ets
     (_, WeakTermStructElim _ d e) -> do
-      let set1 = holeWeakTermPlus d
-      let set2 = holeWeakTermPlus e
+      let set1 = asterWeakTermPlus d
+      let set2 = asterWeakTermPlus e
       S.union set1 set2
     (_, WeakTermQuestion e t) -> do
-      let set1 = holeWeakTermPlus e
-      let set2 = holeWeakTermPlus t
+      let set1 = asterWeakTermPlus e
+      let set2 = asterWeakTermPlus t
       S.union set1 set2
     (_, WeakTermErase _ e) ->
-      holeWeakTermPlus e
+      asterWeakTermPlus e
 
-holeWeakTermPlus' :: [WeakIdentPlus] -> [WeakTermPlus] -> S.Set Ident
-holeWeakTermPlus' binder es =
+asterWeakTermPlus' :: [WeakIdentPlus] -> [WeakTermPlus] -> S.Set Ident
+asterWeakTermPlus' binder es =
   case binder of
     [] ->
-      S.unions $ map holeWeakTermPlus es
+      S.unions $ map asterWeakTermPlus es
     ((_, _, t) : xts) -> do
-      let set1 = holeWeakTermPlus t
-      let set2 = holeWeakTermPlus' xts es
+      let set1 = asterWeakTermPlus t
+      let set2 = asterWeakTermPlus' xts es
       S.union set1 set2
 
 substWeakTermPlus :: SubstWeakTerm -> WeakTermPlus -> WeakTermPlus
@@ -234,7 +234,7 @@ substWeakTermPlus sub term =
       (m, WeakTermFix (mx, x, t') xts' e')
     (_, WeakTermConst _) ->
       term
-    (_, WeakTermHole x) ->
+    (_, WeakTermAster x) ->
       case IntMap.lookup (asInt x) sub of
         Nothing ->
           term
@@ -343,7 +343,7 @@ toText term =
       showCons ["fix", asText' x, argStr, toText e]
     (_, WeakTermConst x) ->
       x
-    (_, WeakTermHole (I (_, i))) ->
+    (_, WeakTermAster (I (_, i))) ->
       "?M" <> T.pack (show i)
     (_, WeakTermInt _ a) ->
       T.pack $ show a

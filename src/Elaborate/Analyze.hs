@@ -89,10 +89,10 @@ simp' constraintList =
           let ms2 = asStuckedTerm e2
           sub <- gets substEnv
           let m = supMeta m1 m2
-          let hs1 = holeWeakTermPlus e1
-          let hs2 = holeWeakTermPlus e2
+          let zs1 = asterWeakTermPlus e1
+          let zs2 = asterWeakTermPlus e2
           -- list of stuck reasons (fmvs: free meta-variables)
-          let fmvs = S.union hs1 hs2
+          let fmvs = S.union zs1 zs2
           oenv <- gets opaqueEnv
           let fvs1 = S.difference (varWeakTermPlus e1) oenv
           let fvs2 = S.difference (varWeakTermPlus e2) oenv
@@ -115,9 +115,9 @@ simp' constraintList =
                   | x1 == x2,
                     Just pairList <- asPairList (map snd mess1) (map snd mess2) ->
                     simp $ pairList ++ cs
-                (Just (StuckPiElimHoleStrict h1 ies1), _)
+                (Just (StuckPiElimAsterStrict h1 ies1), _)
                   | xs1 <- concatMap getVarList ies1,
-                    occurCheck h1 hs2,
+                    occurCheck h1 zs2,
                     isLinear $ filter (`S.member` fvs2) xs1,
                     zs <- includeCheck xs1 fvs2,
                     Just es <- lookupAll zs sub ->
@@ -127,9 +127,9 @@ simp' constraintList =
                       _ -> do
                         let s = IntMap.fromList $ zip (map asInt zs) es
                         simp $ (e1', substWeakTermPlus s e2') : cs
-                (_, Just (StuckPiElimHoleStrict h2 ies2))
+                (_, Just (StuckPiElimAsterStrict h2 ies2))
                   | xs2 <- concatMap getVarList ies2,
-                    occurCheck h2 hs1,
+                    occurCheck h2 zs1,
                     isLinear $ filter (`S.member` fvs1) xs2,
                     zs <- includeCheck xs2 fvs1,
                     Just es <- lookupAll zs sub ->
@@ -145,9 +145,9 @@ simp' constraintList =
                 (_, Just (StuckPiElimUpsilon x2 mx2 mess2))
                   | Just (mBody, body) <- IntMap.lookup (asInt x2) sub ->
                     simp $ (e1, toPiElim (supMeta mx2 mBody, body) mess2) : cs
-                (Just (StuckPiElimHoleStrict h1 ies1), _)
+                (Just (StuckPiElimAsterStrict h1 ies1), _)
                   | xs1 <- concatMap getVarList ies1,
-                    occurCheck h1 hs2,
+                    occurCheck h1 zs2,
                     zs <- includeCheck xs1 fvs2,
                     Just es <- lookupAll zs sub ->
                     case es of
@@ -156,9 +156,9 @@ simp' constraintList =
                       _ -> do
                         let s = IntMap.fromList $ zip (map asInt zs) es
                         simp $ (e1', substWeakTermPlus s e2') : cs
-                (_, Just (StuckPiElimHoleStrict h2 ies2))
+                (_, Just (StuckPiElimAsterStrict h2 ies2))
                   | xs2 <- concatMap getVarList ies2,
-                    occurCheck h2 hs1,
+                    occurCheck h2 zs1,
                     zs <- includeCheck xs2 fvs1,
                     Just es <- lookupAll zs sub ->
                     case es of
@@ -167,14 +167,14 @@ simp' constraintList =
                       _ -> do
                         let s = IntMap.fromList $ zip (map asInt zs) es
                         simp $ (substWeakTermPlus s e1', e2') : cs
-                (Just (StuckPiElimHole h1 ies1), _)
+                (Just (StuckPiElimAster h1 ies1), _)
                   | xs1 <- concatMap getVarList ies1,
-                    occurCheck h1 hs2,
+                    occurCheck h1 zs2,
                     [] <- includeCheck xs1 fvs2 ->
                     simpFlexRigid h1 ies1 e1' e2' fmvs cs
-                (_, Just (StuckPiElimHole h2 ies2))
+                (_, Just (StuckPiElimAster h2 ies2))
                   | xs2 <- concatMap getVarList ies2,
-                    occurCheck h2 hs1,
+                    occurCheck h2 zs1,
                     [] <- includeCheck xs2 fvs1 ->
                     simpFlexRigid h2 ies2 e2' e1' fmvs cs
                 _ -> do
@@ -238,7 +238,7 @@ simpFlexRigid h1 ies1 e1 e2 fmvs cs = do
 
 asWeakIdentPlus :: Meta -> WeakTermPlus -> WithEnv WeakIdentPlus
 asWeakIdentPlus m t = do
-  h <- newNameWith' "hole"
+  h <- newNameWith' "aster"
   return (m, h, t)
 
 asPairList ::
@@ -260,8 +260,8 @@ asPairList list1 list2 =
 
 data Stuck
   = StuckPiElimUpsilon Ident Meta [(Meta, [WeakTermPlus])]
-  | StuckPiElimHole Ident [[WeakTermPlus]]
-  | StuckPiElimHoleStrict Ident [[WeakTermPlus]]
+  | StuckPiElimAster Ident [[WeakTermPlus]]
+  | StuckPiElimAsterStrict Ident [[WeakTermPlus]]
   | StuckPiElimFix FixInfo [(Meta, [WeakTermPlus])]
   | StuckPiElimConst T.Text Meta [(Meta, [WeakTermPlus])]
 
@@ -270,22 +270,22 @@ asStuckedTerm term =
   case term of
     (m, WeakTermUpsilon x) ->
       Just $ StuckPiElimUpsilon x m []
-    (_, WeakTermHole h) ->
-      Just $ StuckPiElimHoleStrict h []
+    (_, WeakTermAster h) ->
+      Just $ StuckPiElimAsterStrict h []
     (m, WeakTermConst x) ->
       Just $ StuckPiElimConst x m []
     (mi, WeakTermFix (_, x, _) xts body) ->
       Just $ StuckPiElimFix (mi, x, xts, body, term) []
     (m, WeakTermPiElim e es) ->
       case asStuckedTerm e of
-        Just (StuckPiElimHole h iess) ->
-          Just $ StuckPiElimHole h (iess ++ [es])
-        Just (StuckPiElimHoleStrict h iexss) ->
+        Just (StuckPiElimAster h iess) ->
+          Just $ StuckPiElimAster h (iess ++ [es])
+        Just (StuckPiElimAsterStrict h iexss) ->
           case mapM asUpsilon es of
             Just _ ->
-              Just $ StuckPiElimHoleStrict h $ iexss ++ [es]
+              Just $ StuckPiElimAsterStrict h $ iexss ++ [es]
             Nothing ->
-              Just $ StuckPiElimHole h $ iexss ++ [es]
+              Just $ StuckPiElimAster h $ iexss ++ [es]
         Just (StuckPiElimFix mu ess) ->
           Just $ StuckPiElimFix mu $ ess ++ [(m, es)]
         Just (StuckPiElimConst x mx ess) ->
@@ -340,13 +340,13 @@ toVarList' ctx xs termList =
     e : es
       | (m, WeakTermUpsilon x) <- e,
         x `S.member` xs -> do
-        t <- newTypeHoleInCtx ctx m
+        t <- newTypeAsterInCtx ctx m
         xts <- toVarList' (ctx ++ [(m, x, t)]) xs es
         return $ (m, x, t) : xts
       | otherwise -> do
         let m = metaOf e
-        t <- newTypeHoleInCtx ctx m
-        x <- newNameWith' "hole"
+        t <- newTypeAsterInCtx ctx m
+        x <- newNameWith' "aster"
         xts <- toVarList' (ctx ++ [(m, x, t)]) xs es
         return $ (m, x, t) : xts
 

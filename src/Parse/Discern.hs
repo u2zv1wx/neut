@@ -80,8 +80,8 @@ discern' nenv term =
       return (m, WeakTermFix xt' xts' e')
     (m, WeakTermConst x) ->
       return (m, WeakTermConst x)
-    (m, WeakTermHole h) ->
-      return (m, WeakTermHole h)
+    (m, WeakTermAster h) ->
+      return (m, WeakTermAster h)
     (m, WeakTermInt t x) -> do
       t' <- discern' nenv t
       return (m, WeakTermInt t' x)

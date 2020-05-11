@@ -93,11 +93,11 @@ elaborate' term =
       xts' <- mapM elaboratePlus xts
       e' <- elaborate' e
       return (m, TermPiIntro xts' e')
-    (m, WeakTermPiElim (mh, WeakTermHole (I (_, x))) es) -> do
+    (m, WeakTermPiElim (mh, WeakTermAster (I (_, x))) es) -> do
       sub <- gets substEnv
       case IntMap.lookup x sub of
         Nothing ->
-          raiseError mh "couldn't instantiate the hole here"
+          raiseError mh "couldn't instantiate the aster here"
         Just (_, WeakTermPiIntro xts e)
           | length xts == length es -> do
             let xs = map (\(_, y, _) -> asInt y) xts
@@ -114,7 +114,7 @@ elaborate' term =
       xts' <- mapM elaboratePlus xts
       e' <- elaborate' e
       return (m, TermFix (mx, x, t') xts' e')
-    (m, WeakTermHole _) ->
+    (m, WeakTermAster _) ->
       raiseCritical
         m
         "every meta-variable must be of the form (?M e1 ... en) where n >= 0, but found the meta-variable here that doesn't fit this pattern"
