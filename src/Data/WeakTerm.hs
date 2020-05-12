@@ -331,8 +331,15 @@ toText term =
       "tau"
     (_, WeakTermUpsilon x) ->
       asText' x
-    (_, WeakTermPi xts cod) ->
-      showCons ["Π", inParen $ showTypeArgs xts cod, toText cod]
+    (_, WeakTermPi xts cod)
+      | [(_, I ("internal.sigma-tau", _), _), (_, _, (_, WeakTermPi yts _))] <- xts ->
+        case splitLast yts of
+          Nothing ->
+            "(product)"
+          Just (zts, (_, _, t)) ->
+            showCons ["∑", inParen $ showTypeArgs zts, toText t]
+      | otherwise ->
+        showCons ["Π", inParen $ showTypeArgs xts, toText cod]
     (_, WeakTermPiIntro xts e) -> do
       let argStr = inParen $ showItems $ map showArg xts
       showCons ["λ", argStr, toText e]
@@ -388,8 +395,8 @@ showArg :: (Meta, Ident, WeakTermPlus) -> T.Text
 showArg (_, x, t) =
   inParen $ asText' x <> " " <> toText t
 
-showTypeArgs :: [WeakIdentPlus] -> WeakTermPlus -> T.Text
-showTypeArgs args cod =
+showTypeArgs :: [WeakIdentPlus] -> T.Text
+showTypeArgs args =
   case args of
     [] ->
       T.empty
@@ -397,7 +404,7 @@ showTypeArgs args cod =
       inParen $ asText' x <> " " <> toText t
     (_, x, t) : xts -> do
       let s1 = inParen $ asText' x <> " " <> toText t
-      let s2 = showTypeArgs xts cod
+      let s2 = showTypeArgs xts
       s1 <> " " <> s2
 
 showClause :: (EnumCase, WeakTermPlus) -> T.Text
@@ -430,11 +437,8 @@ showCons :: [T.Text] -> T.Text
 showCons =
   inParen . T.intercalate " "
 
-extractSigmaArg :: WeakTermPlus -> Maybe [WeakIdentPlus]
-extractSigmaArg term =
-  case term of
-    (_, WeakTermPi [(_, z, (_, WeakTermTau)), (_, _, (_, WeakTermPi xts (_, WeakTermUpsilon z')))] (_, WeakTermUpsilon z''))
-      | z == z',
-        z == z'' ->
-        return xts
-    _ -> Nothing
+splitLast :: [a] -> Maybe ([a], a)
+splitLast xs =
+  if null xs
+    then Nothing
+    else Just (init xs, last xs)
