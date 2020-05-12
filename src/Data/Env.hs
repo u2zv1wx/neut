@@ -52,8 +52,6 @@ data Env
         --
         phase :: Int,
         target :: Maybe Target,
-        -- list of reserved keywords
-        keywordEnv :: S.Set T.Text,
         -- macro transformers
         notationEnv :: Map.HashMap T.Text [(TreePlus, TreePlus)],
         constantSet :: S.Set T.Text,
@@ -107,7 +105,6 @@ initialEnv =
       phase = 0,
       target = Nothing,
       notationEnv = Map.empty,
-      keywordEnv = S.empty,
       constantSet = S.empty,
       enumEnv = Map.empty,
       fileEnv = Map.empty,

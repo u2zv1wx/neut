@@ -8,7 +8,6 @@ import Control.Monad.State.Lazy
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import Data.Meta
-import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Tree
 
@@ -135,9 +134,7 @@ checkKeywordSanity m x
 checkNotationSanity :: Notation -> WithEnv T.Text
 checkNotationSanity t = do
   checkPlusCondition t
-  notationName <- extractHeadAtom t
-  modify (\e -> e {keywordEnv = S.insert notationName (keywordEnv e)})
-  return notationName
+  extractHeadAtom t
 
 checkPlusCondition :: Notation -> WithEnv ()
 checkPlusCondition notationTree =
