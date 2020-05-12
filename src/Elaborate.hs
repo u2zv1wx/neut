@@ -97,7 +97,7 @@ elaborate' term =
       sub <- gets substEnv
       case IntMap.lookup x sub of
         Nothing ->
-          raiseError mh "couldn't instantiate the aster here"
+          raiseError mh "couldn't instantiate the asterisk here"
         Just (_, WeakTermPiIntro xts e)
           | length xts == length es -> do
             let xs = map (\(_, y, _) -> asInt y) xts
