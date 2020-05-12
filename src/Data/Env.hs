@@ -42,7 +42,6 @@ type TypeEnv =
 data Env
   = Env
       { count :: Int,
-        ppCount :: Int, -- count used only for pretty printing
         shouldColorize :: Bool,
         shouldCancelAlloc :: Bool,
         endOfEntry :: String,
@@ -95,7 +94,6 @@ initialEnv :: Env
 initialEnv =
   Env
     { count = 0,
-      ppCount = 0,
       shouldColorize = False,
       shouldCancelAlloc = True,
       endOfEntry = "",
@@ -153,14 +151,6 @@ newCount :: WithEnv Int
 newCount = do
   i <- gets count
   modify (\e -> e {count = i + 1})
-  if i + 1 == 0
-    then raiseCritical' "counter exhausted"
-    else return i
-
-newCountPP :: WithEnv Int
-newCountPP = do
-  i <- gets ppCount
-  modify (\e -> e {ppCount = i + 1})
   if i + 1 == 0
     then raiseCritical' "counter exhausted"
     else return i
