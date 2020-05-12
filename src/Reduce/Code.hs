@@ -11,7 +11,6 @@ import qualified Data.HashMap.Lazy as Map
 import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.Meta
-import qualified Data.Set as S
 
 reduceCodePlus :: CodePlus -> WithEnv CodePlus
 reduceCodePlus term =
@@ -20,22 +19,12 @@ reduceCodePlus term =
       return (m, CodePrimitive c)
     (m, CodePiElimDownElim v ds) -> do
       cenv <- gets codeEnv
-      ns <- gets nameSet
       case v of
         (_, DataConst x)
           | Just (Definition (IsFixed False) xs body) <- Map.lookup x cenv,
             length xs == length ds -> do
             let sub = IntMap.fromList (zip (map asInt xs) ds)
             reduceCodePlus $ substCodePlus sub body
-        (_, DataConst x)
-          | Just (Definition (IsFixed True) xs body) <- Map.lookup x cenv,
-            length xs == length ds,
-            not (x `S.member` ns) -> do
-            modify (\env -> env {nameSet = S.insert x ns})
-            body' <- reduceCodePlus body
-            let def = Definition (IsFixed True) xs body'
-            modify (\env -> env {codeEnv = Map.insert x def cenv})
-            return (m, CodePiElimDownElim v ds)
         _ ->
           return (m, CodePiElimDownElim v ds)
     (m, CodeSigmaElim mk xs v e) ->
@@ -73,8 +62,10 @@ reduceCodePlus term =
           e2' <- reduceCodePlus e2
           case e2' of
             (_, CodeUpIntro (_, DataUpsilon y))
-              | x == y -> return e1' -- eta-reduce
-            _ -> return (m, CodeUpElim x e1' e2')
+              | x == y ->
+                return e1' -- eta-reduce
+            _ ->
+              return (m, CodeUpElim x e1' e2')
     (m, CodeEnumElim v les) ->
       case v of
         (_, DataEnumIntro l)

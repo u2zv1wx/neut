@@ -75,7 +75,6 @@ data Env
         --
         typeEnv :: TypeEnv,
         codeEnv :: Map.HashMap T.Text Definition,
-        nameSet :: S.Set T.Text,
         --
         -- LLVM
         --
@@ -117,7 +116,6 @@ initialEnv =
       constraintQueue = Q.empty,
       substEnv = IntMap.empty,
       opaqueEnv = S.empty,
-      nameSet = S.empty,
       nopFreeSet = S.empty
     }
 

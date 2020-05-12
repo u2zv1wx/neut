@@ -14,7 +14,7 @@ import Data.LLVM
 import Data.LowType
 import Data.Meta
 import Data.Primitive
-import qualified Data.Set as S
+-- import qualified Data.Set as S
 import Data.Size
 import Data.Syscall
 import Data.Term
@@ -24,10 +24,7 @@ import Reduce.Code
 
 lower :: CodePlus -> WithEnv LLVM
 lower mainTerm@(m, _) = do
-  modify (\env -> env {nameSet = S.empty})
-  mainTerm' <- reduceCodePlus mainTerm
-  modify (\env -> env {nameSet = S.empty})
-  mainTerm'' <- lowerCode mainTerm'
+  mainTerm'' <- reduceCodePlus mainTerm >>= lowerCode
   -- the result of "main" must be i64, not i8*
   (result, resultVar) <- newDataUpsilonWith m "result"
   (cast, castThen) <- llvmCast (Just "cast") resultVar (LowTypeInt 64)
@@ -334,7 +331,7 @@ lowerDataLet x lowerData cont =
         Just (Definition _ args e)
           | not (Map.member y lenv) -> do
             insLLVMEnv y args LLVMUnreachable
-            llvm <- lowerCode e
+            llvm <- reduceCodePlus e >>= lowerCode
             insLLVMEnv y args llvm
             llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
           | otherwise ->
