@@ -59,7 +59,6 @@ data Env
         enumEnv :: Map.HashMap T.Text [(T.Text, Int)],
         -- [("left", ("choice", 0)), ("right", ("choice", 1)), ...]
         revEnumEnv :: Map.HashMap T.Text (T.Text, Int),
-        -- [("foo.13", "foo"), ...] (as corresponding int)
         prefixEnv :: [T.Text],
         sectionEnv :: [T.Text],
         intactSet :: S.Set (Meta, T.Text),
