@@ -50,7 +50,6 @@ data Env
         --
         phase :: Int,
         target :: Maybe Target,
-        -- macro transformers
         notationEnv :: Map.HashMap T.Text [(TreePlus, TreePlus)],
         constantSet :: S.Set T.Text,
         fileEnv :: Map.HashMap (Path Abs File) VisitInfo,
