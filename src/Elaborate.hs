@@ -115,9 +115,7 @@ elaborate' term =
       e' <- elaborate' e
       return (m, TermFix (mx, x, t') xts' e')
     (m, WeakTermAster _) ->
-      raiseCritical
-        m
-        "every meta-variable must be of the form (?M e1 ... en) where n >= 0, but found the meta-variable here that doesn't fit this pattern"
+      raiseCritical m "every meta-variable must be of the form (?M e1 ... en) where n >= 0, but the meta-variable here doesn't fit this pattern"
     (m, WeakTermConst x) ->
       return (m, TermConst x)
     (m, WeakTermInt t x) -> do
