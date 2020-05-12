@@ -6,9 +6,7 @@ where
 import Control.Exception.Safe
 import Control.Monad.State.Lazy
 import Data.Constraint
-import Data.EnumCase
 import Data.Env
-import qualified Data.HashMap.Lazy as Map
 import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.List (nub, sortOn)
@@ -202,9 +200,7 @@ constructErrors ps info =
     [] ->
       return []
     (pos, (e1, e2)) : pcs -> do
-      e1' <- unravel e1
-      e2' <- unravel e2
-      let msg = constructErrorMsg e1' e2'
+      let msg = constructErrorMsg e1 e2
       as <- constructErrors (pos : ps) pcs
       return $ logError pos msg : as
 
@@ -214,112 +210,3 @@ constructErrorMsg e1 e2 =
     <> toText e1
     <> "\n- "
     <> toText e2
-
-unravel :: WeakTermPlus -> WithEnv WeakTermPlus
-unravel term =
-  case term of
-    (m, WeakTermTau) ->
-      return (m, WeakTermTau)
-    (m, WeakTermUpsilon x) -> do
-      x' <- unravelUpsilon x
-      return (m, WeakTermUpsilon x')
-    (m, WeakTermPi xts t) -> do
-      (xts', t') <- unravelBinder xts t
-      return (m, WeakTermPi xts' t')
-    (m, WeakTermPiIntro xts e) -> do
-      (xts', e') <- unravelBinder xts e
-      return (m, WeakTermPiIntro xts' e')
-    (m, WeakTermPiElim e es) -> do
-      e' <- unravel e
-      es' <- mapM unravel es
-      return (m, WeakTermPiElim e' es')
-    (m, WeakTermFix (mx, x, t) xts e) -> do
-      x' <- unravelUpsilon x
-      (xts', e') <- unravelBinder xts e
-      return (m, WeakTermFix (mx, x', t) xts' e')
-    (m, WeakTermConst x) ->
-      return (m, WeakTermConst x)
-    (m, WeakTermAster h) ->
-      return (m, WeakTermAster h)
-    (m, WeakTermInt t x) ->
-      return (m, WeakTermInt t x)
-    (m, WeakTermFloat t x) ->
-      return (m, WeakTermFloat t x)
-    (m, WeakTermEnum s) ->
-      return (m, WeakTermEnum s)
-    (m, WeakTermEnumIntro x) ->
-      return (m, WeakTermEnumIntro x)
-    (m, WeakTermEnumElim (e, t) caseList) -> do
-      e' <- unravel e
-      caseList' <- unravelCaseList caseList
-      return (m, WeakTermEnumElim (e', t) caseList')
-    (m, WeakTermArray dom kind) -> do
-      dom' <- unravel dom
-      return (m, WeakTermArray dom' kind)
-    (m, WeakTermArrayIntro kind es) -> do
-      es' <- mapM unravel es
-      return (m, WeakTermArrayIntro kind es')
-    (m, WeakTermArrayElim kind xts e1 e2) -> do
-      e1' <- unravel e1
-      (xts', e2') <- unravelBinder xts e2
-      return (m, WeakTermArrayElim kind xts' e1' e2')
-    (m, WeakTermStruct ts) -> return (m, WeakTermStruct ts)
-    (m, WeakTermStructIntro ets) -> do
-      let (es, ts) = unzip ets
-      es' <- mapM unravel es
-      return (m, WeakTermStructIntro $ zip es' ts)
-    (m, WeakTermStructElim xts e1 e2) -> do
-      e1' <- unravel e1
-      (xts', e2') <- unravelStruct xts e2
-      return (m, WeakTermStructElim xts' e1' e2')
-    (_, WeakTermQuestion e _) ->
-      unravel e
-    (_, WeakTermErase _ e) ->
-      unravel e
-
-unravelUpsilon :: Ident -> WithEnv Ident
-unravelUpsilon (I (s, i)) = do
-  nenv <- gets nameEnv
-  case Map.lookup s nenv of
-    Just s' ->
-      return $ I (s', i)
-    Nothing -> do
-      j <- newCountPP
-      let s' = T.pack $ "var" ++ show j
-      modify (\e -> e {nameEnv = Map.insert s s' nenv})
-      return $ I (s', i)
-
-unravelBinder ::
-  [WeakIdentPlus] ->
-  WeakTermPlus ->
-  WithEnv ([WeakIdentPlus], WeakTermPlus)
-unravelBinder binder e =
-  case binder of
-    [] -> do
-      e' <- unravel e
-      return ([], e')
-    (mx, x, t) : xts -> do
-      t' <- unravel t
-      x' <- unravelUpsilon x
-      (xts', e') <- unravelBinder xts e
-      return ((mx, x', t') : xts', e')
-
-unravelCaseList :: [(EnumCasePlus, WeakTermPlus)] -> WithEnv [(EnumCasePlus, WeakTermPlus)]
-unravelCaseList caseList = do
-  let (ls, es) = unzip caseList
-  es' <- mapM unravel es
-  return $ zip ls es'
-
-unravelStruct ::
-  [(Meta, Ident, a)] ->
-  WeakTermPlus ->
-  WithEnv ([(Meta, Ident, a)], WeakTermPlus)
-unravelStruct binder e =
-  case binder of
-    [] -> do
-      e' <- unravel e
-      return ([], e')
-    (mx, x, t) : xts -> do
-      x' <- unravelUpsilon x
-      (xts', e') <- unravelStruct xts e
-      return ((mx, x', t) : xts', e')
