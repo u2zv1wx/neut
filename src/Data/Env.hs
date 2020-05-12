@@ -74,7 +74,6 @@ data Env
         --
         -- clarify
         --
-        -- f ~> thunk (lam (x1 ... xn) e)
         typeEnv :: TypeEnv,
         codeEnv :: Map.HashMap T.Text Definition,
         nameSet :: S.Set T.Text,
