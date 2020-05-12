@@ -70,7 +70,6 @@ data Env
         constraintQueue :: ConstraintQueue,
         substEnv :: IntMap.IntMap WeakTermPlus,
         opaqueEnv :: S.Set Ident,
-        asterEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus),
         --
         -- clarify
         --
@@ -118,7 +117,6 @@ initialEnv =
       constraintQueue = Q.empty,
       substEnv = IntMap.empty,
       opaqueEnv = S.empty,
-      asterEnv = IntMap.empty,
       nameSet = S.empty,
       nopFreeSet = S.empty
     }

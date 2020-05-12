@@ -59,16 +59,9 @@ infer' ctx term =
       let piType = (m, WeakTermPi xts' tCod)
       insConstraintEnv piType t'
       return ((m, WeakTermFix (mx, x, t') xts' e'), piType)
-    (m, WeakTermAster x) -> do
-      zenv <- gets asterEnv
-      case IntMap.lookup x zenv of
-        Just z ->
-          return z
-        Nothing -> do
-          (app, higherApp) <- newAsterInCtx ctx m
-          modify
-            (\env -> env {asterEnv = IntMap.insert x (app, higherApp) zenv})
-          return (app, higherApp)
+    (m, WeakTermAster _) -> do
+      (app, higherApp) <- newAsterInCtx ctx m
+      return (app, higherApp)
     (m, WeakTermConst x)
       -- i64, f16, etc.
       | Just _ <- asLowTypeMaybe x ->
