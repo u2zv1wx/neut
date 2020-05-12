@@ -96,8 +96,3 @@ reduceCodePlus term =
                 return (mUp, CodeUpIntro d) -- eta-reduce
             _ ->
               return (m, CodeStructElim xks d e')
--- (m, CodeCase sub d mces) -> do
---   let (mcs, es) = unzip mces
---   let es' = map (substCodePlus sub) es
---   es'' <- mapM reduceCodePlus es'
---   return (m, CodeCase IntMap.empty d $ zip mcs es'')
