@@ -205,7 +205,6 @@ discernStruct nenv binder e =
 newDefinedNameWith :: Meta -> Ident -> WithEnv Ident
 newDefinedNameWith m (I (s, _)) = do
   j <- newCount
-  modify (\env -> env {nameEnv = Map.insert s s (nameEnv env)})
   let x = I (s, j)
   insertIntoIntactSet m s
   return x
