@@ -393,7 +393,7 @@ inParen s =
 
 showArg :: (Meta, Ident, WeakTermPlus) -> T.Text
 showArg (_, x, t) =
-  inParen $ asText' x <> " " <> toText t
+  inParen $ showVariable x <> " " <> toText t
 
 showTypeArgs :: [WeakIdentPlus] -> T.Text
 showTypeArgs args =
@@ -401,11 +401,17 @@ showTypeArgs args =
     [] ->
       T.empty
     [(_, x, t)] ->
-      inParen $ asText' x <> " " <> toText t
+      inParen $ showVariable x <> " " <> toText t
     (_, x, t) : xts -> do
-      let s1 = inParen $ asText' x <> " " <> toText t
+      let s1 = inParen $ showVariable x <> " " <> toText t
       let s2 = showTypeArgs xts
       s1 <> " " <> s2
+
+showVariable :: Ident -> T.Text
+showVariable x =
+  if T.any (\c -> c `S.member` S.fromList "()") $ asText x
+    then "_"
+    else asText' x
 
 showClause :: (EnumCase, WeakTermPlus) -> T.Text
 showClause (c, e) =

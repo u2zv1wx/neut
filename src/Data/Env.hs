@@ -348,17 +348,9 @@ inferKind m arrayKind =
     _ ->
       raiseCritical m "inferKind for void-pointer"
 
-weakTermSigma :: Meta -> [WeakIdentPlus] -> WithEnv WeakTermPlus
-weakTermSigma m xts = do
-  z <- newNameWith'' "sigma"
-  let vz = (m, WeakTermUpsilon z)
-  k <- newNameWith'' "sigma"
-  let yts = [(m, z, (m, WeakTermTau)), (m, k, (m, WeakTermPi xts vz))]
-  return (m, WeakTermPi yts vz)
-
 termSigma :: Meta -> [IdentPlus] -> WithEnv TermPlus
 termSigma m xts = do
-  z <- newNameWith'' "sigma"
+  z <- newNameWith' "internal.sigma-tau"
   let vz = (m, TermUpsilon z)
   k <- newNameWith'' "sigma"
   let yts = [(m, z, (m, TermTau)), (m, k, (m, TermPi xts vz))]

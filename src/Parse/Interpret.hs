@@ -240,9 +240,9 @@ interpretArg es =
 --     (array len u8)))
 sigmaIntroString :: Meta -> [WeakTermPlus] -> WithEnv WeakTermPlus
 sigmaIntroString m u8s = do
-  z <- newNameWith'' "sigma"
+  let z = asIdent "internal.sigma-tau"
   k <- newNameWith'' "sigma"
-  lenVar <- newNameWith'' "len"
+  let lenVar = asIdent "length"
   arrVar <- newNameWith'' "array"
   return
     ( m,

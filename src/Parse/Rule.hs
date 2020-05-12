@@ -158,14 +158,13 @@ toInductive ats bts connectiveList =
       let cod = (m, WeakTermPiElim (m, WeakTermUpsilon $ asIdent ai) (map toVar' xts))
       let atsbts = map textPlusToWeakIdentPlus $ ats ++ bts
       -- definition of inductive type
-      indType <-
-        discern
-          (m, WeakTermPiIntro xts (m, WeakTermPi atsbts cod))
+      indType <- discern (m, WeakTermPiIntro xts (m, WeakTermPi atsbts cod))
       at' <- discernIdentPlus at
       -- definition of case
       z <- newNameWith'' "value"
       let zt = (m, z, cod)
-      univVarName <- newNameWith'' "univ"
+      -- univVarName <- newNameWith'' "univ"
+      let univVarName = asIdent "internal.case-tau"
       let univVar = (m, WeakTermUpsilon univVarName)
       bts' <- mapM (toCaseBranchType univVar) bts
       let indArgs = [(m, univVarName, (m, WeakTermTau))] ++ xts ++ [zt] ++ bts'
