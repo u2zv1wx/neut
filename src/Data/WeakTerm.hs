@@ -330,7 +330,7 @@ toText term =
     (_, WeakTermTau) ->
       "tau"
     (_, WeakTermUpsilon x) ->
-      asText' x
+      showVariable x
     (_, WeakTermPi xts cod)
       | [(_, I ("internal.sigma-tau", _), _), (_, _, (_, WeakTermPi yts _))] <- xts ->
         case splitLast yts of
@@ -351,7 +351,7 @@ toText term =
           showCons $ map toText $ e : es
     (_, WeakTermFix (_, x, _) xts e) -> do
       let argStr = inParen $ showItems $ map showArg xts
-      showCons ["fix", asText' x, argStr, toText e]
+      showCons ["fix", showVariable x, argStr, toText e]
     (_, WeakTermConst x) ->
       x
     (_, WeakTermAster _) ->
@@ -411,7 +411,7 @@ showVariable :: Ident -> T.Text
 showVariable x =
   if T.any (\c -> c `S.member` S.fromList "()") $ asText x
     then "_"
-    else asText' x
+    else asText x
 
 showClause :: (EnumCase, WeakTermPlus) -> T.Text
 showClause (c, e) =
