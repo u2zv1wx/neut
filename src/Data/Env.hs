@@ -46,7 +46,6 @@ data Env
         shouldColorize :: Bool,
         shouldCancelAlloc :: Bool,
         endOfEntry :: String,
-        isCheck :: Bool,
         --
         -- parse
         --
@@ -99,7 +98,6 @@ initialEnv =
       ppCount = 0,
       shouldColorize = False,
       shouldCancelAlloc = True,
-      isCheck = False,
       endOfEntry = "",
       phase = 0,
       target = Nothing,
@@ -140,11 +138,6 @@ instance Exception Error
 
 type WithEnv a =
   StateT Env IO a
-
-whenCheck :: WithEnv () -> WithEnv ()
-whenCheck f = do
-  b <- gets isCheck
-  when b f
 
 evalWithEnv :: WithEnv a -> Env -> IO (Either Error a)
 evalWithEnv c env = do

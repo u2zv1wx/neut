@@ -186,9 +186,8 @@ elaborate' term =
       return (m, TermStructElim xts e1' e2')
     (m, WeakTermQuestion e t) -> do
       e' <- elaborate' e
-      whenCheck $ do
-        t' <- elaborate' t
-        note m $ toText (weaken t')
+      t' <- elaborate' t
+      note m $ toText (weaken t')
       return e'
     (_, WeakTermErase _ e) ->
       elaborate' e

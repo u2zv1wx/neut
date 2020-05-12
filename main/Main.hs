@@ -198,7 +198,7 @@ run cmd =
       inputPath <- resolveFile' inputPathStr
       resultOrErr <-
         evalWithEnv (runCheck inputPath) $
-          initialEnv {shouldColorize = colorizeFlag, endOfEntry = eoe, isCheck = True}
+          initialEnv {shouldColorize = colorizeFlag, endOfEntry = eoe}
       case resultOrErr of
         Right _ ->
           return ()

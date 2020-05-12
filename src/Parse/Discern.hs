@@ -215,11 +215,11 @@ insertName (I (s, _)) =
 
 insertIntoIntactSet :: Meta -> T.Text -> WithEnv ()
 insertIntoIntactSet m x =
-  whenCheck $ modify (\env -> env {intactSet = S.insert (m, x) (intactSet env)})
+  modify (\env -> env {intactSet = S.insert (m, x) (intactSet env)})
 
 removeFromIntactSet :: Meta -> T.Text -> WithEnv ()
 removeFromIntactSet m x =
-  whenCheck $ modify (\env -> env {intactSet = S.delete (m, x) (intactSet env)})
+  modify (\env -> env {intactSet = S.delete (m, x) (intactSet env)})
 
 lookupName :: Meta -> [T.Text] -> NameEnv -> Ident -> WithEnv (Maybe Ident)
 lookupName m penv nenv x =
