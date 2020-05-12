@@ -131,12 +131,12 @@ substTermPlus sub term =
       let sub' = IntMap.delete (asInt x) sub
       let (xts', e') = substTermPlus'' sub' xts e
       (m, TermFix (mx, x, t') xts' e')
-    e@(_, TermConst _) ->
-      e
-    e@(_, TermInt _ _) ->
-      e
-    e@(_, TermFloat _ _) ->
-      e
+    (_, TermConst _) ->
+      term
+    (_, TermInt _ _) ->
+      term
+    (_, TermFloat _ _) ->
+      term
     (m, TermEnum x) ->
       (m, TermEnum x)
     (m, TermEnumIntro l) ->
