@@ -13,7 +13,6 @@ import qualified Data.HashMap.Lazy as Map
 import Data.Ident
 import Data.Meta
 import Data.Namespace
-import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.WeakTerm
 
@@ -137,7 +136,7 @@ discernIdentPlus (m, x, t) = do
   sanityCheck m x
   nenv <- gets topNameEnv
   t' <- discern' nenv t
-  x' <- newDefinedNameWith m x
+  x' <- newNameWith x
   modify (\env -> env {topNameEnv = Map.insert (asText x) x' (topNameEnv env)})
   return (m, x', t')
 
@@ -160,7 +159,7 @@ discernBinder nenv binder e =
       return ([], e')
     (mx, x, t) : xts -> do
       t' <- discern' nenv t
-      x' <- newDefinedNameWith mx x
+      x' <- newNameWith x
       (xts', e') <- discernBinder (insertName x x' nenv) xts e
       return ((mx, x', t') : xts', e')
 
@@ -198,34 +197,18 @@ discernStruct nenv binder e =
       e' <- discern' nenv e
       return ([], e')
     ((mx, x, t) : xts) -> do
-      x' <- newDefinedNameWith mx x
+      x' <- newNameWith x
       (xts', e') <- discernStruct (insertName x x' nenv) xts e
       return ((mx, x', t) : xts', e')
-
-newDefinedNameWith :: Meta -> Ident -> WithEnv Ident
-newDefinedNameWith m (I (s, _)) = do
-  j <- newCount
-  let x = I (s, j)
-  insertIntoIntactSet m s
-  return x
 
 insertName :: Ident -> Ident -> NameEnv -> NameEnv
 insertName (I (s, _)) =
   Map.insert s
 
-insertIntoIntactSet :: Meta -> T.Text -> WithEnv ()
-insertIntoIntactSet m x =
-  modify (\env -> env {intactSet = S.insert (m, x) (intactSet env)})
-
-removeFromIntactSet :: Meta -> T.Text -> WithEnv ()
-removeFromIntactSet m x =
-  modify (\env -> env {intactSet = S.delete (m, x) (intactSet env)})
-
 lookupName :: Meta -> [T.Text] -> NameEnv -> Ident -> WithEnv (Maybe Ident)
 lookupName m penv nenv x =
   case Map.lookup (asText x) nenv of
-    Just x' -> do
-      removeFromIntactSet m $ asText x'
+    Just x' ->
       return $ Just x'
     Nothing ->
       lookupName' m penv nenv x
@@ -240,8 +223,7 @@ lookupName' m penv nenv x =
       case Map.lookup query nenv of
         Nothing ->
           lookupName' m prefixList nenv x
-        Just x' -> do
-          removeFromIntactSet m query
+        Just x' ->
           return $ Just x'
 
 lookupName'' :: Meta -> [T.Text] -> NameEnv -> Ident -> WithEnv Ident
@@ -257,9 +239,7 @@ lookupConstantMaybe :: Meta -> [T.Text] -> T.Text -> WithEnv (Maybe T.Text)
 lookupConstantMaybe m penv x = do
   b <- isConstant x
   if b
-    then do
-      removeFromIntactSet m x
-      return $ Just x
+    then return $ Just x
     else lookupConstantMaybe' m penv x
 
 lookupConstantMaybe' :: Meta -> [T.Text] -> T.Text -> WithEnv (Maybe T.Text)
@@ -271,9 +251,7 @@ lookupConstantMaybe' m penv x =
       let query = prefix <> nsSep <> x
       b <- isConstant query
       if b
-        then do
-          removeFromIntactSet m query
-          return $ Just query
+        then return $ Just query
         else lookupConstantMaybe' m prefixList x
 
 lookupEnum :: (T.Text -> WithEnv Bool) -> T.Text -> WithEnv (Maybe T.Text)

@@ -60,7 +60,6 @@ data Env
         revEnumEnv :: Map.HashMap T.Text (T.Text, Int),
         prefixEnv :: [T.Text],
         sectionEnv :: [T.Text],
-        intactSet :: S.Set (Meta, T.Text),
         topNameEnv :: Map.HashMap T.Text Ident,
         --
         -- elaborate
@@ -103,7 +102,6 @@ initialEnv =
       fileEnv = Map.empty,
       traceEnv = [],
       revEnumEnv = Map.empty,
-      intactSet = S.empty,
       topNameEnv = Map.empty,
       prefixEnv = [],
       sectionEnv = [],
