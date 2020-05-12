@@ -79,7 +79,6 @@ data Env
         -- LLVM
         --
         llvmEnv :: Map.HashMap T.Text ([Ident], LLVM),
-        -- external functions that must be declared in LLVM IR
         declEnv :: Map.HashMap T.Text ([LowType], LowType),
         nopFreeSet :: S.Set Int
       }
