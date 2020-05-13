@@ -86,7 +86,7 @@ initialEnv :: Env
 initialEnv =
   Env
     { count = 0,
-      shouldColorize = False,
+      shouldColorize = True,
       shouldCancelAlloc = True,
       endOfEntry = "",
       phase = 0,

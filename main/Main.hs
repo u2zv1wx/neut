@@ -173,9 +173,7 @@ run cmd =
   case cmd of
     Build inputPathStr mOutputPathStr outputKind cancelAllocFlag -> do
       inputPath <- resolveFile' inputPathStr
-      resultOrErr <-
-        evalWithEnv (runBuild inputPath) $
-          initialEnv {shouldColorize = True, shouldCancelAlloc = cancelAllocFlag, endOfEntry = ""}
+      resultOrErr <- evalWithEnv (runBuild inputPath) $ initialEnv {shouldCancelAlloc = cancelAllocFlag}
       (basename, _) <- splitExtension $ filename inputPath
       mOutputPath <- mapM resolveFile' mOutputPathStr
       outputPath <- constructOutputPath basename mOutputPath outputKind
