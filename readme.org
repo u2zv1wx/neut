@@ -146,7 +146,7 @@ let (_, str3) := string.print str2;
 let (_, str4) := string.print str3;
 unit
 #+END_SRC
-Note that the variables =str1=, =str2=, =str2=, and =str3= are used exactly once, and =str4= for the 0 time. Therefore, the copying operation doesn't occur in the code above. Also, since the =str4= is defined but not used, the =str4= is discarded immediately after its definition.
+Note that the variables =str1=, =str2=, and =str3= are used exactly once, and =str4= for the 0 time. Therefore, the copying operation doesn't occur in the code above. Also, since the =str4= is defined but not used, the =str4= is discarded immediately after its definition.
 
 Now we have seen that those redundant copying/discarding can be avoided by writing the code in the manner above. There still remains a problem: code cluttering. It would be much nicer to have more sophisticated notation of that code pattern. Towards that end, firstly note that we can use the same name for the variables =str1=, =str2=, =str3=, and =str4= thanks to variable shadowing:
 #+BEGIN_SRC text
