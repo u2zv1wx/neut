@@ -1,6 +1,5 @@
 module Reduce.WeakTerm
   ( reduceWeakTermPlus,
-    reduceWeakTermWeakIdentPlus,
   )
 where
 
@@ -98,7 +97,3 @@ reduceWeakTermPlus term =
     (_, WeakTermQuestion e _) ->
       reduceWeakTermPlus e
     _ -> term
-
-reduceWeakTermWeakIdentPlus :: WeakIdentPlus -> WeakIdentPlus
-reduceWeakTermWeakIdentPlus (m, x, t) =
-  (m, x, reduceWeakTermPlus t)
