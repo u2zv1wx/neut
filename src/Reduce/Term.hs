@@ -40,15 +40,11 @@ reduceTermPlus term =
             reduceTermPlus $ substTermPlus sub body
         _ ->
           (m, app)
-    (m, TermFix (mx, x, t) xts e)
-      | asInt x `S.notMember` varTermPlus e ->
-        reduceTermPlus (m, TermPiIntro xts e)
-      | otherwise -> do
-        let t' = reduceTermPlus t
-        let (ms, xs, ts) = unzip3 xts
-        let ts' = map reduceTermPlus ts
-        let e' = reduceTermPlus e
-        (m, TermFix (mx, x, t') (zip3 ms xs ts') e')
+    (m, TermFix (mx, x, t) xts e) -> do
+      let lam@(_, TermPiIntro xts' e') = reduceTermPlus (m, TermPiIntro xts e)
+      if asInt x `S.notMember` varTermPlus e'
+        then lam
+        else (m, TermFix (mx, x, reduceTermPlus t) xts' e')
     (m, TermEnumElim (e, t) les) -> do
       let t' = reduceTermPlus t
       let e' = reduceTermPlus e
