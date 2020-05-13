@@ -218,7 +218,7 @@ define i64 @main() {
 #+END_SRC
 Again, the non-schematic output can be found in the [[#llvm-ir-for-the-second-example][appendix]]. The output in this time is actually short enough to include it here (36 lines), though I chose not to. The point here is that the string "a" is reused without copying, as expected.
 
- The resulting assembly code is reasonably small too (works on macOS; when you compile the same code in Linux, the =write= operation is lowered into a syscall):
+ The resulting assembly code is reasonably small too (works on macOS; when you compile the same code on Linux, =write= operations are lowered into syscalls):
 #+BEGIN_SRC asm
 	.section	__TEXT,__text,regular,pure_instructions
 	.macosx_version_min 12, 15
