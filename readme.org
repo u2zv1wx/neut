@@ -7,7 +7,7 @@ Neut is a dependently-typed programming language based on [[https://en.wikipedia
 
 Theoretically, this is made possible by translating the source language into a dependent variant of [[https://www.cs.bham.ac.uk/~pbl/papers/thesisqmwphd.pdf][Call-By-Push-Value]]. The crucial point of this translation is to see that knowing the type of a term is knowing how to eta-expand the term, which in turn means knowing how to copy/discard the term. In the translation, a type is not erased, but *translated into a computationally-meaningful term that copies/discards the terms of the type*.
 
-Practically, this means that you can write your program in ordinary lambda-calculus without any extra restrictions or annotations, and at the same time you are allowed to control how resources are used in the program. If you want a ordinary-lambda-calculus based programming language with a human-predictable semantics (including its memory management), this might be for you.
+Practically, this means that you can write your program in ordinary lambda-calculus without any extra restrictions or annotations, and at the same time you are allowed to control how resources are used in the program. If you want an ordinary-lambda-calculus based programming language with a human-predictable semantics (including its memory management), this might be for you.
 
 Here I briefly summerize the basic properties of Neut before diving into the details:
 
@@ -17,11 +17,11 @@ Here I briefly summerize the basic properties of Neut before diving into the det
 - The type inference algorithm is based on [[https://arxiv.org/abs/1505.04324][the one of Lean]]
 - The evaluation strategy is call-by-value
 - Every tail call is optimized into a loop
-- Memory allocations/deallocations are statically determined at compile time
+- Memory allocation/deallocation is statically determined at compile time
 
 * Table of Contents                                                    :TOC:
-- [[#some-hopefully-illuminating-examples][Some (Hopefully) Illuminating Examples]]
-  - [[#type-based-mallocfree-determination][Type-Based malloc/free Determination]]
+- [[#examples][Examples]]
+  - [[#basics-of-proof-theoretic-memory-management][Basics of Proof-Theoretic Memory Management]]
   - [[#manual-optimization-via-borrowing][Manual Optimization via Borrowing]]
   - [[#automatic-optimization-via-mallocfree-cancellation][Automatic Optimization via malloc/free Cancellation]]
   - [[#summary][Summary]]
@@ -60,9 +60,9 @@ Here I briefly summerize the basic properties of Neut before diving into the det
 - [[#appendix][Appendix]]
   - [[#llvm-ir-for-the-first-example][LLVM IR for the First Example]]
 
-* Some (Hopefully) Illuminating Examples
+* Examples
 
-** Type-Based malloc/free Determination
+** Basics of Proof-Theoretic Memory Management
 Here I will firstly show an "inefficient" version of some code pieces. After that, I will show a more efficient version of the code, and compare resulting LLVM IR.
 
 Note that the code here is written in a rather verbose way to make things as explicit as possible to the readers. You don't have to be that verbose in actual code.
