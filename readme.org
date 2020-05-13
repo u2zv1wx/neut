@@ -50,7 +50,6 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#enum-1][enum]]
   - [[#array][array]]
   - [[#struct][struct]]
-  - [[#case][case]]
 - [[#auxiliary-syntax][Auxiliary Syntax]]
   - [[#hole][hole]]
   - [[#sigma][sigma]]
@@ -1252,46 +1251,6 @@ The type of elements of a struct must be the integer type, or the float type.
 The memory layout of a struct is the same as the one of LLVM; For example, a struct of type =(struct i8 f16 i32)= is aligned as in a struct of type ={i8, f16, f32}= in LLVM.
 
 The struct type is intended to be used for implementation of interfaces of syscalls.
-
-** case
-=case= is for so-called pattern-matching (the composition =µF -> FµF -> A=).
-*** Example
-#+BEGIN_SRC neut
-(inductive bottom ())
-
-(define ex-falso-quodlibet ((a tau) (x (bottom)))
-  (witness a
-    (case x)))
-
-(inductive my-nat ()
-  (zero ()
-    (my-nat))
-  (succ ((_ (my-nat)))
-    (my-nat)))
-
-(define my-nat-to-i64 ((n (my-nat)))
-  (witness i64
-    (case n
-      ((my-nat.zero)
-        0)
-      ((my-nat.succ m)
-        (i64.add 1 (my-nat-to-i64 m))))))
-#+END_SRC
-*** Syntax
-#+BEGIN_SRC neut
-(case TREE
-  ((LEAF LEAF ... LEAF) TREE)
-  ...
-  ((LEAF LEAF ... LEAF) TREE))
-#+END_SRC
-*** Semantics
-#+BEGIN_SRC neut
-(case (ci v1i ... vn{i}i)
-  ((c1 x11 ... xn{1}1) e1)
-   ...
-   (cm x1m ... xn{m}m) em)
-~> ei {x1i := v1i, ..., xn{i}i := vni}
-#+END_SRC
 
 * Auxiliary Syntax
 ** hole
