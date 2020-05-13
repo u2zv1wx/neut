@@ -59,6 +59,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#check][check]]
 - [[#appendix][Appendix]]
   - [[#llvm-ir-for-the-first-example][LLVM IR for the First Example]]
+  - [[#llvm-ir-for-the-second-example][LLVM IR for the Second Example]]
 
 * Examples
 
@@ -119,13 +120,18 @@ Thankfully, there is a workaround for this performance problem.
 ** Manual Optimization via Borrowing
 The point of the workaround is straightforward: If those copying/discarding result from using variables in non-linear way, we just have to use those variables in linear way. Let's go back to the first example code:
 #+BEGIN_SRC neut
+(ensure core/0.1.0.0
+  "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz")
+
+(include "core/0.1.0.0/core.neut")
+
 (with identity.bind
   (let str "a")
   (let _ (string.print str))
   (let _ (string.print str))
   (string.print str))
 #+END_SRC
-We would like to use the variable =str= linear way. To this end, we just request =string.print= to include the argument =str= in its return value. So, the type of =string.print= shouldn't be something like =string -> top= - where the =top= is the unit type - but should be =string -> top * string=. More specifically, the implementation of =string.print= should be something like (in pseudo-code):
+We would like to use the variable =str= in linear way. To this end, we just request =string.print= to include the argument =str= in its return value. So, the type of =string.print= shouldn't be something like =string -> top= - where the =top= is the unit type - but should be =string -> top * string=, where the =A * B= means the product type of =A= and =B=. More specifically, the implementation of =string.print= should be something like (in pseudo-code):
 #+BEGIN_SRC text
 string.print :: string -> top * string
 string.print str = do
@@ -138,16 +144,9 @@ let str1 = "a";
 let (_, str2) := string.print str1;
 let (_, str3) := string.print str2;
 let (_, str4) := string.print str3;
-0
+unit
 #+END_SRC
-Note that the variables =str1=, =str2=, =str2=, and =str3= are used exactly once, and =str4= for the 0 time. Therefore, the copying operation doesn't occur in the code above. Also, since the =str4= is defined but not used, the =str4= is discarded immediately after its definition:
-#+BEGIN_SRC text
-let str1 = "a";                         -- allocation of `str1`
-let (_, str2) := string.print str1;     -- print `str1`, return it as a element of a tuple, and rename it as `str2`
-let (_, str3) := string.print str2;     -- print `str2`, return it as a element of a tuple, and rename it as `str3`
-let (_, str4) := string.print str3;     -- print `str3`, return it as a element of a tuple, and rename it as `str4`, then deallocate `str4`
-0                                       -- return 0
-#+END_SRC
+Note that the variables =str1=, =str2=, =str2=, and =str3= are used exactly once, and =str4= for the 0 time. Therefore, the copying operation doesn't occur in the code above. Also, since the =str4= is defined but not used, the =str4= is discarded immediately after its definition.
 
 Now we have seen that those redundant copying/discarding can be avoided by writing the code in the manner above. There still remains a problem: code cluttering. It would be much nicer to have more sophisticated notation of that code pattern. Towards that end, firstly note that we can use the same name for the variables =str1=, =str2=, =str3=, and =str4= thanks to variable shadowing:
 #+BEGIN_SRC text
@@ -155,7 +154,7 @@ let str = "a";
 let (_, str) := string.print str;
 let (_, str) := string.print str;
 let (_, str) := string.print str;
-0
+unit
 #+END_SRC
 Now, we just have to introduce a notation that translates:
 #+BEGIN_SRC text
@@ -172,60 +171,39 @@ let str = "a";
 let _ := string.print &str;
 let _ := string.print &str;
 let _ := string.print &str;
-0
+unit
 #+END_SRC
 
 And this is the notation that is implemented in Neut. Indeed, the following is a valid code of Neut:
 #+BEGIN_SRC neut
+(ensure core/0.1.0.0
+  "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz")
+
+(include "core/0.1.0.0/core.neut")
+
 (with identity.bind
   (let str "a")
   (let _ (string.print &str))
   (let _ (string.print &str))
   (let _ (string.print &str))
-  (i64 0))
+  top.unit) ;; ~> top.unit
 #+END_SRC
-where the last =(i64 0)= is to tell the compiler that the type of =0= is =i64= and not, e.g. =i32=. This notation is "borrowing" in Neut. Note that borrowing in Neut is nothing but a syntactic translation. Borrowing has nothing to do with, for example, the type system, or the operational semantics, of Neut. Indeed, this syntactic translation is processed at the stage of parsing in the compiler.
+Or,
+#+BEGIN_SRC neut
+(ensure core/0.1.0.0
+  "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz")
 
-OK, then, how does the resulting LLVM IR change? Is it faster now? Let us compile the code above by running =$ neut build --no-alloc-cancellation --emit llvm filename.neut=. The output is short enough to include it here:
-#+BEGIN_SRC llvm
-declare void @free(i8*)
-declare i8* @write(i8*, i8*, i8*)
-declare i8* @malloc(i64)
-define i64 @main() {
-  ;; memory allocation
-  %_12034 = getelementptr i8, i8* null, i64 1
-  %_12035 = ptrtoint i8* %_12034 to i64
-  %_12036 = call fastcc i8* @malloc(i64 %_12035)
-  ;; create the string "a" (i.e. write the character 'a' to the allocated memory)
-  %_12037 = bitcast i8* %_12036 to [1 x i8]*
-  %_12038 = inttoptr i8 97 to i8* ;; a = 97
-  %_12039 = ptrtoint i8* %_12038 to i8
-  %_12040 = getelementptr [1 x i8], [1 x i8]* %_12037, i32 0, i64 0 ;; where to write 'a'
-  store i8 %_12039, i8* %_12040 ;; write a
-  ;; write the string into stdout for the three times
-  %_12041 = inttoptr i64 1 to i8* ;; this `1` stands for stdout
-  %_12042 = inttoptr i64 1 to i8* ;; this `1` is the length of the string in bytes
-  %_12043 = call fastcc i8* @write(i8* %_12041, i8* %_12036, i8* %_12042)
-  %_12044 = inttoptr i64 1 to i8*
-  %_12045 = inttoptr i64 1 to i8*
-  %_12046 = call fastcc i8* @write(i8* %_12044, i8* %_12036, i8* %_12045)
-  %_12047 = inttoptr i64 1 to i8*
-  %_12048 = inttoptr i64 1 to i8*
-  %_12049 = call fastcc i8* @write(i8* %_12047, i8* %_12036, i8* %_12048)
-  ;; memory deallocation
-  %_12050 = bitcast i8* %_12036 to [1 x i8]*
-  %_12051 = getelementptr [1 x i8], [1 x i8]* %_12050, i32 0, i32 0
-  %_12052 = load i8, i8* %_12051
-  %_12053 = bitcast [1 x i8]* %_12050 to i8*
-  call fastcc void @free(i8* %_12053)
-  %_12054 = inttoptr i8 %_12052 to i8*
-  ;; return 0
-  %_12055 = inttoptr i64 0 to i8*
-  %_12056 = ptrtoint i8* %_12055 to i64
-  ret i64 %_12056
-}
+(include "core/0.1.0.0/core.neut")
+
+(with identity.bind
+  (let str "a")
+  (let _ (string.print &str))
+  (let _ (string.print &str))
+  (string.print str)) ;; ~> (unit, "a")
 #+END_SRC
-or more schematically:
+This notation is "borrowing" in Neut. Note that borrowing in Neut is nothing but a syntactic translation. Borrowing has nothing to do with, for example, the type system, or the operational semantics, of Neut. Indeed, this syntactic translation is processed at the stage of parsing.
+
+Let's see how the resulting LLVM IR changes. Is it faster now? We can compile the code above by running =$ neut build --no-alloc-cancellation --emit llvm filename.neut=. The output is schematically as follows:
 #+BEGIN_SRC llvm
 declare void @free(i8*)
 declare i8* @write(i8*, i8*, i8*)
@@ -238,7 +216,9 @@ define i64 @main() {
   ;; <return 0>
 }
 #+END_SRC
-The former LLVM IR is the actual output except for the comments like ";; memory allocation", which are inserted after compilation for explanatory purposes. The point here is that the string stored at =%12036= (the second argument of =@write=) is reused without copying, as expected. The resulting assembly code is reasonably small too:
+Again, the non-schematic output can be found in the [[#llvm-ir-for-the-second-example][appendix]]. The output in this time is actually short enough to include it here (36 lines), though I chose not to. The point here is that the string "a" is reused without copying, as expected.
+
+ The resulting assembly code is reasonably small too (works on macOS; when you compile the same code in Linux, the =write= operation is lowered into a syscall):
 #+BEGIN_SRC asm
 	.section	__TEXT,__text,regular,pure_instructions
 	.macosx_version_min 12, 15
@@ -275,9 +255,9 @@ _main:                                  ## @main
                                         ## -- End function
 .subsections_via_symbols
 #+END_SRC
-In short: the resulting code is faster in that it is free from the redundant copying/discarding we saw in the first example.
+In short: the resulting code is faster in that it is free from the redundant copying operations we saw in the first example.
 
-This is how Neut controls resources efficiently, without modifying the type system of the source language (the ordinary dependent lambda calculus).
+This is how Neut controls resources efficiently, without modifying the type system of the source language.
 
 ** Automatic Optimization via malloc/free Cancellation
 Neut's static, type-based malloc/free determination enables not only the "manual" optimization we have just seen, but also another "automatic" optimization. Remember the first example:
@@ -1546,5 +1526,45 @@ define i64 @main() {
   %_11920 = inttoptr i64 0 to i8*
   %_11921 = ptrtoint i8* %_11920 to i64
   ret i64 %_11921
+}
+#+END_SRC
+
+** LLVM IR for the Second Example
+#+BEGIN_SRC llvm
+declare void @free(i8*)
+declare i8* @write(i8*, i8*, i8*)
+declare i8* @malloc(i64)
+define i64 @main() {
+  ;; memory allocation
+  %_12034 = getelementptr i8, i8* null, i64 1
+  %_12035 = ptrtoint i8* %_12034 to i64
+  %_12036 = call fastcc i8* @malloc(i64 %_12035)
+  ;; create the string "a" (i.e. write the character 'a' to the allocated memory)
+  %_12037 = bitcast i8* %_12036 to [1 x i8]*
+  %_12038 = inttoptr i8 97 to i8* ;; a = 97
+  %_12039 = ptrtoint i8* %_12038 to i8
+  %_12040 = getelementptr [1 x i8], [1 x i8]* %_12037, i32 0, i64 0 ;; where to write 'a'
+  store i8 %_12039, i8* %_12040 ;; write a
+  ;; write the string into stdout for the three times
+  %_12041 = inttoptr i64 1 to i8* ;; this `1` stands for stdout
+  %_12042 = inttoptr i64 1 to i8* ;; this `1` is the length of the string in bytes
+  %_12043 = call fastcc i8* @write(i8* %_12041, i8* %_12036, i8* %_12042)
+  %_12044 = inttoptr i64 1 to i8*
+  %_12045 = inttoptr i64 1 to i8*
+  %_12046 = call fastcc i8* @write(i8* %_12044, i8* %_12036, i8* %_12045)
+  %_12047 = inttoptr i64 1 to i8*
+  %_12048 = inttoptr i64 1 to i8*
+  %_12049 = call fastcc i8* @write(i8* %_12047, i8* %_12036, i8* %_12048)
+  ;; memory deallocation
+  %_12050 = bitcast i8* %_12036 to [1 x i8]*
+  %_12051 = getelementptr [1 x i8], [1 x i8]* %_12050, i32 0, i32 0
+  %_12052 = load i8, i8* %_12051
+  %_12053 = bitcast [1 x i8]* %_12050 to i8*
+  call fastcc void @free(i8* %_12053)
+  %_12054 = inttoptr i8 %_12052 to i8*
+  ;; return 0
+  %_12055 = inttoptr i64 0 to i8*
+  %_12056 = ptrtoint i8* %_12055 to i64
+  ret i64 %_12056
 }
 #+END_SRC
