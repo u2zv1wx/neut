@@ -63,11 +63,11 @@ Here I briefly summerize the basic properties of Neut before diving into the det
 * Examples
 
 ** Basics of Proof-Theoretic Memory Management
-Here I will firstly show an "inefficient" version of some code pieces. After that, I will show a more efficient version of the code, and compare resulting LLVM IR.
+# Here I will firstly show an "inefficient" version of some code pieces. After that, I will show a more efficient version of the code, and compare resulting LLVM IR.
 
-Note that the code here is written in a rather verbose way to make things as explicit as possible to the readers. You don't have to be that verbose in actual code.
+# Note that the code here is written in a rather verbose way to make things as explicit as possible to the readers. You don't have to be that verbose in actual code.
 
-The following code prints the string "a" for the three times:
+Let's see how Neut manages resources. The following code prints the string "a" for the three times:
 #+BEGIN_SRC neut
 (with identity.bind
   (let str "a")          ;; define a variable `str : string` with content `"hello"`
@@ -75,7 +75,7 @@ The following code prints the string "a" for the three times:
   (let _ (string.print str))
   (string.print str))
 #+END_SRC
-The `(with identity.bind (...))` is the same as so-called do-notation in Haskell or other languages, specilized to the identity monad.
+The =(with identity.bind (...))= is the same as so-called do-notation in Haskell or other languages, specilized to the identity monad.
 
 By running =$ neut build --no-alloc-cancellation --emit llvm filename.neut=, we obtain schematically the following LLVM IR (the =--no-alloc-cancellation= is to disable certain optimization that we will see [[#memory-reuse-via-linearity][later]]):
 #+BEGIN_SRC llvm
@@ -92,11 +92,13 @@ define i64 @main() {
 #+END_SRC
 The non-schematic, actual output can also be found in the [[#llvm-ir-for-the-first-example][appendix]]. I chose not to write the IR here since the output is a bit long (59 lines).
 
-The resulting LLVM IR creates a string in memory, print it, and free it for the three times. In other words, the IR creates two copies of the original string. This is because the variable =str= is used for the three times; The content of a variable is copied to create n instances when the variable is used for the n times (n > 1). If the variable isn't used at all (n < 1), the content of the variable is discarded (deallocated). If the variable is used exactly once, or linearly (n = 1), the content of the variable is used without any discarding/copying operation.
+The resulting LLVM IR creates a string in memory, print it, and free it for the three times. The important point is that the resulting code creates 2 copies of the original string. This is because the variable =str= is used for the three times; The content of a variable is copied to create n instances when the variable is used for the n times (n > 1). If the variable isn't used at all (n < 1), the content of the variable is discarded (deallocated). If the variable is used exactly once, or linearly (n = 1), the content of the variable is used without any discarding/copying operation.
 
-The way how a variable is copied is determined by the type of the variable. For example, if the type of a variable is the array type as in the example above, the copying operation is something that you would do in C to copy an array (allocation then value insertion). If the type is an immediate type like an integer type, the "copying" operation is the one that uses the original value for the clone value. Every type determines how to copy/discard the type of a value of the type, including the type of the type itself.
+The way how a variable is copied is determined by the type of the variable. For example, if the type of a variable is the array type as in the example above, the copying operation is something that you would do in C to copy an array (allocation then value insertion). If the type is an immediate type like an integer type, the "copying" operation is the one that uses the original value for the cloned value. Every type determines how to copy/discard the type of a value of the type, including the type of the type itself.
 
-This is the basics of the behavior of resource copying/discarding in Neut. As you can easily imagine, this naive copying/discarding can result in an inefficient object code. We often use a variable more than once. If those uses of a variable result in copying the content every time, the performance of the resulting code would be nothing but a disaster. Thankfully, there is a workaround for this performance problem.
+This is the basics of the behavior of resource copying/discarding in Neut. As you can easily imagine, this naive copying/discarding can result in an inefficient object code. We often use a variable more than once, as in the example above (=str=). I can't say the code above is efficient enough; I can't ignore those redundant copy operations.
+
+Thankfully, there is a workaround for this performance problem.
 
 ** Manual Optimization via Borrowing
 The point of the workaround is nothing special: If those copying/discarding result from using variables in non-linear way, we just have to use those variables in linear way. Let's go back to the first example code:
