@@ -78,7 +78,6 @@ The following code prints the string "a" for the three times:
   (string.print str))
 #+END_SRC
 The `(with identity.bind (...))` is the same as so-called do-notation in Haskell or other languages, specilized to the identity monad.
-# You may note that the language doesn't require the IO monad. This is because the evaluation strategy of Neut is CBV.
 
 By running =$ neut build --no-alloc-cancellation --emit llvm filename.neut=, we obtain schematically the following LLVM IR (the =--no-alloc-cancellation= is to disable certain optimization that we will see [[#memory-reuse-via-linearity][later]]):
 #+BEGIN_SRC llvm
@@ -1476,8 +1475,6 @@ This subcommand is intended to be used with an editor-side syntax checker like [
 
 # * Where is ...?
 
-# ** Unsigned Integers?
-
 # ** Typeclass?
 
 # ** Proof-Related Stuff?
@@ -1492,22 +1489,8 @@ This subcommand is intended to be used with an editor-side syntax checker like [
 # ** Box Modality, Polarity, and Closure Conversion
 # (to be written later)
 
-# ** Realizing Inductive Type within CoC (including nested, mutual, or higher ones)
-# (to be written later)
-
-# ** Universe Hierarchy and the Weakly-Normalizing Fragment
-# (to be written later)
-
 # ** "Unified" Pattern Resolution in Dependent Type Inference
 # (to be written later)
-
-# * Contribution
-
-# ** To Implementation
-
-# ** To Documentation
-
-# ** To Theory
 
 * Appendix
 
