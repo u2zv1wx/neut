@@ -1,24 +1,23 @@
 #+TITLE: Neut
-Neut is a dependently-typed programming language based on [[https://en.wikipedia.org/wiki/Calculus_of_constructions][the Calculus of Constructions (CoC)]]. The interesting point is that this language determines how to allocate/free memory at compile-time, without extra annotations to the source language. In other words, Neut in its source language is the ordinary lambda-calculus after all (imagine something like Haskell, Coq, Agda, Lean), and at the same time it handles memory without using, for example:
+Neut is a dependently-typed programming language based on [[https://en.wikipedia.org/wiki/Calculus_of_constructions][the Calculus of Constructions (CoC)]]. The interesting point is that this language determines how to allocate/deallocate memory at compile-time, without extra annotations to the source language. In other words, Neut in its source language is the ordinary lambda-calculus after all (imagine something like Haskell, OCaml, Idris, Coq, Agda, or Lean), and at the same time it handles memory without using, for example:
 
 - explicit malloc/free,
 - garbage collection,
 - region-based memory management.
 
-Theoretically, this is made possible by translating the source language into a dependent-and-linear variant of [[https://www.cs.bham.ac.uk/~pbl/papers/thesisqmwphd.pdf][Call-By-Push-Value]]. The crucial point of this translation is to see that knowing the type of a term is knowing how to eta-expand the term, which in turn means knowing how to copy/discard the term. In the translation, a type is not erased, but *translated into a computationally-meaningful term that copies/discards the terms of the type*.
-# Those who are interested in these theoretical things can find further details in the [[#theoretical-notes][section about the theory of Neut]].
+Theoretically, this is made possible by translating the source language into a dependent variant of [[https://www.cs.bham.ac.uk/~pbl/papers/thesisqmwphd.pdf][Call-By-Push-Value]]. The crucial point of this translation is to see that knowing the type of a term is knowing how to eta-expand the term, which in turn means knowing how to copy/discard the term. In the translation, a type is not erased, but *translated into a computationally-meaningful term that copies/discards the terms of the type*.
 
-Practically, this means that you can write your program in the ordinary lambda calculus without any extra restrictions or annotations, and at the same time are allowed to pursue performance in the language via e.g. borrowing or linearity. The source code doesn't need esoteric annotations for the compiler to infer how to use resources. Nor does the world stop all of a sudden by GC. You have full control over resource allocation.
+Practically, this means that you can write your program in ordinary lambda-calculus without any extra restrictions or annotations, and at the same time you are allowed to control how resources are used in the program. If you want a ordinary-lambda-calculus based programming language with a human-predictable semantics (including its memory management), this might be for you.
 
 Here I briefly summerize the basic properties of Neut before diving into the details:
 
 - A compiled language
-- The output is [[https://llvm.org/docs/LangRef.html][LLVM IR]] / assembly / object binary (the last two are via clang)
-- The type system is CoC + fix + int + float + enum + array + struct
+- The output is [[https://llvm.org/docs/LangRef.html][LLVM IR]], assembly, and object binary (the last two are via clang)
+- The type system is CoC + fix + int + float + enum + array + struct - universe hierarchy
 - The type inference algorithm is based on [[https://arxiv.org/abs/1505.04324][the one of Lean]]
 - The evaluation strategy is call-by-value
 - Every tail call is optimized into a loop
-- The memory management is statically determined at compile time (Can be optimized via borrowing and linearity)
+- Memory allocations/deallocations are statically determined at compile time
 
 * Table of Contents                                                    :TOC:
 - [[#some-hopefully-illuminating-examples][Some (Hopefully) Illuminating Examples]]
