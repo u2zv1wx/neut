@@ -80,7 +80,7 @@ Let's see how Neut manages resources. The following code prints the string "a" f
 #+END_SRC
 The =(with identity.bind (...))= is the same as so-called do-notation in Haskell or other languages, specilized to the identity monad.
 
-By running =$ neut build --no-alloc-cancellation --emit llvm filename.neut=, we obtain schematically the following LLVM IR (the =--no-alloc-cancellation= is to disable certain optimization that we will see [[#memory-reuse-via-linearity][later]]):
+By running =$ neut build --no-alloc-cancellation --emit llvm filename.neut=, we obtain schematically the following LLVM IR (the =--no-alloc-cancellation= is to disable certain optimization that we will see later):
 #+BEGIN_SRC llvm
 declare void @free(i8*)
 declare i8* @write(i8*, i8*, i8*)
@@ -260,7 +260,7 @@ In short: the resulting code is faster in that it is free from the redundant cop
 This is how Neut controls resources efficiently, without modifying the type system of the source language.
 
 ** Automatic Optimization via malloc/free Cancellation
-Neut's static, type-based malloc/free determination enables not only the "manual" optimization we have just seen, but also another "automatic" optimization. Remember the first example:
+Neut's static, proof-theoretic memory management enables not only the "manual" optimization we have just seen, but also another "automatic" optimization. Remember the first example:
 #+BEGIN_SRC neut
 (with identity.bind
   (let str "a")
