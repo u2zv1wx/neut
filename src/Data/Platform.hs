@@ -2,9 +2,6 @@ module Data.Platform where
 
 import qualified Data.Text as T
 
-type Target =
-  (OS, Arch)
-
 data OS
   = OSLinux
   | OSDarwin

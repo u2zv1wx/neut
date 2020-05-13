@@ -49,7 +49,6 @@ data Env
         -- parse
         --
         phase :: Int,
-        target :: Maybe Target,
         notationEnv :: Map.HashMap T.Text [(TreePlus, TreePlus)],
         constantSet :: S.Set T.Text,
         fileEnv :: Map.HashMap (Path Abs File) VisitInfo,
@@ -91,7 +90,6 @@ initialEnv =
       shouldCancelAlloc = True,
       endOfEntry = "",
       phase = 0,
-      target = Nothing,
       notationEnv = Map.empty,
       constantSet = S.empty,
       enumEnv = Map.empty,
@@ -174,17 +172,6 @@ newAster :: Meta -> WithEnv WeakTermPlus
 newAster m = do
   i <- newCount
   return (m, WeakTermAster i)
-
-getTarget :: WithEnv Target
-getTarget = do
-  mtarget <- gets target
-  case mtarget of
-    Just t ->
-      return t
-    Nothing -> do
-      currentOS <- getOS
-      currentArch <- getArch
-      return (currentOS, currentArch)
 
 getOS :: WithEnv OS
 getOS =
