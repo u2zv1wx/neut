@@ -67,7 +67,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
 *** Basics
 Let's see how Neut manages resources. The following code prints the string "a" for the three times:
 #+BEGIN_SRC neut
-;; download core library (if necessary)
+; download core library (if necessary)
 (ensure core/0.1.0.0
   "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz")
 
@@ -87,11 +87,11 @@ declare void @free(i8*)
 declare i8* @write(i8*, i8*, i8*)
 declare i8* @malloc(i64)
 define i64 @main() {
-  ;; Repeat the following for the 3 times:
-  ;;   <memory allocation for the string>
-  ;;   <create the string "a" (i.e. write the character 'a' to the allocated memory)>
-  ;;   <write the string into stdout>
-  ;;   <memory deallocation for the string>
+  ; Repeat the following for the 3 times:
+  ;   <memory allocation for the string>
+  ;   <create the string "a" (i.e. write the character 'a' to the allocated memory)>
+  ;   <write the string into stdout>
+  ;   <memory deallocation for the string>
 }
 #+END_SRC
 The non-schematic, actual output can also be found in the [[#llvm-ir-for-the-first-example][appendix]]. I chose not to write the IR here since the output is a bit long (59 lines).
@@ -237,7 +237,7 @@ And this is the notation that is implemented in Neut. Indeed, the following is a
   (let _ (string.print &str))
   (let _ (string.print &str))
   (let _ (string.print &str))
-  top.unit) ;; ~> top.unit
+  top.unit) ; ~> top.unit
 #+END_SRC
 Or,
 #+BEGIN_SRC neut
@@ -250,7 +250,7 @@ Or,
   (let str "a")
   (let _ (string.print &str))
   (let _ (string.print &str))
-  (string.print str)) ;; ~> (unit, "a")
+  (string.print str)) ; ~> (unit, "a")
 #+END_SRC
 This notation is "borrowing" in Neut. Note that borrowing in Neut is nothing but a syntactic translation. Borrowing has nothing to do with, for example, the type system, or the operational semantics. Indeed, this syntactic translation is processed at the stage of parsing in the compiler.
 
@@ -260,11 +260,11 @@ declare void @free(i8*)
 declare i8* @write(i8*, i8*, i8*)
 declare i8* @malloc(i64)
 define i64 @main() {
-  ;; <memory allocation for the string>
-  ;; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
-  ;; <write the string into stdout for the three times>
-  ;; <memory deallocation for the string>
-  ;; <return 0>
+  ; <memory allocation for the string>
+  ; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
+  ; <write the string into stdout for the three times>
+  ; <memory deallocation for the string>
+  ; <return 0>
 }
 #+END_SRC
 Again, the non-schematic output can be found in the [[#llvm-ir-for-the-second-example][appendix]]. The output in this time is actually short enough to include it here (36 lines including comments), though I chose not to. The point here is that the string "a" is reused without copying, as expected.
@@ -326,11 +326,11 @@ declare void @free(i8*)
 declare i8* @write(i8*, i8*, i8*)
 declare i8* @malloc(i64)
 define i64 @main() {
-  ;; Repeat the following for the 3 times:
-  ;;   <memory allocation for the string>
-  ;;   <create the string "a" (i.e. write the character 'a' to the allocated memory)>
-  ;;   <write the string into stdout>
-  ;;   <memory deallocation for the string>
+  ; Repeat the following for the 3 times:
+  ;   <memory allocation for the string>
+  ;   <create the string "a" (i.e. write the character 'a' to the allocated memory)>
+  ;   <write the string into stdout>
+  ;   <memory deallocation for the string>
 }
 #+END_SRC
 The code is already judged to be inefficient in that it allocates/deallocates memory unnecessarily. More specifically, it is inefficient in that it deallocates the memory that can actually be reused.
@@ -341,14 +341,14 @@ And it is indeed possible. When the option =--no-alloc-cancellation= is not pass
 #+BEGIN_SRC llvm
 define TYPE @FUNCTION_NAME(...) {
   (...)
-  ;; <memory allocation for the string>
-  ;; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
-  ;; <write the string into stdout>
-  ;; <memory deallocation for the string>    -- (*1)
-  ;; <memory allocation for the string>      -- (*2)
-  ;; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
-  ;; <write the string into stdout>
-  ;; <memory deallocation for the string>
+  ; <memory allocation for the string>
+  ; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
+  ; <write the string into stdout>
+  ; <memory deallocation for the string>    -- (*1)
+  ; <memory allocation for the string>      -- (*2)
+  ; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
+  ; <write the string into stdout>
+  ; <memory deallocation for the string>
   (...)
 }
 #+END_SRC
@@ -356,12 +356,12 @@ into something like this:
 #+BEGIN_SRC llvm
 define TYPE @FUNCTION_NAME(...) {
   (...)
-  ;; <memory allocation for the string>
-  ;; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
-  ;; <write the string into stdout>
-  ;; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
-  ;; <write the string into stdout>
-  ;; <memory deallocation for the string>
+  ; <memory allocation for the string>
+  ; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
+  ; <write the string into stdout>
+  ; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
+  ; <write the string into stdout>
+  ; <memory deallocation for the string>
   (...)
 }
 #+END_SRC
@@ -370,13 +370,13 @@ In other words, the compiler can cancel the memory deallocation at =(*1)= and th
 Note that the "create the string" parts are not optimized away from the resulting LLVM IR, in contrast to the one of borrowing:
 #+BEGIN_SRC llvm
 define i64 @main() {
-  ;; <memory allocation for the string>
-  ;; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
-  ;; <write the string into stdout>
-  ;; <write the string into stdout>
-  ;; <write the string into stdout>
-  ;; <memory deallocation for the string>
-  ;; <return 0>
+  ; <memory allocation for the string>
+  ; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
+  ; <write the string into stdout>
+  ; <write the string into stdout>
+  ; <write the string into stdout>
+  ; <memory deallocation for the string>
+  ; <return 0>
 }
 #+END_SRC
 Although the compiler can cancel memory allocations/deallocations, it cannot cancel their accompanying initialization processes (at least for now). If you do need performance, you need to write code in the linear/borrowing style.
@@ -447,7 +447,7 @@ The =ensure= statement fetches the content of the specified URL for later use.
 
 *** Example
 #+BEGIN_SRC neut
-;; extracts the content of URL into ~/.local/share/neut/NEUT_VERSION/library/core/0.1.0.0
+; extracts the content of URL into ~/.local/share/neut/NEUT_VERSION/library/core/0.1.0.0
 (ensure core/0.1.0.0
   "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz")
 
@@ -470,7 +470,7 @@ Archives specified in =ensure= is supposed to be ones created via the [[#archive
 The =enum= statement declares a new enum-type and its values.
 *** Example
 #+BEGIN_SRC neut
-(enum choice left right) ;; defines choice : tau, choice.left : choice, and choice.right : choice
+(enum choice left right) ; defines choice : tau, choice.left : choice, and choice.right : choice
 
 (let x choice.left)
 
@@ -479,11 +479,11 @@ The =enum= statement declares a new enum-type and its values.
     (choice.left
       (i64 1))
      choice.right
-      (i64 2))) ;; ~> 1
+      (i64 2))) ; ~> 1
 
-(i64.print (unsafe.cast choice i64 choice.left)) ;; ~> 0
+(i64.print (unsafe.cast choice i64 choice.left)) ; ~> 0
 
-(i64.print (unsafe.cast choice i64 choice.right)) ;; ~> 1
+(i64.print (unsafe.cast choice i64 choice.right)) ; ~> 1
 
 (enum foo
   (a 100)
@@ -493,12 +493,12 @@ The =enum= statement declares a new enum-type and its values.
   e
   (f 103))
 
-(i64.print (unsafe.cast foo i64 foo.a)) ;; ~> 100
-(i64.print (unsafe.cast foo i64 foo.b)) ;; ~> 101
-(i64.print (unsafe.cast foo i64 foo.c)) ;; ~> 20
-(i64.print (unsafe.cast foo i64 foo.d)) ;; ~> 21
-(i64.print (unsafe.cast foo i64 foo.e)) ;; ~> 22
-(i64.print (unsafe.cast foo i64 foo.f)) ;; ~> 103
+(i64.print (unsafe.cast foo i64 foo.a)) ; ~> 100
+(i64.print (unsafe.cast foo i64 foo.b)) ; ~> 101
+(i64.print (unsafe.cast foo i64 foo.c)) ; ~> 20
+(i64.print (unsafe.cast foo i64 foo.d)) ; ~> 21
+(i64.print (unsafe.cast foo i64 foo.e)) ; ~> 22
+(i64.print (unsafe.cast foo i64 foo.f)) ; ~> 103
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
@@ -557,7 +557,7 @@ Cyclic inclusion is invalid.
 The =inductive= statement defines an inductive type, its introduction rules (constructors), and its pattern match function.
 *** Example
 #+BEGIN_SRC neut
-;; this defines list, list.nil, list.cons, and list.case
+; this defines list, list.nil, list.cons, and list.case
 (inductive list ((a tau))
   (nil ()
     (list a))
@@ -575,7 +575,7 @@ The =inductive= statement defines an inductive type, its introduction rules (con
 
 (let xs (list.cons * 10 (list.cons * 20 (list.nil i64))))
 
-(i64.print (length xs)) ;; ~> 2
+(i64.print (length xs)) ; ~> 2
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
@@ -586,7 +586,7 @@ The =inductive= statement defines an inductive type, its introduction rules (con
   (LEAF ((LEAF TREE) ... (LEAF TREE))
     TREE))
 
-;; n-mutual inductive type
+; n-mutual inductive type
 (inductive
   (LEAF ((LEAF TREE) ... (LEAF TREE))
     (LEAF ((LEAF TREE) ... (LEAF TREE))
@@ -699,54 +699,51 @@ and then replaces =b=, =e1=, and =e2= in the codomain of the notation according 
 #+END_SRC
 Given this step-expansion, the macro-expansion proceeds as follows. Take =t= to be an input tree. If the tree =t= is of the form =LEAF=, the compiler returns the result of step-expansion of =t=. If a tree is of the form =(t1 ... tn)=, the =t1=, ..., =tn= are firstly macro-expanded them into =t1'= , ..., =tn'= , and then the compiler step-expands the tree =(t1' ... tn')=.
 
-You may want to use this statement with [[erase][erase]] to accomplish (certain form of) safety.
+You may want to use this statement with [[erase][erase]] to accomplish safety.
 
 ** let
 The =let= statement evaluates given term and binds the result to a variable.
 
 *** Example
 #+BEGIN_SRC neut
-(let foo (i64 10)) ;; define a variable `foo` to be `10`
+(let foo (i64 10)) ; define a variable `foo` to be `10`
 
-(i64.print foo) ;; ~> 10 (this is equivalent to `(let _ (i64.print foo))`)
+(i64.print foo) ; ~> 10 (this is equivalent to `(let _ (i64.print foo))`)
 
-(let (bar i64) 20) ;; `let` with type annotation
+(let (bar i64) 20) ; `let` with type annotation
 
-(i64.print bar) ;; ~> 20
+(i64.print bar) ; ~> 20
 
-;; `define` is defined in `core/notation.neut` as follows:
-;;
-;; (keyword define)
-;;
-;; (notation (define f xts e)
-;;   (let f (fix f xts e)))
-;;
-;; (notation (define f e)
-;;   (let f e))
-;;
+; `define` is defined in `core/<VERSION>/notation.neut` as follows:
+; (notation (define f xts e)
+;   (let f (fix f xts e)))
+;
+; (notation (define f e)
+;   (let f e))
+;
 
-;; ordinary definition (i.e. 1-mutual definition)
+; ordinary definition (i.e. 1-mutual definition)
 (define fact ((x i64))
-  (if (icmp-sle-i64 x 0) ;; compare (by less-than-or-equal) two `i64`s as signed integers
+  (if (icmp-sle-i64 x 0) ; compare (by less-than-or-equal) two `i64`s as signed integers
     1
-    (mul-i64 x (fact (sub-i64 x 1))))) ;; the self-referential variable "fact" is available in its function body
+    (mul-i64 x (fact (sub-i64 x 1))))) ; the self-referential variable "fact" is available in its function body
 
-(i64.print (fact foo)) ;; ~> 3628800 (= 10!)
+(i64.print (fact foo)) ; ~> 3628800 (= 10!)
 
-;; the definition of `fact` above is equivalent to the following:
+; the definition of `fact` above is equivalent to the following:
 (let fact
   (fix fact ((x i64))
     (if (icmp-sle-i64 x 0)
       1
       (mul-i64 x (fact (sub-i64 x 1))))))
-;; which is alpha-equivalent to:
+; which is alpha-equivalent to:
 (let fact
   (fix self ((x i64))
     (if (icmp-sle-i64 x 0)
       1
       (mul-i64 x (self (sub-i64 x 1))))))
 
-;; mutual recursion can be realized as in the ordinary way:
+; mutual recursion can be realized as in the ordinary way:
 (define even-f ((f (hom i64 bool)) (n i64))
   (if (icmp-eq-i64 n 0)
     true
@@ -763,7 +760,7 @@ The =let= statement evaluates given term and binds the result to a variable.
 (i64.print
   (if (even 10)
     100
-    1000)) ;; ~> 100
+    1000)) ; ~> 100
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
@@ -797,9 +794,9 @@ The =record= statement creates a record type, its elimination rules (destructors
     20
     top.unit))
 
-(i64.print (my-record.item-1 i64 item)) ;; ~> 10
+(i64.print (my-record.item-1 i64 item)) ; ~> 10
 
-(i64.print (my-record.item-2 i64 item)) ;; ~> 20
+(i64.print (my-record.item-2 i64 item)) ; ~> 20
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
@@ -852,27 +849,27 @@ The =use= / =unuse= statement registers a prefix for name resolution.
 #+BEGIN_SRC neut
 (let foo.bar.buz (i64 10))
 
-;; (i64.print buz)      ;; ~> undefined variable: `buz`
-;; (i64.print bar.buz)  ;; ~> undefined variable: `bar.buz`
-(i64.print foo.bar.buz) ;; ~> 10
+; (i64.print buz)      ; ~> undefined variable: `buz`
+; (i64.print bar.buz)  ; ~> undefined variable: `bar.buz`
+(i64.print foo.bar.buz) ; ~> 10
 
 (use foo)
 
-;; (i64.print buz)      ;; ~> undefined variable: `buz`
-(i64.print bar.buz)     ;; ~> 10
-(i64.print foo.bar.buz) ;; ~> 10
+; (i64.print buz)      ; ~> undefined variable: `buz`
+(i64.print bar.buz)     ; ~> 10
+(i64.print foo.bar.buz) ; ~> 10
 
 (use foo.bar)
 
-(i64.print buz)         ;; ~> 10
-(i64.print bar.buz)     ;; ~> 10
-(i64.print foo.bar.buz) ;; ~> 10
+(i64.print buz)         ; ~> 10
+(i64.print bar.buz)     ; ~> 10
+(i64.print foo.bar.buz) ; ~> 10
 
 (unuse foo)
 
-(i64.print buz)         ;; ~> 10
-;; (i64.print bar.buz)  ;; ~> undefined variable: `bar.buz`
-(i64.print foo.bar.buz) ;; ~> 10
+(i64.print buz)         ; ~> 10
+; (i64.print bar.buz)  ; ~> undefined variable: `bar.buz`
+(i64.print foo.bar.buz) ; ~> 10
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
@@ -898,27 +895,27 @@ The prefix environment modifies [[#upsilon][how the compiler parses a variable]]
 
 (let bar (i64 20))
 
-(i64.print foo)          ;; ~> 10
-(i64.print pohe.foo)     ;; ~> 10
-(i64.print bar)          ;; ~> 20
-(i64.print qux.bar)      ;; ~> 20
-(i64.print pohe.qux.bar) ;; ~> 20
+(i64.print foo)          ; ~> 10
+(i64.print pohe.foo)     ; ~> 10
+(i64.print bar)          ; ~> 20
+(i64.print qux.bar)      ; ~> 20
+(i64.print pohe.qux.bar) ; ~> 20
 
 (end qux)
 
-(i64.print foo)          ;; ~> 10
-(i64.print pohe.foo)     ;; ~> 10
-;; (i64.print bar)       ;; ~> undefined variable: `bar`
-(i64.print qux.bar)      ;; ~> 20
-(i64.print pohe.qux.bar) ;; ~> 20
+(i64.print foo)          ; ~> 10
+(i64.print pohe.foo)     ; ~> 10
+; (i64.print bar)       ; ~> undefined variable: `bar`
+(i64.print qux.bar)      ; ~> 20
+(i64.print pohe.qux.bar) ; ~> 20
 
 (end pohe)
 
-;; (i64.print foo)       ;; ~> undefined variable: `foo`
-(i64.print pohe.foo)     ;; ~> 10
-;; (i64.print bar)       ;; ~> undefined variable: `bar`
-;; (i64.print qux.bar)   ;; ~> undefined variable: `qux.bar`
-(i64.print pohe.qux.bar) ;; ~> 20
+; (i64.print foo)       ; ~> undefined variable: `foo`
+(i64.print pohe.foo)     ; ~> 10
+; (i64.print bar)       ; ~> undefined variable: `bar`
+; (i64.print qux.bar)   ; ~> undefined variable: `qux.bar`
+(i64.print pohe.qux.bar) ; ~> 20
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
@@ -962,7 +959,7 @@ The =tau= term is the type of types.
 
 (id i64 10)
 
-(id tau tau) ;; valid since `tau : tau`
+(id tau tau) ; valid since `tau : tau`
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
@@ -983,11 +980,11 @@ The =upsilion= term is a term that represents a variable.
 #+BEGIN_SRC neut
 (let x (i64 10))
 
-;; "explicit" notation
-(i64.print (upsilon x)) ;; ~> 10
+; "explicit" notation
+(i64.print (upsilon x)) ; ~> 10
 
-;; "implicit" notation
-(i64.print x)           ;; ~> 10
+; "implicit" notation
+(i64.print x)           ; ~> 10
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
@@ -1008,27 +1005,27 @@ If the name of a variable is "_", the compiler automatically generates a fresh v
 The =pi= term is a term that represents the universal quantification.
 *** Example
 #+BEGIN_SRC neut
-;; unary pi-introduction
-(let (f2 (pi (x i64) i64))  ;; f2 : Pi (x : i64). i64  (i.e. f2 receives a term of type i64, and returns a term of type i64)
+; unary pi-introduction
+(let (f2 (pi (x i64) i64))  ; f2 : Pi (x : i64). i64  (i.e. f2 receives a term of type i64, and returns a term of type i64)
   (pi-introduction ((x i64)) x))
 
-;; "explicit" pi-elimination
+; "explicit" pi-elimination
 (pi-elimination i64.print (pi-elimination f2 2))
 
-;; "automatic" pi-elimination
+; "automatic" pi-elimination
 (i64.print (f2 2))
 
-;; nullary pi-introduction
+; nullary pi-introduction
 (let (f1 (pi () i64))
-  (lambda () (i64 1))) ;; 'lambda' can be used instead of 'pi-introduction'
+  (lambda () (i64 1))) ; 'lambda' can be used instead of 'pi-introduction'
 
-;; "explicit" pi-elimination
+; "explicit" pi-elimination
 (pi-elimination i64.print (pi-elimination f1))
 
-;; "automatic" pi-elimination
+; "automatic" pi-elimination
 (i64.print (f1))
 
-;; binary pi-introduction
+; binary pi-introduction
 (let f3
   (lambda ((x i64) (y i64)) (i64.add x y)))
 
@@ -1112,7 +1109,7 @@ The =fix= term is a term that realizes recursion.
 #+BEGIN_SRC neut
 (let fact
   (fix self ((x i64))
-    (if (icmp-sle-i64 x 0) ;; i.e. if x <= 0
+    (if (icmp-sle-i64 x 0) ; i.e. if x <= 0
       1
       (mul-i64 x (self (sub-i64 x 1))))))
 #+END_SRC
@@ -1156,13 +1153,13 @@ The =int= term is the one that represents the integer type in LLVM.
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
-;; the integer type i{n}
+; the integer type i{n}
 i{n} [where n is one of 1, 2, ..., 64]
 
-;; an integer of type i{n}
+; an integer of type i{n}
 (i{n} LEAF)  [where n is one of 1, 2, ..., 64]
 
-;; an integer without explicit type info
+; an integer without explicit type info
 LEAF [where this LEAF can be parsed as integer]
 #+END_SRC
 *** Semantics
@@ -1185,10 +1182,10 @@ The =float= term is the one that represents the float type in LLVM.
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
-;; the float type f{n}
+; the float type f{n}
 f{n}   [where n is one of 16, 32, 64]
 
-;; a float of type f{n}
+; a float of type f{n}
 (f{n} LEAF) [where n is one of 16, 32, 64]
 
 LEAF [where this LEAF can be parsed as float]
@@ -1221,7 +1218,7 @@ LEAF [where this LEAF is already defined to be an enum value]
 The =array= term represents the array in LLVM.
 *** Example
 #+BEGIN_SRC neut
-;; float array
+; float array
 (let _
   (array-introduction f16 3.28 2.14 2.0 9.82))
 
@@ -1237,15 +1234,15 @@ The =array= term represents the array in LLVM.
     (erase xs)
     (i64.add a (i64.add b (i64.add c d)))))
 
-(i64.print k) ;; -7
+(i64.print k) ; -7
 
 (i64.print
   (array-elimination i64 (a b c d) xs
-    (i64.add a (i64.add b (i64.add c d))))) ;; -7
+    (i64.add a (i64.add b (i64.add c d))))) ; -7
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC text
-;; the array type
+; the array type
 (array TREE LOWTYPE)
 
 (array-introduction LOWTYPE TREE ... TREE)
@@ -1291,11 +1288,11 @@ The =array= term represents the struct in LLVM.
   (struct-elimination
     ((_ f16) (_ i8) (_ i16) (_ f32) (z i64) (w i64) (_ f64) (_ i8))
     st
-    (i64.add z w))) ;; ~> 40
+    (i64.add z w))) ; ~> 40
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
-;; the struct type
+; the struct type
 (struct LOWTYPE ... LOWTYPE)
 
 (struct-introduction (LOWTYPE TREE) ... (LOWTYPE TREE))
@@ -1327,11 +1324,11 @@ The =hole= term is a placeholder that should be inferred.
 
 (enum foo value)
 
-;; explicit application
-(id foo foo.value) ;; ~> foo.value
+; explicit application
+(id foo foo.value) ; ~> foo.value
 
-;; implicit application
-(id hole foo.value) ;; ~> foo.value (the `hole` part is inferred to be `foo`)
+; implicit application
+(id hole foo.value) ; ~> foo.value (the `hole` part is inferred to be `foo`)
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
@@ -1352,11 +1349,11 @@ since the =10= cannot be determined to be =i32=, =i16=, or =i64=, etc.
 The =sigma= term is a term that represents the existential quantification.
 *** Example
 #+BEGIN_SRC neut
-;; binary sigma-intro without dependence
+; binary sigma-intro without dependence
 (let pair
   (sigma-introduction (i64 2) (lambda ((x tau)) x)))
 
-;; binary sigma-elim without dependence
+; binary sigma-elim without dependence
 (sigma-elimination (x _) pair
   (i64.print x))
 
@@ -1410,7 +1407,7 @@ A sigma-type without dependence is the familiar product type; =(sigma ((_ A1) ..
 (with identity.bind
   (let str "foo")
   (let _ (string.print &str))
-  (string.print &str) ;; the same as (let _ (string.print &str))
+  (string.print &str) ; the same as (let _ (string.print &str))
   (let x (i64 10))
   (let y (add-i64 100 x))
   (i64.print y))
@@ -1418,7 +1415,7 @@ A sigma-type without dependence is the familiar product type; =(sigma ((_ A1) ..
 (with identity.bind
   (let str "foo")
   (let _
-    (let _ (i64 100)) ;; each `e` in `(let x e)` is implicitly wrapped by `with`
+    (let _ (i64 100)) ; each `e` in `(let x e)` is implicitly wrapped by `with`
     (string.print &str)
     (string.print &str))
   (string.print &str)
@@ -1525,18 +1522,18 @@ declare void @free(i8*)
 declare i8* @write(i8*, i8*, i8*)
 declare i8* @malloc(i64)
 define i64 @main() {
-  ;; <REPETITION 1>
-  ;; <memory allocation for the string>
+  ; <REPETITION 1>
+  ; <memory allocation for the string>
   %_11875 = getelementptr i8, i8* null, i64 1
   %_11876 = ptrtoint i8* %_11875 to i64
   %_11877 = call fastcc i8* @malloc(i64 %_11876)
-  ;; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
+  ; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
   %_11878 = bitcast i8* %_11877 to [1 x i8]*
   %_11879 = inttoptr i8 97 to i8*
   %_11880 = ptrtoint i8* %_11879 to i8
   %_11881 = getelementptr [1 x i8], [1 x i8]* %_11878, i32 0, i64 0
   store i8 %_11880, i8* %_11881
-  ;; <write the string into stdout>
+  ; <write the string into stdout>
   %_11882 = inttoptr i64 1 to i8*
   %_11883 = inttoptr i64 1 to i8*
   %_11884 = call fastcc i8* @write(i8* %_11882, i8* %_11877, i8* %_11883)
@@ -1544,21 +1541,21 @@ define i64 @main() {
   %_11886 = getelementptr [1 x i8], [1 x i8]* %_11885, i32 0, i32 0
   %_11887 = load i8, i8* %_11886
   %_11888 = bitcast [1 x i8]* %_11885 to i8*
-  ;; <memory deallocation for the string>
+  ; <memory deallocation for the string>
   call fastcc void @free(i8* %_11888)
   %_11889 = inttoptr i8 %_11887 to i8*
-  ;; <REPETITION 2>
-  ;; <memory allocation for the string>
+  ; <REPETITION 2>
+  ; <memory allocation for the string>
   %_11890 = getelementptr i8, i8* null, i64 1
   %_11891 = ptrtoint i8* %_11890 to i64
   %_11892 = call fastcc i8* @malloc(i64 %_11891)
-  ;; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
+  ; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
   %_11893 = bitcast i8* %_11892 to [1 x i8]*
   %_11894 = inttoptr i8 97 to i8*
   %_11895 = ptrtoint i8* %_11894 to i8
   %_11896 = getelementptr [1 x i8], [1 x i8]* %_11893, i32 0, i64 0
   store i8 %_11895, i8* %_11896
-  ;; <write the string into stdout>
+  ; <write the string into stdout>
   %_11897 = inttoptr i64 1 to i8*
   %_11898 = inttoptr i64 1 to i8*
   %_11899 = call fastcc i8* @write(i8* %_11897, i8* %_11892, i8* %_11898)
@@ -1566,21 +1563,21 @@ define i64 @main() {
   %_11901 = getelementptr [1 x i8], [1 x i8]* %_11900, i32 0, i32 0
   %_11902 = load i8, i8* %_11901
   %_11903 = bitcast [1 x i8]* %_11900 to i8*
-  ;; <memory deallocation for the string>
+  ; <memory deallocation for the string>
   call fastcc void @free(i8* %_11903)
   %_11904 = inttoptr i8 %_11902 to i8*
-  ;; <REPETITION 3>
-  ;; <memory allocation for the string>
+  ; <REPETITION 3>
+  ; <memory allocation for the string>
   %_11905 = getelementptr i8, i8* null, i64 1
   %_11906 = ptrtoint i8* %_11905 to i64
   %_11907 = call fastcc i8* @malloc(i64 %_11906)
-  ;; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
+  ; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
   %_11908 = bitcast i8* %_11907 to [1 x i8]*
   %_11909 = inttoptr i8 97 to i8*
   %_11910 = ptrtoint i8* %_11909 to i8
   %_11911 = getelementptr [1 x i8], [1 x i8]* %_11908, i32 0, i64 0
   store i8 %_11910, i8* %_11911
-  ;; <write the string into stdout>
+  ; <write the string into stdout>
   %_11912 = inttoptr i64 1 to i8*
   %_11913 = inttoptr i64 1 to i8*
   %_11914 = call fastcc i8* @write(i8* %_11912, i8* %_11907, i8* %_11913)
@@ -1588,10 +1585,10 @@ define i64 @main() {
   %_11916 = getelementptr [1 x i8], [1 x i8]* %_11915, i32 0, i32 0
   %_11917 = load i8, i8* %_11916
   %_11918 = bitcast [1 x i8]* %_11915 to i8*
-  ;; <memory deallocation for the string>
+  ; <memory deallocation for the string>
   call fastcc void @free(i8* %_11918)
   %_11919 = inttoptr i8 %_11917 to i8*
-  ;; <return 0>
+  ; <return 0>
   %_11920 = inttoptr i64 0 to i8*
   %_11921 = ptrtoint i8* %_11920 to i64
   ret i64 %_11921
@@ -1604,19 +1601,19 @@ declare void @free(i8*)
 declare i8* @write(i8*, i8*, i8*)
 declare i8* @malloc(i64)
 define i64 @main() {
-  ;; memory allocation
+  ; memory allocation
   %_12034 = getelementptr i8, i8* null, i64 1
   %_12035 = ptrtoint i8* %_12034 to i64
   %_12036 = call fastcc i8* @malloc(i64 %_12035)
-  ;; create the string "a" (i.e. write the character 'a' to the allocated memory)
+  ; create the string "a" (i.e. write the character 'a' to the allocated memory)
   %_12037 = bitcast i8* %_12036 to [1 x i8]*
-  %_12038 = inttoptr i8 97 to i8* ;; a = 97
+  %_12038 = inttoptr i8 97 to i8* ; a = 97
   %_12039 = ptrtoint i8* %_12038 to i8
-  %_12040 = getelementptr [1 x i8], [1 x i8]* %_12037, i32 0, i64 0 ;; where to write 'a'
-  store i8 %_12039, i8* %_12040 ;; write a
-  ;; write the string into stdout for the three times
-  %_12041 = inttoptr i64 1 to i8* ;; this `1` stands for stdout
-  %_12042 = inttoptr i64 1 to i8* ;; this `1` is the length of the string in bytes
+  %_12040 = getelementptr [1 x i8], [1 x i8]* %_12037, i32 0, i64 0 ; where to write 'a'
+  store i8 %_12039, i8* %_12040 ; write a
+  ; write the string into stdout for the three times
+  %_12041 = inttoptr i64 1 to i8* ; this `1` stands for stdout
+  %_12042 = inttoptr i64 1 to i8* ; this `1` is the length of the string in bytes
   %_12043 = call fastcc i8* @write(i8* %_12041, i8* %_12036, i8* %_12042)
   %_12044 = inttoptr i64 1 to i8*
   %_12045 = inttoptr i64 1 to i8*
@@ -1624,14 +1621,14 @@ define i64 @main() {
   %_12047 = inttoptr i64 1 to i8*
   %_12048 = inttoptr i64 1 to i8*
   %_12049 = call fastcc i8* @write(i8* %_12047, i8* %_12036, i8* %_12048)
-  ;; memory deallocation
+  ; memory deallocation
   %_12050 = bitcast i8* %_12036 to [1 x i8]*
   %_12051 = getelementptr [1 x i8], [1 x i8]* %_12050, i32 0, i32 0
   %_12052 = load i8, i8* %_12051
   %_12053 = bitcast [1 x i8]* %_12050 to i8*
   call fastcc void @free(i8* %_12053)
   %_12054 = inttoptr i8 %_12052 to i8*
-  ;; return 0
+  ; return 0
   %_12055 = inttoptr i64 0 to i8*
   %_12056 = ptrtoint i8* %_12055 to i64
   ret i64 %_12056
