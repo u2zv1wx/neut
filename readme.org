@@ -116,13 +116,21 @@ Note that the second line translates the type =String= into a pair =(discard-str
 
 Incidentally, in the actual implementation, the result of =TRANSLATE(String)= is not a pair, but a function as in the pseudo-code below:
 #+BEGIN_SRC txt
-cartesian_string :: (i : Int, _ : String) -> if i == 0 then Top else String * String
-cartesian_string (i, e) :=
+cartesian-string :: (i : Int, _ : String) -> if i == 0 then Top else String * String
+cartesian-string (i, e) :=
   if i == 0
   then discard-string(e)
   else copy-string(e)
 #+END_SRC
-By translating type in this manner, we can omit creating tuples every time when we translate a type. Thus, in the actual implementation (you can find it in =src/Clarify.hs=), a type is translated into a closed function, which is represented in 1 word (a pointer to the function).
+which is used in the following manner:
+#+BEGIN_SRC txt
+let str : String := "a";
+let cartesian-string := TRANSLATE(String);
+let (str1, tmp) := cartesian-string(1, tmp);
+let (str2, str3) := cartesian-string(1, tmp);
+<THE CODE THAT USES `str1`, `str2`, AND `str3` LINEARLY>
+#+END_SRC
+By translating types in this way, we can omit creating tuples every time when we translate a type. Thus, in the actual implementation (you can find it in =src/Clarify.hs=), a type is translated into a closed function, which is represented in 1 word (a pointer to the function).
 
 Or, you may be wondering now: "What if a function is polymorphic? If the size of an argument of a function is not fixed, how can that function copy the term?"
 
