@@ -112,8 +112,46 @@ let (str1, tmp) := copy-string(str);
 let (str2, str3) := copy-string(tmp);
 <THE CODE THAT USES `str1`, `str2`, AND `str3` LINEARLY>
 #+END_SRC
+Note that the second line translates the type =String= into a pair =(discard-string, copy-string)=. Every type =X= is translated in this manner; the pair of =discard-X= and =copy-X=. These resource controllers are used in its continuation so that every variable of this type (=str= in this example) is used linearly.
 
-This is the basics of the behavior of proof-theoretic memory management. As you can easily imagine, this naive copying/discarding can result in an inefficient object code. We often use a variable more than once, as in the example above (=str=). We can't say the code above is efficient enough; We can't ignore those redundant copy operations.
+Incidentally,in actual implementation, the result of =TRANSLATE(String)= is not a pair, but a function as in the pseudo-code below:
+#+BEGIN_SRC txt
+cartesian_string :: (i : Int, _ : String) -> if i == 0 then Top else String * String
+cartesian_string (i, e) :=
+  if i == 0
+  then discard-string(e)
+  else copy-string(e)
+#+END_SRC
+By translating type in this manner, we can omit creating tuples every time when we translate a type. Thus, in the actual implementation (you can find it in =src/Clarify.hs=), a type is translated into a closed function, which is represented in 1 word (a pointer to the function).
+
+Or, you may be wondering now: "What if a function is polymorphic? If the size of an argument of a function is not fixed, how can that function copy the term?"
+
+That is a valid question - And here comes dependent-type. Firstly, note that a polymorphic function in dependent-type theory is nothing but an ordinary function with an argument of type =type=. For example, the following is a polymorphic function that creates a pair of any type:
+#+BEGIN_SRC neut
+(define to-tuple ((a tau) (x a))
+  (tuple x x))
+#+END_SRC
+where the =tau= is the type of types. This function =to-tuple= is, for example, used as follows:
+#+BEGIN_SRC neut
+(to-tuple i64 1) ; ~> (tuple 1 1)
+(to-tuple bool bool.true) ; ~> (tuple bool.true bool.true)
+(to-tuple string "a") ; ~> (tuple "a" "a")
+
+;; compare:
+(define to-tuple-i64 ((x i64)) (tuple x x))
+(to-tuple-i64 1) ; ~> (tuple 1 1)
+#+END_SRC
+Note that the type =i64= is used in exactly the same way as =1=; A type is nothing but an ordinary term of type =tau=. And these very type-terms =i64=, =bool=, and =string= in the example above are translated into ordinary closed functions that copies/discards terms of the type. Thus, the =to-tuple= function can copy the resource =x= of type =a= conceptually as follows:
+#+BEGIN_SRC text
+to-tuple :: Pi (a : tau, x : a). a * a
+to-tuple a x :=
+  let (discard-a, copy-a) := a in
+  let (x1, x2) := copy-a(x) in
+  (tuple x1, x2)
+#+END_SRC
+Thus the answer to the question is: Polymorphic functions can copy/discard its polymorphic argument since the type, which is guaranteed to be passed as an argument, contains information on how to copy/discard the terms of the type.
+
+This is the basics of the behavior of proof-theoretic memory management. As you can easily imagine, this naive copying/discarding can result in an inefficient object code. We often use a variable more than once, as in the example of =str=. We can't say that code is efficient enough; We can't ignore those redundant copy operations.
 
 Thankfully, there is a workaround for this performance problem.
 
@@ -216,7 +254,7 @@ define i64 @main() {
   ;; <return 0>
 }
 #+END_SRC
-Again, the non-schematic output can be found in the [[#llvm-ir-for-the-second-example][appendix]]. The output in this time is actually short enough to include it here (36 lines), though I chose not to. The point here is that the string "a" is reused without copying, as expected.
+Again, the non-schematic output can be found in the [[#llvm-ir-for-the-second-example][appendix]]. The output in this time is actually short enough to include it here (36 lines including comments), though I chose not to. The point here is that the string "a" is reused without copying, as expected.
 
  The resulting assembly code is reasonably small too (works on macOS; when you compile the same code on Linux, =write= operations are lowered into syscalls):
 #+BEGIN_SRC asm
