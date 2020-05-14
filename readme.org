@@ -764,16 +764,14 @@ The =let= statement evaluates given term and binds the result to a variable.
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
-(let (ID TERM) TERM)
+(let LEAF_PLUS TREE)
 
-(let ID TERM)
+LEAF_PLUS ::= LEAF | (LEAF TREE)
 #+END_SRC
 *** Semantics
-When parsed, the =(let x e)= statement does nothing.
+=(let x e)= checks the type of the term =e=, evaluates the term =e=, then defines a variable =x= with =e= as its content. =x= is available in the continuation. The type of =x= can be annotated to be =t= by writing =(let (x t) e)=.
 
-When evaluated, the =(let x e)= statement checks the type of the term =e=, evaluates the term =e=, then defines a variable =x= with =e= as its content. =x= is available in the remaining program. The type of =x= can be specified to be =t= by writing =(let (x t) e)=.
-
-If user input is not parsed as a statement when it is supposed to be, the compiler firstly interpret it as a term =e=, and then processes a statement =(let _ e)=.
+If a user input =e= is not parsed as a statement when it is supposed to be, the compiler firstly interpret it as =(let _ e)=.
 
 ** record
 The =record= statement creates a record type, its elimination rules (destructors), and its introduction rule.
