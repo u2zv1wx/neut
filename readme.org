@@ -639,10 +639,10 @@ The =introspect= statement introspects the state of the compiler and selects sta
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
-(introspect COMPILE_TIME_VAR (ID STATEMENT ... STATEMENT) ... (ID STATEMENT ... STATEMENT))
+(introspect LEAF (LEAF TREE ... TREE) ... (LEAF TREE ... TREE))
 #+END_SRC
 *** Semantics
-When parsed, the =(introspect var (v1 stmt-list-1) ... (vn stmt-list-n))= statement introspects the value of the compile-time variable =var= and select a list of statement according to it.
+=(introspect var (v1 stmt-list-1) ... (vn stmt-list-n))= introspects the value of the compile-time variable =var= and selects a list of statement according to it, and then parses the statement list.
 
 If the corresponding value is not found in the clause list, this statement does nothing.
 
