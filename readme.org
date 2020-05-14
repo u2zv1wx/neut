@@ -413,25 +413,34 @@ As for editor support, you can currently try [[https://github.com/u2zv1wx/neut-m
 * Syntax and Semantics of Statements
 A program of Neut is a list of statements. Each statement is one of the following statements described in this section.
 
-# Every example in this section is a valid program in itself. You can [[#build][build]] and run the code to check the behavior.
+Please understand that the descriptions in the followings are not that formal yet, though I try to be as clear as possible. If you find something unclear, feel free to ask me.
+
+In the following, I use the symbols =LEAF= and =TREE= defined as follows:
+#+BEGIN_SRC text
+LEAF ::= {x | x is a sequence of character that doesn't contain '(', ')', or '${ANY_WHITESPACE_CHARACTER}'}
+TREE ::= LEAF | (TREE ... TREE)
+#+END_SRC
+I also define the symbol =STRING= to be a string.
 
 ** constant
 The =constant= statement declares an external constant.
 
 *** Example
 #+BEGIN_SRC neut
-(constant os.file-descriptor tau)
+(constant unsafe.cast (Π ((A tau) (B tau) (x A)) B))
 
-(constant os.stdin os.file-descriptor)
-
-(constant os.fork (pi () i64))
+(let foo (unsafe.cast i64 string 1)) ; foo : string
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
-(constant ID TERM)
+(constant LEAF TREE)
 #+END_SRC
 *** Semantics
-When evaluated, the =(constant x t)= statement modifies the state of the compiler so that a [[#constant][constant]] =x= of type =t= is available for later use. Declared constants can then be available for use as in the same way of ordinary [[#upsilon][variables]]. Every constant must have distinct names. This statement is currently intended for internal use, such as for implementation of syscalls. External constants (FFI) might also be supported in future release via this statement.
+=(constant x t)= modifies the state of the compiler so that a [[#constant][constant]] =x= of type =t= is available in its continuation. Declared constants can then be available for use as in the same way of ordinary [[#upsilon][variables]].
+
+Every constant must have distinct names.
+
+This statement is currently intended only for internal use, such as for implementation of syscalls. External constants (FFI) might also be supported in future release via this statement.
 
 ** ensure
 The =ensure= statement fetches the content of the specified URL for later use.
@@ -446,7 +455,7 @@ The =ensure= statement fetches the content of the specified URL for later use.
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
-(ensure ID "URL_OF_LIBRARY")
+(ensure LEAF "URL_OF_LIBRARY")
 #+END_SRC
 *** Semantics
 When parsed, the =(ensure path "URL")= statement fetches the content of the specified URL, extracts the content into =~/.local/share/neut/NEUT_VERSION/path=, assuming that the format of the archive is =tar.gz=. The =path= must be a valid path string. Every path separator in =path= is treated as "real" one. For example, if the =path= is =some-library/0.2.0.0=, the content of the archive is extracted into =~/.local/share/neut/NEUT_VERSION/some-library/0.2.0.0=. Incidentally, this means that users can choose where to install third-party libraries.
