@@ -408,6 +408,8 @@ Also make sure that you have =~/.local/bin= in your =$PATH=.
 
 To uninstall, you just have to remove the binary =~/.local/bin/neut= and the directory =~/.local/share/neut=; Neut won't clutter your system.
 
+As for editor support, you can currently try [[https://github.com/u2zv1wx/neut-mode][neut-mode]] and [[https://github.com/u2zv1wx/flycheck-neut][flycheck-neut]] if you're using Emacs. The former package is for syntax highlighting, and the latter one for linting.
+
 * Syntax and Semantics of Statements
 A program of Neut is a list of statements. Each statement is one of the following statements described in this section.
 
