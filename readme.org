@@ -114,7 +114,7 @@ let (str2, str3) := copy-string(tmp);
 #+END_SRC
 Note that the second line translates the type =String= into a pair =(discard-string, copy-string)=. Every type =X= is translated in this manner; the pair of =discard-X= and =copy-X=. These resource controllers are used in its continuation so that every variable of this type (=str= in this example) is used linearly.
 
-Incidentally,in actual implementation, the result of =TRANSLATE(String)= is not a pair, but a function as in the pseudo-code below:
+Incidentally, in the actual implementation, the result of =TRANSLATE(String)= is not a pair, but a function as in the pseudo-code below:
 #+BEGIN_SRC txt
 cartesian_string :: (i : Int, _ : String) -> if i == 0 then Top else String * String
 cartesian_string (i, e) :=
