@@ -730,19 +730,6 @@ The =let= statement evaluates given term and binds the result to a variable.
 
 (i64.print (fact foo)) ; ~> 3628800 (= 10!)
 
-; the definition of `fact` above is equivalent to the following:
-(let fact
-  (fix fact ((x i64))
-    (if (icmp-sle-i64 x 0)
-      1
-      (mul-i64 x (fact (sub-i64 x 1))))))
-; which is alpha-equivalent to:
-(let fact
-  (fix self ((x i64))
-    (if (icmp-sle-i64 x 0)
-      1
-      (mul-i64 x (self (sub-i64 x 1))))))
-
 ; mutual recursion can be realized as in the ordinary way:
 (define even-f ((f (hom i64 bool)) (n i64))
   (if (icmp-eq-i64 n 0)
@@ -1012,37 +999,36 @@ The name of a variable is interpreted in relation with the keyword environment. 
 *** Example
 #+BEGIN_SRC neut
 ; unary pi-introduction
-(let (f2 (pi (x i64) i64))  ; f2 : Pi (x : i64). i64  (i.e. f2 receives a term of type i64, and returns a term of type i64)
+(let f2
   (pi-introduction ((x i64)) x))
 
-; "explicit" pi-elimination
+; pi-elimination
 (pi-elimination i64.print (pi-elimination f2 2))
 
-; "automatic" pi-elimination
+; pi-elimination with the familar (or, implicit) syntax
 (i64.print (f2 2))
 
 ; nullary pi-introduction
-(let (f1 (pi () i64))
+; (you need to include core/VERSION/notation.neut to use `lambda` or `λ`)
+(let f1
   (lambda () (i64 1))) ; 'lambda' can be used instead of 'pi-introduction'
-
-; "explicit" pi-elimination
-(pi-elimination i64.print (pi-elimination f1))
-
-; "automatic" pi-elimination
-(i64.print (f1))
 
 ; binary pi-introduction
 (let f3
-  (lambda ((x i64) (y i64)) (i64.add x y)))
+  (λ ((x i64)   ; an argument with type annotation
+      y)        ; an argument without type annotation
+    (i64.add x y)))
 
 (i64.print (f3 1 2))
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
-(pi ((x1 A1) ... (xn An)) B)
-(pi-introduction ((x1 A1) ... (xn An)) e)
-(pi-elimination e e1 ... en)
-(e e1 ... en)
+(pi (LEAF_PLUS*) B)
+(pi-introduction (LEAF_PLUS*) e)
+(pi-elimination TREE+)
+(TREE+)
+
+LEAF_PLUS ::= LEAF | (LEAF TREE)
 #+END_SRC
 *** Semantics
 #+BEGIN_SRC neut
@@ -1059,40 +1045,19 @@ If a tree =(e e1 ... en)= is not parsed into any other terms, the tree is parsed
 
 Note that the arguments of a lambda abstraction is generalized from unary to n-ary. This enables the compiler to emit more performant code when a lambda abstraction receives multiple arguments; Without that generalization, the argument must be represented as a tuple, discarding the possibility to pass the arguments of a function using multiple registers.
 
-Some additional notations for pi are defined by default:
+Some additional notations for pi are defined in =core/VERSION/notation.neut=:
 #+BEGIN_SRC neut
-(keyword forall)
-
 (notation forall pi)
-
-(keyword Π)
 
 (notation Π pi)
 
-(keyword lambda)
-
 (notation lambda pi-introduction)
-
-(keyword λ)
 
 (notation λ pi-introduction)
 
-(keyword witness)
-
 (notation (witness t e)
-  ((lambda ((x t)) x) e))
-
-(keyword hom)
-
-(notation (hom t) t)
-
-(notation (hom t rest+)
-  (pi
-    ((_ t))
-    (hom rest+)))
+  ((λ ((x t)) x) e))
 #+END_SRC
-These are in =core/notation.neut=.
-
 Incidentally, I personally recommend you to use the =witness= notation above when defining a function to write the resulting type of the function explicitly. For example, the code
 #+BEGIN_SRC neut
 (define fact ((x i64))
