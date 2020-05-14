@@ -1086,9 +1086,9 @@ The =fix= term is a term that realizes recursion.
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
-(fix LEAFPLUS (LEAFPLUS ... LEAFPLUS) TREE)
+(fix LEAF_PLUS (LEAF_PLUS ... LEAF_PLUS) TREE)
 
-LEAFPLUS ::= LEAF | (LEAF TREE)
+LEAF_PLUS ::= LEAF | (LEAF TREE)
 #+END_SRC
 *** Semantics
 #+BEGIN_SRC neut
@@ -1098,6 +1098,13 @@ LEAFPLUS ::= LEAF | (LEAF TREE)
       xn := vn,
       self := (fix self ((x1 A1) ... (xn An)) e)}
 #+END_SRC
+*** Notes
+Every tail call is optimized into a loop.
+
+The logic of Neut doesn't adopt the universe hierarchy, and thus inconsistent. This means that the Z combinator can be written in the source language as an ordinary term. In other words, from the viewpoint of expressiveness, =fix= is simply redundant. The existence of =fix= is just for optimization purpose.
+
+# (By the way, can it be said that the weakly-normalizing fragment of CoC-without-universe-hierarchy (CoC-) is consistent? If it is true, it seems to me that we can prove a theorem by taking a proof term of CoC- and check if it halts by trying to reduce the term into its normal form; Or just a delusion?)
+
 ** constant
 The =constant= rule is for external constants. Proof-theoretically, this can be understood as admitted axioms.
 *** Example
