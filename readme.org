@@ -415,7 +415,7 @@ A program of Neut is a list of statements. Each statement is one of the followin
 
 Please understand that the descriptions in the followings are not that formal yet, though I try to be as clear as possible. If you find something unclear, feel free to ask me.
 
-In the following, I use the symbols =LEAF= and =TREE= defined as follows:
+In the following, I use the symbols =LEAF= and =TREE= defined roughly (!) as follows:
 #+BEGIN_SRC text
 LEAF ::= {x | x is a sequence of character that doesn't contain '(', ')', or '${ANY_WHITESPACE_CHARACTER}'}
 TREE ::= LEAF | (TREE ... TREE)
@@ -502,16 +502,16 @@ The =enum= statement declares a new enum-type and its values.
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
-(enum ID ID_INT ... ID_INT)
+(enum LEAF LEAF_INT)
 
-ID_INT := ID | (ID INT)
+LEAF_INT := LEAF | (LEAF INT)
 #+END_SRC
 *** Semantics
-When parsed, a =(enum x a1 ... an)= statement updates the state of the compiler so that the specified enum-type =x : tau= and the enum-values =x.a1, ..., x.an : x= can be used in the succeeding code.
+=(enum x a1 ... an)= updates the state of the compiler so that the specified enum-type =x : tau= and the enum-values =x.a1, ..., x.an : x= can be used in its continuation.
 
 Every enum-value has its internal i64 value (discriminant). Those discriminant value can be extracted by using the unsafe cast, though not recommended in ordinary use.
 
-Discriminant value starts from =0= by default, and increments one by one. The "current" value of this process can be modified by writing, e.g. =(enum foo a (b 100) c d)=. In this example, the discriminant value of =c= is defined to be =101=.
+Discriminant value starts from =0= by default, and increments one by one. The "current" value of this process can be modified by writing, e.g. =(enum foo a (b 100) c d)=. In this example, the discriminant value of =c= is set to be =101=.
 
 The discriminant values of an enum-type must be distinct.
 
