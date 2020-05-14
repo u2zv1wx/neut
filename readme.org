@@ -332,7 +332,7 @@ define i64 @main() {
   ;;   <memory deallocation for the string>
 }
 #+END_SRC
-The code is already judged to be inefficient in that it allocates/deallocates memory unnecessarily. In other words, it is inefficient in that the code deallocates the memory that can actually be reused.
+The code is already judged to be inefficient in that it allocates/deallocates memory unnecessarily. More specifically, it is inefficient in that it deallocates the memory that can actually be reused.
 
 But, if the sizes of memory being allocated/deallocated are known at compile-time, isn't it possible to compare the sizes of them in compile-time and emit a code that reuses the allocated memory?
 
@@ -364,7 +364,7 @@ define TYPE @FUNCTION_NAME(...) {
   (...)
 }
 #+END_SRC
-In other words, the compiler can cancel the memory deallocation at =(*1)= and the allocation at =(*2)=, reusing the allocated memory in its continuation. This is automatic malloc/free cancellation. By this fallback optimization, the compiler can emit performant code even if a user wrote code in an inefficient way.
+In other words, the compiler can cancel the memory deallocation at =(*1)= and the allocation at =(*2)=, reusing the allocated memory in its continuation. This is automatic malloc/free cancellation. By this fallback optimization, the compiler can emit somewhat performant code even if a user wrote code in an inefficient way.
 
 Note that the "create the string" parts are not optimized away from the resulting LLVM IR, in contrast to the one of borrowing:
 #+BEGIN_SRC llvm
@@ -378,7 +378,7 @@ define i64 @main() {
   ;; <return 0>
 }
 #+END_SRC
-Although the compiler can cancel memory allocations/deallocations, it cannot cancel its accompanying initialization process (at least currently). If you do need performance, you need to write code in the linear/borrowing style.
+Although the compiler can cancel memory allocations/deallocations, it cannot cancel their accompanying initialization processes (at least for now). If you do need performance, you need to write code in the linear/borrowing style.
 
 ** Summary
 - Neut statically determines malloc/free at compile-time via type information.
