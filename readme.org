@@ -447,24 +447,24 @@ The =ensure= statement fetches the content of the specified URL for later use.
 
 *** Example
 #+BEGIN_SRC neut
-;; extracts the content of URL into ~/.local/share/neut/NEUT_VERSION/library/some-library/0.2.0.0
-(ensure some-library/0.2.0.0
-  "https://example.com/some-library-0.2.0.0.tar.gz")
+;; extracts the content of URL into ~/.local/share/neut/NEUT_VERSION/library/core/0.1.0.0
+(ensure core/0.1.0.0
+  "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz")
 
-(include library "some-library/0.2.0.0/some-file.neut")
+(include "core/0.1.0.0/core.neut")
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
-(ensure LEAF "URL_OF_LIBRARY")
+(ensure LEAF STRING)
 #+END_SRC
 *** Semantics
-When parsed, the =(ensure path "URL")= statement fetches the content of the specified URL, extracts the content into =~/.local/share/neut/NEUT_VERSION/path=, assuming that the format of the archive is =tar.gz=. The =path= must be a valid path string. Every path separator in =path= is treated as "real" one. For example, if the =path= is =some-library/0.2.0.0=, the content of the archive is extracted into =~/.local/share/neut/NEUT_VERSION/some-library/0.2.0.0=. Incidentally, this means that users can choose where to install third-party libraries.
+=(ensure path URL)= fetches the content of the specified URL, extracts the content into =~/.local/share/neut/NEUT_VERSION/path=, assuming that the format of the archive is =tar.gz=. The =path= must be a valid path string. Every path separator in =path= is treated as a "real" one. For example, if the =path= is =some-library/0.2.0.0=, the content of the archive is extracted into =~/.local/share/neut/NEUT_VERSION/some-library/0.2.0.0=.
 
 If the target directory of archive extraction already exists, the =ensure= statement does nothing.
 
-This statement is intended to be used in harmony with the [[#include][include]] statement.
+This statement is intended to be used in harmony with [[#include][include]].
 
-Archives specified in =(ensure path "URL")= is intended to be ones created via the [[#archive][archive]] subcommand.
+Archives specified in =ensure= is supposed to be ones created via the [[#archive][archive]] subcommand.
 
 ** enum
 The =enum= statement declares a new enum-type and its values.
