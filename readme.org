@@ -403,7 +403,7 @@ $ ./install.sh 0.1.0.0
 #+END_SRC
 Also make sure that you have =~/.local/bin= in your =$PATH=.
 
-To uninstall, you just have to remove =~/.local/bin/neut= and =~/.local/share/neut=; Neut won't clutter your system.
+To uninstall, you just have to remove the binary =~/.local/bin/neut= and the directory =~/.local/share/neut=; Neut won't clutter your system.
 
 * Syntax and Semantics of Statements
 A program of Neut is a list of statements. Each statement is one of the following statements described in this section.
