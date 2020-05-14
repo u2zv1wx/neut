@@ -21,7 +21,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
 
 * Table of Contents                                                    :TOC:
 - [[#examples][Examples]]
-  - [[#proof-theoretic-memory-management][Proof-Theoretic Memory Management]]
+  - [[#compile-time-mallocfree-determination][Compile-Time malloc/free Determination]]
   - [[#manual-optimization-via-borrowing][Manual Optimization via Borrowing]]
   - [[#automatic-optimization-via-mallocfree-cancellation][Automatic Optimization via malloc/free Cancellation]]
   - [[#summary][Summary]]
@@ -63,7 +63,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
 
 * Examples
 
-** Proof-Theoretic Memory Management
+** Compile-Time malloc/free Determination
 *** Basics
 Let's see how Neut manages resources. The following code prints the string "a" for the three times:
 #+BEGIN_SRC neut
@@ -163,7 +163,7 @@ Thus the answer to the question is: Polymorphic functions can copy/discard its p
 - A type is lowered into a function pointer that copies/discards the terms of the type
 - Polymorphic function can copy resources thanks to the information provided by its type argument
 
-This is the basics of the behavior of proof-theoretic memory management. As you might already be aware, this naive copying/discarding might result in an inefficient object code. We often use a variable more than once, as in the example of =str=. We can't say that code of =str= is efficient enough; We can't ignore those redundant copy operations.
+This is the basic behavior of Neut's proof-theoretic memory management. As you might already be aware, this naive copying/discarding can result in an inefficient object code. We often use a variable more than once, as in the example of =str=. We can't say that code of =str= is efficient enough; We can't ignore those redundant copy operations.
 
 Thankfully, there is a workaround for this performance problem.
 
