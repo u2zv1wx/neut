@@ -252,7 +252,7 @@ Or,
   (let _ (string.print &str))
   (string.print str)) ;; ~> (unit, "a")
 #+END_SRC
-This notation is "borrowing" in Neut. Note that borrowing in Neut is nothing but a syntactic translation. Borrowing has nothing to do with, for example, the type system, or the operational semantics, of Neut. Indeed, this syntactic translation is processed at the stage of parsing.
+This notation is "borrowing" in Neut. Note that borrowing in Neut is nothing but a syntactic translation. Borrowing has nothing to do with, for example, the type system, or the operational semantics. Indeed, this syntactic translation is processed at the stage of parsing in the compiler.
 
 Let's see how the resulting LLVM IR changes. Is it faster now? We can compile the code above by running =$ neut build --no-alloc-cancellation --emit llvm filename.neut=. The output is schematically as follows:
 #+BEGIN_SRC llvm
@@ -311,7 +311,7 @@ In short: the resulting code is faster in that it is free from the redundant cop
 This is how Neut controls resources efficiently, without modifying the type system of the source language.
 
 ** Automatic Optimization via malloc/free Cancellation
-Neut's static, proof-theoretic memory management enables not only the "manual" optimization we have just seen, but also another "automatic" optimization. Remember the first example:
+Neut's static memory management enables not only the "manual" optimization we have just seen, but also another "automatic" optimization. Remember the first example:
 #+BEGIN_SRC neut
 (with identity.bind
   (let str "a")
