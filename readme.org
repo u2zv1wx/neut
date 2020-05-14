@@ -654,13 +654,17 @@ The =var= must be a valid compile-time variable. Valid compile-time variables an
 | architecture          | x64             |
 
 ** notation
-The =notation= statement registers a notation.
+The =notation= statement registers a notation (macro).
 *** Example
 #+BEGIN_SRC neut
 (notation λ pi-introduction)
 
+((λ (x) (add-i64 x 1)) 10) ; ~> 11
+
+(notation switch enum-elimination)
+
 (notation (if b e1 e2)
-  (enum-elimination b
+  (switch b
     (bool.true e1)
     (bool.false e2)))
 #+END_SRC
@@ -671,18 +675,10 @@ The =notation= statement registers a notation.
 *** Semantics
 When parsed, the statement =(notation FROM TO)= modifies the state of the compiler so that the mapping =FROM ~> TO= is recognized as a notation. This affects the result of macro expansion in the succeeding code.
 
-# See [[#macroexpansion][the section on macro expansion]] for the details of keywords and notations.
-
 *** Notes on Macro Expansion
-Every source code of Neut is firstly translated into the corresponding trees that is conceptually defined as follows:
-#+BEGIN_SRC text
-tree ::= leaf STRING | node (LIST tree)
-#+END_SRC
-After this translation, the resulting ASTs are *macro-expanded*, and then interpreted as, for example, statements by the compiler. Here I will explain how this macro-expansion works.
+Macro-expansion in Neut is a process of recursively applying *step-expansion*.
 
-In short, the macro-expansion of an AST in Neut is a call-by-value-like recursive application of the *step-expansion*.
-
-I believe the step-expansion process is best explained by an example. Consider we have defined a notation as follows:
+I believe this step-expansion process is best explained by an example. Consider we have defined a notation as follows:
 #+BEGIN_SRC text
 (notation (if b e1 e2)
   (switch b
@@ -701,9 +697,9 @@ and then replaces =b=, =e1=, and =e2= in the codomain of the notation according 
   (bool.true (i64.print 10))
   (bool.false (string.print "hello")))
 #+END_SRC
-# This translation is the step-expansion. The keyword environment here is required to determine whether a leaf of the domain of a notation is a variable or an opaque syntactic construct (i.e. "keyword"). In the example above, without the =(keyword if)= statement, we cannot determine if the =if= in =(if b e1 e2)= is a variable or a keyword.
+Given this step-expansion, the macro-expansion proceeds as follows. Take =t= to be an input tree. If the tree =t= is of the form =LEAF=, the compiler returns the result of step-expansion of =t=. If a tree is of the form =(t1 ... tn)=, the =t1=, ..., =tn= are firstly macro-expanded them into =t1'= , ..., =tn'= , and then the compiler step-expands the tree =(t1' ... tn')=.
 
-Given this step-expansion, the macro-expansion proceeds as follows. Take =t= to be an input tree. If the tree =t= is of the form =(leaf STRING)=, the compiler returns the result of step-expansion of =t=. If a tree is of the form =(node t1 ... tn)=, the =t1=, ..., =tn= are firstly macro-expanded them into =t1'= , ..., =tn'= , and then the compiler step-expands the tree =(node t1' ... tn')=.
+You may want to use this statement with [[erase][erase]] to accomplish (certain form of) safety.
 
 ** let
 The =let= statement evaluates given term and binds the result to a variable.
