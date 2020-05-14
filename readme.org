@@ -104,7 +104,7 @@ The way how a variable is copied is determined by the type of the variable. For 
 Let us go a little deeper. Consider the following schematic user input:
 #+BEGIN_SRC txt
 let str : string := "a";
-<THE CODE THAT USES `str` for the 3 times>
+<A CODE THAT USES `str` for the 3 times>
 #+END_SRC
 Intuitively, what the compiler does is to translate the term above into the following term:
 #+BEGIN_SRC txt
@@ -154,7 +154,7 @@ to-tuple :: Pi (a : tau, x : a). a * a
 to-tuple a x :=
   let (discard-a, copy-a) := a in
   let (x1, x2) := copy-a(x) in
-  (tuple x1, x2)
+  (tuple x1 x2)
 #+END_SRC
 Thus the answer to the question is: Polymorphic functions can copy/discard its polymorphic argument since the type, which is guaranteed to be passed as an argument, contains information on how to copy/discard the terms of the type.
 
@@ -181,7 +181,7 @@ The point of the workaround is straightforward: If those copying/discarding resu
   (let _ (string.print str))
   (string.print str))
 #+END_SRC
-We would like to use the variable =str= in linear way. To this end, we just request =string.print= to include the argument =str= in its return value. So, the type of =string.print= shouldn't be something like =string -> top= - where the =top= is the unit type - but should be =string -> top * string=, where the =A * B= means the product type of =A= and =B=. More specifically, the implementation of =string.print= should be something like (in pseudo-code):
+We would like to use the variable =str= in linear way. To this end, we just have to request =string.print= to include the argument =str= in its return value. So, the type of =string.print= shouldn't be something like =string -> top= - where the =top= is the unit type - but should be =string -> top * string=, where the =A * B= means the product type of =A= and =B=. More specifically, the implementation of =string.print= should be something like (in pseudo-code):
 #+BEGIN_SRC text
 string.print :: string -> top * string
 string.print str = do
