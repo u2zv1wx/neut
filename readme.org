@@ -1075,7 +1075,7 @@ is preferred to:
 #+END_SRC
 
 ** fix
-The =fix= term is a term that realizes recursion.
+=fix= is for recursion.
 *** Example
 #+BEGIN_SRC neut
 (let fact
@@ -1106,10 +1106,11 @@ The logic of Neut doesn't adopt the universe hierarchy, and thus inconsistent. T
 # (By the way, can it be said that the weakly-normalizing fragment of CoC-without-universe-hierarchy (CoC-) is consistent? If it is true, it seems to me that we can prove a theorem by taking a proof term of CoC- and check if it halts by trying to reduce the term into its normal form; Or just a delusion?)
 
 ** constant
-The =constant= rule is for external constants. Proof-theoretically, this can be understood as admitted axioms.
+=constant= is for external constants. Proof-theoretically, this can be understood as admitted axioms.
 *** Example
 #+BEGIN_SRC neut
-(constant os.fork)
+((constant add-i64) 1 3) ; ~> 4
+(add-i64 1 3)            ; ~> 4
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
@@ -1119,14 +1120,15 @@ LEAF
 *** Semantics
 The =constant= rule doesn't have any operational semantics by itself; Each constant has its own dedicated semantics.
 *** Notes
-If a leaf is declared to be a constant using the [[#constant][constant]] statement, the leaf is parsed as =(constant LEAF)=.
+If a leaf is declared to be a constant using the [[#constant][constant]] statement beforehand, the leaf is interpreted as =(constant LEAF)=.
 
 ** int
-The =int= term is the one that represents the integer type in LLVM.
+=int= is a thin layer for the integer type in LLVM.
 *** Example
 #+BEGIN_SRC neut
 (i64 1)
 (i32 10)
+23456789
 (i2 100)
 #+END_SRC
 *** Syntax
@@ -1141,16 +1143,16 @@ i{n} [where n is one of 1, 2, ..., 64]
 LEAF [where this LEAF can be parsed as integer]
 #+END_SRC
 *** Semantics
-The terms of an integer type doesn't have any operational semantics.
+The terms of an integer type don't have any operational semantics by themselves.
 *** Notes
 The =int= type in Neut is the same as the one of LLVM, restricted into =i1=, =i2=, ..., =i64=.
 
-If the specified integer literal is out of range of its type =i{n}=, the integer is interpreted modulo =2^n=, just as in the same way of LLVM. For example, =(i2 10)= is the same as =(i2 6)=, =(i2 2)=, =(i2 -2)=, or =(i2 -6)=, since all of these are equivalent modulo =2^2=.
+Every integer of type =i{n}= is interpreted modulo =2^n=, just as in the same way of LLVM. For example, =(i2 10)= is the same as =(i2 6)=, =(i2 2)=, =(i2 -2)=, or =(i2 -6)=, since all of these are equivalent modulo =2^2=.
 
 An integer without explicit type information is overloaded; it's type is firstly set to be unknown, and then inferred.
 
 ** float
-The =float= term is the one that represents the float type in LLVM.
+=float= is a thin layer for the float type in LLVM.
 *** Example
 #+BEGIN_SRC neut
 (f16 3.8)
@@ -1169,20 +1171,27 @@ f{n}   [where n is one of 16, 32, 64]
 LEAF [where this LEAF can be parsed as float]
 #+END_SRC
 *** Semantics
-The terms of a float type doesn't have any operational semantics.
+The terms of a float type don't have any operational semantics by themselves.
 *** Notes
 The =float= type in Neut is the same as the one of LLVM. Specifically, LLVM's =half= corresponds to Neut's =f16=, =float= to =f32=, and =double= to =f64=.
 
 An float without explicit type information is overloaded; it's type is firstly set to be unknown, and then inferred.
 
 ** enum
-The =enum= term represents enumeration as in other language.
+=enum= is the enumeration as in other languages.
 *** Example
 See the example in [[#enum][the section about the enum statement]].
 *** Syntax
 #+BEGIN_SRC neut
 (enum-introduction LEAF)
 LEAF [where this LEAF is already defined to be an enum value]
+
+(enum-elimination TREE
+  (ENUM_CASE TREE)
+  ...
+  (ENUM_CASE TREE))
+
+ENUM_CASE ::= LEAF | default
 #+END_SRC
 *** Semantics
 #+BEGIN_SRC neut
@@ -1191,9 +1200,18 @@ LEAF [where this LEAF is already defined to be an enum value]
   ...
   (cn en))
 ~> ei [where c = ci]
+
+(enum-elimination (enum-introduction c)
+  (c1 e1)
+  ...
+  (cn en)
+  (default e)
+  ...)
+~> e [where e != e1, ..., en]
 #+END_SRC
+
 ** array
-The =array= term represents the array in LLVM.
+=array= is a thin layer of the array in LLVM.
 *** Example
 #+BEGIN_SRC neut
 ; float array
@@ -1248,7 +1266,7 @@ The array type can be used, for example, to implement strings.
 You won't use =array-elimination= in actual code; You would use the constant =array-access= instead.
 
 ** struct
-The =array= term represents the struct in LLVM.
+=struct= is a thin layer of the struct in LLVM.
 *** Example
 #+BEGIN_SRC neut
 (let st
