@@ -290,15 +290,10 @@ includeFile m mPath pathString as = do
 
 ensureEnvSanity :: Meta -> WithEnv ()
 ensureEnvSanity m = do
-  ns <- gets sectionEnv
   penv <- gets prefixEnv
-  case (null ns, null penv) of
-    (False, _) ->
-      raiseError m "`include` can only be used at top-level section"
-    (_, False) ->
-      raiseError m "`include` can only be used with no prefix assumption"
-    _ ->
-      return ()
+  if null penv
+    then return ()
+    else raiseError m "`include` can only be used with no prefix assumption"
 
 prefixTextPlus :: TreePlus -> WithEnv TreePlus
 prefixTextPlus tree =
