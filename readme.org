@@ -832,12 +832,11 @@ Internally, every record statement is translated into the corresponding [[#induc
      (item-3 top))
     (my-record a)))
 #+END_SRC
-The compiler then processes this statement in the same way ordinary =inductive= statement, generating the record type =my-record= and the introduction rule =my-record.new=, and the elimination rule (as an inductive type) =my-record.fold=. After that, the compiler automatically generates destructors from this definition via =my-record.fold=. For example, the generated definition of =my-record.item-1= is as follows:
+The compiler then processes this statement in the same way ordinary =inductive= statement, generating the record type =my-record= and the introduction rule =my-record.new=, and the pattern matching function =my-record.case=. After that, the compiler automatically generates destructors from this definition via =my-record.case=. For example, the generated definition of =my-record.item-1= is as follows:
 #+BEGIN_SRC neut
 (define my-record.item-1 ((a tau) (record-value (my-record a)))
-  (my-record.fold a record-value
-    (lambda () a)
-    (lambda (item-1 item-2 item3) item-1)))
+  (my-record.case a record-value
+    (λ (item-1 item-2 item3) item-1)))
 #+END_SRC
 The other destructors are defined similarly.
 
