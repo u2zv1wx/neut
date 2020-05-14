@@ -846,23 +846,33 @@ The =use= / =unuse= statement registers a prefix for name resolution.
 #+BEGIN_SRC neut
 (let foo.bar.buz (i64 10))
 
-; (i64.print buz)      ; ~> undefined variable: `buz`
-; (i64.print bar.buz)  ; ~> undefined variable: `bar.buz`
+; (i64.print buz)       ; ~> undefined variable: `buz`
+; (i64.print bar.buz)   ; ~> undefined variable: `bar.buz`
 (i64.print foo.bar.buz) ; ~> 10
 
+; keyword-env = []
 (use foo)
+; keyword-env = ["foo"]
 
-; (i64.print buz)      ; ~> undefined variable: `buz`
+; (i64.print buz)       ; ~> undefined variable: `buz`
 (i64.print bar.buz)     ; ~> 10
 (i64.print foo.bar.buz) ; ~> 10
 
+; keyword-env = ["foo"]
 (use foo.bar)
+; keyword-env = ["foo.bar", "foo"]
+
+; keyword-env = ["foo.bar", "foo"]
+(use qux)
+; keyword-env = ["qux", "foo.bar", "foo"]
 
 (i64.print buz)         ; ~> 10
 (i64.print bar.buz)     ; ~> 10
 (i64.print foo.bar.buz) ; ~> 10
 
+; keyword-env = ["qux", "foo.bar", "foo"]
 (unuse foo)
+; keyword-env = ["qux", "foo.bar"]
 
 (i64.print buz)         ; ~> 10
 ; (i64.print bar.buz)  ; ~> undefined variable: `bar.buz`
@@ -949,7 +959,7 @@ A term of Neut is a tree of inference rules. Each rule is one of the following r
  # Each statement is one of the following statements described in this section.
 
 ** tau
-The =tau= term is the type of types.
+=tau= is the type of types.
 *** Example
 #+BEGIN_SRC neut
 (define id ((a tau) (x a)) x)
@@ -965,14 +975,8 @@ tau
 *** Semantics
 The =tau= rule doesn't have any operational semantics.
 
-*** Notes
-The =tau= type is the type of types. In other words, a term =e= is defined to be a type if and only if =e : tau=. Obviously, =tau= is also a type since =tau : tau= holds.
-
-The universe hierarchy is intentionally removed from the source language since the source language already contains the =fix= operator.
-# The universe hierarchy is intentionally removed from the source language since (1) the source language already contains the =fix= operator, and (2) we can check if a term is subsumed in the weakly-normalizing fragment of the type system, which is consistent, by using the [[#verify][verify]] statement.
-
 ** upsilon
-The =upsilion= term is a term that represents a variable.
+=upsilion= is a variable.
 *** Example
 #+BEGIN_SRC neut
 (let x (i64 10))
@@ -992,16 +996,19 @@ LEAF
 The =upsilon= rule doesn't have any operational semantics.
 
 *** Notes
-The =upsilon= term can be interpreted as a variable.
-
 If a leaf is not parsed into any other syntactic construct, the leaf is considered to be wrapped by =upsilon=.
 
 If the name of a variable is "_", the compiler automatically generates a fresh variable so that the variable cannot be referred in the succeeding code.
 
-# fixme: use/unuse
+The name of a variable is interpreted in relation with the keyword environment. For example, if the keyword environment is =["foo", "bar", "buz"]=, the name =qux= is interpreted in the following way:
+1. Look up a bound variable of name =qux= in current scope.
+2. If not found, look up a bound variable of name =foo.qux= in current scope.
+3. If not found, look up a bound variable of name =bar.qux= in current scope.
+4. If not found, look up a bound variable of name =buz.qux= in current scope.
+5. If not found, report the error: "undefined variable".
 
 ** pi
-The =pi= term is a term that represents the universal quantification.
+=pi= is the universal quantification.
 *** Example
 #+BEGIN_SRC neut
 ; unary pi-introduction
