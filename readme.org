@@ -902,16 +902,16 @@ The prefix environment modifies [[#upsilon][how the compiler parses a variable]]
 
 (i64.print foo)          ; ~> 10
 (i64.print pohe.foo)     ; ~> 10
-; (i64.print bar)       ; ~> undefined variable: `bar`
+; (i64.print bar)        ; ~> undefined variable
 (i64.print qux.bar)      ; ~> 20
 (i64.print pohe.qux.bar) ; ~> 20
 
 (end pohe)
 
-; (i64.print foo)       ; ~> undefined variable: `foo`
+; (i64.print foo)        ; ~> undefined variable
 (i64.print pohe.foo)     ; ~> 10
-; (i64.print bar)       ; ~> undefined variable: `bar`
-; (i64.print qux.bar)   ; ~> undefined variable: `qux.bar`
+; (i64.print bar)        ; ~> undefined variable
+; (i64.print qux.bar)    ; ~> undefined variable
 (i64.print pohe.qux.bar) ; ~> 20
 #+END_SRC
 *** Syntax
@@ -937,10 +937,10 @@ is equivalent to:
 (let FOO.xn en)
 (unuse FOO)
 #+END_SRC
-In other words, the =section= / =end= statement
-- insert the [[#useunuse][use/unuse]] statements at the beginning and the end of the section
-- add the name of the section as a prefix of the variables defined by =let= / =define= statements
-- keep all the other statements in the section untouched
+In other words, the =section= - =end= statement
+- inserts the [[#useunuse][use/unuse]] statements at the beginning and the end of the section
+- adds the name of the section as a prefix of the variables defined by =let= / =define= statements
+- keeps all the other statements in the section untouched
 
 Each =section= statement must be paired with an =end= statement with the corresponding name.
 
@@ -997,6 +997,8 @@ The =upsilon= term can be interpreted as a variable.
 If a leaf is not parsed into any other syntactic construct, the leaf is considered to be wrapped by =upsilon=.
 
 If the name of a variable is "_", the compiler automatically generates a fresh variable so that the variable cannot be referred in the succeeding code.
+
+# fixme: use/unuse
 
 ** pi
 The =pi= term is a term that represents the universal quantification.
