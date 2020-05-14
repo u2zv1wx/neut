@@ -49,6 +49,8 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#enum-1][enum]]
   - [[#array][array]]
   - [[#struct][struct]]
+  - [[#erase][erase]]
+  - [[#question][question]]
 - [[#auxiliary-syntax][Auxiliary Syntax]]
   - [[#asterisk][asterisk]]
   - [[#sigma][sigma]]
@@ -549,7 +551,7 @@ If the first character of the path is dot ("."), the path is interpreted as a re
 
 If the file at the =path= is already included, this statement does nothing.
 
-When including a file, both [[#useunuse][the prefix environment]] and [[#sectionend][the section environment]] must be empty.
+When including a file, [[#useunuse][the prefix environment]] must be empty.
 
 Cyclic inclusion is invalid.
 
@@ -576,6 +578,22 @@ The =inductive= statement defines an inductive type, its introduction rules (con
 (let xs (list.cons * 10 (list.cons * 20 (list.nil i64))))
 
 (i64.print (length xs)) ; ~> 2
+
+; mutually inductive types
+(inductive
+  (even ((_ (nat)))
+    (zero-is-even
+      ()
+      (even (nat.zero)))
+    (succ-of-odd-is-even
+      ((n (nat))
+       (_ (odd n)))
+      (even (nat.succ n))))
+  (odd ((_ (nat)))
+    (succ-of-even-is-odd
+      ((n (nat))
+       (_ (even n)))
+      (odd (nat.succ n)))))
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
@@ -1310,6 +1328,16 @@ The type of elements of a struct must be the integer type, or the float type.
 The memory layout of a struct is the same as the one of LLVM; For example, a struct of type =(struct i8 f16 i32)= is aligned as in a struct of type ={i8, f16, f32}= in LLVM.
 
 The struct type is intended to be used for implementation of interfaces of syscalls.
+
+** erase
+*** Example
+*** Syntax
+*** Semantics
+
+** question
+*** Example
+*** Syntax
+*** Semantics
 
 * Auxiliary Syntax
 ** asterisk
