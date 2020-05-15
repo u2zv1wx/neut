@@ -66,11 +66,6 @@ asConvOpMaybe domType codType name =
         LowTypeInt i2 <- codType,
         i1 > i2 ->
         Just $ UnaryOpTrunc domType codType
-    "fptrunc"
-      | LowTypeFloat size1 <- domType,
-        LowTypeFloat size2 <- codType,
-        sizeAsInt size1 > sizeAsInt size2 ->
-        Just $ UnaryOpFpTrunc domType codType
     "zext"
       | LowTypeInt i1 <- domType,
         LowTypeInt i2 <- codType,
@@ -81,6 +76,11 @@ asConvOpMaybe domType codType name =
         LowTypeInt i2 <- codType,
         i1 < i2 ->
         Just $ UnaryOpSext domType codType
+    "fptrunc"
+      | LowTypeFloat size1 <- domType,
+        LowTypeFloat size2 <- codType,
+        sizeAsInt size1 > sizeAsInt size2 ->
+        Just $ UnaryOpFpTrunc domType codType
     "fpext"
       | LowTypeFloat size1 <- domType,
         LowTypeFloat size2 <- codType,
