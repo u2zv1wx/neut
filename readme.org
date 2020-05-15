@@ -75,7 +75,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
 *** Basics
 Let's see how Neut manages resources. The following code prints the string "a" for the 3 times:
 #+BEGIN_SRC neut
-; download core library
+; download the core library
 (ensure core/0.1.0.0
   "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz")
 
@@ -104,7 +104,7 @@ define i64 @main() {
 #+END_SRC
 The non-schematic, actual output can also be found in the [[#llvm-ir-for-the-first-example][appendix]]. I chose not to write the IR here since the output is a bit long (59 lines including comments).
 
-The resulting LLVM IR creates a string in memory, print it, and free it for the 3 times. The point is that the resulting code creates 2 copies of the original string. This is because the variable =str= is used for the 3 times; The content of a variable is copied to create n instances when the variable is used for the n times (n > 1). If the variable isn't used at all (n < 1), the content of the variable is discarded (deallocated). If the variable is used exactly once, or linearly (n = 1), the content of the variable is used without any discarding/copying operation.
+The resulting LLVM IR creates a string in memory, print it, and free it for the 3 times. The point here is that the resulting code creates 2 copies of the original string. This is because the variable =str= is used for the 3 times; The content of a variable is copied to create n instances when the variable is used for the n times (n > 1). If the variable isn't used at all (n < 1), the content of the variable is discarded (deallocated). If the variable is used exactly once, or linearly (n = 1), the content of the variable is used without any discarding/copying operation.
 
 By translating the source calculus in the way sketched above, every variable is ensured to be used linearly, except for the ones in the functions that realize those copying/discarding operations. Thus, by checking that those exponential functions use resources properly, we can ensure that the target calculus of this translation handles memory properly too. And indeed those exponentializers are sane - This is the basic storyline.
 
@@ -124,7 +124,7 @@ let (str1, tmp) := copy-string(str);
 let (str2, str3) := copy-string(tmp);
 <THE CODE THAT USES `str1`, `str2`, AND `str3` LINEARLY>
 #+END_SRC
-Note that the second line translates the type =string= into a pair =(discard-string, copy-string)=. Every type =X= is translated in this manner; the pair of =discard-X= and =copy-X=. These exponential functions - something that allow us to create n copies of =x= from a single =x= -  are used in its continuation so that every variable of this type (=str= in this example) is used linearly.
+Note that the second line uses the pair =(discard-string, copy-string)=, which is the result of translation of the type =string=. Every type =X= is translated in this manner; the pair of =discard-X= and =copy-X=. These exponential functions - something that allow us to create n copies of =x= from a single =x= - are used in its continuation so that every variable of this type (=str= in this example) is used linearly.
 
 Incidentally, in the actual implementation, the result of =TRANSLATE(string)= is not a pair, but a function as in the pseudo-code below:
 #+BEGIN_SRC txt
@@ -142,7 +142,7 @@ let (str1, tmp) := cartesian-string(1, tmp);
 let (str2, str3) := cartesian-string(1, tmp);
 <THE CODE THAT USES `str1`, `str2`, AND `str3` LINEARLY>
 #+END_SRC
-By translating types in this way, we can omit creating tuples every time when we translate a type. Thus, in the actual implementation, a type is translated into a closed function, which is represented as a pointer to the function (1 word).
+By translating types in this way, we can omit creating tuples every time when we translate a type. Thus, in the actual implementation, a type is translated into a closed function, which is lowered to a pointer to the function (1 word).
 
 *** Notes on Closures
 Some of you may be wondering now: "How can we copy/discard a closure? In ordinary closure conversion, a lambda-abstraction is translated into a pair consists of (1) all the free variables in the abstraction, and (2) a pointer to an appropriately-arranged closed function. How can that tuple be copied/discarded just by using type information like =i64 -> bool=, which is seemingly useless here?"
@@ -1776,9 +1776,12 @@ This subcommand is intended to be used with an editor-side syntax checker like [
 
 # ** Typeclass?
 
-# ** Proof-Related Stuff?
+# ** Proof-Related Stuff? ("I've heard that _THE_ canonical example of dependent type in real life is safe array indexing")
 
 # ** The Universe Hierarchy?
+
+# ** Correctness Proof?
+# Not yet, because of limited resource.
 
 # * Theoretical Notes
 
