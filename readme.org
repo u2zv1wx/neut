@@ -55,16 +55,21 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#asterisk][asterisk]]
   - [[#sigma][sigma]]
   - [[#with][with]]
+- [[#primitives][Primitives]]
+  - [[#llvm-based-primitives][LLVM-Based Primitives]]
+  - [[#syscalls][Syscalls]]
+  - [[#miscs][Miscs]]
 - [[#compiler-subcommands][Compiler Subcommands]]
   - [[#archive][archive]]
   - [[#build][build]]
   - [[#check][check]]
+- [[#compiler-structure][Compiler Structure]]
 - [[#appendix][Appendix]]
   - [[#llvm-ir-for-the-first-example][LLVM IR for the First Example]]
   - [[#llvm-ir-for-the-second-example][LLVM IR for the Second Example]]
+  - [[#types-as-exponentials-more-specifically][Types as Exponentials, More Specifically]]
 
 * Examples
-
 ** Compile-Time malloc/free Determination
 *** Basics
 Let's see how Neut manages resources. The following code prints the string "a" for the three times:
@@ -516,6 +521,29 @@ Every enum-value has its internal i64 value (discriminant). Those discriminant v
 Discriminant value starts from =0= by default, and increments one by one. The "current" value of this process can be modified by writing, e.g. =(enum foo a (b 100) c d)=. In this example, the discriminant value of =c= is set to be =101=.
 
 The discriminant values of an enum-type must be distinct.
+
+# ** erase
+# The =erase= statement makes given variable invisible in its continuation.
+# *** Example
+# #+BEGIN_SRC neut
+# (define helper-function (x) (add-i64 x 1))
+
+# (define public-function (x) (mul-i64 (helper-function x) 2))
+
+# (erase helper-function)
+
+# (public-function 10)   ; ~> 22
+
+# ; (helper-function 10) ; ~> undefined variable: helper-function
+# #+END_SRC
+# *** Syntax
+# #+BEGIN_SRC neut
+# (erase LEAF)
+# #+END_SRC
+# *** Semantics
+# The =erase= statement makes given variable invisible in its continuation.
+# *** Notes
+# =erase= can be used to realize a private function. If you
 
 ** include
 The =include= statement temporary transfers the parsing process to the file specified by given path, if necessary.
@@ -1600,6 +1628,17 @@ Note that the =bind= operator is not restricted to the monadic bind; You can set
 
 The =e= in =(let x e)= is automatically surrounded by =with=.
 
+* Primitives
+** LLVM-Based Primitives
+Neut currently supports the following LLVM instructions: =fneg, add, fadd, sub, fsub, mul, fmul, udiv, sdiv, fdiv, urem, srem, frem, shl, lshr, ashr, and, or, xor, trunc, zext, sext, fptrunc, fpext, fptoui, fptosi, uitofp, sitofp, icmp, fcmp=. Each instruction is "separated" according to its type. Let us take the instruction =fneg= for example. This instruction can be applied to =half=, =float=, and =double= in LLVM. Thus, Neut has the following three constants as primitives: =fneg-f16, fneg-f32, fneg-f32=. For the instruction =add=, the constants =add-i1, add-i2, ..., add-i64= is available. The instructions with two type arguments like =fptosi= is named as =fptosi-f64-i32, fptosi-f32-i1, fptosi-f16-i5=, etc. As for the comparison operators =icmp= and =fcmp=, the names are of the form ={icmp, fcmp}-{CONDITION}-{TYPE}=. For example, =icmp-eq-i16, icmp-ult-i32, icmp-sge-i64, fcmp-ogt-f32, fcmp-ord-f16, fcmp-ueq-f64= are all valid.
+
+The semantics of these instructions is as specified in the [[https://llvm.org/docs/LangRef.html][LLVM Language Reference Manual]].
+
+** Syscalls
+** Miscs
+*** Accessing Array without Consuming it
+*** Unsafe Cast
+
 * Compiler Subcommands
 The =neut= binary provides subcommands in this section.
 
@@ -1657,6 +1696,8 @@ This subcommand is intended to be used with an editor-side syntax checker like [
 
 # ** "Unified" Pattern Resolution in Dependent Type Inference
 # (to be written later)
+
+* Compiler Structure
 
 * Appendix
 
@@ -1778,3 +1819,5 @@ define i64 @main() {
   ret i64 %_12056
 }
 #+END_SRC
+
+** Types as Exponentials, More Specifically
