@@ -1367,7 +1367,7 @@ The struct type is intended to be used for implementation of interfaces of sysca
   ...)
 #+END_SRC
 
- =erase= can also be used to ensure that a variable introduced in [[#notation][notation]] doesn't cause name collision to a free variable. For example, consider the following notation:
+ =erase= can also be used to ensure that a variable introduced in [[#notation][notation]] doesn't cause name collision with a free variable. For example, consider the following notation:
 #+BEGIN_SRC neut
 (notation (pair-of-i64-and-bool e1 e2)
   (λ
@@ -1418,7 +1418,7 @@ Though we luckily got a type error in the example above, generally this sort of 
 ;        (k (erase (z k) k) bool.true)))
 ; ~> undefined variable: k
 #+END_SRC
-That is, using =erase=, we can ensure that a variable introduced by =notation= does not collide to a free variable contained in an argument of the notation.
+That is, using =erase=, we can ensure that a variable introduced by =notation= does not collide with a free variable contained in an argument of the notation.
 
 Note that =erase= is not a complete solution to the problem of [[https://en.wikipedia.org/wiki/Hygienic_macro][hygienic macros]]: consider the following code:
 #+BEGIN_SRC neut
