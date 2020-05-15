@@ -1330,14 +1330,18 @@ The memory layout of a struct is the same as the one of LLVM; For example, a str
 The struct type is intended to be used for implementation of interfaces of syscalls.
 
 ** erase
-=erase= removes specified bound variables from its scope.
+=erase= makes given variables invisible in its scope.
 *** Example
 #+BEGIN_SRC neut
-((λ (x y) x) bool.true bool.false)             ; ~> bool.true
+((λ (x y) x) bool.true bool.false)                        ; ~> bool.true
 
-((λ (x y) (erase (x y) x)) bool.true)          ; ~> undefined variable: x
+((λ (x y) (erase (x) x)) bool.true bool.false)            ; ~> undefined variable: x
 
-; `with` notation has dedicated notation for `erase`
+((λ (x y) (erase (y) x)) bool.true bool.false)            ; ~> bool.true
+
+((λ (x y) (erase (x y) x)) bool.true bool.false)          ; ~> undefined variable: x
+
+; `with` has a dedicated notation for `erase`
 (with identity.bind
   (let x bool.true)
   (let y x)
@@ -1356,13 +1360,12 @@ The struct type is intended to be used for implementation of interfaces of sysca
 #+BEGIN_SRC neut
 ; `with` has a dedicated notation for `erase`
 (with identity.bind
-  (let var (some-computation))
+  (let VAR (some-computation))
   {COMPUTATION_WITH_VAR}
-  (erase var)
-  {REST_COMPUTATION_WITHOUT_VAR}
+  (erase VAR)
+  {COMPUTATION_WITHOUT_VAR}
   ...)
 #+END_SRC
-This might be useful for debug purposes.
 
  =erase= can also be used to ensure that a variable introduced in [[#notation][notation]] doesn't cause name collision to a free variable. For example, consider the following notation:
 #+BEGIN_SRC neut
