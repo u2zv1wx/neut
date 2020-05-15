@@ -415,7 +415,7 @@ As for editor support, you can currently try [[https://github.com/u2zv1wx/neut-m
 * Syntax and Semantics of Statements
 A program of Neut is a list of statements. Each statement is one of the following statements described in this section.
 
-Please understand that the descriptions in the followings are not that formal yet, though I try to be as clear as possible. If you find something unclear, feel free to ask me.
+Please note that the descriptions in the followings are not that formal yet, though I try to be as clear as possible.
 
 In the following, I use the symbols =LEAF= and =TREE= defined roughly (!) as follows:
 #+BEGIN_SRC text
@@ -1124,7 +1124,7 @@ The logic of Neut doesn't adopt the universe hierarchy, and thus inconsistent. T
 # (By the way, can it be said that the weakly-normalizing fragment of CoC-without-universe-hierarchy (CoC-) is consistent? If it is true, it seems to me that we can prove a theorem by taking a proof term of CoC- and check if it halts by trying to reduce the term into its normal form; Or just a delusion?)
 
 ** constant
-=constant= is for external constants. Proof-theoretically, this can be understood as admitted axioms.
+=constant= is for external constants.
 *** Example
 #+BEGIN_SRC neut
 ((constant add-i64) 1 3) ; ~> 4
