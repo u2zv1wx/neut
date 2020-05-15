@@ -1261,11 +1261,11 @@ ENUM_CASE ::= LEAF | default
 
 (array-introduction LOWTYPE TREE ... TREE)
 
-(array-elimination LOWTYPE (LEAFPLUS ... LEAFPLUS) TREE TREE)
+(array-elimination LOWTYPE (LEAF_PLUS ... LEAF_PLUS) TREE TREE)
 
 LOWTYPE ::= i{n} | f{n}
 
-LEAFPLUS ::= LEAF | (LEAF TREE)
+LEAF_PLUS ::= LEAF | (LEAF TREE)
 #+END_SRC
 *** Semantics
 #+BEGIN_SRC neut
