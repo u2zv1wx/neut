@@ -58,7 +58,8 @@ Here I briefly summerize the basic properties of Neut before diving into the det
 - [[#primitives][Primitives]]
   - [[#llvm-based-primitives][LLVM-Based Primitives]]
   - [[#syscalls][Syscalls]]
-  - [[#miscs][Miscs]]
+  - [[#array-indexing][Array Indexing]]
+  - [[#unsafe-cast][Unsafe Cast]]
 - [[#compiler-subcommands][Compiler Subcommands]]
   - [[#archive][archive]]
   - [[#build][build]]
@@ -1641,9 +1642,31 @@ As for the comparison operators =icmp= and =fcmp=, the names are of the form ={i
 The semantics of these instructions is as specified in the [[https://llvm.org/docs/LangRef.html][LLVM Language Reference Manual]].
 
 ** Syscalls
-** Miscs
-*** Accessing Array without Consuming it
-*** Unsafe Cast
+** Array Indexing
+Neut offers a family of constants that allows accessing an element of an array. The array is of the form ={LOWTYPE}.array-access=, where the ={LOWTYPE}= is either =i{n}= or =f{n}=. For example, =i8.array-access= can be used for indexing an array of type =(array N i8)=.
+
+The type of such accesser is:
+#+BEGIN_SRC neut
+(Π
+  ((i i64)
+   (n i64)
+   (_ (array n LOWTYPE)))
+  (product (array n LOWTYPE) LOWTYPE))
+#+END_SRC
+where the first argument =i= specifies the index of the array, and the second argument =n= specifies the length of the array. Using this constant, one can use an element of an array without consuming the array as follows:
+#+BEGIN_SRC neut
+(let xs
+  (array-introduction i64 1 2 -30 20))
+
+(with identity.bind
+  (let a (i64.array-access 0 * &xs)) ; the `*` is inferred to be `4`, since the length of `xs` is 4
+  (let b (i64.array-access 1 * &xs))
+  (let c (i64.array-access 2 * &xs))
+  (let d (i64.array-access 3 * &xs))
+  (i64.add a (i64.add b (i64.add c d)))) ; 1 + 2 + (-30) + 20
+#+END_SRC
+
+** Unsafe Cast
 The constant =unsafe.cast : Pi (A : tau, B : tau, x : A). B= is available (assuming that the constant is declared using the statement [[#constant][constant]]). The semantics of this constant is no-op cast:
 #+BEGIN_SRC neut
 (unsafe.cast t1 t2 e)
