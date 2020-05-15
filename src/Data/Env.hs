@@ -263,7 +263,7 @@ unaryOpToType m op = do
   let (dom, cod) = unaryOpToDomCod op
   dom' <- lowTypeToType m dom
   cod' <- lowTypeToType m cod
-  x <- newNameWith' "arg"
+  x <- newNameWith'' "_"
   let xts = [(m, x, dom')]
   return (m, TermPi xts cod')
 
@@ -272,8 +272,8 @@ binaryOpToType m op = do
   let (dom, cod) = binaryOpToDomCod op
   dom' <- lowTypeToType m dom
   cod' <- lowTypeToType m cod
-  x1 <- newNameWith' "arg"
-  x2 <- newNameWith' "arg"
+  x1 <- newNameWith'' "_"
+  x2 <- newNameWith'' "_"
   let xts = [(m, x1, dom'), (m, x2, dom')]
   return (m, TermPi xts cod')
 
@@ -281,15 +281,14 @@ arrayAccessToType :: Meta -> LowType -> WithEnv TermPlus
 arrayAccessToType m lowType = do
   t <- lowTypeToType m lowType
   k <- lowTypeToArrayKind m lowType
-  x1 <- newNameWith' "arg"
-  x2 <- newNameWith' "arg"
-  x3 <- newNameWith' "arg"
+  idx <- newNameWith' "i"
+  len <- newNameWith' "n"
+  arrName <- newNameWith'' "_"
   let int64 = (m, TermConst (showIntSize 64))
-  let idx = (m, TermUpsilon x2)
-  let arr = (m, TermArray idx k)
-  let xts = [(m, x1, int64), (m, x2, int64), (m, x3, arr)]
-  x4 <- newNameWith' "arg"
-  x5 <- newNameWith' "arg"
+  let arr = (m, TermArray (m, TermUpsilon len) k)
+  let xts = [(m, idx, int64), (m, len, int64), (m, arrName, arr)]
+  x4 <- newNameWith'' "_"
+  x5 <- newNameWith'' "_"
   cod <- termSigma m [(m, x4, arr), (m, x5, t)]
   return (m, TermPi xts cod)
 
