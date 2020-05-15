@@ -1420,12 +1420,14 @@ Though we luckily got a type error in the example above, generally this sort of 
 #+END_SRC
 That is, using =erase=, we can ensure that a variable introduced by =notation= does not collide with a free variable contained in an argument of the notation.
 
-Note that =erase= is not a complete solution to the problem of [[https://en.wikipedia.org/wiki/Hygienic_macro][hygienic macros]]: consider the following code:
+Note that =erase= is only a partial solution to the problem of [[https://en.wikipedia.org/wiki/Hygienic_macro][hygienic macros]]. Consider the following code:
 #+BEGIN_SRC neut
 (notation (unless condition on-false on-true)
   (if (bool.not condition) on-true on-false)
 #+END_SRC
-The notation above presupposes that the free variable =bool.not= is bound in a sane way; =bool.not= can't be something like =(λ (x) x)=, or =(string.print "hello, world!")=. =erase= has no use in this situation, though we might be able to introduce something like =(coerase (LEAF ... LEAF) TREE)= which ensures that every given variable is defined at top level.
+The notation above presupposes that the free variable =bool.not= is bound in a sane way; =bool.not= can't be something like =(λ (x) x)=, or =(string.print "hello, world!")=. More generally, even the very symbol =erase= can be bound to a variable. Thus =erase= has no use in this situation.
+
+ # though we might be able to introduce something like =(coerase (LEAF ... LEAF) TREE)= which ensures that every given variable is defined at top level. We will have to prohibit using the names =erase= and =coerase= as a name of a bound variable in that case.
 
 ** question
 *** Example
