@@ -1645,7 +1645,7 @@ The semantics of these instructions is as specified in the [[https://llvm.org/do
 ** Array Indexing
 Neut offers a family of constants that allows accessing an element of an array. The array is of the form ={LOWTYPE}.array-access=, where the ={LOWTYPE}= is either =i{n}= or =f{n}=. For example, =i8.array-access= can be used for indexing an array of type =(array N i8)=.
 
-The type of such accesser is:
+The types of these accesser are of the following form:
 #+BEGIN_SRC neut
 (Π
   ((i i64)
