@@ -1644,6 +1644,27 @@ The semantics of these instructions is as specified in the [[https://llvm.org/do
 ** Miscs
 *** Accessing Array without Consuming it
 *** Unsafe Cast
+The constant =unsafe.cast : Pi (A : tau, B : tau, x : A). B= is available. The semantics of this constant is specified as follows:
+#+BEGIN_SRC neut
+(unsafe.cast t1 t2 e)
+~> e
+#+END_SRC
+That is, =unsafe.cast= is a no-op cast operation.
+
+You can easily break the resource management system of Neut using this constant. Consider the following example:
+#+BEGIN_SRC neut
+(ensure core/0.1.0.0
+  "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz")
+
+(include "core/0.1.0.0/core.neut")
+
+(let z (unsafe.cast i64 (Π ((_ i64)) i64) 1))
+
+(let foo z) ; (*1)
+
+(let bar z) ; (*2)
+#+END_SRC
+The code above uses the variable =z= for the two times. Since =z= is casted to a Pi-type, The resulting code tries to copy the value =1= as if it were a closure. Since the internal representation of closure at least uses 3 words (the type of all the free variables, all the free variables, and the label of a closed function), this causes an access to an invalid memory region, that is, a segmentation fault.
 
 * Compiler Subcommands
 The =neut= binary provides subcommands in this section.
