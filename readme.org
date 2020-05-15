@@ -7,12 +7,12 @@ Neut is a dependently-typed programming language based on [[https://en.wikipedia
 
 Theoretically, this is made possible by translating the source language into a dependent variant of [[https://www.cs.bham.ac.uk/~pbl/papers/thesisqmwphd.pdf][Call-By-Push-Value]]. The crucial point of this translation is to see that knowing the type of a term is knowing how to eta-expand the term, which in turn means knowing how to copy/discard the term. In the translation, a type is not erased, but *translated into a computationally-meaningful term that copies/discards the terms of the type*.
 
-Practically, this means that you can write your program in ordinary lambda-calculus without any extra restrictions or esoteric annotations, and at the same time are allowed to control how resources are used in the program. If you want an ordinary-lambda-calculus based programming language with a human-predictable semantics (including its memory management), this might be for you.
+Practically, this means that you can write your program in the ordinary lambda-calculus without any extra restrictions or esoteric annotations, and at the same time are allowed to control how resources are used in the program. If you want an ordinary-lambda-calculus based programming language with a human-predictable semantics (including its memory management), this might be for you.
 
 Here I briefly summerize the basic properties of Neut before diving into the details:
 
 - A compiled language
-- The output is [[https://llvm.org/docs/LangRef.html][LLVM IR]], assembly, and object binary (the last two are via clang)
+- The output is [[https://llvm.org/docs/LangRef.html][LLVM IR]] / assembly / executable binary (the last two are via clang)
 - The type system is CoC + fix + int + float + enum + array + struct - universe hierarchy
 - The type inference algorithm is based on [[https://arxiv.org/abs/1505.04324][the one of Lean]]
 - The evaluation strategy is call-by-value
@@ -68,14 +68,14 @@ Here I briefly summerize the basic properties of Neut before diving into the det
 - [[#appendix][Appendix]]
   - [[#llvm-ir-for-the-first-example][LLVM IR for the First Example]]
   - [[#llvm-ir-for-the-second-example][LLVM IR for the Second Example]]
-  - [[#types-as-exponentials-more-specifically][Types as Exponentials, More Specifically]]
+  - [[#proof-theoretic-memory-management-more-specifically][Proof-Theoretic Memory Management, More Specifically]]
 
 * Examples
 ** Compile-Time malloc/free Determination
 *** Basics
-Let's see how Neut manages resources. The following code prints the string "a" for the three times:
+Let's see how Neut manages resources. The following code prints the string "a" for the 3 times:
 #+BEGIN_SRC neut
-; download core library (if necessary)
+; download core library
 (ensure core/0.1.0.0
   "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz")
 
@@ -102,13 +102,15 @@ define i64 @main() {
   ;   <memory deallocation for the string>
 }
 #+END_SRC
-The non-schematic, actual output can also be found in the [[#llvm-ir-for-the-first-example][appendix]]. I chose not to write the IR here since the output is a bit long (59 lines).
+The non-schematic, actual output can also be found in the [[#llvm-ir-for-the-first-example][appendix]]. I chose not to write the IR here since the output is a bit long (59 lines including comments).
 
-The resulting LLVM IR creates a string in memory, print it, and free it for the three times. The point is that the resulting code creates 2 copies of the original string. This is because the variable =str= is used for the three times; The content of a variable is copied to create n instances when the variable is used for the n times (n > 1). If the variable isn't used at all (n < 1), the content of the variable is discarded (deallocated). If the variable is used exactly once, or linearly (n = 1), the content of the variable is used without any discarding/copying operation.
+The resulting LLVM IR creates a string in memory, print it, and free it for the 3 times. The point is that the resulting code creates 2 copies of the original string. This is because the variable =str= is used for the 3 times; The content of a variable is copied to create n instances when the variable is used for the n times (n > 1). If the variable isn't used at all (n < 1), the content of the variable is discarded (deallocated). If the variable is used exactly once, or linearly (n = 1), the content of the variable is used without any discarding/copying operation.
 
-The way how a variable is copied is determined by the type of the variable. For example, if the type of a variable is the array type as in the example above, the copying operation is something that you would do in C to copy an array (memory allocation followed by value insertion). If the type is an immediate type like an integer type, the "copying" operation is the one that uses the original value for the cloned value. Every type is translated into a term that copies/discards the terms of the type, including the type of the type itself.
+By translating the source calculus in the way sketched above, every variable is ensured to be used linearly, except for the ones in the functions that realize those copying/discarding operations. Thus, by checking that those exponential functions use resources properly, we can ensure that the target calculus of this translation handles memory properly too. And indeed those exponentializers are sane - This is the basic storyline.
 
-*** Types as Exponentials
+The way how a variable is copied/discarded is determined by the type of the variable. For example, if the type of a variable is the array type as in the example above, the copying operation is something that you would do in C to copy an array (memory allocation followed by value insertion). If the type is an immediate type like an integer type, the "copying" operation is the one that uses the original value for the cloned value. Every type is translated into a term that copies/discards the terms of the type, including the type of the type itself.
+
+*** Types as Exponentializers
 Let us go a little deeper. Consider the following schematic user input:
 #+BEGIN_SRC txt
 let str : string := "a";
@@ -122,7 +124,7 @@ let (str1, tmp) := copy-string(str);
 let (str2, str3) := copy-string(tmp);
 <THE CODE THAT USES `str1`, `str2`, AND `str3` LINEARLY>
 #+END_SRC
-Note that the second line translates the type =string= into a pair =(discard-string, copy-string)=. Every type =X= is translated in this manner; the pair of =discard-X= and =copy-X=. These resource controllers are used in its continuation so that every variable of this type (=str= in this example) is used linearly.
+Note that the second line translates the type =string= into a pair =(discard-string, copy-string)=. Every type =X= is translated in this manner; the pair of =discard-X= and =copy-X=. These exponential functions - something that allow us to create n copies of =x= from a single =x= -  are used in its continuation so that every variable of this type (=str= in this example) is used linearly.
 
 Incidentally, in the actual implementation, the result of =TRANSLATE(string)= is not a pair, but a function as in the pseudo-code below:
 #+BEGIN_SRC txt
@@ -140,10 +142,17 @@ let (str1, tmp) := cartesian-string(1, tmp);
 let (str2, str3) := cartesian-string(1, tmp);
 <THE CODE THAT USES `str1`, `str2`, AND `str3` LINEARLY>
 #+END_SRC
-By translating types in this way, we can omit creating tuples every time when we translate a type. Thus, in the actual implementation (you can find it in =src/Clarify.hs=), a type is translated into a closed function, which is represented in 1 word (a pointer to the function).
+By translating types in this way, we can omit creating tuples every time when we translate a type. Thus, in the actual implementation, a type is translated into a closed function, which is represented as a pointer to the function (1 word).
+
+*** Notes on Closures
+Some of you may be wondering now: "How can we copy/discard a closure? In ordinary closure conversion, a lambda-abstraction is translated into a pair consists of (1) all the free variables in the abstraction, and (2) a pointer to an appropriately-arranged closed function. How can that tuple be copied/discarded just by using type information like =i64 -> bool=, which is seemingly useless here?"
+
+# The key is the "all the" part of (1).
+
+# Proof-theoretically, this can be explained via the following type-isomorphism: Pi (x : A). B = Sigma (C : tau). C * Box (Pi (x : A, env :  C). B), where the =Box= is a necessity modality which can only be introduced when the antecedent is empty.
 
 *** Notes on Polymorphic Functions
-Or, you may be wondering now: "What if a function is polymorphic? If the size of an argument is not fixed, how can that function copy the term?"
+Others of you may be wondering: "What if a function is polymorphic? If the size of an argument is not fixed, how can that function copy the term?"
 
 That is a valid question - And here comes dependent-type. Firstly, remember that a polymorphic function in dependent-type theory is nothing but an ordinary function with an argument of type =tau=, where =tau= is the type of types. For example, the following is a polymorphic function that creates a pair of any type:
 #+BEGIN_SRC neut
@@ -157,7 +166,7 @@ This function =to-tuple= is, for example, used as follows:
 (to-tuple bool bool.true) ; ~> (tuple bool.true bool.true)
 (to-tuple string "a")     ; ~> (tuple "a" "a")
 #+END_SRC
-Note that the type =i64= is used in exactly the same way as =1=; A type is nothing but an ordinary term of type =tau=. And these very terms =i64=, =bool=, and =string= in the example are translated into ordinary closed functions that copies/discards terms of the type. Thus, the =to-tuple= function can copy the resource =x= of type =a= conceptually as follows:
+Note that the type =i64= is used in exactly the same way as =1=; A type is nothing but an ordinary term of type =tau=. And these very terms =i64=, =bool=, and =string= in the example are translated into ordinary closed functions that copies/discards the terms of the type. Thus, the =to-tuple= function can copy the resource =x= of type =a= conceptually as follows:
 #+BEGIN_SRC text
 to-tuple :: Π (a : tau, x : a). a * a
 to-tuple a x :=
@@ -177,7 +186,7 @@ This is the basic behavior of Neut's proof-theoretic memory management. As you m
 Thankfully, there is a workaround for this performance problem.
 
 ** Manual Optimization via Borrowing
-The point of the workaround is straightforward: If those copying/discarding result from using variables in non-linear way, we just have to use those variables in linear way. Let's go back to the first example code:
+The point of the workaround is straightforward: If those copying/discarding result from using variables in non-linear way, we simply have to use those variables in linear way. Let's go back to the first example code:
 #+BEGIN_SRC neut
 (ensure core/0.1.0.0
   "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz")
@@ -190,19 +199,19 @@ The point of the workaround is straightforward: If those copying/discarding resu
   (let _ (string.print str))
   (string.print str))
 #+END_SRC
-We would like to use the variable =str= in linear way. To this end, we just have to request =string.print= to include the argument =str= in its return value. So, the type of =string.print= shouldn't be something like =string -> top= - where the =top= is the unit type - but should be =string -> top * string=, where the =A * B= means the product type of =A= and =B=. More specifically, the implementation of =string.print= should be something like (in pseudo-code):
+We would like to use the variable =str= in linear way. To this end, we just have to request =string.print= to include the argument =str= in its return value. So, the type of =string.print= shouldn't be something like =string -> top= - where the =top= is the unit type - but should be =string -> string * top=, where the =A * B= means the product type of =A= and =B=. More specifically, the implementation of =string.print= should be something like (in pseudo-code):
 #+BEGIN_SRC text
-string.print :: string -> top * string
+string.print :: string -> string * top
 string.print str = do
   {print the string `str` without consuming it}
-  return (unit, str)
+  return (str, unit)
 #+END_SRC
 With that definition of =string.print=, we can use the variable =str= linearly (again, in pseudo-code):
 #+BEGIN_SRC text
 let str1 = "a";
-let (_, str2) := string.print str1;
-let (_, str3) := string.print str2;
-let (_, str4) := string.print str3;
+let (str2, _) := string.print str1;
+let (str3, _) := string.print str2;
+let (str4, _) := string.print str3;
 unit
 #+END_SRC
 Note that the variables =str1=, =str2=, and =str3= are used exactly once, and =str4= for the 0 time. Therefore, the copying operation doesn't occur in the code above. Also, since the =str4= is defined but not used, the =str4= is discarded immediately after its definition.
@@ -210,9 +219,9 @@ Note that the variables =str1=, =str2=, and =str3= are used exactly once, and =s
 Now we have seen that those redundant copying/discarding can be avoided by writing the code in the manner above. There still remains a problem: code cluttering. It would be much nicer to have more sophisticated notation of that code pattern. Towards that end, firstly note that we can use the same name for the variables =str1=, =str2=, =str3=, and =str4= thanks to variable shadowing:
 #+BEGIN_SRC text
 let str = "a";
-let (_, str) := string.print str;
-let (_, str) := string.print str;
-let (_, str) := string.print str;
+let (str, _) := string.print str;
+let (str, _) := string.print str;
+let (str, _) := string.print str;
 unit
 #+END_SRC
 Now, we just have to introduce a notation that translates:
@@ -221,7 +230,7 @@ let foo := string.print &str;
 #+END_SRC
 into:
 #+BEGIN_SRC text
-let (foo, str) := string.print str;
+let (str, foo) := string.print str;
 #+END_SRC
 
 With this notation, our running example is rewritten as follows:
@@ -260,7 +269,7 @@ Or,
   (let _ (string.print &str))
   (string.print str)) ; ~> (unit, "a")
 #+END_SRC
-This notation is "borrowing" in Neut. Note that borrowing in Neut is nothing but a syntactic translation. Borrowing has nothing to do with, for example, the type system, or the operational semantics. Indeed, this syntactic translation is processed at the stage of parsing in the compiler.
+This notation is "borrowing" in Neut. Note that borrowing in Neut is nothing but a syntactic translation. Borrowing has nothing to do with, for example, the type system, or the operational semantics, of Neut. Indeed, this syntactic translation is processed at the stage of parsing in the compiler.
 
 Let's see how the resulting LLVM IR changes. Is it faster now? We can compile the code above by running =$ neut build --no-alloc-cancellation --emit llvm filename.neut=. The output is schematically as follows:
 #+BEGIN_SRC llvm
@@ -277,7 +286,7 @@ define i64 @main() {
 #+END_SRC
 Again, the non-schematic output can be found in the [[#llvm-ir-for-the-second-example][appendix]]. The output in this time is actually short enough to include it here (36 lines including comments), though I chose not to. The point here is that the string "a" is reused without copying, as expected.
 
- The resulting assembly code is reasonably small too (works on macOS; when you compile the same code on Linux, =write= operations are lowered into syscalls):
+The resulting assembly code is reasonably small too (works on macOS; when you compile the same code on Linux, the =write= operations are lowered into corresponding syscalls):
 #+BEGIN_SRC asm
 	.section	__TEXT,__text,regular,pure_instructions
 	.macosx_version_min 12, 15
@@ -421,11 +430,11 @@ As for editor support, you can currently try [[https://github.com/u2zv1wx/neut-m
 * Syntax and Semantics of Statements
 A program of Neut is a list of statements. Each statement is one of the following statements described in this section.
 
-Please note that the descriptions in the followings are not that formal yet, though I try to be as clear as possible.
+Please note that the descriptions in the followings are not that formal yet.
 
-In the following, I use the symbols =LEAF= and =TREE= defined roughly (!) as follows:
+In the following, I use the symbols =LEAF= and =TREE= defined as follows:
 #+BEGIN_SRC text
-LEAF ::= {x | x is a sequence of character that doesn't contain '(', ')', or '${ANY_WHITESPACE_CHARACTER}'}
+LEAF ::= {a sequence of character that doesn't contain '(', ')', or '${ANY_WHITESPACE_CHARACTER}'}
 TREE ::= LEAF | (TREE ... TREE)
 #+END_SRC
 I also define the symbol =STRING= to be a string.
@@ -1492,11 +1501,9 @@ The type of a term wrapped by =question= is reported by the compiler. This might
 
 (enum foo value)
 
-; explicit application
 (id foo foo.value) ; ~> foo.value
 
-; implicit application
-(id * foo.value) ; ~> foo.value (the `hole` part is inferred to be `foo`)
+(id * foo.value) ; ~> foo.value (`*` is inferred to be `foo`)
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
@@ -1907,4 +1914,4 @@ define i64 @main() {
 }
 #+END_SRC
 
-** Types as Exponentials, More Specifically
+** Proof-Theoretic Memory Management, More Specifically
