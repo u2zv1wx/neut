@@ -1330,9 +1330,99 @@ The memory layout of a struct is the same as the one of LLVM; For example, a str
 The struct type is intended to be used for implementation of interfaces of syscalls.
 
 ** erase
+=erase= removes specified bound variables from its scope.
 *** Example
+#+BEGIN_SRC neut
+((λ (x y) x) bool.true bool.false)             ; ~> bool.true
+
+((λ (x y) (erase (x y) x)) bool.true)          ; ~> undefined variable: x
+
+; `with` notation has dedicated notation for `erase`
+(with identity.bind
+  (let x bool.true)
+  (let y x)
+  (erase x)
+  y) ; ~> undefined variable: y
+#+END_SRC
 *** Syntax
+#+BEGIN_SRC neut
+(erase (LEAF ... LEAF) TREE)
+#+END_SRC
 *** Semantics
+=erase= removes specified bound variables from its scope.
+
+*** Notes
+=erase= can be used, for example, to ensure that a variable is not used after certain point of a program:
+#+BEGIN_SRC neut
+; `with` has a dedicated notation for `erase`
+(with identity.bind
+  (let var (some-computation))
+  {COMPUTATION_WITH_VAR}
+  (erase var)
+  {REST_COMPUTATION_WITHOUT_VAR}
+  ...)
+#+END_SRC
+This might be useful for debug purposes.
+
+ =erase= can also be used to ensure that a variable introduced in [[#notation][notation]] doesn't cause name collision to a free variable. For example, consider the following notation:
+#+BEGIN_SRC neut
+(notation (pair-of-i64-and-bool e1 e2)
+  (λ
+    ((z tau)
+     (k (Π ((_ i64) (_ bool)) z)))
+    (k e1 e2)))
+
+; let (x1, x2) := pair in cont
+(notation (let-pair (x1 x2) pair cont)
+  (pair * (λ (x1 x2) cont)))
+
+; pair-introduction
+(let p (pair-of-i64-and-bool 10 bool.true))
+
+; pair-elimination
+(let-pair (i b) p
+  (if b
+    (add-i64 i 1)
+    (add-i64 i 2)))
+#+END_SRC
+Though the notation for a pair of i64 and bool works in many cases, it can cause an unintuitive behavior if the =e1= or =e2= in =(pair-of-i64-and-bool e1 e2)= contains =k= as a free variable:
+#+BEGIN_SRC neut
+(let k 100)
+
+(let p (pair-of-i64-and-bool k bool.true))
+; ~> (let p
+;      (λ
+;        ((z tau)
+;         (k (Π ((_ i64) (_ bool)))))
+;        (k k bool.true)))
+; ~> type error
+#+END_SRC
+Though we luckily got a type error in the example above, generally this sort of variable capturing can result in a more hard-to-debug runtime error. =erase= can be used here to prevent this kind of situation as follows:
+#+BEGIN_SRC neut
+(notation (pair-of-i64-and-bool e1 e2)
+  (λ
+    ((z tau)
+     (k (Π ((_ i64) (_ bool)) z)))
+    (k (erase (z k) e1) e2)))
+
+(let k 100)
+
+(let p (pair-of-i64-and-bool k bool.true))
+; ~> (let p
+;      (λ
+;        ((z tau)
+;         (k (Π ((_ i64) (_ bool)))))
+;        (k (erase (z k) k) bool.true)))
+; ~> undefined variable: k
+#+END_SRC
+That is, using =erase=, we can ensure that a variable introduced by =notation= does not collide to a free variable contained in an argument of the notation.
+
+Note that =erase= is not a complete solution to the problem of [[https://en.wikipedia.org/wiki/Hygienic_macro][hygienic macros]]: consider the following code:
+#+BEGIN_SRC neut
+(notation (unless condition on-false on-true)
+  (if (bool.not condition) on-true on-false)
+#+END_SRC
+The notation above presupposes that the free variable =bool.not= is bound in a sane way; =bool.not= can't be something like =(λ (x) x)=, or =(string.print "hello, world!")=. =erase= has no use in this situation, though we might be able to introduce something like =(coerase (LEAF ... LEAF) TREE)= which ensures that every given variable is defined at top level.
 
 ** question
 *** Example
