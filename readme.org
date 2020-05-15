@@ -1456,7 +1456,7 @@ The type of a term wrapped by =question= is reported by the compiler. This might
 
 * Auxiliary Syntax
 ** asterisk
-=*= is a placeholder that should be inferred.
+=*= is a placeholder that must be inferred.
 *** Example
 #+BEGIN_SRC neut
 (define id ((a tau) (x a)) x)
@@ -1485,7 +1485,7 @@ If the type is not determined, the compiler raises an error; For example, the ty
 since the =10= cannot be determined to be =i32=, =i16=, or =i64=, etc.
 
 ** sigma
-The =sigma= term is a term that represents the existential quantification.
+=sigma= is the existential quantification.
 *** Example
 #+BEGIN_SRC neut
 ; binary sigma-intro without dependence
@@ -1508,9 +1508,9 @@ The =sigma= term is a term that represents the existential quantification.
 
 (sigma-introduction e1 ... en)
 
-(sigma-elimination (LEAFPLUS ... LEAFPLUS) e1 e2)
+(sigma-elimination (LEAF_PLUS ... LEAF_PLUS) e1 e2)
 
-LEAFPLUS ::= LEAF | (LEAF TREE)
+LEAF_PLUS ::= LEAF | (LEAF TREE)
 #+END_SRC
 *** Semantics
 #+BEGIN_SRC text
@@ -1529,7 +1529,9 @@ LEAFPLUS ::= LEAF | (LEAF TREE)
 ~> (e1 hole (lambda ((x1 A1) ... (xn An)) e2))
 #+END_SRC
 *** Notes
-The sigma-type is just a convenient notation of certain pattern of use of pi-type; This encoding is the ordinary one in CoC.
+Actual definition of =sigma= is found in =core/VERSION/notation.neut=. In other words, =sigma= is just a convenient notation of certain use of =pi=.
+
+# The sigma-type is just a convenient notation of certain pattern of use of pi-type; This encoding is the ordinary one in CoC.
 
 Sigma-type with dependence can be used, for example, to realize the type of string as follows:
 #+BEGIN_SRC text
@@ -1579,6 +1581,9 @@ where:
 (with bind (let x e) rest+)
 ~> (bind hole hole (with e)
      (lambda (x) (with rest+)))
+
+(with bind (erase x1 ... xn) rest+)
+~> (erase (x1 ... xn) (with bind rest+))
 
 (with bind e rest+)
 ~> (with bind (let _ e) rest+)
