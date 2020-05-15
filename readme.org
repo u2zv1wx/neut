@@ -1677,7 +1677,7 @@ syscall-os.write A out buf nbyte :=
   return (buf, result)
 #+END_SRC
 
-You may note that the "syscalls" are lowered to some external interface functions on macOS. This is because macOS (>= 10.12) doesn't support using syscalls directly; Indeed, for example, if we were to use the syscall =fork= directly (0x2000002), succeeding =malloc= causes a fatal error, saying =mach_vm_map(size=1048576) failed (error code=268435459)=.
+Regarding macOS: You may note that the "syscalls" are lowered to some external interface functions on macOS. This is because macOS (>= 10.12) doesn't support using syscalls directly; Indeed, for example, if we were to use the syscall =fork= directly (0x2000002), succeeding =malloc= causes a fatal error, saying =mach_vm_map(size=1048576) failed (error code=268435459)=.
 
 ** Array Indexing
 Neut offers a family of constants that allows accessing an element of an array. The array is of the form ={LOWTYPE}.array-access=, where the ={LOWTYPE}= is either =i{n}= or =f{n}=. For example, =i8.array-access= can be used for indexing an array of type =(array N i8)=.
