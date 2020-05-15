@@ -1353,7 +1353,10 @@ The struct type is intended to be used for implementation of interfaces of sysca
 (erase (LEAF ... LEAF) TREE)
 #+END_SRC
 *** Semantics
-=erase= removes specified bound variables from its scope.
+#+BEGIN_SRC neut
+(erase (x1 ... xn) e)
+~> e  [where the `e` can't contain x1, ..., xn]
+#+END_SRC
 
 *** Notes
 =erase= can be used, for example, to ensure that a variable is not used after certain point of a program:
@@ -1430,9 +1433,26 @@ The notation above presupposes that the free variable =bool.not= is bound in a s
  # though we might be able to introduce something like =(coerase (LEAF ... LEAF) TREE)= which ensures that every given variable is defined at top level. We will have to prohibit using the names =erase= and =coerase= as a name of a bound variable in that case.
 
 ** question
+=question= requests the compiler to show the type of a term.
 *** Example
+#+BEGIN_SRC neut
+(let x top.unit)
+
+(question x)
+#+END_SRC
 *** Syntax
+#+BEGIN_SRC neut
+(question TREE)
+
+?TREE
+#+END_SRC
 *** Semantics
+#+BEGIN_SRC neut
+(question e)
+~> e
+#+END_SRC
+*** Notes
+The type of a term wrapped by =question= is reported by the compiler. This might be useful when used in harmony with a linter like flycheck.
 
 * Auxiliary Syntax
 ** asterisk
