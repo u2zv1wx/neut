@@ -1642,6 +1642,31 @@ As for the comparison operators =icmp= and =fcmp=, the names are of the form ={i
 The semantics of these instructions is as specified in the [[https://llvm.org/docs/LangRef.html][LLVM Language Reference Manual]].
 
 ** Syscalls
+Neut supports syscalls, although its current support is quite limited. As you can see in =core/VERSION/constant/{linux, darwin}.neut=, only basic syscalls like =read, write, exit, open, close= are supported. This is not something that caused by some theoretical difficulties; Rather, it is simply because of my limited resources.
+
+Syscall can be added via the following procedure:
+1. Declare corresponding constant (like =os.write=) using the [[#constant][constant]] statement
+2. Register argument information and syscall number in =src/Data/Syscall.hs=
+3. Rebuild the compiler and run some test codes to check if it really works
+
+Note that a syscall shouldn't produce/consume a resource. For example, the syscall =write= is (currently) declared to have the following type in Neut:
+#+BEGIN_SRC neut
+(constant write
+  (pi
+    ((A i64)
+     (out file-descriptor)
+     (buf (array A i8))
+     (nbyte i64))
+    (product (array A i8) i64)))
+#+END_SRC
+Compare the type above with the C signature of =write=:
+#+BEGIN_SRC c
+ssize_t write(int fildes, const void *buf, size_t nbyte);
+#+END_SRC
+Ignoring the =(A i64)= part that is necessary to receive an array of arbitrary length, the crucial difference here is the types of the codomains. While the latter one returns ordinary =ssize_t= (integer), the former one also returns the original array. This is because the syscall =write= doesn't consume (i.e. deallocate) given string. If we =write= in Neut doesn't return the original string, the string is never freed in the succeeding program, causing space leak.
+
+You may note that the "syscalls" are lowered to some external interface functions on macOS. This is because macOS (>= 10.12) doesn't support using syscalls directly; Indeed, for example, if we were to use the syscall =fork= directly (0x2000002), succeeding =malloc= causes a fatal error, saying something like =mach_vm_map(size=1048576) failed (error code=268435459)=.
+
 ** Array Indexing
 Neut offers a family of constants that allows accessing an element of an array. The array is of the form ={LOWTYPE}.array-access=, where the ={LOWTYPE}= is either =i{n}= or =f{n}=. For example, =i8.array-access= can be used for indexing an array of type =(array N i8)=.
 
