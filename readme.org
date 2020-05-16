@@ -128,7 +128,6 @@ Note that the second line uses the pair =(discard-string, copy-string)=, which i
 
 Incidentally, in the actual implementation, the result of =TRANSLATE(string)= is not a pair, but a function as in the pseudo-code below:
 #+BEGIN_SRC txt
-cartesian-string :: (i : Int, _ : string) -> (if i == 0 then () else string * string)
 cartesian-string (i, e) :=
   if i == 0
   then discard-string(e)
@@ -144,17 +143,48 @@ let (str2, str3) := cartesian-string(1, tmp);
 #+END_SRC
 By translating types in this way, we can omit creating tuples every time when we translate a type. Thus, in the actual implementation, a type is translated into a closed function, which is lowered to a pointer to the function (1 word).
 
+It would be worth noting here that these functions like =cartesian-string= are β-reduced (inlined) aggressively; These are ordinary functions that can be defined in the target language, after all.
+
 *** Notes on Closures
-Some of you may be wondering now: "How can we copy/discard a closure? In ordinary closure conversion, a lambda-abstraction is translated into a pair consists of (1) all the free variables in the abstraction, and (2) a pointer to an appropriately-arranged closed function. How can that tuple be copied/discarded just by using type information like =i64 -> bool=, which is seemingly useless here?"
+You may be wondering now: "How can we copy/discard a closure? In ordinary closure conversion, a lambda-abstraction is translated into a pair consists of (1) all the free variables in the abstraction, and (2) a pointer to an appropriately-arranged closed function. How can that tuple be copied/discarded just by using type information like =i64 -> bool=, which is seemingly useless here?"
+
+That is a valid question. The key to give an answer to this question is generalizing the concept of "all the free variables". Consider the following pseudo-code:
+#+BEGIN_SRC neut
+let make-pair-of-ANY-and-i64 := λ (a : type). λ (x : a). λ (y : i64). (x, y)
+#+END_SRC
+In ordinary closure conversion, the free variables of =λ (y : i64). (x, y)= is calculated to be =[x]= without making a fuss. Here, however, we generalize the concept so that we "trace" all the free variables included in the type of every free variable. In this case, for example, note that the type of =x= is =a=, which is again a free variable if it occurs in =λ (y : i64). (...)=, and thus this =a= is also considered to be a free variable. Since the type of =a= is =type=, which has no free variables, our "tracing" stops here, resulting a chain of free variables =[a : type, x : a]=.
+
+Note that the result of this process is necesarrily "closed". That is, if =[x1 : A1, ..., xn : An]= is a result of this tracing process, then the set of free variables in =A{i}= is exhausted by ={x1, ..., x{i-1}}=. In this way, we extract a closed chain from a lambda-abstraction.
+
+Let us continue the example of =λ (y : i64), (x, y)=. Using the closed chain we have just calculated, the compiler translates this lambda-abstraction conceptually as follows:
+#+BEGIN_SRC text
+(Sigma [a : type, x : a], (a, x), LABEL_TO_A_CLOSED_FUNCTION)
+#+END_SRC
+That is, a closure is translated into *(0) the type of the closed chain*, (1) the closed chain, and (2) a pointer to an appropriately-arranged closed function. Now, remember that every type gives the way how to copy/discard the terms of the type. Also remember that every type is translated into a function pointer, which can be copied/discarded without any malloc/free operations. Thus, we can generate a function that copies/discards a closure conceptually as follows:
+#+BEGIN_SRC text
+cartesian-closure i closure = do
+  let (TYPE_OF_CHAIN, CHAIN, LABEL) := closure in -- extract the element of the closure, freeing the outer tuple
+  if i == 0
+  then do
+    let _ := TYPE_OF_CHAIN(0, CHAIN); -- discard the chain using the type information
+    return ()                         -- note that both TYPE_OF_CHAIN and LABEL are immediate
+  else do
+    let (CHAIN_A, CHAIN_B) := TYPE_OF_CHAIN(1, CHAIN) in
+    return ((TYPE_OF_CHAIN, CHAIN_A, LABEL),
+            (TYPE_OF_CHAIN, CHAIN_B, LABEL)) -- construct the 2 closures, and the wrapper tuple (thus do malloc for the 3 times)
+#+END_SRC
+Thus, we can translate every Π-type into the function =cartesian-closure=. Every Closure is copied/discarded in the same way, regardless of its actual implementation. So, type information like =i64 -> bool= is indeed useless here; But it isn't a problem since every closure /knows/ how to copy/discard itself.
+
+The remaining piece is how a type of a closed chain like =Sigma [a : type, x : a]= is translated.
 
 # The key is the "all the" part of (1).
 
-# Proof-theoretically, this can be explained via the following type-isomorphism: Pi (x : A). B = Sigma (C : tau). C * Box (Pi (x : A, env :  C). B), where the =Box= is a necessity modality which can only be introduced when the antecedent is empty.
+# Proof-theoretically, this can be justified via the following type-isomorphism: Pi (x : A). B = Sigma (C : tau). C * Box (Pi (x : A, env :  C). B), where the =Box= is a necessity modality which can only be introduced when the antecedent is empty.
 
 *** Notes on Polymorphic Functions
-Others of you may be wondering: "What if a function is polymorphic? If the size of an argument is not fixed, how can that function copy the term?"
+Or you may be wondering: "What if a function is polymorphic? If the size of an argument is not fixed, how can that function copy the term?"
 
-That is a valid question - And here comes dependent-type. Firstly, remember that a polymorphic function in dependent-type theory is nothing but an ordinary function with an argument of type =tau=, where =tau= is the type of types. For example, the following is a polymorphic function that creates a pair of any type:
+That is again a valid question - And here comes dependent-type. Firstly, remember that a polymorphic function in dependent-type theory is nothing but an ordinary function with an argument of type =tau=, where =tau= is the type of types. For example, the following is a polymorphic function that creates a pair of any type:
 #+BEGIN_SRC neut
 ; to-tuple : Π (a : tau, x : a). a * a
 (define to-tuple ((a tau) (x a))
@@ -286,7 +316,7 @@ define i64 @main() {
 #+END_SRC
 Again, the non-schematic output can be found in the [[#llvm-ir-for-the-second-example][appendix]]. The output in this time is actually short enough to include it here (36 lines including comments), though I chose not to. The point here is that the string "a" is reused without copying, as expected.
 
-The resulting assembly code is reasonably small too (works on macOS; when you compile the same code on Linux, the =write= operations are lowered into corresponding syscalls):
+The resulting assembly code, which can be obtained by =--emit asm=, is reasonably small too (works on macOS; when you compile the same code on Linux, the =write= operations are lowered into corresponding syscalls):
 #+BEGIN_SRC asm
 	.section	__TEXT,__text,regular,pure_instructions
 	.macosx_version_min 12, 15
