@@ -654,7 +654,7 @@ Discriminant value starts from =0= by default, and increments one by one. The "c
 All the discriminant values of an enum-type must be distinct.
 
 ** erase
-=erase= makes given variable invisible.
+=erase= makes given variable invisible in its continuation.
 *** Example
 #+BEGIN_SRC neut
 (define helper (x)
@@ -663,9 +663,13 @@ All the discriminant values of an enum-type must be distinct.
 (define f (x)
   (mul-i64 (helper x) 2))
 
+(f 10)        ; ~> 22
+
+(helper 10)   ; ~> 11
+
 (erase helper)
 
-(f 10)   ; ~> 22
+(f 10)        ; ~> 22
 
 ; (helper 10) ; ~> undefined variable: helper
 #+END_SRC
@@ -677,7 +681,8 @@ All the discriminant values of an enum-type must be distinct.
 =erase= makes given variable invisible in its continuation.
 
 ** include
-=include= temporary transfers the parsing process to the file specified by given path, if necessary.
+=include= "pastes" the content of the specified file.
+# temporary transfers the parsing process to the file specified by given path, if necessary.
 *** Example
 #+BEGIN_SRC neut
 (include "core/0.1.0.0/free.neut")
@@ -704,21 +709,20 @@ All the discriminant values of an enum-type must be distinct.
 
 {CODE_2}
 #+END_SRC
+With the following notes:
 
-*** Notes
-If the first character of the path is dot ("."), the path is interpreted as a relative one. That is, the path is calculated using the current file's directory as the base path. Otherwise, the base path of this path calculation is set to be the library path of Neut (i.e. =~/.local/share/neut/NEUT_VERSION/library=).
+(1) If the first character of the path is dot ("."), the path is interpreted as a relative one. That is, the path is calculated using the current file's directory as the base path. Otherwise, the base path is set to be the library path (i.e. =~/.local/share/neut/NEUT_VERSION/library=).
 
-If the file at the =path= is already included, this statement does nothing.
+(2) If the file is already included, =include= does nothing.
 
-When including a file, [[#useunuse][the prefix environment]] must be empty.
+(3) When including a file, [[#useunuse][the prefix environment]] must be empty.
 
-Cyclic inclusion is invalid.
+(4) Cyclic inclusion is invalid.
 
 ** inductive
 =inductive= defines an inductive type, its introduction rules (constructors), and its pattern match function.
 *** Example
 #+BEGIN_SRC neut
-; this defines list, list.nil, list.cons, and list.case
 (inductive list ((a tau))
   (nil ()
     (list a))
@@ -780,7 +784,7 @@ Cyclic inclusion is invalid.
       TREE)))
 #+END_SRC
 *** Semantics
-When parsed, the =inductive= statement is translated into =let= statements that defines (1) the inductive type, (2) the introduction rules (or the constructors of the inductive type), and (3) the pattern match function. For example, consider the following =inductive= statement:
+When parsed, the =inductive= statement is translated into the =let= statements that defines (1) the inductive type, (2) the introduction rules (or the constructors of the inductive type), and (3) the pattern match function. For example, consider the following =inductive= statement:
 #+BEGIN_SRC neut
 (inductive list ((a tau))
   (nil ()
@@ -788,7 +792,7 @@ When parsed, the =inductive= statement is translated into =let= statements that 
   (cons ((_ a) (_ (list a)))
     (list a)))
 #+END_SRC
-Given this statement, the compiler generates [[#definelet][let]] statements that defines the followings:
+Given this statement, the compiler generates the =let= statements that define the followings:
 1. The inductive type =list : Pi (a : tau). tau=
 2. The introduction rules (constructors) of the type:
    - =list.nil : Pi (a : tau). list a=
@@ -819,11 +823,23 @@ is an invalid =inductive= statement, since the codomain of =bar= is not of the f
 (introspect LEAF (LEAF TREE ... TREE) ... (LEAF TREE ... TREE))
 #+END_SRC
 *** Semantics
-=(introspect var (v1 stmt-list-1) ... (vn stmt-list-n))= introspects the value of the compile-time variable =var= and selects a list of statement according to it, and then parses the statement list.
+#+BEGIN_SRC text
+(introspect VAR
+  (VAR-1 stmt-1-1 ... stmt-1-n{1})
+  ...
+  (VAR-m stmt-m-1 ... stmt-m-n{m}))
 
+~>
+
+(stmt-i-1)
+...
+(stmt-i-n)
+
+[where VAR == VAR-i]
+#+END_SRC
 If the corresponding value is not found in the clause list, this statement does nothing.
 
-The =var= must be a valid compile-time variable. Valid compile-time variables and its possible values currently available are as in the table below:
+The =var= in =(introspect var (...))= must be a valid compile-time variable. The valid compile-time variables and its possible values are currently as in the table below:
 
 | compile-time variable | possible values |
 |-----------------------+-----------------|
@@ -850,10 +866,10 @@ The =notation= statement registers a notation (macro).
 (notation TREE TREE)
 #+END_SRC
 *** Semantics
-When parsed, the statement =(notation FROM TO)= modifies the state of the compiler so that the mapping =FROM ~> TO= is recognized as a notation. This affects the result of macro expansion in the succeeding code.
+=(notation FROM TO)= modifies the state of the compiler so that the mapping =FROM ~> TO= is recognized as a notation (macro). This affects the result of macro expansion in the succeeding code.
 
 *** Notes on Macro Expansion
-Macro-expansion in Neut is a process of recursively applying *step-expansion*.
+Macro-expansion in Neut is a process of applying *step-expansion* recursively.
 
 I believe this step-expansion process is best explained by an example. Consider we have defined a notation as follows:
 #+BEGIN_SRC text
@@ -862,7 +878,13 @@ I believe this step-expansion process is best explained by an example. Consider 
     (bool.true e1)
     (bool.false e2)))
 #+END_SRC
-Now, suppose we have an AST =(if some-condition (i64.print 10) (string.print "hello"))=. The compiler then creates the following substitution:
+Also suppose that we have the following AST:
+#+BEGIN_SRC text
+(if some-condition
+  (i64.print 10)
+  (string.print "hello"))
+#+END_SRC
+In this situation, the compiler creates the following substitution:
 #+BEGIN_SRC text
 b  ~> some-condition
 e1 ~> (i64.print 10)
@@ -876,7 +898,7 @@ and then replaces =b=, =e1=, and =e2= in the codomain of the notation according 
 #+END_SRC
 Given this step-expansion, the macro-expansion proceeds as follows. Take =t= to be an input tree. If the tree =t= is of the form =LEAF=, the compiler returns the result of step-expansion of =t=. If a tree is of the form =(t1 ... tn)=, the =t1=, ..., =tn= are firstly macro-expanded them into =t1'= , ..., =tn'= , and then the compiler step-expands the tree =(t1' ... tn')=.
 
-You may want to use this statement with [[erase][erase]] to accomplish safety.
+You may want to use this statement with [[erase][erase]] to accomplish (a certain sort of) safety.
 
 ** let
 =let= evaluates given term and binds the result to the specified variable.
