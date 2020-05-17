@@ -152,7 +152,7 @@ That is a valid question. The key to give an answer to this question is generali
 #+BEGIN_SRC haskell
 λ (a : type). λ (x : a). λ (y : i64). (x, y)
 #+END_SRC
-In ordinary closure conversion, the free variables of =λ (y : i64). (x, y)= is calculated to be =[x]= without making a fuss. Here, however, we generalize the concept to "trace" all the free variables included in the type of every free variable. In this case, for example, note that the type of =x= is =a=, which is again a free variable if it occurs in =λ (y : i64). (...)=, and thus this =a= is also considered to be a free variable. Since the type of =a= is =type=, which has no free variables, our tracing stops here, resulting a chain of free variables =[a : type, x : a]=.
+In ordinary closure conversion, the free variables of =λ (y : i64). (x, y)= is calculated to be =[x]= without making a fuss. Here, however, we generalize the concept so that we "trace" all the free variables included in the type of every free variable. In this case, for example, note that the type of =x= is =a=, which is again a free variable if it occurs in =λ (y : i64). (...)=, and thus this =a= is also considered to be a free variable. Since the type of =a= is =type=, which has no free variables, our tracing stops here, resulting a chain of free variables =[a : type, x : a]=.
 
 Note that every result of this procedure is necessarily "closed". That is, if =[x1 : A1, ..., xn : An]= is a result of this tracing process, then the set of free variables in =A{i}= is exhausted by ={x1, ..., x{i-1}}=. In this way, we extract a closed chain from a lambda-abstraction.
 
@@ -160,10 +160,10 @@ Let us continue the example of =λ (y : i64), (x, y)=. Using the closed chain we
 #+BEGIN_SRC text
 (∑ [a : type, x : a], (a, x), LABEL_TO_A_CLOSED_FUNCTION)
 #+END_SRC
-That is, a closure is translated into *(0) the type of the closed chain*, (1) the closed chain, and (2) a pointer to an appropriately-arranged closed function. Now, remember that every type is translated into a term that copies/discards the terms of the type. Also remember that every type is translated into a function pointer, which can be copied/discarded without any malloc/free operations. Thus, we can generate a function that copies/discards a closure conceptually as follows:
+That is, a lambda-abstraction is translated into *(0) the type of the closed chain*, (1) the closed chain, and (2) a pointer to an appropriately-arranged closed function. Now, remember that every type is translated into a term that copies/discards the terms of the type. Also remember that every type is translated into a function pointer, which can be copied/discarded without any malloc/free operations. Thus, we can generate a function that copies/discards a closure conceptually as follows:
 #+BEGIN_SRC haskell
 cartesian-closure i closure = do
-  -- extract the element of the closure, freeing the outer tuple
+  -- extract the element of the closure, freeing the outer 3-word tuple
   let (typeOfChain, chain, label) := closure in
   if i == 0
   then do
@@ -172,6 +172,7 @@ cartesian-closure i closure = do
     -- note that both typeOfChain and label are immediate
     return ()
   else do
+    -- copy the chain using the type information
     let (chain_A, chain_B) := typeOfChain(1, chain) in
     -- construct the 2 closures, and the wrapper tuple (thus do malloc for the 3 times)
     return ((typeOfChain, chain_A, label), (typeOfChain, chain_B, label))
@@ -240,7 +241,7 @@ cartesian-sigma i sig :=
 #+END_SRC
 and translate =∑ [a : type, x : a]= into the =cartesian-sigma= above. In this way we can copy/discard a closure.
 
-# (Here one might be lead to say that this translation is a generalized (n-ary) eta-expansion)
+(One might be lead to say that this translation is a generalized eta-expansion)
 
 # Incidentally, the 3-element representation of a closure can be justified proof-theoretically. Let us consider a depenedent variant of CBPV, where the inference rules =thunk= / =force= can be used only when the assumption is empty:
 # #+BEGIN_SRC text
@@ -277,9 +278,8 @@ Note that the type =i64= is used in exactly the same way as =1=; A type is nothi
 #+BEGIN_SRC haskell
 to-tuple :: Π (a : tau, x : a). a * a
 to-tuple a x :=
-  let (discard-a, copy-a) := a in
-  let (x1, x2) := copy-a(x) in
-  (tuple x1 x2)
+  let (x1, x2) := a(1, x) in
+  (x1, x2)
 #+END_SRC
 Thus the answer to the question is: Polymorphic functions can copy/discard its polymorphic argument since the type, which is guaranteed to be passed as an argument, contains information on how to copy/discard the terms of the type.
 
@@ -315,7 +315,7 @@ The point of the workaround is straightforward: If those copying/discarding resu
   (let _ (string.print str))
   (string.print str))
 #+END_SRC
-We would like to use the variable =str= in linear way. To this end, we just have to request =string.print= to include the argument =str= in its return value. So, the type of =string.print= shouldn't be something like =string -> top= - where the =top= is the unit type - but should be =string -> string * top=, where the =A * B= means the product type of =A= and =B=. More specifically, the implementation of =string.print= should be something like (in pseudo-code):
+We would like to use the variable =str= in linear way. To this end, we can request =string.print= to include the argument =str= in its return value. So, the type of =string.print= shouldn't be something like =string -> top= - where the =top= is the unit type - but should be =string -> string * top=, where the =A * B= means the product type of =A= and =B=. More specifically, the implementation of =string.print= should be something like (in pseudo-code):
 #+BEGIN_SRC haskell
 string.print :: string -> string * top
 string.print str = do
@@ -332,7 +332,7 @@ unit
 #+END_SRC
 Note that the variables =str1=, =str2=, and =str3= are used exactly once, and =str4= for the 0 time. Therefore, the copying operation doesn't occur in the code above. Also, since the =str4= is defined but not used, the =str4= is discarded immediately after its definition.
 
-Now we have seen that those redundant copying/discarding can be avoided by writing the code in the manner above. There still remains a problem: code cluttering. It would be much nicer to have more sophisticated notation of that code pattern. Towards that end, firstly note that we can use the same name for the variables =str1=, =str2=, =str3=, and =str4= thanks to variable shadowing:
+Now we have seen that those redundant copying/discarding operations can be avoided by writing the code in the manner above. There still remains a problem: code cluttering. It would be much nicer to have more sophisticated notation of that code pattern. Towards that end, firstly note that we can use the same name for the variables =str1=, =str2=, =str3=, and =str4= thanks to variable shadowing:
 #+BEGIN_SRC haskell
 let str = "a";
 let (str, _) := string.print str;
