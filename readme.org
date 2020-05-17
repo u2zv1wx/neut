@@ -112,34 +112,34 @@ The way how a variable is copied/discarded is determined by the type of the vari
 
 *** Types as Exponentializers
 Let us go a little deeper. Consider the following schematic user input:
-#+BEGIN_SRC txt
+#+BEGIN_SRC haskell
 let str : string := "a";
-<A CODE THAT USES `str` for the 3 times>
+{- A CODE THAT USES `str` for the 3 times -}
 #+END_SRC
 Intuitively, what the compiler does is to translate the term above into the following term:
-#+BEGIN_SRC txt
+#+BEGIN_SRC haskell
 let str : string := "a";
 let (discard-string, copy-string) := TRANSLATE(string);
 let (str1, tmp) := copy-string(str);
 let (str2, str3) := copy-string(tmp);
-<THE CODE THAT USES `str1`, `str2`, AND `str3` LINEARLY>
+{- THE CODE THAT USES `str1`, `str2`, AND `str3` LINEARLY -}
 #+END_SRC
 Note that the second line uses the pair =(discard-string, copy-string)=, which is the result of translation of the type =string=. Every type =X= is translated in this manner; the pair of =discard-X= and =copy-X=. These exponential functions - something that allow us to create n copies of =x= from a single =x= - are used in its continuation so that every variable of this type (=str= in this example) is used linearly.
 
 Incidentally, in the actual implementation, the result of =TRANSLATE(string)= is not a pair, but a function as in the pseudo-code below:
-#+BEGIN_SRC txt
+#+BEGIN_SRC haskell
 cartesian-string (i, e) :=
   if i == 0
   then discard-string(e)
   else copy-string(e)
 #+END_SRC
 which is used in the following manner:
-#+BEGIN_SRC txt
+#+BEGIN_SRC haskell
 let str : string := "a";
 let cartesian-string := TRANSLATE(string);
 let (str1, tmp) := cartesian-string(1, tmp);
 let (str2, str3) := cartesian-string(1, tmp);
-<THE CODE THAT USES `str1`, `str2`, AND `str3` LINEARLY>
+{- THE CODE THAT USES `str1`, `str2`, AND `str3` LINEARLY -}
 #+END_SRC
 By translating types in this way, we can omit creating tuples every time when we translate a type. Thus, in the actual implementation, a type is translated into a closed function, which is lowered to a pointer to the function (1 word).
 
@@ -149,8 +149,8 @@ It would be worth noting here that these functions like =cartesian-string= are �
 You may be wondering now: "How can we copy/discard a closure? In ordinary closure conversion, a lambda-abstraction is translated into a pair consists of (1) all the free variables in the abstraction, and (2) a pointer to an appropriately-arranged closed function. How can that tuple be copied/discarded just by using type information like =i64 -> bool=, which is seemingly useless here?"
 
 That is a valid question. The key to give an answer to this question is generalizing the concept of "all the free variables". Consider the following pseudo-code:
-#+BEGIN_SRC neut
-let make-pair-of-ANY-and-i64 := λ (a : type). λ (x : a). λ (y : i64). (x, y)
+#+BEGIN_SRC haskell
+let make-pair-of-any-and-i64 := λ (a : type). λ (x : a). λ (y : i64). (x, y)
 #+END_SRC
 In ordinary closure conversion, the free variables of =λ (y : i64). (x, y)= is calculated to be =[x]= without making a fuss. Here, however, we generalize the concept to "trace" all the free variables included in the type of every free variable. In this case, for example, note that the type of =x= is =a=, which is again a free variable if it occurs in =λ (y : i64). (...)=, and thus this =a= is also considered to be a free variable. Since the type of =a= is =type=, which has no free variables, our tracing stops here, resulting a chain of free variables =[a : type, x : a]=.
 
@@ -161,7 +161,7 @@ Let us continue the example of =λ (y : i64), (x, y)=. Using the closed chain we
 (∑ [a : type, x : a], (a, x), LABEL_TO_A_CLOSED_FUNCTION)
 #+END_SRC
 That is, a closure is translated into *(0) the type of the closed chain*, (1) the closed chain, and (2) a pointer to an appropriately-arranged closed function. Now, remember that every type is translated into a term that copies/discards the terms of the type. Also remember that every type is translated into a function pointer, which can be copied/discarded without any malloc/free operations. Thus, we can generate a function that copies/discards a closure conceptually as follows:
-#+BEGIN_SRC text
+#+BEGIN_SRC haskell
 cartesian-closure i closure = do
   let (TYPE_OF_CHAIN, CHAIN, LABEL) := closure in -- extract the element of the closure, freeing the outer tuple
   if i == 0
@@ -176,11 +176,11 @@ cartesian-closure i closure = do
 Thus, we can translate every Π-type into the function =cartesian-closure=. Every Closure is copied/discarded in the same way, regardless of its actual implementation. So, type information like =i64 -> bool= is indeed useless here; But it isn't a problem since every closure knows how to copy/discard itself.
 
 The remaining piece is how a type of a closed chain like =∑ [a : type, x : a]= is translated. This is where eta-expansion plays its role. Suppose we have a term =e= of type =∑ [a : type, x : a]=. Since we already know that the type of =e=, we can eta-expand this term as follows:
-#+BEGIN_SRC text
+#+BEGIN_SRC haskell
 let (a, x) := e in (a, x)
 #+END_SRC
 Now, at this point, note that if we can copy/discard both =a : type= and =x : a=, we can then copy/discard =e= as follows:
-#+BEGIN_SRC text
+#+BEGIN_SRC haskell
 let (a, x) := e in
 let (a1, a2) := {COPY_a} a in
 let (x1, x2) := {COPY_x} x in
@@ -189,18 +189,18 @@ let (x1, x2) := {COPY_x} x in
 Thus, thanks to eta-expansion, the problem of copying/discarding the terms of type =∑ [a : type, x : a]= is reduced into the one of copying/discarding the terms of type =a : type= and =x : a=.
 
 The actual copying function is constructed inductively as follows. The starting point is the following term:
-#+BEGIN_SRC text
+#+BEGIN_SRC haskell
 let (a, x) := e in
 ((a, x), (a, x))
 #+END_SRC
 Firstly we copy =x= - using its type =a= - so that =x= is used linearly:
-#+BEGIN_SRC text
+#+BEGIN_SRC haskell
 let (a, x) := e in
 let (x1, x2) := a(1, x) in
 ((a, x1), (a, x2))
 #+END_SRC
 This creates a term that uses =x= linearly. Then we copy the term =a= - using its type =type= - so that =a= is used linearly:
-#+BEGIN_SRC text
+#+BEGIN_SRC haskell
 let (a, x) := e in
 let (a1, tmp) := type(1, a) in
 let (a2, a3) := type(1, tmp) in
@@ -208,7 +208,7 @@ let (x1, x2) := a1(1, x) in
 ((a2, x1), (a3, x2))
 #+END_SRC
 where the =type= is a term defined as follows:
-#+BEGIN_SRC text
+#+BEGIN_SRC haskell
 type i a :=
   if i == 0
   then ()     -- non-linear (affine) use of `a`
@@ -219,7 +219,7 @@ which is valid since a type is translated into a function pointer. This creates 
 Note that, by its construction, the first element of a closed chain doesn't contain any free variables, and therefore can be copied without using any free variables.
 
 In conclusion, =∑ [a : type, x : a]= is translated into the following term:
-#+BEGIN_SRC text
+#+BEGIN_SRC haskell
 cartesian-sigma sig :=
   let (a, x) := sig in
   let (a1, tmp) := type(1, a) in
@@ -263,7 +263,7 @@ This function =to-tuple= is, for example, used as follows:
 (to-tuple string "a")     ; ~> (tuple "a" "a")
 #+END_SRC
 Note that the type =i64= is used in exactly the same way as =1=; A type is nothing but an ordinary term of type =tau=. And these very terms =i64=, =bool=, and =string= in the example are translated into ordinary closed functions that copies/discards the terms of the type. Thus, the =to-tuple= function can copy the resource =x= of type =a= conceptually as follows:
-#+BEGIN_SRC text
+#+BEGIN_SRC haskell
 to-tuple :: Π (a : tau, x : a). a * a
 to-tuple a x :=
   let (discard-a, copy-a) := a in
@@ -296,14 +296,14 @@ The point of the workaround is straightforward: If those copying/discarding resu
   (string.print str))
 #+END_SRC
 We would like to use the variable =str= in linear way. To this end, we just have to request =string.print= to include the argument =str= in its return value. So, the type of =string.print= shouldn't be something like =string -> top= - where the =top= is the unit type - but should be =string -> string * top=, where the =A * B= means the product type of =A= and =B=. More specifically, the implementation of =string.print= should be something like (in pseudo-code):
-#+BEGIN_SRC text
+#+BEGIN_SRC haskell
 string.print :: string -> string * top
 string.print str = do
   {print the string `str` without consuming it}
   return (str, unit)
 #+END_SRC
 With that definition of =string.print=, we can use the variable =str= linearly (again, in pseudo-code):
-#+BEGIN_SRC text
+#+BEGIN_SRC haskell
 let str1 = "a";
 let (str2, _) := string.print str1;
 let (str3, _) := string.print str2;
@@ -313,7 +313,7 @@ unit
 Note that the variables =str1=, =str2=, and =str3= are used exactly once, and =str4= for the 0 time. Therefore, the copying operation doesn't occur in the code above. Also, since the =str4= is defined but not used, the =str4= is discarded immediately after its definition.
 
 Now we have seen that those redundant copying/discarding can be avoided by writing the code in the manner above. There still remains a problem: code cluttering. It would be much nicer to have more sophisticated notation of that code pattern. Towards that end, firstly note that we can use the same name for the variables =str1=, =str2=, =str3=, and =str4= thanks to variable shadowing:
-#+BEGIN_SRC text
+#+BEGIN_SRC haskell
 let str = "a";
 let (str, _) := string.print str;
 let (str, _) := string.print str;
@@ -321,16 +321,16 @@ let (str, _) := string.print str;
 unit
 #+END_SRC
 Now, we just have to introduce a notation that translates:
-#+BEGIN_SRC text
+#+BEGIN_SRC haskell
 let foo := string.print &str;
 #+END_SRC
 into:
-#+BEGIN_SRC text
+#+BEGIN_SRC haskell
 let (str, foo) := string.print str;
 #+END_SRC
 
 With this notation, our running example is rewritten as follows:
-#+BEGIN_SRC text
+#+BEGIN_SRC haskell
 let str = "a";
 let _ := string.print &str;
 let _ := string.print &str;
@@ -1768,13 +1768,13 @@ Implementation note: A syscall can be added via the following procedure:
 2. Register its argument information and the syscall number in =src/Data/Syscall.hs=
 3. Rebuild the compiler and run some test codes to check if it really works
 Here, the "argument information" is a list consists of one of the following tags: "immediate", "struct", "array", and "unused". This information is necessary to generate a corresponding syscall without writing each function definition explicitly. For example, consider you add a syscall =foo= with its argument information ["unused", "immediate", "struct", "array"]. This creates a function with 4 arguments. Let us call these arguments =x1=, =x2=, =x3=, and =x4=. The compiler then generates a function that calls the syscall, assuming that the "struct"- and "array"-tagged arguments are borrowed one. That is, the compiler generates a function that is defined schematically as follows:
-#+BEGIN_SRC text
+#+BEGIN_SRC haskell
 syscall-foo x1 x2 x3 x4 :=
   let result := CALL_SYSCALL(foo, x2, x3, x4) in
   return (x2, x3, result)
 #+END_SRC
 Using this mechanism, for example, the actual implementation of the syscall =os.write= above can be generated from ["unused", "immediate", "array", "immediate"]:
-#+BEGIN_SRC text
+#+BEGIN_SRC haskell
 syscall-os.write A out buf nbyte :=
   let result := CALL_SYSCALL(write, out, buf, nbyte) in
   return (buf, result)
