@@ -554,6 +554,8 @@ TREE ::= LEAF | (TREE ... TREE)
 #+END_SRC
 I also define the symbol =STRING= to be a double-quoted string.
 
+Note that the examples codes below usually assumes that the core library is already included.
+
 ** constant
 =constant= declares an external constant.
 
@@ -637,18 +639,18 @@ Archives specified in =ensure= is expected to be the ones created via [[#archive
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
-(enum LEAF LEAF_INT)
+(enum LEAF LEAF_INT ... LEAF_INT)
 
 LEAF_INT := LEAF | (LEAF INT)
 #+END_SRC
 *** Semantics
 =(enum x a1 ... an)= updates the state of the compiler so that the specified enum-type =x : tau= and the enum-values =x.a1, ..., x.an : x= can be used in its continuation.
 
-Every enum-value has its internal i64 value (discriminant). Those discriminant value can be extracted by using the unsafe cast, though not recommended in ordinary use.
+Every enum-value has its internal i64 value (discriminant). Those discriminant values can be extracted by using the constant =unsafe.cast=, though usually not recommended.
 
 Discriminant value starts from =0= by default, and increments one by one. The "current" value of this process can be modified by writing, e.g. =(enum foo a (b 100) c d)=. In this example, the discriminant value of =c= is set to be =101=.
 
-The discriminant values of an enum-type must be distinct.
+All the discriminant values of an enum-type must be distinct.
 
 # ** erase
 # The =erase= statement makes given variable invisible in its continuation.
