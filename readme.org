@@ -148,13 +148,13 @@ It would be worth noting here that these functions like =cartesian-string= are �
 *** Notes on Closures
 You may be wondering now: "How can we copy/discard a closure? In ordinary closure conversion, a lambda-abstraction is translated into a pair consists of (1) all the free variables in the abstraction, and (2) a pointer to an appropriately-arranged closed function. How can that tuple be copied/discarded just by using type information like =i64 -> bool=, which is seemingly useless here?"
 
-That is a valid question. The key to give an answer to this question is generalizing the concept of "all the free variables". Consider the following pseudo-code:
+That is a valid question. The key to give an answer to this question is generalizing the concept of "all the free variables". Consider the following term:
 #+BEGIN_SRC haskell
-let make-pair-of-any-and-i64 := λ (a : type). λ (x : a). λ (y : i64). (x, y)
+λ (a : type). λ (x : a). λ (y : i64). (x, y)
 #+END_SRC
 In ordinary closure conversion, the free variables of =λ (y : i64). (x, y)= is calculated to be =[x]= without making a fuss. Here, however, we generalize the concept to "trace" all the free variables included in the type of every free variable. In this case, for example, note that the type of =x= is =a=, which is again a free variable if it occurs in =λ (y : i64). (...)=, and thus this =a= is also considered to be a free variable. Since the type of =a= is =type=, which has no free variables, our tracing stops here, resulting a chain of free variables =[a : type, x : a]=.
 
-Note that the result of this process is necessarily "closed". That is, if =[x1 : A1, ..., xn : An]= is a result of this tracing process, then the set of free variables in =A{i}= is exhausted by ={x1, ..., x{i-1}}=. In this way, we extract a closed chain from a lambda-abstraction.
+Note that every result of this procedure is necessarily "closed". That is, if =[x1 : A1, ..., xn : An]= is a result of this tracing process, then the set of free variables in =A{i}= is exhausted by ={x1, ..., x{i-1}}=. In this way, we extract a closed chain from a lambda-abstraction.
 
 Let us continue the example of =λ (y : i64), (x, y)=. Using the closed chain we have just calculated, the compiler translates this lambda-abstraction conceptually as follows:
 #+BEGIN_SRC text
@@ -163,17 +163,20 @@ Let us continue the example of =λ (y : i64), (x, y)=. Using the closed chain we
 That is, a closure is translated into *(0) the type of the closed chain*, (1) the closed chain, and (2) a pointer to an appropriately-arranged closed function. Now, remember that every type is translated into a term that copies/discards the terms of the type. Also remember that every type is translated into a function pointer, which can be copied/discarded without any malloc/free operations. Thus, we can generate a function that copies/discards a closure conceptually as follows:
 #+BEGIN_SRC haskell
 cartesian-closure i closure = do
-  let (TYPE_OF_CHAIN, CHAIN, LABEL) := closure in -- extract the element of the closure, freeing the outer tuple
+  -- extract the element of the closure, freeing the outer tuple
+  let (typeOfChain, chain, label) := closure in
   if i == 0
   then do
-    let _ := TYPE_OF_CHAIN(0, CHAIN); -- discard the chain using the type information
-    return ()                         -- note that both TYPE_OF_CHAIN and LABEL are immediate
+    -- discard the chain using the type information
+    let _ := typeOfChain(0, chain);
+    -- note that both typeOfChain and label are immediate
+    return ()
   else do
-    let (CHAIN_A, CHAIN_B) := TYPE_OF_CHAIN(1, CHAIN) in
-    return ((TYPE_OF_CHAIN, CHAIN_A, LABEL),
-            (TYPE_OF_CHAIN, CHAIN_B, LABEL)) -- construct the 2 closures, and the wrapper tuple (thus do malloc for the 3 times)
+    let (chain_A, chain_B) := typeOfChain(1, chain) in
+    -- construct the 2 closures, and the wrapper tuple (thus do malloc for the 3 times)
+    return ((typeOfChain, chain_A, label), (typeOfChain, chain_B, label))
 #+END_SRC
-Thus, we can translate every Π-type into the function =cartesian-closure=. Every Closure is copied/discarded in the same way, regardless of its actual implementation. So, type information like =i64 -> bool= is indeed useless here; But it isn't a problem since every closure knows how to copy/discard itself.
+Thus, we can translate every Π-type into the function =cartesian-closure=. Every Closure is copied/discarded in the same way, regardless of its actual implementation. So, information like =i64= or =bool= in =i64 -> bool= is indeed useless here; But it isn't a problem since every closure knows how to copy/discard itself.
 
 The remaining piece is how a type of a closed chain like =∑ [a : type, x : a]= is translated. This is where eta-expansion plays its role. Suppose we have a term =e= of type =∑ [a : type, x : a]=. Since we already know the type of =e=, we can eta-expand this term as follows:
 #+BEGIN_SRC haskell
@@ -237,7 +240,7 @@ cartesian-sigma i sig :=
 #+END_SRC
 and translate =∑ [a : type, x : a]= into the =cartesian-sigma= above. In this way we can copy/discard a closure.
 
-(Here one might be lead to say that this translation is a generalized (n-ary) eta-expansion)
+# (Here one might be lead to say that this translation is a generalized (n-ary) eta-expansion)
 
 # Incidentally, the 3-element representation of a closure can be justified proof-theoretically. Let us consider a depenedent variant of CBPV, where the inference rules =thunk= / =force= can be used only when the assumption is empty:
 # #+BEGIN_SRC text
@@ -283,11 +286,20 @@ Thus the answer to the question is: Polymorphic functions can copy/discard its p
 *** Summary
 - A variable is copied/discarded so that the variable is used linearly
 - A type is lowered into a function pointer that copies/discards the terms of the type
-- Polymorphic function can copy resources thanks to the information provided by its type argument
+- Closures can be copied/discarded since they know how to copy/discard itself
+- Polymorphic function can copy/discard its polymorphic arguments thanks to the information provided by its type argument
 
-This is the basic behavior of Neut's proof-theoretic memory management. As you might already be aware, this naive copying/discarding can result in an inefficient object code. We often use a variable more than once, as in the example of =str=. We can't say that code of =str= is efficient enough; We can't ignore those redundant copy operations.
+This is the basic behavior of Neut's proof-theoretic memory management. As you might already be aware, this naive copying/discarding can result in an inefficient object code. We often use a variable more than once, as in the example of =str=:
+#+BEGIN_SRC neut
+(with identity.bind
+  (let str "a")
+  (let _ (string.print str))
+  (let _ (string.print str))
+  (string.print str))
+#+END_SRC
+We can't say the resulting LLVM IR of this code is efficient enough; We can't ignore those redundant copy operations.
 
-Thankfully, there is a workaround for this performance problem.
+Fortunately, there is a workaround for this performance problem.
 
 ** Manual Optimization via Borrowing
 The point of the workaround is straightforward: If those copying/discarding result from using variables in non-linear way, we simply have to use those variables in linear way. Let's go back to the first example code:
