@@ -68,7 +68,6 @@ Here I briefly summerize the basic properties of Neut before diving into the det
 - [[#appendix][Appendix]]
   - [[#llvm-ir-for-the-first-example][LLVM IR for the First Example]]
   - [[#llvm-ir-for-the-second-example][LLVM IR for the Second Example]]
-  - [[#proof-theoretic-memory-management-more-specifically][Proof-Theoretic Memory Management, More Specifically]]
 
 * Examples
 ** Compile-Time malloc/free Determination
@@ -106,7 +105,7 @@ The non-schematic, actual output can also be found in the [[#llvm-ir-for-the-fir
 
 The resulting LLVM IR creates a string in memory, print it, and free it for the 3 times. The point here is that the resulting code creates 2 copies of the original string. This is because the variable =str= is used for the 3 times; The content of a variable is copied to create n instances when the variable is used for the n times (n > 1). If the variable isn't used at all (n < 1), the content of the variable is discarded (deallocated). If the variable is used exactly once, or linearly (n = 1), the content of the variable is used without any discarding/copying operation.
 
-By translating the source calculus in the way sketched above, every variable is ensured to be used linearly, except for the ones in the functions that realize those copying/discarding operations. Thus, by checking that those exponential functions use resources properly, we can ensure that the target calculus of this translation handles memory properly too. And indeed those exponentializers are sane - This is the basic storyline.
+By translating the source calculus in the way sketched above, every variable is ensured to be used linearly, except for the ones in the functions that realize those copying/discarding operations. Thus, by checking that those exponentializers use resources properly, we can ensure that the target calculus of this translation handles memory properly too. And indeed those exponentializers are sane - This is the basic storyline.
 
 The way how a variable is copied/discarded is determined by the type of the variable. For example, if the type of a variable is the array type as in the example above, the copying operation is something that you would do in C to copy an array (memory allocation followed by value insertion). If the type is an immediate type like an integer type, the "copying" operation is the one that uses the original value for the cloned value. Every type is translated into a term that copies/discards the terms of the type, including the type of the type itself.
 
@@ -124,7 +123,7 @@ let (str1, tmp) := copy-string(str);
 let (str2, str3) := copy-string(tmp);
 {- THE CODE THAT USES `str1`, `str2`, AND `str3` LINEARLY -}
 #+END_SRC
-Note that the second line uses the pair =(discard-string, copy-string)=, which is the result of translation of the type =string=. Every type =X= is translated in this manner; the pair of =discard-X= and =copy-X=. These exponential functions - something that allow us to create n copies of =x= from a single =x= - are used in its continuation so that every variable of this type (=str= in this example) is used linearly.
+Note that the second line uses the pair =(discard-string, copy-string)=, which is the result of translation of the type =string=. Every type =X= is translated in this manner; the pair of =discard-X= and =copy-X=. These exponentializers - something that allow us to create n copies of =x= from a single =x= - are used in its continuation so that every variable of this type (=str= in this example) is used linearly.
 
 Incidentally, in the actual implementation, the result of =TRANSLATE(string)= is not a pair, but a function as in the pseudo-code below:
 #+BEGIN_SRC haskell
@@ -148,13 +147,13 @@ It would be worth noting here that these functions like =cartesian-string= are �
 *** Notes on Closures
 You may be wondering now: "How can we copy/discard a closure? In ordinary closure conversion, a lambda-abstraction is translated into a pair consists of (1) all the free variables in the abstraction, and (2) a pointer to an appropriately-arranged closed function. How can that tuple be copied/discarded just by using type information like =i64 -> bool=, which is seemingly useless here?"
 
-That is a valid question. The key to give an answer to this question is generalizing the concept of "all the free variables". Consider the following term:
+That is a valid question. The key to give the answer to this question is generalizing the concept of "all the free variables". Consider the following term:
 #+BEGIN_SRC haskell
 λ (a : type). λ (x : a). λ (y : i64). (x, y)
 #+END_SRC
 In ordinary closure conversion, the free variables of =λ (y : i64). (x, y)= is calculated to be =[x]= without making a fuss. Here, however, we generalize the concept so that we "trace" all the free variables included in the type of every free variable. In this case, for example, note that the type of =x= is =a=, which is again a free variable if it occurs in =λ (y : i64). (...)=, and thus this =a= is also considered to be a free variable. Since the type of =a= is =type=, which has no free variables, our tracing stops here, resulting a chain of free variables =[a : type, x : a]=.
 
-Note that every result of this procedure is necessarily "closed". That is, if =[x1 : A1, ..., xn : An]= is a result of this tracing process, then the set of free variables in =A{i}= is exhausted by ={x1, ..., x{i-1}}=. In this way, we extract a closed chain from a lambda-abstraction.
+Note that every result of this procedure is necessarily "closed". That is, if the list =[x1 : A1, ..., xn : An]= is a result of this tracing process, then the set of free variables in =A{i}= is a subset of ={x1, ..., x{i-1}}=. In this way, we extract a closed chain from a lambda-abstraction.
 
 Let us continue the example of =λ (y : i64), (x, y)=. Using the closed chain we have just calculated, the compiler translates this lambda-abstraction conceptually as follows:
 #+BEGIN_SRC text
@@ -173,11 +172,11 @@ cartesian-closure i closure = do
     return ()
   else do
     -- copy the chain using the type information
-    let (chain_A, chain_B) := typeOfChain(1, chain);
+    let (chainA, chainB) := typeOfChain(1, chain);
     -- construct the 2 closures, and the wrapper tuple (thus do malloc for the 3 times)
-    return ((typeOfChain, chain_A, label), (typeOfChain, chain_B, label))
+    return ((typeOfChain, chainA, label), (typeOfChain, chainB, label))
 #+END_SRC
-Thus, we can translate every Π-type into the function =cartesian-closure=. Every Closure is copied/discarded in the same way, regardless of its actual implementation. So, information like =i64= or =bool= in =i64 -> bool= is indeed useless here; But it isn't a problem since every closure knows how to copy/discard itself.
+Thus, we can translate every Π-type into the function =cartesian-closure=. Every Closure is copied/discarded in the same way, regardless of its actual details. So, information like =i64= or =bool= in =i64 -> bool= is indeed useless here; But it isn't a problem since every closure knows how to copy/discard itself.
 
 The remaining piece is how a type of a closed chain like =∑ [a : type, x : a]= is translated. This is where eta-expansion plays its role. Suppose we have a term =e= of type =∑ [a : type, x : a]=. Since we already know the type of =e=, we can eta-expand this term as follows:
 #+BEGIN_SRC haskell
@@ -283,7 +282,7 @@ to-tuple a x :=
 #+END_SRC
 Thus the answer to the question is: Polymorphic functions can copy/discard its polymorphic argument since the type, which is guaranteed to be passed as an argument, contains information on how to copy/discard the terms of the type.
 
-*** Summary
+*** Summary So Far
 - A variable is copied/discarded so that the variable is used linearly
 - A type is lowered into a function pointer that copies/discards the terms of the type
 - Closures can be copied/discarded since they know how to copy/discard itself
@@ -302,7 +301,7 @@ We can't say the resulting LLVM IR of this code is efficient enough; We can't ig
 Fortunately, there is a workaround for this performance problem.
 
 ** Manual Optimization via Borrowing
-The point of the workaround is straightforward: If those copying/discarding result from using variables in non-linear way, we simply have to use those variables in linear way. Let's go back to the first example code:
+The point of the workaround is straightforward: If those copying/discarding result from using variables non-linearly, we simply have to use those variables linearly. Let's go back to the first example code:
 #+BEGIN_SRC neut
 (ensure core/0.1.0.0
   "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz")
@@ -315,7 +314,7 @@ The point of the workaround is straightforward: If those copying/discarding resu
   (let _ (string.print str))
   (string.print str))
 #+END_SRC
-We would like to use the variable =str= in linear way. To this end, we can request =string.print= to include the argument =str= in its return value. So, the type of =string.print= shouldn't be something like =string -> top= - where the =top= is the unit type - but should be =string -> string * top=, where the =A * B= means the product type of =A= and =B=. More specifically, the implementation of =string.print= should be something like (in pseudo-code):
+We would like to use the variable =str= linearly. To this end, we can request =string.print= to include the argument =str= in its return value. So, the type of =string.print= shouldn't be something like =string -> top= - where the =top= is the unit type - but should be =string -> string * top=, where the =A * B= means the product type of =A= and =B=. More specifically, the implementation of =string.print= should be something like (in pseudo-code):
 #+BEGIN_SRC haskell
 string.print :: string -> string * top
 string.print str = do
@@ -515,16 +514,16 @@ define i64 @main() {
 Although the compiler can cancel memory allocations/deallocations, it cannot cancel their accompanying initialization processes (at least for now). If you do need performance, you need to write code in the linear/borrowing style.
 
 ** Summary
-- Neut statically determines malloc/free at compile-time via type information.
+- Neut statically determines malloc/free at compile-time via type information
 - The content of a variable is
-  - discarded if and only if the variable isn't used at all.
-  - untouched if and only if the variable is used exactly once (i.e. used linearly).
-  - copied if and only if the variable is used more than once.
-- Linearity tends to result in an efficient code.
-- Non-linearity tends to result in an inefficient code.
-- Borrowing can be used as a convenient syntactic tool when accomplishing linearity.
-- Redundant malloc/free can be reduced by automatic malloc/free cancellation.
-- Borrowing-based, or "manually" optimized code is faster than cancellation-based, or "automatically" optimized code.
+  - discarded if and only if the variable isn't used at all
+  - untouched if and only if the variable is used exactly once (i.e. used linearly)
+  - copied if and only if the variable is used more than once
+- Linearity tends to result in an efficient code
+- Non-linearity tends to result in an inefficient code
+- Borrowing can be used as a convenient syntactic tool when accomplishing linearity
+- Redundant malloc/free can be reduced by automatic malloc/free cancellation
+- Borrowing-based, or "manually" optimized code is faster than cancellation-based, or "automatically" optimized code
 
 * Installation
 The currently supported platforms are: Linux (x64), macOS (x64).
@@ -2032,5 +2031,3 @@ define i64 @main() {
   ret i64 %_12056
 }
 #+END_SRC
-
-** Proof-Theoretic Memory Management, More Specifically
