@@ -164,7 +164,7 @@ That is, a lambda-abstraction is translated into *(0) the type of the closed cha
 #+BEGIN_SRC haskell
 cartesian-closure i closure = do
   -- extract the element of the closure, freeing the outer 3-word tuple
-  let (typeOfChain, chain, label) := closure in
+  let (typeOfChain, chain, label) := closure;
   if i == 0
   then do
     -- discard the chain using the type information
@@ -173,7 +173,7 @@ cartesian-closure i closure = do
     return ()
   else do
     -- copy the chain using the type information
-    let (chain_A, chain_B) := typeOfChain(1, chain) in
+    let (chain_A, chain_B) := typeOfChain(1, chain);
     -- construct the 2 closures, and the wrapper tuple (thus do malloc for the 3 times)
     return ((typeOfChain, chain_A, label), (typeOfChain, chain_B, label))
 #+END_SRC
@@ -214,7 +214,7 @@ let (x1, x2) := a1(1, x) in
 #+END_SRC
 where the =type= is a term defined as follows:
 #+BEGIN_SRC haskell
-type i a :=
+type i a =
   if i == 0
   then ()     -- non-linear (affine) use of `a`
   else (a, a) -- non-linear (relevant) use of `a`
@@ -1800,7 +1800,7 @@ syscall-os.write A out buf nbyte :=
   return (buf, result)
 #+END_SRC
 
-Regarding macOS: You may note that the "syscalls" are lowered to some external interface functions on macOS. This is because macOS (>= 10.12) doesn't support using syscalls directly; Indeed, for example, if we were to use the syscall =fork= directly (0x2000002), succeeding =malloc= causes a fatal error, saying =mach_vm_map(size=1048576) failed (error code=268435459)=.
+Regarding macOS: You may note that the "syscalls" are lowered to some external interface functions on macOS. This is because macOS (>= 10.12) doesn't support using syscalls directly; Indeed, for example, if we were to use the syscall =fork= directly (0x2000002), succeeding =malloc= causes a fatal error when I tested, saying =mach_vm_map(size=1048576) failed (error code=268435459)=.
 
 ** Array Indexing
 Neut offers a family of constants that allows accessing an element of an array. The array is of the form ={LOWTYPE}.array-access=, where the ={LOWTYPE}= is either =i{n}= or =f{n}=. For example, =i8.array-access= can be used for indexing an array of type =(array N i8)=.
