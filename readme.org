@@ -175,9 +175,10 @@ cartesian-closure i closure = do
 #+END_SRC
 Thus, we can translate every Π-type into the function =cartesian-closure=. Every Closure is copied/discarded in the same way, regardless of its actual implementation. So, type information like =i64 -> bool= is indeed useless here; But it isn't a problem since every closure knows how to copy/discard itself.
 
-The remaining piece is how a type of a closed chain like =∑ [a : type, x : a]= is translated. This is where eta-expansion plays its role. Suppose we have a term =e= of type =∑ [a : type, x : a]=. Since we already know that the type of =e=, we can eta-expand this term as follows:
+The remaining piece is how a type of a closed chain like =∑ [a : type, x : a]= is translated. This is where eta-expansion plays its role. Suppose we have a term =e= of type =∑ [a : type, x : a]=. Since we already know the type of =e=, we can eta-expand this term as follows:
 #+BEGIN_SRC haskell
-let (a, x) := e in (a, x)
+let (a, x) := e in
+(a, x)
 #+END_SRC
 Now, at this point, note that if we can copy/discard both =a : type= and =x : a=, we can then copy/discard =e= as follows:
 #+BEGIN_SRC haskell
@@ -214,20 +215,27 @@ type i a :=
   then ()     -- non-linear (affine) use of `a`
   else (a, a) -- non-linear (relevant) use of `a`
 #+END_SRC
-which is valid since a type is translated into a function pointer. This creates a term that uses both =a= and =x= linearly.
+which is resource-safe since a type is translated into a function pointer. This creates a term that uses both =a= and =x= linearly.
 
 Note that, by its construction, the first element of a closed chain doesn't contain any free variables, and therefore can be copied without using any free variables.
 
-In conclusion, =∑ [a : type, x : a]= is translated into the following term:
+In conclusion, the copying part of =∑ [a : type, x : a]= is defined by the following term:
 #+BEGIN_SRC haskell
-cartesian-sigma sig :=
+copy-sigma sig :=
   let (a, x) := sig in
   let (a1, tmp) := type(1, a) in
   let (a2, a3) := type(1, tmp) in
   let (x1, x2) := a1(1, x) in
   ((a2, x1), (a3, x2))
 #+END_SRC
-By using this term, we can now copy the tuple =(a, x)= in the closure =(∑ [a : type, x : a], (a, x), LABEL)=. The discarding function is defined similarly. In this way we can copy/discard a closure.
+By using this term, we can now copy the tuple =(a, x)= in the closure =(∑ [a : type, x : a], (a, x), LABEL)=. The discarding function is defined similarly. Then we just have to construct the following term:
+#+BEGIN_SRC haskell
+cartesian-sigma i sig :=
+  if i == 0
+  then discard-sigma sig
+  else copy-sigma sig
+#+END_SRC
+and translate =∑ [a : type, x : a]= into the =cartesian-sigma= above. In this way we can copy/discard a closure.
 
 (Here one might be lead to say that this translation is a generalized (n-ary) eta-expansion)
 
