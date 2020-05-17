@@ -30,6 +30,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#constant][constant]]
   - [[#ensure][ensure]]
   - [[#enum][enum]]
+  - [[#erase][erase]]
   - [[#include][include]]
   - [[#inductive][inductive]]
   - [[#introspect][introspect]]
@@ -49,7 +50,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#enum-1][enum]]
   - [[#array][array]]
   - [[#struct][struct]]
-  - [[#erase][erase]]
+  - [[#erase-1][erase]]
   - [[#question][question]]
 - [[#auxiliary-syntax][Auxiliary Syntax]]
   - [[#asterisk][asterisk]]
@@ -652,28 +653,28 @@ Discriminant value starts from =0= by default, and increments one by one. The "c
 
 All the discriminant values of an enum-type must be distinct.
 
-# ** erase
-# The =erase= statement makes given variable invisible in its continuation.
-# *** Example
-# #+BEGIN_SRC neut
-# (define helper-function (x) (add-i64 x 1))
+** erase
+=erase= makes given variable invisible.
+*** Example
+#+BEGIN_SRC neut
+(define helper (x)
+  (add-i64 x 1))
 
-# (define public-function (x) (mul-i64 (helper-function x) 2))
+(define f (x)
+  (mul-i64 (helper x) 2))
 
-# (erase helper-function)
+(erase helper)
 
-# (public-function 10)   ; ~> 22
+(f 10)   ; ~> 22
 
-# ; (helper-function 10) ; ~> undefined variable: helper-function
-# #+END_SRC
-# *** Syntax
-# #+BEGIN_SRC neut
-# (erase LEAF)
-# #+END_SRC
-# *** Semantics
-# The =erase= statement makes given variable invisible in its continuation.
-# *** Notes
-# =erase= can be used to realize a private function. If you
+; (helper 10) ; ~> undefined variable: helper
+#+END_SRC
+*** Syntax
+#+BEGIN_SRC neut
+(erase LEAF)
+#+END_SRC
+*** Semantics
+=erase= makes given variable invisible in its continuation.
 
 ** include
 =include= temporary transfers the parsing process to the file specified by given path, if necessary.
