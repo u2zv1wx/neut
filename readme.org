@@ -552,14 +552,18 @@ In the following, I use the symbols =LEAF= and =TREE= defined as follows:
 LEAF ::= {a sequence of character that doesn't contain '(', ')', or '${ANY_WHITESPACE_CHARACTER}'}
 TREE ::= LEAF | (TREE ... TREE)
 #+END_SRC
-I also define the symbol =STRING= to be a string.
+I also define the symbol =STRING= to be a double-quoted string.
 
 ** constant
-The =constant= statement declares an external constant.
+=constant= declares an external constant.
 
 *** Example
 #+BEGIN_SRC neut
-(constant unsafe.cast (Π ((A tau) (B tau) (x A)) B))
+(constant unsafe.cast
+  (Π ((A tau)
+      (B tau)
+      (x A))
+     B))
 
 (let foo (unsafe.cast i64 string 1)) ; foo : string
 #+END_SRC
@@ -568,14 +572,14 @@ The =constant= statement declares an external constant.
 (constant LEAF TREE)
 #+END_SRC
 *** Semantics
-=(constant x t)= modifies the state of the compiler so that a [[#constant][constant]] =x= of type =t= is available in its continuation. Declared constants can then be available for use as in the same way of ordinary [[#upsilon][variables]].
+=(constant x t)= modifies the state of the compiler so that the [[#constant][constant]] =x= of type =t= is available in the succeeding code. Declared constants can then be available for use in the same way as ordinary [[#upsilon][variables]].
 
-Every constant must have distinct names.
+All the constants must have distinct names.
 
-This statement is currently intended only for internal use, such as for implementation of syscalls. External constants (FFI) might also be supported in future release via this statement.
+This statement is currently intended only for internal use (e.g. implementation of a syscall). FFI might also be supported in future release via this statement.
 
 ** ensure
-The =ensure= statement fetches the content of the specified URL for later use.
+=ensure= fetches the content of the specified URL for later use.
 
 *** Example
 #+BEGIN_SRC neut
@@ -599,7 +603,7 @@ This statement is intended to be used in harmony with [[#include][include]].
 Archives specified in =ensure= is supposed to be ones created via the [[#archive][archive]] subcommand.
 
 ** enum
-The =enum= statement declares a new enum-type and its values.
+=enum= declares a new enum-type and its values.
 *** Example
 #+BEGIN_SRC neut
 (enum choice left right) ; defines choice : tau, choice.left : choice, and choice.right : choice
@@ -671,7 +675,7 @@ The discriminant values of an enum-type must be distinct.
 # =erase= can be used to realize a private function. If you
 
 ** include
-The =include= statement temporary transfers the parsing process to the file specified by given path, if necessary.
+=include= temporary transfers the parsing process to the file specified by given path, if necessary.
 *** Example
 #+BEGIN_SRC neut
 (include "core/0.1.0.0/free.neut")
@@ -709,7 +713,7 @@ When including a file, [[#useunuse][the prefix environment]] must be empty.
 Cyclic inclusion is invalid.
 
 ** inductive
-The =inductive= statement defines an inductive type, its introduction rules (constructors), and its pattern match function.
+=inductive= defines an inductive type, its introduction rules (constructors), and its pattern match function.
 *** Example
 #+BEGIN_SRC neut
 ; this defines list, list.nil, list.cons, and list.case
@@ -799,7 +803,7 @@ The codomain of each constructor must be of the form =(a e1 ... en)=, where the 
 is an invalid =inductive= statement, since the codomain of =bar= is not of the form =(foo _)=, but =i64=.
 
 ** introspect
-The =introspect= statement introspects the state of the compiler and selects statements by those information.
+=introspect= introspects the state of the compiler and selects statements by those information.
 *** Example
 #+BEGIN_SRC neut
 (introspect OS
@@ -873,7 +877,7 @@ Given this step-expansion, the macro-expansion proceeds as follows. Take =t= to 
 You may want to use this statement with [[erase][erase]] to accomplish safety.
 
 ** let
-The =let= statement evaluates given term and binds the result to a variable.
+=let= evaluates given term and binds the result to the specified variable.
 
 *** Example
 #+BEGIN_SRC neut
@@ -999,7 +1003,7 @@ The compiler then processes this statement in the same way ordinary =inductive= 
 The other destructors are defined similarly.
 
 ** use/unuse
-The =use= / =unuse= statement registers a prefix for name resolution.
+=use= / =unuse= registers a prefix for name resolution.
 *** Example
 #+BEGIN_SRC neut
 (let foo.bar.buz (i64 10))
