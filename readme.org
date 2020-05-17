@@ -898,7 +898,7 @@ and then replaces =b=, =e1=, and =e2= in the codomain of the notation according 
 #+END_SRC
 Given this step-expansion, the macro-expansion proceeds as follows. Take =t= to be an input tree. If the tree =t= is of the form =LEAF=, the compiler returns the result of step-expansion of =t=. If a tree is of the form =(t1 ... tn)=, the =t1=, ..., =tn= are firstly macro-expanded them into =t1'= , ..., =tn'= , and then the compiler step-expands the tree =(t1' ... tn')=.
 
-You may want to use this statement with [[erase][erase]] to accomplish (a certain sort of) safety.
+You may want to use this statement with [[#erase-1][erase]] to accomplish (a certain sort of) safety.
 
 ** let
 =let= evaluates given term and binds the result to the specified variable.
