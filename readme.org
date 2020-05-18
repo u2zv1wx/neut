@@ -1350,9 +1350,9 @@ LEAF_PLUS ::= LEAF | (LEAF TREE)
 #+END_SRC
 *** Inference Rule
 #+BEGIN_SRC text
-Γ, f : (pi ((x1 A1) ... (xn An)) B), x1 : A1, ..., xn : An |- e : B       f ∉ freevar(A1) ∪ ... ∪ freevar(An) ∪ freevar(B)
---------------------------------------------------------------------------------------------------------------------------- (fix)
-                   Γ |- (fix f ((x1 A1) ... (xn An)) e) : (pi ((x1 A1) ... (xn An)) B)
+Γ, f : (pi ((x1 A1) ... (xn An)) B), x1 : A1, ..., xn : An |- e : B
+-------------------------------------------------------------------- (fix)
+Γ |- (fix f ((x1 A1) ... (xn An)) e) : (pi ((x1 A1) ... (xn An)) B)
 #+END_SRC
 *** Semantics
 #+BEGIN_SRC neut
