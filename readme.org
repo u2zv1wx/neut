@@ -1165,8 +1165,6 @@ In other words, the =section= - =end= statement
 Each =section= must be paired with an =end= with the corresponding name.
 
 * Syntax and Semantics of Terms
-A term of Neut is a tree of inference rules. Each rule is one of the following rules described in this section.
-
 ** tau
 =tau= is the type of types.
 *** Example
@@ -1180,6 +1178,16 @@ A term of Neut is a tree of inference rules. Each rule is one of the following r
 *** Syntax
 #+BEGIN_SRC neut
 tau
+#+END_SRC
+*** Inference Rule
+#+BEGIN_SRC text
+
+-------------------(empty)
+well-formed(EMPTY)
+
+well-formed(Γ)
+--------------- (tau)
+Γ |- tau : tau
 #+END_SRC
 *** Semantics
 The =tau= rule doesn't have any operational semantics.
@@ -1200,6 +1208,16 @@ The =tau= rule doesn't have any operational semantics.
 #+BEGIN_SRC neut
 (upsilon LEAF)
 LEAF
+#+END_SRC
+*** Inference Rule
+#+BEGIN_SRC text
+    Γ |- A : tau
+------------------------- (ext)
+well-formed(Γ, x : A)
+
+well-formed(Γ)  (x : A) ∈ Γ
+---------------------------- (var)
+       Γ |- x : A
 #+END_SRC
 *** Semantics
 The =upsilon= rule doesn't have any operational semantics.
@@ -1251,6 +1269,20 @@ The name of a variable is interpreted in relation with the keyword environment. 
 (TREE+)
 
 LEAF_PLUS ::= LEAF | (LEAF TREE)
+#+END_SRC
+*** Inference Rule
+#+BEGIN_SRC text
+Γ |- A : tau     (...)    Γ, x1 : A1, ..., xn : An |- B : tau
+------------------------------------------------------------- (Pi)
+          Γ |- (pi ((x1 A1) ... (xn An)) B) : tau
+
+             Γ, x1 : A1, ..., xn : An |- e : B
+------------------------------------------------------------------------------- (pi-introduction)
+ Γ |- (pi-introduction ((x1 A1) ... (xn An)) e) : (pi ((x1 A1) ... (xn An)) B)
+
+Γ |- e : (pi ((x1 A1) ... (xn An)) B)   Γ |- e1 : A1   (...)   Γ |- en : An {xi := ei}
+-------------------------------------------------------------------------------------- (pi-elimination)
+              Γ |- (pi-elimination e e1 ... en) : B {xi := ei}
 #+END_SRC
 *** Semantics
 #+BEGIN_SRC neut
