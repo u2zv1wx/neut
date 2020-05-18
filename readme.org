@@ -152,7 +152,7 @@ That is a valid question. The key to give the answer to this question is general
 #+BEGIN_SRC haskell
 λ (a : type). λ (x : a). λ (y : i64). (x, y)
 #+END_SRC
-In ordinary closure conversion, the free variables of =λ (y : i64). (x, y)= is calculated to be =[x]= without making a fuss. Here, however, we generalize the concept so that we "trace" all the free variables included in the type of every free variable. In this case, for example, note that the type of =x= is =a=, which is again a free variable if it occurs in =λ (y : i64). (...)=, and thus this =a= is also considered to be a free variable. Since the type of =a= is =type=, which has no free variables, our tracing stops here, resulting a chain of free variables =[a : type, x : a]=.
+In ordinary closure conversion, the free variables of =λ (y : i64). (x, y)= is calculated to be =[x]= without making a fuss. Here, however, we generalize the concept so that we "trace" all the free variables included in the type of every free variable. In this case, for example, note that the type of =x= is =a=, which is again a free variable if it occurs in =λ (y : i64). (...)=, and thus this =a= is also considered to be a free variable. Since the type of =a= is =type=, which has no free variables, our tracing stops here, resulting a chain of the free variables =[a : type, x : a]=.
 
 Note that every result of this procedure is necessarily "closed". That is, if the list =[x1 : A1, ..., xn : An]= is a result of this tracing process, then the set of free variables in =A{i}= is a subset of ={x1, ..., x{i-1}}=. In this way, we extract a closed chain from a lambda-abstraction.
 
