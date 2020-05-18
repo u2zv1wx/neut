@@ -871,7 +871,7 @@ The =notation= statement registers a notation (macro).
 *** Notes on Macro Expansion
 Macro-expansion in Neut is a process of applying *step-expansion* recursively.
 
-I believe this step-expansion process is best explained by an example. Consider we have defined a notation as follows:
+I believe this step-expansion process is best explained by example. Consider we have defined a notation as follows:
 #+BEGIN_SRC text
 (notation (if b e1 e2)
   (switch b
@@ -896,7 +896,26 @@ and then replaces =b=, =e1=, and =e2= in the codomain of the notation according 
   (bool.true (i64.print 10))
   (bool.false (string.print "hello")))
 #+END_SRC
-Given this step-expansion, the macro-expansion proceeds as follows. Take =t= to be an input tree. If the tree =t= is of the form =LEAF=, the compiler returns the result of step-expansion of =t=. If a tree is of the form =(t1 ... tn)=, the =t1=, ..., =tn= are firstly macro-expanded them into =t1'= , ..., =tn'= , and then the compiler step-expands the tree =(t1' ... tn')=.
+Given this step-expansion, macro-expansion is schematically defined as follows.
+#+BEGIN_SRC haskell
+macroExpand :: Tree -> Tree
+macroExpand inputTree =
+  case inputTree of
+    Leaf x ->
+      recurseOrReturn (Leaf x)
+    Node t1 ... tn ->
+      recurseOrReturn (Node (macroExpand t1) ... (macroExpand tn))
+
+recurseOrReturn :: Tree -> Tree
+recurseOrReturn t =
+  case stepExpand t of
+    -- if there exists a notation that step-expands `t`, with resulting subtitution `sub`
+    Just sub ->
+      macroExpand (applySubstitution sub t)
+    Nothing ->
+      t
+#+END_SRC
+(The pseudo-code above is intended to be call-by-value)
 
 You may want to use this statement with [[#erase-1][erase]] to accomplish (a certain sort of) safety.
 
