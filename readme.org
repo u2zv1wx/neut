@@ -1046,7 +1046,7 @@ The compiler then processes this statement in the same way ordinary =inductive= 
 The other destructors are defined similarly.
 
 ** use/unuse
-=use= / =unuse= registers a prefix for name resolution.
+=use= inserts a prefix to the prefix environment. =unuse= removes a prefix from the prefix environment.
 *** Example
 #+BEGIN_SRC neut
 (let foo.bar.buz (i64 10))
@@ -1055,29 +1055,29 @@ The other destructors are defined similarly.
 ; (i64.print bar.buz)   ; ~> undefined variable: `bar.buz`
 (i64.print foo.bar.buz) ; ~> 10
 
-; keyword-env = []
+; prefix-environment = []
 (use foo)
-; keyword-env = ["foo"]
+; prefix-environment = ["foo"]
 
 ; (i64.print buz)       ; ~> undefined variable: `buz`
 (i64.print bar.buz)     ; ~> 10
 (i64.print foo.bar.buz) ; ~> 10
 
-; keyword-env = ["foo"]
+; prefix-environment = ["foo"]
 (use foo.bar)
-; keyword-env = ["foo.bar", "foo"]
+; prefix-environment = ["foo.bar", "foo"]
 
-; keyword-env = ["foo.bar", "foo"]
+; prefix-environment = ["foo.bar", "foo"]
 (use qux)
-; keyword-env = ["qux", "foo.bar", "foo"]
+; prefix-environment = ["qux", "foo.bar", "foo"]
 
 (i64.print buz)         ; ~> 10
 (i64.print bar.buz)     ; ~> 10
 (i64.print foo.bar.buz) ; ~> 10
 
-; keyword-env = ["qux", "foo.bar", "foo"]
+; prefix-environment = ["qux", "foo.bar", "foo"]
 (unuse foo)
-; keyword-env = ["qux", "foo.bar"]
+; prefix-environment = ["qux", "foo.bar"]
 
 (i64.print buz)         ; ~> 10
 ; (i64.print bar.buz)  ; ~> undefined variable: `bar.buz`
@@ -1094,9 +1094,11 @@ When parsed, the statement =(use PREFIX)= inserts =PREFIX= at the head of the pr
 
 When parsed, the statement =(unuse PREFIX)= removes =PREFIX= from the prefix environment. If the =PREFIX= is not contained in the environment, the =unuse= statement does nothing.
 
-The prefix environment modifies [[#upsilon][how the compiler parses a variable]].
+The prefix environment modifies [[#upsilon][how the compiler interprets a variable]].
 
 ** section/end
+=section= - =end= automatically adds the specified prefix to the variables defined by =let=.
+
 *** Example
 #+BEGIN_SRC neut
 (section pohe)
@@ -1109,6 +1111,7 @@ The prefix environment modifies [[#upsilon][how the compiler parses a variable]]
 
 (i64.print foo)          ; ~> 10
 (i64.print pohe.foo)     ; ~> 10
+
 (i64.print bar)          ; ~> 20
 (i64.print qux.bar)      ; ~> 20
 (i64.print pohe.qux.bar) ; ~> 20
@@ -1117,6 +1120,7 @@ The prefix environment modifies [[#upsilon][how the compiler parses a variable]]
 
 (i64.print foo)          ; ~> 10
 (i64.print pohe.foo)     ; ~> 10
+
 ; (i64.print bar)        ; ~> undefined variable
 (i64.print qux.bar)      ; ~> 20
 (i64.print pohe.qux.bar) ; ~> 20
@@ -1125,6 +1129,7 @@ The prefix environment modifies [[#upsilon][how the compiler parses a variable]]
 
 ; (i64.print foo)        ; ~> undefined variable
 (i64.print pohe.foo)     ; ~> 10
+
 ; (i64.print bar)        ; ~> undefined variable
 ; (i64.print qux.bar)    ; ~> undefined variable
 (i64.print pohe.qux.bar) ; ~> 20
@@ -1153,15 +1158,14 @@ is equivalent to:
 (unuse FOO)
 #+END_SRC
 In other words, the =section= - =end= statement
-- inserts the [[#useunuse][use/unuse]] statements at the beginning and the end of the section
-- adds the name of the section as a prefix of the variables defined by =let= / =define= statements
-- keeps all the other statements in the section untouched
+- inserts [[#useunuse][use / unuse]] at the beginning and the end of the section
+- adds the name of the section as a prefix of the variables defined by =let=
+- keeps all the other statements in the section intact
 
-Each =section= statement must be paired with an =end= statement with the corresponding name.
+Each =section= must be paired with an =end= with the corresponding name.
 
 * Syntax and Semantics of Terms
 A term of Neut is a tree of inference rules. Each rule is one of the following rules described in this section.
- # Each statement is one of the following statements described in this section.
 
 ** tau
 =tau= is the type of types.
