@@ -944,7 +944,7 @@ You may want to use this statement with [[#erase-1][erase]] to accomplish (a cer
 (define fact ((x i64))
   (if (icmp-sle-i64 x 0) ; compare (by less-than-or-equal) two `i64`s as signed integers
     1
-    (mul-i64 x (fact (sub-i64 x 1))))) ; the self-referential variable "fact" is available in its function body
+    (mul-i64 x (fact (sub-i64 x 1)))))
 
 (i64.print (fact foo)) ; ~> 3628800 (= 10!)
 
@@ -976,7 +976,7 @@ LEAF_PLUS ::= LEAF | (LEAF TREE)
 *** Semantics
 =(let x e)= checks the type of the term =e=, evaluates the term =e=, then defines a variable =x= with =e= as its content. =x= is available in the continuation. The type of =x= can be annotated to be =t= by writing =(let (x t) e)=.
 
-If a user input =e= is not parsed as a statement when it is supposed to be, the compiler firstly interpret it as =(let _ e)=.
+If a user input =e= is not parsed as a statement when it is supposed to be, the compiler interprets it as =(let _ e)=.
 
 ** record
 The =record= statement creates a record type, its elimination rules (destructors), and its introduction rule.
