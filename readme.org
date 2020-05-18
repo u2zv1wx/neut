@@ -1019,14 +1019,14 @@ When parsed, the =record= statement is translated into =let= statements that def
   (item-3
     top))
 #+END_SRC
-Given this statement, the compiler generates [[#definelet][let]] statements that defines the followings:
+Given this statement, the compiler generates [[#definelet][let]] statements that define the followings:
 1. The record type =my-record : Pi (a : tau). tau=
 2. The elimination rules (destructors) of the type:
-   - =my-record.item-1 : Pi (a : tau, _ : (my-record a)). a=
-   - =my-record.item-2 : Pi (a : tau, _ : (my-record a)). i64=
-   - =my-record.item-3 : Pi (a : tau, _ : (my-record a)). top=
+   - =my-record.item-1 : Pi (a : tau, _ : my-record a). a=
+   - =my-record.item-2 : Pi (a : tau, _ : my-record a). i64=
+   - =my-record.item-3 : Pi (a : tau, _ : my-record a). top=
 3. The introduction rule of the type:
-   - =my-record.new : (Π ((a tau) (_ a) (_ i64) (_ top)) (my-record a))=
+   - =my-record.new : Π (a : tau, item-1 : a, item-2 : i64, item-3 : top). my-record a=
 
 Internally, every record statement is translated into the corresponding [[#inductive][inductive]] statement. For example, given the =record= statement above, the compiler translates it into the following =inductive= statement:
 #+BEGIN_SRC neut
@@ -1041,7 +1041,7 @@ The compiler then processes this statement in the same way ordinary =inductive= 
 #+BEGIN_SRC neut
 (define my-record.item-1 ((a tau) (record-value (my-record a)))
   (my-record.case a record-value
-    (λ (item-1 item-2 item3) item-1)))
+    (λ (item-1 item-2 item-3) item-1)))
 #+END_SRC
 The other destructors are defined similarly.
 
