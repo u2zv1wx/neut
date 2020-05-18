@@ -1914,7 +1914,7 @@ where:
 ~> e
 #+END_SRC
 *** Notes
-The =with= notation can be understood as a generalization of =begin= in Scheme, or an explicit version of the =do= notation in Haskell.
+=with= can be understood as a generalization of =begin= in Scheme, or an explicit version of the =do= notation in Haskell.
 
 The "borrowing" is covered by the first rule of the semantics; As you can see from the definition, this realization of borrowing works for any =bind= operation.
 
