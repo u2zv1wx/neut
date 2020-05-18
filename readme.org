@@ -50,8 +50,8 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#enum-1][enum]]
   - [[#array][array]]
   - [[#struct][struct]]
-  - [[#erase-1][erase]]
   - [[#question][question]]
+  - [[#erase-1][erase]]
 - [[#auxiliary-syntax][Auxiliary Syntax]]
   - [[#asterisk][asterisk]]
   - [[#sigma][sigma]]
@@ -1191,7 +1191,7 @@ well-formed(Γ)
 Γ |- tau : tau
 #+END_SRC
 *** Semantics
-The =tau= rule doesn't have any operational semantics.
+=tau= doesn't have any operational semantics.
 
 ** upsilon
 =upsilion= is a variable.
@@ -1218,22 +1218,20 @@ well-formed(Γ, x : A)
 
 
 well-formed(Γ)  (x : A) ∈ Γ
----------------------------- (var)
-       Γ |- x : A
+---------------------------- (upsilon)
+   Γ |- (upsilon x) : A
 #+END_SRC
 *** Semantics
-The =upsilon= rule doesn't have any operational semantics.
+=upsilon= doesn't have any operational semantics.
 
 *** Notes
-If a leaf is not parsed into any other syntactic construct, the leaf is considered to be wrapped by =upsilon=.
-
-If the name of a variable is "_", the compiler automatically generates a fresh variable so that the variable cannot be referred in the succeeding code.
+If a leaf is not parsed into any other syntactic construct, the leaf =x= is regarded as =(upsilon x)=.
 
 The name of a variable is interpreted in relation with the keyword environment. For example, if the keyword environment is =["foo", "bar", "buz"]=, the name =qux= is interpreted in the following way:
-1. Look up a bound variable of name =qux= in current scope.
-2. If not found, look up a bound variable of name =foo.qux= in current scope.
-3. If not found, look up a bound variable of name =bar.qux= in current scope.
-4. If not found, look up a bound variable of name =buz.qux= in current scope.
+1. Look up a bound variable named =qux= in current scope.
+2. If not found, look up a bound variable named =foo.qux= in current scope.
+3. If not found, look up a bound variable named =bar.qux= in current scope.
+4. If not found, look up a bound variable named =buz.qux= in current scope.
 5. If not found, report the error: "undefined variable".
 
 ** pi
@@ -1291,17 +1289,17 @@ LEAF_PLUS ::= LEAF | (LEAF TREE)
 *** Semantics
 #+BEGIN_SRC neut
 (pi-elimination e e1 ... en)
-~> (pi-elimination v v1 ... vn)  [i.e. reduce e and ei to values v and vi, from left to right]
+~> (pi-elimination v v1 ... vn)  [i.e. reduce e and ei into the values v and vi, from left to right]
 
 (pi-elimination (pi-introduction ((x1 A1) ... (xn An)) e) v1 ... vn)
-~> e {x1 := v1,
-      ...,
-      xn := vn}
+~> e {x1 := v1, ..., xn := vn}
 #+END_SRC
 *** Notes
-If a tree =(e e1 ... en)= is not parsed into any other terms, the tree is parsed as =(pi-elimination e e1 ... en)=.
+If a tree =(e e1 ... en)= is not parsed into any other terms, the tree is regarded as =(pi-elimination e e1 ... en)=.
 
-Note that the arguments of a lambda abstraction is generalized from unary to n-ary. This enables the compiler to emit more performant code when a lambda abstraction receives multiple arguments; Without that generalization, the argument must be represented as a tuple, discarding the possibility to pass the arguments of a function using multiple registers.
+If the name of an argument of a pi-introduction is "_", the compiler automatically generates a fresh name so that the variable cannot be used in its scope.
+
+Note that the arguments of a lambda-abstraction is generalized from unary to n-ary. This enables the compiler to emit more performant code when a lambda-abstraction receives multiple arguments; Without that generalization, the arguments must be represented as a tuple, discarding the possibility to pass the arguments of a function using multiple registers.
 
 Some additional notations for pi are defined in =core/VERSION/notation.neut=:
 #+BEGIN_SRC neut
@@ -1313,6 +1311,7 @@ Some additional notations for pi are defined in =core/VERSION/notation.neut=:
 
 (notation λ pi-introduction)
 
+; tells the compiler that the type of `e` is `t`
 (notation (witness t e)
   ((λ ((x t)) x) e))
 #+END_SRC
@@ -1393,13 +1392,13 @@ The =constant= rule doesn't have any operational semantics by itself; Each const
 If a leaf is declared to be a constant using the [[#constant][constant]] statement beforehand, the leaf is interpreted as =(constant LEAF)=.
 
 ** int
-=int= is a thin layer for the integer type in LLVM.
+=i{n}= is the integer type in LLVM.
 *** Example
 #+BEGIN_SRC neut
-(i64 1)
+(add-i64 (i64 1) 2)
 (i32 10)
 23456789
-(i2 100)
+(mul-i2 (i2 100) 3)
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
@@ -1416,7 +1415,7 @@ LEAF [where this LEAF can be parsed as integer]
 #+BEGIN_SRC text
 well-formed(Γ)     {`l` is an integer}     {i{n} is a valid integer type}
 --------------------------------------------------------------------------- (integer)
-                  Γ |- l : i{n}
+                  Γ |- (i{n} l) : i{n}
 #+END_SRC
 *** Semantics
 The terms of an integer type don't have any operational semantics by themselves.
@@ -1428,13 +1427,13 @@ Every integer of type =i{n}= is interpreted modulo =2^n=, just as in the same wa
 An integer without explicit type information is overloaded; it's type is firstly set to be unknown, and then inferred.
 
 ** float
-=float= is a thin layer for the float type in LLVM.
+=f{n}= is the float type in LLVM.
 *** Example
 #+BEGIN_SRC neut
 (f16 3.8)
 (f32 9.22888)
 (f64 1.23456789)
-(fadd-f64 1.23456 7.89)
+(fadd-f64 1.23456 (f64 7.89))
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
@@ -1460,13 +1459,15 @@ The =float= type in Neut is the same as the one of LLVM. Specifically, LLVM's =h
 An float without explicit type information is overloaded; it's type is firstly set to be unknown, and then inferred.
 
 ** enum
-=enum= is the enumeration as in other languages.
+=enum= is the enumeration type.
 *** Example
 See the example in [[#enum][the section about the enum statement]].
 *** Syntax
 #+BEGIN_SRC neut
+(enum LEAF)
+
 (enum-introduction LEAF)
-LEAF [where this LEAF is already defined to be an enum value]
+LEAF
 
 (enum-elimination TREE
   (ENUM_CASE TREE)
@@ -1508,8 +1509,11 @@ well-formed(Γ)   {`l` is a value of enum-type `(enum E)`}
 ~> e [where e != e1, ..., en]
 #+END_SRC
 
+*** Notes
+The cases of an enum-elimination must be exhaustive.
+
 ** array
-=array= is a thin layer of the array in LLVM.
+=array= is the array type in LLVM.
 *** Example
 #+BEGIN_SRC neut
 ; float array
@@ -1575,12 +1579,12 @@ The type of elements of an array must be the integer type, or the float type.
 
 The memory layout of an array is the same as the one of LLVM; For example, an array of type =i8= is aligned as in the array =[0 x i8]= in LLVM.
 
-The array type can be used, for example, to implement strings.
+The array type can be used, for example, to implement string.
 
 You won't use =array-elimination= in actual code; You would use the constant =array-access= instead.
 
 ** struct
-=struct= is a thin layer of the struct in LLVM.
+=struct= is the struct type in LLVM.
 *** Example
 #+BEGIN_SRC neut
 (let st
@@ -1635,11 +1639,39 @@ well-formed(Γ)    {Every `ki` in {`k1`, ..., `kn`} is either an integer type or
       xn := en}
 #+END_SRC
 *** Notes
-The type of elements of a struct must be the integer type, or the float type.
+Note that an element of a struct type in Neut is restricted into an integer or a float. This means, among others, that you can't write a struct that contains another struct, or a memory region. This might get in the way when you implement an interface of a syscall; You might want to use the constant =unsafe.cast= in that case, or "flatten" the struct.
 
 The memory layout of a struct is the same as the one of LLVM; For example, a struct of type =(struct i8 f16 i32)= is aligned as in a struct of type ={i8, f16, f32}= in LLVM.
 
 The struct type is intended to be used for implementation of interfaces of syscalls.
+
+** question
+=question= requests the compiler to show the type of a term.
+*** Example
+#+BEGIN_SRC neut
+(let x top.unit)
+
+(question x)
+#+END_SRC
+*** Syntax
+#+BEGIN_SRC neut
+(question TREE)
+
+?TREE
+#+END_SRC
+*** Inference Rule
+#+BEGIN_SRC text
+     Γ |- e : A
+----------------------- (question)
+Γ |- (question e) : A
+#+END_SRC
+*** Semantics
+#+BEGIN_SRC neut
+(question e)
+~> e
+#+END_SRC
+*** Notes
+The type of a term wrapped by =question= is reported by the compiler. This might be useful when used in harmony with a linter like flycheck.
 
 ** erase
 =erase= makes given variables invisible in its scope.
@@ -1677,7 +1709,7 @@ The struct type is intended to be used for implementation of interfaces of sysca
 #+END_SRC
 
 *** Notes
-=erase= can be used, for example, to ensure that a variable is not used after certain point of a program:
+=erase= can be used, for example, to ensure that a variable is not used after a certain point of a program:
 #+BEGIN_SRC neut
 ; `with` has a dedicated notation for `erase`
 (with identity.bind
@@ -1688,32 +1720,21 @@ The struct type is intended to be used for implementation of interfaces of sysca
   ...)
 #+END_SRC
 
-=erase= can also be used to ensure that a variable introduced in [[#notation][notation]] doesn't cause name collision with a free variable. For example, consider the following notation:
+=erase= can also be used to ensure that a variable introduced in a [[#notation][notation]] doesn't cause name collision with a free variable. For example, consider the following notation:
 #+BEGIN_SRC neut
-(notation (pair-of-i64-and-bool e1 e2)
+(notation (foo e1 e2)
   (λ
     ((z tau)
      (k (Π ((_ i64) (_ bool)) z)))
     (k e1 e2)))
 
-; let (x1, x2) := pair in cont
-(notation (let-pair (x1 x2) pair cont)
-  (pair * (λ (x1 x2) cont)))
-
-; pair-introduction
-(let p (pair-of-i64-and-bool 10 bool.true))
-
-; pair-elimination
-(let-pair (i b) p
-  (if b
-    (add-i64 i 1)
-    (add-i64 i 2)))
+(let p (foo 10 bool.true))
 #+END_SRC
-Though the notation for a pair of i64 and bool works in many cases, it can cause an unintuitive behavior if the =e1= or =e2= in =(pair-of-i64-and-bool e1 e2)= contains =k= as a free variable:
+Though the notation =foo= works in many cases, it can cause an unintuitive behavior if the =e1= or =e2= in =(foo e1 e2)= contains =k= as a free variable:
 #+BEGIN_SRC neut
 (let k 100)
 
-(let p (pair-of-i64-and-bool k bool.true))
+(let p (foo k bool.true))
 ; ~> (let p
 ;      (λ
 ;        ((z tau)
@@ -1723,7 +1744,7 @@ Though the notation for a pair of i64 and bool works in many cases, it can cause
 #+END_SRC
 Though we luckily got a type error in the example above, generally this sort of variable capturing can result in a more hard-to-debug runtime error. =erase= can be used here to prevent this kind of situation as follows:
 #+BEGIN_SRC neut
-(notation (pair-of-i64-and-bool e1 e2)
+(notation (foo e1 e2)
   (λ
     ((z tau)
      (k (Π ((_ i64) (_ bool)) z)))
@@ -1731,7 +1752,7 @@ Though we luckily got a type error in the example above, generally this sort of 
 
 (let k 100)
 
-(let p (pair-of-i64-and-bool k bool.true))
+(let p (foo k bool.true))
 ; ~> (let p
 ;      (λ
 ;        ((z tau)
@@ -1746,37 +1767,10 @@ Note that =erase= is only a partial solution to the problem of [[https://en.wiki
 (notation (unless condition on-false on-true)
   (if (bool.not condition) on-true on-false)
 #+END_SRC
-The notation above presupposes that the free variable =bool.not= is bound in a sane way; =bool.not= can't be something like =(λ (x) x)=, or =(string.print "hello, world!")=. More generally, even the very symbol =erase= can be bound to a variable. Thus =erase= has no use in this situation.
+The notation above presupposes that the free variable =bool.not= is bound in a sane way; =bool.not= can't be something like =(λ (x) x)=, or =(string.print "hello, world!")=. Or, even the very symbol =erase= can theoretically be bound to a variable. Thus =erase= has no use in this situation.
 
- # though we might be able to introduce something like =(coerase (LEAF ... LEAF) TREE)= which ensures that every given variable is defined at top level. We will have to prohibit using the names =erase= and =coerase= as a name of a bound variable in that case.
+# though we might be able to introduce something like =(coerase (LEAF ... LEAF) TREE)= which ensures that every given variable is defined at top level. We will have to prohibit using the names =erase= and =coerase= as a name of a bound variable in that case.
 
-** question
-=question= requests the compiler to show the type of a term.
-*** Example
-#+BEGIN_SRC neut
-(let x top.unit)
-
-(question x)
-#+END_SRC
-*** Syntax
-#+BEGIN_SRC neut
-(question TREE)
-
-?TREE
-#+END_SRC
-*** Inference Rule
-#+BEGIN_SRC text
-     Γ |- e : A
------------------------ (question)
-Γ |- (question e) : A
-#+END_SRC
-*** Semantics
-#+BEGIN_SRC neut
-(question e)
-~> e
-#+END_SRC
-*** Notes
-The type of a term wrapped by =question= is reported by the compiler. This might be useful when used in harmony with a linter like flycheck.
 
 * Auxiliary Syntax
 ** asterisk
@@ -1812,14 +1806,21 @@ since the =10= cannot be determined to be =i32=, =i16=, or =i64=, etc.
 #+BEGIN_SRC neut
 ; binary sigma-intro without dependence
 (let pair
-  (sigma-introduction (i64 2) (lambda ((x tau)) x)))
+  (sigma-introduction (i64 2) (λ ((x tau)) x)))
 
 ; binary sigma-elim without dependence
 (sigma-elimination (x _) pair
   (i64.print x))
 
 (let n-pair
-  (sigma-introduction (i64 1) (lambda ((x tau)) x) (f32 10.82) top.unit top.unit top tau))
+  (sigma-introduction
+    (i64 1)
+    (λ ((x tau)) x)
+    (f32 10.82)
+    top.unit
+    top.unit
+    top
+    tau))
 
 (let 0-pair
   (sigma-introduction)
@@ -1851,15 +1852,14 @@ LEAF_PLUS ::= LEAF | (LEAF TREE)
 ~> (e1 hole (lambda ((x1 A1) ... (xn An)) e2))
 #+END_SRC
 *** Notes
-Actual definition of =sigma= is found in =core/VERSION/notation.neut=. In other words, =sigma= is just a convenient notation of certain use of =pi=.
-
-# The sigma-type is just a convenient notation of certain pattern of use of pi-type; This encoding is the ordinary one in CoC.
+Actual definition of =sigma= is found in =core/VERSION/notation.neut=; =sigma= is just a convenient notation of a certain use of =pi=. This enocding is the ordinary one in CoC.
 
 Sigma-type with dependence can be used, for example, to realize the type of string as follows:
 #+BEGIN_SRC text
 (define string
   (sigma ((len i64)) (array len i8)))
 #+END_SRC
+In this case, a term of this =string= type is something like =(3, [10, 20, 30])=. The first element is the =len : i64= part. This part contains the length information of a string. The second element is the actual content of the string.
 
 A sigma-type without dependence is the familiar product type; =(sigma ((_ A1) ... (_ An)) B)= is =(product A1 ... An B)=.
 
@@ -1892,7 +1892,7 @@ A sigma-type without dependence is the familiar product type; =(sigma ((_ A1) ..
 *** Semantics
 #+BEGIN_SRC text
 (with bind (let x (e e1 ... en)) rest+)
-~> (bind hole hole (with (e e1' ... en'))
+~> (bind * * (with (e e1' ... en'))
      (lambda (sig)
        (sigma-elimination (x1 ... xj) sig (with rest+))))
 where:
@@ -1901,14 +1901,14 @@ where:
   sig : a fresh variable
 
 (with bind (let x e) rest+)
-~> (bind hole hole (with e)
+~> (bind * * (with e)
      (lambda (x) (with rest+)))
-
-(with bind (erase x1 ... xn) rest+)
-~> (erase (x1 ... xn) (with bind rest+))
 
 (with bind e rest+)
 ~> (with bind (let _ e) rest+)
+
+(with bind (erase x1 ... xn) rest+)
+~> (erase (x1 ... xn) (with bind rest+))
 
 (with e)
 ~> e
@@ -1918,7 +1918,7 @@ The =with= notation can be understood as a generalization of =begin= in Scheme, 
 
 The "borrowing" is covered by the first rule of the semantics; As you can see from the definition, this realization of borrowing works for any =bind= operation.
 
-Note that the =bind= operator is not restricted to the monadic bind; You can set any term there as long as the resulting term of this syntactic translation is well-typed.
+Note that the =bind= operator is not restricted to monadic bind; You can set any term there as long as the resulting term of this syntactic translation is well-typed.
 
 The =e= in =(let x e)= is automatically surrounded by =with=.
 
