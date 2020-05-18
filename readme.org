@@ -1185,6 +1185,7 @@ tau
 -------------------(empty)
 well-formed(EMPTY)
 
+
 well-formed(Γ)
 --------------- (tau)
 Γ |- tau : tau
@@ -1214,6 +1215,7 @@ LEAF
     Γ |- A : tau
 ------------------------- (ext)
 well-formed(Γ, x : A)
+
 
 well-formed(Γ)  (x : A) ∈ Γ
 ---------------------------- (var)
@@ -1276,9 +1278,11 @@ LEAF_PLUS ::= LEAF | (LEAF TREE)
 ------------------------------------------------------------- (Pi)
           Γ |- (pi ((x1 A1) ... (xn An)) B) : tau
 
+
              Γ, x1 : A1, ..., xn : An |- e : B
 ------------------------------------------------------------------------------- (pi-introduction)
  Γ |- (pi-introduction ((x1 A1) ... (xn An)) e) : (pi ((x1 A1) ... (xn An)) B)
+
 
 Γ |- e : (pi ((x1 A1) ... (xn An)) B)   Γ |- e1 : A1   (...)   Γ |- en : An {xi := ei}
 -------------------------------------------------------------------------------------- (pi-elimination)
@@ -1344,6 +1348,12 @@ is preferred to:
 
 LEAF_PLUS ::= LEAF | (LEAF TREE)
 #+END_SRC
+*** Inference Rule
+#+BEGIN_SRC text
+Γ, f : (pi ((x1 A1) ... (xn An)) B), x1 : A1, ..., xn : An |- e : B
+-------------------------------------------------------------------- (fix)
+Γ |- (fix f ((x1 A1) ... (xn An)) e) : (pi ((x1 A1) ... (xn An)) B)
+#+END_SRC
 *** Semantics
 #+BEGIN_SRC neut
 (pi-elimination (fix self ((x1 A1) ... (xn An)) e) v1 ... vn)
@@ -1371,6 +1381,12 @@ The logic of Neut doesn't adopt the universe hierarchy, and thus inconsistent. T
 (constant LEAF)
 LEAF
 #+END_SRC
+*** Inference Rule
+#+BEGIN_SRC text
+well-formed(Γ)               {`c` is declared to be a constant of type `A`}
+---------------------------------------------------------------------------- (constant)
+            Γ |- (constant c) : A
+#+END_SRC
 *** Semantics
 The =constant= rule doesn't have any operational semantics by itself; Each constant has its own dedicated semantics.
 *** Notes
@@ -1395,6 +1411,12 @@ i{n} [where n is one of 1, 2, ..., 64]
 
 ; an integer without explicit type info
 LEAF [where this LEAF can be parsed as integer]
+#+END_SRC
+*** Inference Rule
+#+BEGIN_SRC text
+well-formed(Γ)     {`l` is an integer}      {i{n} is a valid integer type}
+------------------------------------------------------------------------ (integer)
+                  Γ |- l : i{n}
 #+END_SRC
 *** Semantics
 The terms of an integer type don't have any operational semantics by themselves.
@@ -1424,6 +1446,12 @@ f{n}   [where n is one of 16, 32, 64]
 
 LEAF [where this LEAF can be parsed as float]
 #+END_SRC
+*** Inference Rule
+#+BEGIN_SRC text
+well-formed(Γ)     {`l` is a float}      {f{n} is a valid float type}
+------------------------------------------------------------------------ (float)
+                  Γ |- l : f{n}
+#+END_SRC
 *** Semantics
 The terms of a float type don't have any operational semantics by themselves.
 *** Notes
@@ -1446,6 +1474,22 @@ LEAF [where this LEAF is already defined to be an enum value]
   (ENUM_CASE TREE))
 
 ENUM_CASE ::= LEAF | default
+#+END_SRC
+*** Inference Rule
+#+BEGIN_SRC text
+well-formed(Γ)  {`E` is declared to be an enum type}
+----------------------------------------------------- (enum)
+                 Γ |- (enum E) : tau
+
+
+well-formed(Γ)   {`l` is a value of enum-type `(enum E)`}
+----------------------------------------------------- (enum-introduction)
+          Γ |- (enum-introduction l) : (enum E)
+
+
+Γ |- e : (enum E)        (Γ |- e_l : A) for all l ∈ E = {l1, ..., ln}
+---------------------------------------------------------------------- (enum-elimination)
+            Γ |- (enum-elimination e (l1 e1) ... (ln en)) : A
 #+END_SRC
 *** Semantics
 #+BEGIN_SRC neut
