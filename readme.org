@@ -1275,7 +1275,7 @@ LEAF_PLUS ::= LEAF | (LEAF TREE)
 *** Inference Rule
 #+BEGIN_SRC text
 Γ |- A : tau     (...)    Γ, x1 : A1, ..., xn : An |- B : tau
-------------------------------------------------------------- (Pi)
+------------------------------------------------------------- (pi)
           Γ |- (pi ((x1 A1) ... (xn An)) B) : tau
 
 
@@ -1383,9 +1383,9 @@ LEAF
 #+END_SRC
 *** Inference Rule
 #+BEGIN_SRC text
-well-formed(Γ)               {`c` is declared to be a constant of type `A`}
----------------------------------------------------------------------------- (constant)
-            Γ |- (constant c) : A
+well-formed(Γ)       {`c` is declared to be a constant of type `A`}
+--------------------------------------------------------------------- (constant)
+         Γ |- (constant c) : A
 #+END_SRC
 *** Semantics
 The =constant= rule doesn't have any operational semantics by itself; Each constant has its own dedicated semantics.
@@ -1414,8 +1414,8 @@ LEAF [where this LEAF can be parsed as integer]
 #+END_SRC
 *** Inference Rule
 #+BEGIN_SRC text
-well-formed(Γ)     {`l` is an integer}      {i{n} is a valid integer type}
------------------------------------------------------------------------- (integer)
+well-formed(Γ)     {`l` is an integer}     {i{n} is a valid integer type}
+--------------------------------------------------------------------------- (integer)
                   Γ |- l : i{n}
 #+END_SRC
 *** Semantics
@@ -1483,13 +1483,13 @@ well-formed(Γ)  {`E` is declared to be an enum type}
 
 
 well-formed(Γ)   {`l` is a value of enum-type `(enum E)`}
------------------------------------------------------ (enum-introduction)
-          Γ |- (enum-introduction l) : (enum E)
+----------------------------------------------------------- (enum-introduction)
+       Γ |- (enum-introduction l) : (enum E)
 
 
-Γ |- e : (enum E)        (Γ |- e_l : A) for all l ∈ E = {l1, ..., ln}
+Γ |- e : (enum E)       (Γ |- e_l : A) for all l ∈ E = {l1, ..., ln}
 ---------------------------------------------------------------------- (enum-elimination)
-            Γ |- (enum-elimination e (l1 e1) ... (ln en)) : A
+       Γ |- (enum-elimination e (l1 e1) ... (ln en)) : A
 #+END_SRC
 *** Semantics
 #+BEGIN_SRC neut
@@ -1547,6 +1547,22 @@ LOWTYPE ::= i{n} | f{n}
 
 LEAF_PLUS ::= LEAF | (LEAF TREE)
 #+END_SRC
+*** Inference Rule
+#+BEGIN_SRC text
+Γ |- len : i64    {`k` is an integer type or a float type}
+----------------------------------------------------------- (array)
+              Γ |- (array len k) : tau
+
+
+Γ |- l1 : k   ...  Γ |- ln : k      {`k` is an integer type or a float type}
+----------------------------------------------------------------------------- (array-introduction)
+       Γ |- (array-introduction k l1 ... ln) : (array (i64 n) k)
+
+
+Γ |- e1 : (array (i64 n) k)     Γ, x1 : k, ..., xn : k |- e2 : B
+------------------------------------------------------------------- (array-elimination)
+ Γ |- (array-elimination k (x1 ... xn) e1 e2) : B
+#+END_SRC
 *** Semantics
 #+BEGIN_SRC neut
 (array-elimination _ (x1 ... xn) (array-introduction _ e1 ... en) e)
@@ -1595,6 +1611,22 @@ You won't use =array-elimination= in actual code; You would use the constant =ar
 
 LOWTYPE ::= i{n} | f{n}
 #+END_SRC
+*** Inference Rule
+#+BEGIN_SRC text
+well-formed(Γ)    {Every `ki` in {`k1`, ..., `kn`} is either an integer type or a float type}
+---------------------------------------------------------------------------------------------- (struct)
+                         Γ |- (struct k1 ... kn) : tau
+
+
+Γ |- e1 : k1   (...)   Γ |- en : kn      Γ |- (struct k1 ... kn) : tau
+-------------------------------------------------------------------------- (struct-introduction)
+   Γ |- (struct-introduction (e1 k1) ... (en kn)) : (struct k1 ... kn)
+
+
+Γ |- e1 : (struct k1 ... kn)       Γ, x1 : k1, ..., xn : kn |- e2 : B
+--------------------------------------------------------------------------- (struct-elimination)
+    Γ |- (struct-elimination ((x1 k1) ... (xn kn)) e1 e2) : B
+#+END_SRC
 *** Semantics
 #+BEGIN_SRC text
 (struct-elimination (x1 _) ... (xn _) (struct-introduction (_ e1) ... (_ en)) e)
@@ -1632,10 +1664,16 @@ The struct type is intended to be used for implementation of interfaces of sysca
 #+BEGIN_SRC neut
 (erase (LEAF ... LEAF) TREE)
 #+END_SRC
+*** Inference Rule
+#+BEGIN_SRC text
+Γ |- e : A    (x1 : A1, ..., xn : An) ∈ Γ    (x1 : A1, ..., xn : An) ∉ freevar(e)
+-------------------------------------------------------------------------------------- (erase)
+                   Γ |- (erase (x1 ... xn) e) : A
+#+END_SRC
 *** Semantics
 #+BEGIN_SRC neut
 (erase (x1 ... xn) e)
-~> e  [where the `e` can't contain x1, ..., xn]
+~> e
 #+END_SRC
 
 *** Notes
@@ -1650,7 +1688,7 @@ The struct type is intended to be used for implementation of interfaces of sysca
   ...)
 #+END_SRC
 
- =erase= can also be used to ensure that a variable introduced in [[#notation][notation]] doesn't cause name collision with a free variable. For example, consider the following notation:
+=erase= can also be used to ensure that a variable introduced in [[#notation][notation]] doesn't cause name collision with a free variable. For example, consider the following notation:
 #+BEGIN_SRC neut
 (notation (pair-of-i64-and-bool e1 e2)
   (λ
@@ -1725,6 +1763,12 @@ The notation above presupposes that the free variable =bool.not= is bound in a s
 (question TREE)
 
 ?TREE
+#+END_SRC
+*** Inference Rule
+#+BEGIN_SRC text
+     Γ |- e : A
+----------------------- (question)
+Γ |- (question e) : A
 #+END_SRC
 *** Semantics
 #+BEGIN_SRC neut
