@@ -1973,7 +1973,7 @@ syscall-os.write A out buf nbyte :=
 #+END_SRC
 
 ** Array Indexing
-Neut offers a family of constants that allows accessing an element of an array. The array is of the form ={LOWTYPE}.array-access=, where the ={LOWTYPE}= is either =i{n}= or =f{n}=. For example, =i8.array-access= can be used for indexing an array of type =(array N i8)=.
+Neut offers a family of constants that allows us to access an element of an array. The names of these constants are of the form ={LOWTYPE}.array-access=, where the ={LOWTYPE}= is either =i{n}= or =f{n}=. For example, =i8.array-access= can be used for indexing of an array of type =(array N i8)=.
 
 The types of these accesser are of the following form:
 #+BEGIN_SRC neut
@@ -1997,7 +1997,7 @@ where the first argument =i= specifies the index of the array, and the second ar
 #+END_SRC
 
 ** Unsafe Cast
-The constant =unsafe.cast : Pi (A : tau, B : tau, x : A). B= is available (assuming that the constant is declared using the statement [[#constant][constant]]). The semantics of this constant is no-op cast:
+The constant =unsafe.cast : Pi (A : tau, B : tau, x : A). B= is available (assuming that the constant is declared using the statement [[#constant][constant]]). The semantics of this constant is the no-op cast:
 #+BEGIN_SRC neut
 (unsafe.cast t1 t2 e)
 ~> e
@@ -2020,7 +2020,7 @@ You can easily break the resource management system of Neut using this constant.
 The code above uses the variable =z= for the two times. Since =z= is casted to a Pi-type, The resulting code tries to copy the integer =1= as if it were a closure. Since the internal representation of a closure at least uses 3 words, this causes an access to an invalid memory region, that is, a segmentation fault.
 
 * Compiler Subcommands
-The =neut= binary provides subcommands in this section.
+The =neut= binary provides the subcommands in this section.
 
 ** archive
 *** Example
@@ -2041,6 +2041,8 @@ $ neut build --emit asm path/to/file.neut  # create an assembly code ./file.s
 #+END_SRC
 *** Notes
 The =build= subcommand builds given source code and emits resulting code.
+
+Internally, these command firstly creates an LLVM IR, then passes it to =clang= (if necessary).
 
 ** check
 *** Example
