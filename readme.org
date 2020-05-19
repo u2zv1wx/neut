@@ -555,7 +555,7 @@ Next. Notes on primitives: (0) The following primitive types are available: =i1=
 
 Next. Notes on the compiler command. (0) You can build a program with =$ neut build path/to/file.neut=. (1) You can create an =tar.gz= archive of a project via =$ neut archive path/to/dir=. Then you can upload the archive to somewhere, allowing others to =ensure= and =include= it.
 
-Now you are ready to, for example, start reading [[https://github.com/u2zv1wx/neut/tree/master/test/data][the files in the test directory]], or [[https://github.com/u2zv1wx/neut-core][the files in the core library]]. At this point you know how to write the universal quantification, recursion, inductive types, tuples. Needs state? You can use the state monad. Multiple effects? The free monad. You have the full power of lambda calculus, after all.
+Now you are ready to, for example, start reading [[https://github.com/u2zv1wx/neut/tree/master/test/data][the files in the test directory]], or [[https://github.com/u2zv1wx/neut-core][the files in the core library]]. After that you should know how to write lambdas, recursive functions, inductive types, tuples. Needs state? You can use the state monad. Multiple effects? The free monad. You have the full power of lambda calculus.
 
 So that pretty much should do it. I hope you enjoy.
 
