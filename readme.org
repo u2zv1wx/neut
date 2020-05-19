@@ -26,6 +26,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#automatic-optimization-via-mallocfree-cancellation][Automatic Optimization via malloc/free Cancellation]]
   - [[#summary][Summary]]
 - [[#installation][Installation]]
+- [[#highly-accelerated-tutorial][Highly-Accelerated Tutorial]]
 - [[#syntax-and-semantics-of-statements][Syntax and Semantics of Statements]]
   - [[#constant][constant]]
   - [[#ensure][ensure]]
@@ -177,7 +178,7 @@ cartesian-closure i closure = do
     -- construct the 2 closures, and the wrapper tuple (thus do malloc for the 3 times)
     return ((typeOfChain, chainA, label), (typeOfChain, chainB, label))
 #+END_SRC
-Thus, we can translate every Π-type into the function =cartesian-closure=. Every Closure is copied/discarded in the same way, regardless of its actual details. So, information like =i64= or =bool= in =i64 -> bool= is indeed useless here; But it isn't a problem since every closure knows how to copy/discard itself.
+Thus, we can translate every Π-type into the function =cartesian-closure=. Every Closure is copied/discarded in the same way, regardless of its actual details. So, information like =i64= or =bool= in =i64 -> bool= is indeed useless here; At the same time it isn't a problem since every closure knows how to copy/discard itself.
 
 The remaining piece is how a type of a closed chain like =∑ [a : type, x : a]= is translated. This is where eta-expansion plays its role. Suppose we have a term =e= of type =∑ [a : type, x : a]=. Since we already know the type of =e=, we can eta-expand this term as follows:
 #+BEGIN_SRC haskell
@@ -262,7 +263,7 @@ and translate =∑ [a : type, x : a]= into the =cartesian-sigma= above. In this 
 *** Notes on Polymorphic Functions
 Or you may be wondering: "What if a function is polymorphic? If the size of an argument is not fixed, how can that function copy the term?"
 
-That is again a valid question - And here comes dependent-type. Firstly, remember that a polymorphic function in dependent-type theory is nothing but an ordinary function with an argument of type =tau=, where =tau= is the type of types. For example, the following is a polymorphic function that creates a pair of any type:
+That is again a valid question, and here comes dependent-type. Firstly, remember that a polymorphic function in dependent-type theory is nothing but an ordinary function with an argument of type =tau=, where =tau= is the type of types. For example, the following is a polymorphic function that creates a pair of any type:
 #+BEGIN_SRC neut
 ; to-tuple : Π (a : tau, x : a). a * a
 (define to-tuple ((a tau) (x a))
@@ -542,6 +543,21 @@ Also make sure that you have =~/.local/bin= in your =$PATH=.
 To uninstall, you just have to remove the binary =~/.local/bin/neut= and the directory =~/.local/share/neut=; Neut won't clutter your system.
 
 As for editor support, you can currently try [[https://github.com/u2zv1wx/neut-mode][neut-mode]] and [[https://github.com/u2zv1wx/flycheck-neut][flycheck-neut]] if you're using Emacs. The former package is for syntax highlighting, and the latter one for linting.
+
+* Highly-Accelerated Tutorial
+You can find a detailed description of the syntax, the logic, and the semantics of Neut in the succeeding sections. Those should suffice to read/write a program of Neut. Having said that though, some might prefer learning from actual source code after taking a brief look at this and that basic stuff. So here I introduce you some necessities that would be required to understand - or guess the meaning of - a program of Neut.
+
+Let's start. Notes on programs. (0) A program of Neut is a list of statements, processed one by one. (1) [[#ensure][ensure]] and [[#include][include]] are the ones that uses codes written in other files. I recommend you to read the linked notes; both of them are not so long. (2) [[#useunuse][use/unuse]] and [[#sectionend][section/end]] are the ones that manages namespace. Again I recommend you to read them.
+
+Next. Notes on terms. (0) Note that what follows presupposes the core library =core/VERSION/notation.neut=; Some of these won't work without including the file. (1) =tau=, or =type= is the type of types. (2) =Π= or =pi= is the universal quantification. Note that =Π (x : A). B= (or =∀ (x : A). B= if you like) is the same as the arrow type =A -> B= if =x ∉ freevar(B)=. Also note that a lambda-abstraction in Neut is n-ary; =(λ ((x A) (y B)) e)= is not the same as =(λ ((x A)) (λ ((y B)) e))=. (3) If you want to create a n-ary tuple, you can use =(sigma-introduction e1 ... en)= or =(tuple e1 ... en)=. The elements of a term of a sigma type can be extracted by =(sigma-elimination (x1 ... xn) sigma-term cont)=. (4) You can write =(question e)= or =?x= when you want to write the type of =e=, =x=. It might be useful for debug. (5) You can write =*= to make the compiler infer the specified part. For example, assuming =(define id ((a tau) (x a)) x)=, you can write =(id * bool.true)= instead of =(id bool bool.true)=. (6) You will notice that =(witness t e)= is used here and there. This is a notation defined by =(notation (witness t e) ((λ ((x t)) x) e))=; A notation that tells the compiler that the term of =e= is =t=.
+
+Next. Notes on primitives: (0) The following primitive types are available: =i1=, =i2=, =i3=, ..., =i64=. These are the same as the integer types in LLVM. (1) You can also use =f16=, =f32=, and =f64=. These are LLVM's =half=, =float=, and =double=, respectively. (2) You will soon come to want primitives - like =add=, =mul=, or =xor= - that can operate on terms of these types, and you can find information on them [[#llvm-based-primitives][here]]. (3) In the section you can also find notes on unsafe casting, array accessing, and syscall. I think these should also count as necessities.
+
+Next. Notes on the compiler command. (0) You can build a program with =$ neut build path/to/file.neut=. (1) You can create an =tar.gz= archive of a project via =$ neut archive path/to/dir=. Then you can upload the archive to somewhere, allowing others to =ensure= and =include= it.
+
+Now you are ready to, for example, start reading [[https://github.com/u2zv1wx/neut/tree/master/test/data][the files in the test directory]], or [[https://github.com/u2zv1wx/neut-core][the files in the core library]]. At this point you know how to write the universal quantification, recursion, inductive types, tuples. Needs state? You can use the state monad. Multiple effects? The free(r) monad. You have the full power of lambda calculus, after all.
+
+So that pretty much should do it. I hope you enjoy.
 
 * Syntax and Semantics of Statements
 A program of Neut is a list of statements. Each statement is one of the following statements described in this section.
