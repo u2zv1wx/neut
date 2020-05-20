@@ -68,11 +68,11 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#check][check]]
 - [[#notes-on-the-structure-of-the-compiler][Notes on The Structure of the Compiler]]
   - [[#overview][Overview]]
-  - [[#parse-text---lambda-term-with-possible-holes][Parse: Text -> Lambda-Term With Possible Holes]]
-  - [[#elaborate-lambda-term-with-possible-holes---lambda-term][Elaborate: Lambda-Term With Possible Holes -> Lambda-Term]]
-  - [[#clarify-lambda-term---lambda-term-in-a-dependent-cbpv][Clarify: Lambda-term -> Lambda-term in a Dependent CBPV]]
-  - [[#lower-lambda-term-in-a-dependent-cbpv---llvm-code][Lower: Lambda-term in a Dependent CBPV -> LLVM Code]]
-  - [[#emit-llvm-code---text][Emit: LLVM Code -> Text]]
+  - [[#parse-text--λ-term-with-holes][Parse: Text → λ-Term With Holes]]
+  - [[#elaborate-λ-term-with-holes--λ-term][Elaborate: λ-Term With Holes → λ-Term]]
+  - [[#clarify-λ-term--λ-term-in-a-dependent-cbpv][Clarify: λ-Term → λ-Term in a Dependent CBPV]]
+  - [[#lower-λ-term-in-a-dependent-cbpv--llvm-code][Lower: λ-Term in a Dependent CBPV → LLVM Code]]
+  - [[#emit-llvm-code--text][Emit: LLVM Code → Text]]
 - [[#some-possible-questions-and-answers][Some Possible Questions and Answers]]
   - [[#cant-you-break-the-proof-theoretic-memory-safety-via-the-inconsistency-of-the-logic][Can't You Break the Proof-Theoretic Memory Safety via the Inconsistency of the Logic?]]
   - [[#can-you-show-me-the-explicit-definition-of-the-target-calculus-a-dependent-cbpv][Can You Show Me the Explicit Definition of the Target Calculus (a Dependent CBPV)?]]
@@ -2094,15 +2094,15 @@ This subcommand is intended to be used with an editor-side syntax checker like [
 
 ** Overview
 
-** Parse: Text -> Lambda-Term With Possible Holes
+** Parse: Text → λ-Term With Holes
 
-** Elaborate: Lambda-Term With Possible Holes -> Lambda-Term
+** Elaborate: λ-Term With Holes → λ-Term
 
-** Clarify: Lambda-term -> Lambda-term in a Dependent CBPV
+** Clarify: λ-Term → λ-Term in a Dependent CBPV
 
-** Lower: Lambda-term in a Dependent CBPV -> LLVM Code
+** Lower: λ-Term in a Dependent CBPV → LLVM Code
 
-** Emit: LLVM Code -> Text
+** Emit: LLVM Code → Text
 
 * Some Possible Questions and Answers
 
