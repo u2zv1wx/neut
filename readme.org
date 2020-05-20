@@ -66,19 +66,10 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#archive][archive]]
   - [[#build][build]]
   - [[#check][check]]
-- [[#notes-on-the-structure-of-the-compiler][Notes on The Structure of the Compiler]]
-  - [[#overview][Overview]]
-  - [[#parse][Parse]]
-  - [[#elaborate][Elaborate]]
-  - [[#clarify][Clarify]]
-  - [[#lower][Lower]]
-  - [[#emit][Emit]]
 - [[#some-possible-questions-and-answers][Some Possible Questions and Answers]]
-  - [[#cant-you-break-the-memory-safety-via-the-inconsistency-of-the-logic][Can't You Break the Memory Safety via the Inconsistency of the Logic?]]
+  - [[#cant-you-break-the-memory-safety-via-the-absence-of-the-universe-hierarchy][Can't You Break the Memory Safety via the Absence of the Universe Hierarchy?]]
   - [[#can-you-show-me-the-logic-of-the-target-calculus-a-dependent-cbpv][Can You Show Me the Logic of the Target Calculus (a Dependent CBPV)?]]
   - [[#where-is-a-correctness-proof][Where is a Correctness Proof?]]
-  - [[#where-is-theorem-proving-stuff][Where is Theorem-Proving Stuff?]]
-  - [[#where-is-typeclass-or-its-equivalent][Where is Typeclass (or its Equivalent)?]]
   - [[#where-is-the-io-monad][Where is the IO monad?]]
   - [[#so-does-this-really-performs-well-in-real-life-programs][So, Does This Really Performs Well in Real-Life Programs?]]
 - [[#appendix][Appendix]]
@@ -192,7 +183,7 @@ cartesian-closure i closure = do
     -- construct the 2 closures, and the wrapper tuple (thus do malloc for the 3 times)
     return ((typeOfChain, chainA, label), (typeOfChain, chainB, label))
 #+END_SRC
-Thus, we can translate every Π-type into the function =cartesian-closure=. Every Closure is copied/discarded in the same way, regardless of its actual details. So, information like =i64= or =bool= in =i64 -> bool= is indeed useless here; At the same time it isn't a problem since every closure knows how to copy/discard itself.
+Thus, we can translate every Π-type into the function =cartesian-closure=. Every Closure is copied/discarded in the same way, regardless of its actual details. So, information like =i64= or =bool= in =i64 -> bool= is indeed useless here; It simply isn't a problem since every closure knows how to copy/discard itself.
 
 The remaining piece is how a type of a closed chain like =∑ [a : type, x : a]= is translated. This is where eta-expansion plays its role. Suppose we have a term =e= of type =∑ [a : type, x : a]=. Since we already know the type of =e=, we can eta-expand this term as follows:
 #+BEGIN_SRC haskell
@@ -2090,35 +2081,32 @@ If =--end-of-entry SEPARATOR= is specified, each entry of the result of type che
 
 This subcommand is intended to be used with an editor-side syntax checker like [[https://www.flycheck.org/en/latest/][flycheck]].
 
-* Notes on The Structure of the Compiler
-
-** Overview
-
-** Parse
-
-** Elaborate
-
-** Clarify
-
-** Lower
-
-** Emit
-
 * Some Possible Questions and Answers
 
-** Can't You Break the Memory Safety via the Inconsistency of the Logic?
+** Can't You Break the Memory Safety via the Absence of the Universe Hierarchy?
 
 ** Can You Show Me the Logic of the Target Calculus (a Dependent CBPV)?
 
 ** Where is a Correctness Proof?
-
-** Where is Theorem-Proving Stuff?
-
-** Where is Typeclass (or its Equivalent)?
+Not yet due to my limited time.
 
 ** Where is the IO monad?
+Neut doesn't have the IO monad in its language core since the evaluation strategy is already CBV. If you still want to use the IO monad, you can define it as a state monad that has a dedicated unit type as its type of state.
 
 ** So, Does This Really Performs Well in Real-Life Programs?
+Obviously I can't give an immediate answer to this question since there doesn't exist any real-life programs written in this language, at least yet.
+
+Still I think I can point out a possible obstacle regarding this. What comes to my mind is the =get= function of the state monad. The implementation of the function would be something like this:
+#+BEGIN_SRC neut
+; get : Pi (s : tau). s -> (s, s)
+(define get ((s tau))
+  (λ (env) (tuple env env)))
+#+END_SRC
+As you can easily see from the definition above, the variable =env= is used twice, and thus copied. This means that, ignoring any optimizations, every use of =get= causes the full copying of the environment. This can cost quite a bit.
+
+On the other hand, remember that the copying operations are defined as ordinary functions in the target language, which means that it can be beta-reduced at compile-time. Also remember that we have the automatic malloc/free cancellation. These optimizations may help reducing the cost of the copying operations, though it is only a speculation.
+
+So the bottom line is the expected one: Try it and see.
 
 * Appendix
 
