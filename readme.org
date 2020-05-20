@@ -66,7 +66,21 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#archive][archive]]
   - [[#build][build]]
   - [[#check][check]]
-- [[#compiler-structure][Compiler Structure]]
+- [[#notes-on-the-structure-of-the-compiler][Notes on The Structure of the Compiler]]
+  - [[#overview][Overview]]
+  - [[#parse-text---lambda-term-with-possible-holes][Parse: Text -> Lambda-Term With Possible Holes]]
+  - [[#elaborate-lambda-term-with-possible-holes---lambda-term][Elaborate: Lambda-Term With Possible Holes -> Lambda-Term]]
+  - [[#clarify-lambda-term---lambda-term-in-a-dependent-cbpv][Clarify: Lambda-term -> Lambda-term in a Dependent CBPV]]
+  - [[#lower-lambda-term-in-a-dependent-cbpv---llvm-code][Lower: Lambda-term in a Dependent CBPV -> LLVM Code]]
+  - [[#emit-llvm-code---text][Emit: LLVM Code -> Text]]
+- [[#some-possible-questions-and-answers][Some Possible Questions and Answers]]
+  - [[#cant-you-break-the-proof-theoretic-memory-safety-via-the-inconsistency-of-the-logic][Can't You Break the Proof-Theoretic Memory Safety via the Inconsistency of the Logic?]]
+  - [[#can-you-show-me-the-explicit-definition-of-the-target-calculus-a-dependent-cbpv][Can You Show Me the Explicit Definition of the Target Calculus (a Dependent CBPV)?]]
+  - [[#where-is-a-correctness-proof][Where is a Correctness Proof?]]
+  - [[#where-is-theorem-proving-stuff][Where is Theorem-Proving Stuff?]]
+  - [[#where-is-typeclass-or-its-equivalent][Where is Typeclass (or its Equivalent)?]]
+  - [[#where-is-the-io-monad][Where is the IO monad?]]
+  - [[#so-does-this-really-performs-well-in-real-life-programs][So, Does This Really Performs Well in Real-Life Programs?]]
 - [[#appendix][Appendix]]
   - [[#llvm-ir-for-the-first-example][LLVM IR for the First Example]]
   - [[#llvm-ir-for-the-second-example][LLVM IR for the Second Example]]
@@ -2076,29 +2090,35 @@ If =--end-of-entry SEPARATOR= is specified, each entry of the result of type che
 
 This subcommand is intended to be used with an editor-side syntax checker like [[https://www.flycheck.org/en/latest/][flycheck]].
 
-# * Where is ...?
+* Notes on The Structure of the Compiler
 
-# ** Typeclass?
+** Overview
 
-# ** Proof-Related Stuff? ("I've heard that _THE_ canonical example of dependent type in real life is safe array indexing")
+** Parse: Text -> Lambda-Term With Possible Holes
 
-# ** The Universe Hierarchy?
+** Elaborate: Lambda-Term With Possible Holes -> Lambda-Term
 
-# ** Correctness Proof?
-# Not yet, because of limited resource.
+** Clarify: Lambda-term -> Lambda-term in a Dependent CBPV
 
-# * Theoretical Notes
+** Lower: Lambda-term in a Dependent CBPV -> LLVM Code
 
-# ** Compile-Time Memory Usage Determination
-# (to be written later)
+** Emit: LLVM Code -> Text
 
-# ** Box Modality, Polarity, and Closure Conversion
-# (to be written later)
+* Some Possible Questions and Answers
 
-# ** "Unified" Pattern Resolution in Dependent Type Inference
-# (to be written later)
+** Can't You Break the Proof-Theoretic Memory Safety via the Inconsistency of the Logic?
 
-* Compiler Structure
+** Can You Show Me the Explicit Definition of the Target Calculus (a Dependent CBPV)?
+
+** Where is a Correctness Proof?
+
+** Where is Theorem-Proving Stuff?
+
+** Where is Typeclass (or its Equivalent)?
+
+** Where is the IO monad?
+
+** So, Does This Really Performs Well in Real-Life Programs?
 
 * Appendix
 
