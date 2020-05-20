@@ -71,8 +71,8 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#parse-text--λ-term-with-holes][Parse: (Text) → (λ-Term With Holes)]]
   - [[#elaborate-λ-term-with-holes--λ-term][Elaborate: (λ-Term With Holes) → (λ-Term)]]
   - [[#clarify-λ-term--λ-term-in-a-dependent-cbpv][Clarify: (λ-Term) → (λ-Term in a Dependent CBPV)]]
-  - [[#lower-λ-term-in-a-dependent-cbpv--llvm-code][Lower: (λ-Term in a Dependent CBPV) → (LLVM Code)]]
-  - [[#emit-llvm-code--text][Emit: (LLVM Code) → (Text)]]
+  - [[#lower-λ-term-in-a-dependent-cbpv--llvm-ir][Lower: (λ-Term in a Dependent CBPV) → (LLVM IR)]]
+  - [[#emit-llvm-ir--text][Emit: (LLVM IR) → (Text)]]
 - [[#some-possible-questions-and-answers][Some Possible Questions and Answers]]
   - [[#cant-you-break-the-proof-theoretic-memory-safety-via-the-inconsistency-of-the-logic][Can't You Break the Proof-Theoretic Memory Safety via the Inconsistency of the Logic?]]
   - [[#can-you-show-me-the-logic-of-the-target-calculus-a-dependent-cbpv][Can You Show Me the Logic of the Target Calculus (a Dependent CBPV)?]]
@@ -2100,9 +2100,9 @@ This subcommand is intended to be used with an editor-side syntax checker like [
 
 ** Clarify: (λ-Term) → (λ-Term in a Dependent CBPV)
 
-** Lower: (λ-Term in a Dependent CBPV) → (LLVM Code)
+** Lower: (λ-Term in a Dependent CBPV) → (LLVM IR)
 
-** Emit: (LLVM Code) → (Text)
+** Emit: (LLVM IR) → (Text)
 
 * Some Possible Questions and Answers
 
