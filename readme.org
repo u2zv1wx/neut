@@ -66,12 +66,6 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#archive][archive]]
   - [[#build][build]]
   - [[#check][check]]
-- [[#some-possible-questions-and-answers][Some Possible Questions and Answers]]
-  - [[#cant-you-break-the-memory-safety-via-the-absence-of-the-universe-hierarchy][Can't You Break the Memory Safety via the Absence of the Universe Hierarchy?]]
-  - [[#can-you-show-me-the-logic-of-the-target-calculus-a-dependent-cbpv][Can You Show Me the Logic of the Target Calculus (a Dependent CBPV)?]]
-  - [[#where-is-a-correctness-proof][Where is a Correctness Proof?]]
-  - [[#where-is-the-io-monad][Where is the IO monad?]]
-  - [[#so-does-this-really-perform-well-in-real-life-programs][So, Does This Really Perform Well in Real-Life Programs?]]
 - [[#appendix][Appendix]]
   - [[#llvm-ir-for-the-first-example][LLVM IR for the First Example]]
   - [[#llvm-ir-for-the-second-example][LLVM IR for the Second Example]]
@@ -2080,46 +2074,6 @@ If =--no-color= option is specified, the result of type checking is printed with
 If =--end-of-entry SEPARATOR= is specified, each entry of the result of type checking is followed by =SEPARATOR=.
 
 This subcommand is intended to be used with an editor-side syntax checker like [[https://www.flycheck.org/en/latest/][flycheck]].
-
-* Some Possible Questions and Answers
-
-** Can't You Break the Memory Safety via the Absence of the Universe Hierarchy?
-The logic behind this question is as follows: (0) Neut manages resources based on its types. (1) CoC without the universe hierarchy is logically inconsistent. (2) Thus, in Neut, for every type =A : tau=, there exists a term =e= such that =e : A=. (3) This may mean that there exists a term =e : A= that "shouldn't" be of the type =A=.
-
-** Can You Show Me the Logic of the Target Calculus (a Dependent CBPV)?
-Sure.
-#+BEGIN_SRC text
-P, v ::= (...) | ↓N
-N, e ::= Π (x : ↑P). N | λ (x : ↑P). e | e @ v | ↑P | return v | let x := e in e
-
-
-------------------- (empty)
-well-formed(EMPTY)
-
-#+END_SRC
-The interesting part would be the polarity of the domain of Π-type.
-
-** Where is a Correctness Proof?
-Not yet due to my limited time.
-
-** Where is the IO monad?
-Neut doesn't have the IO monad in its language core since the evaluation strategy is already CBV. If you still want to use the IO monad, you can define it as a state monad that has a dedicated unit type as its type of state.
-
-** So, Does This Really Perform Well in Real-Life Programs?
-Obviously I can't give an immediate answer to this question since there doesn't exist any real-life programs written in this language, at least yet.
-
-Still I think I can point out a possible obstacle regarding this. What comes to my mind is the =get= function of the state monad. The implementation of the function would be something like this:
-#+BEGIN_SRC neut
-; get : Pi (s : tau). s -> (s, s)
-(define get ((s tau))
-  (λ ((env s))
-    (tuple env env)))
-#+END_SRC
-As you can easily see from the definition above, the variable =env= is used twice, and thus copied. This means that, ignoring any optimizations, every use of =get= causes the full copying of the environment. This can cost quite a bit.
-
-On the other hand, remember that the copying operations are defined as ordinary functions in the target language, which means that it can be beta-reduced at compile-time. Also remember that we have the automatic malloc/free cancellation. These optimizations might help reducing the cost of the copying operations, though it is only a speculation.
-
-So the bottom line is the expected one: Please try it and see.
 
 * Appendix
 
