@@ -1247,7 +1247,6 @@ The name of a variable is interpreted in relation with the keyword environment. 
 (i64.print (f2 2))
 
 ; nullary Π-introduction
-; (you need to include core/VERSION/notation.neut to use `lambda` or `λ`)
 (let f1
   (lambda () (i64 1))) ; 'lambda' can be used instead of 'Π-introduction'
 
