@@ -2045,8 +2045,7 @@ The =neut= binary provides the subcommands in this section.
 ** archive
 *** Example
 #+BEGIN_SRC shell
-$ neut archive path/to/some/directory # ~> creates a tar.gz archive `directory.tar.gz`
-$ neut archive path/to/some/directory -o pohe # ~> creates a tar.gz archive `pohe`
+$ neut archive path/to/source/directory -o path/to/release/directory/0.1.0.0.tar.gz
 #+END_SRC
 *** Notes
 The =archive= subcommand creates a tar.gz archive from the specified directory. The [[#ensure][ensure]] statement expects an archive created by this subcommand.
