@@ -1066,36 +1066,26 @@ The other destructors are defined similarly.
 #+BEGIN_SRC neut
 (let foo.bar.buz (i64 10))
 
-; (i64.print buz)       ; ~> undefined variable: `buz`
-; (i64.print bar.buz)   ; ~> undefined variable: `bar.buz`
+(i64.print buz)         ; ~> undefined variable: `buz`
+(i64.print bar.buz)     ; ~> undefined variable: `bar.buz`
 (i64.print foo.bar.buz) ; ~> 10
 
-; prefix-environment = []
 (use foo)
-; prefix-environment = ["foo"]
 
-; (i64.print buz)       ; ~> undefined variable: `buz`
+(i64.print buz)         ; ~> undefined variable: `buz`
 (i64.print bar.buz)     ; ~> 10
 (i64.print foo.bar.buz) ; ~> 10
 
-; prefix-environment = ["foo"]
 (use foo.bar)
-; prefix-environment = ["foo.bar", "foo"]
-
-; prefix-environment = ["foo.bar", "foo"]
-(use qux)
-; prefix-environment = ["qux", "foo.bar", "foo"]
 
 (i64.print buz)         ; ~> 10
 (i64.print bar.buz)     ; ~> 10
 (i64.print foo.bar.buz) ; ~> 10
 
-; prefix-environment = ["qux", "foo.bar", "foo"]
 (unuse foo)
-; prefix-environment = ["qux", "foo.bar"]
 
 (i64.print buz)         ; ~> 10
-; (i64.print bar.buz)  ; ~> undefined variable: `bar.buz`
+(i64.print bar.buz)     ; ~> undefined variable: `bar.buz`
 (i64.print foo.bar.buz) ; ~> 10
 #+END_SRC
 *** Syntax
