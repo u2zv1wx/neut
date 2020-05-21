@@ -77,8 +77,8 @@ Here I briefly summerize the basic properties of Neut before diving into the det
 Let's see how Neut manages resources. The following code prints the string "a" for the 3 times:
 #+BEGIN_SRC neut
 ; download the core library
-(ensure core/0.1.0.0
-  "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz")
+(ensure core/1.0.0.0
+  "https://github.com/u2zv1wx/neut-core/raw/master/release/0.1.0.0.tar.gz")
 
 (include "core/0.1.0.0/core.neut")
 
@@ -303,8 +303,8 @@ Fortunately, there is a workaround for this performance problem.
 ** Manual Optimization via Borrowing
 The point of the workaround is straightforward: If those copying/discarding operations result from using variables non-linearly, we simply have to use variables linearly. Let's go back to the first example code:
 #+BEGIN_SRC neut
-(ensure core/0.1.0.0
-  "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz")
+(ensure core/1.0.0.0
+  "https://github.com/u2zv1wx/neut-core/raw/master/release/0.1.0.0.tar.gz")
 
 (include "core/0.1.0.0/core.neut")
 
@@ -359,8 +359,8 @@ unit
 
 And this is the notation that is implemented in Neut. Indeed, the following is a valid code of Neut:
 #+BEGIN_SRC neut
-(ensure core/0.1.0.0
-  "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz")
+(ensure core/1.0.0.0
+  "https://github.com/u2zv1wx/neut-core/raw/master/release/0.1.0.0.tar.gz")
 
 (include "core/0.1.0.0/core.neut")
 
@@ -373,8 +373,8 @@ And this is the notation that is implemented in Neut. Indeed, the following is a
 #+END_SRC
 Or,
 #+BEGIN_SRC neut
-(ensure core/0.1.0.0
-  "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz")
+(ensure core/1.0.0.0
+  "https://github.com/u2zv1wx/neut-core/raw/master/release/0.1.0.0.tar.gz")
 
 (include "core/0.1.0.0/core.neut")
 
@@ -600,8 +600,8 @@ This statement is currently intended only for internal use (e.g. implementation 
 
 *** Example
 #+BEGIN_SRC neut
-(ensure core/0.1.0.0
-  "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz")
+(ensure core/1.0.0.0
+  "https://github.com/u2zv1wx/neut-core/raw/master/release/0.1.0.0.tar.gz")
 
 (include "core/0.1.0.0/core.neut")
 #+END_SRC
@@ -2025,8 +2025,8 @@ The constant =unsafe.cast : Pi (A : tau, B : tau, x : A). B= is available (assum
 
 You can easily break the resource management system of Neut using this constant. Consider the following example:
 #+BEGIN_SRC neut
-(ensure core/0.1.0.0
-  "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz")
+(ensure core/1.0.0.0
+  "https://github.com/u2zv1wx/neut-core/raw/master/release/0.1.0.0.tar.gz")
 
 ; (note that this declares the constant unsafe.cast)
 (include "core/0.1.0.0/core.neut")

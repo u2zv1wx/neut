@@ -1,9 +1,9 @@
-(ensure core/0.1.0.0
-  "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz")
+(ensure core/1.0.0.0
+  "https://github.com/u2zv1wx/neut-core/raw/master/release/0.1.0.0.tar.gz")
 
 (include "core/0.1.0.0/core.neut")
 
-; nullary lambda (pi-introduction)
+; nullary lambda (Π-introduction)
 (let f1
   (Π-introduction () (i64 1)))
 
@@ -21,7 +21,7 @@
 
 (i64.print (f3 1 2))
 
-; a function that takes another function as argument
+; a function that takes another function as an argument
 (let f4
   (lambda ((a tau) (f (hom a a)) (x a)) (f x)))
 
