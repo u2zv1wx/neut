@@ -108,7 +108,7 @@ The resulting LLVM IR creates a string in memory, print it, and free it for the 
 
 By translating the source calculus in the way sketched above, every variable is ensured to be used linearly, except for the ones in the functions that realize those copying/discarding operations. Thus, by checking that those exponentializers use resources properly, we can ensure that the target calculus of this translation handles memory properly too. Then we check that those exponentializers are indeed sane - This is the basic storyline.
 
-The way how a variable is copied/discarded is determined by the type of the variable. For example, if the type of a variable is the array type as in the example above, the copying operation is something that you would do in C to copy an array (memory allocation followed by value insertion). If the type is an immediate type like an integer type, the "copying" operation is the one that uses the original value for the cloned value. Every type is translated into a term that copies/discards the terms of the type, including the type of the type itself.
+The way how a variable is copied/discarded is determined by the type of the variable. For example, if the type of a variable is the array type as in the example above, the copying operation is something that you would do in C to copy an array (memory allocation followed by value insertion). If the type is an immediate type like an integer type, the "copying" operation is the one that uses the original value for the cloned value. Every type is translated into a term that copies/discards the terms of the type, including the type of the types.
 
 *** Types as Exponentializers
 Let us go a little deeper. Consider the following schematic user input:
@@ -124,11 +124,11 @@ let (str1, tmp) := copy-string(str);
 let (str2, str3) := copy-string(tmp);
 {- THE CODE THAT USES `str1`, `str2`, AND `str3` LINEARLY -}
 #+END_SRC
-Note that the second line uses the pair =(discard-string, copy-string)=, which is the result of translation of the type =string=. Every type =X= is translated in this manner; the pair of =discard-X= and =copy-X=. These exponentializers - something that allow us to create n copies of =x= from a single =x= - are used in its continuation so that every variable of this type (=str= in this example) is used linearly.
+Note that the second line uses the pair =(discard-string, copy-string)=, which is the result of translation of the type =string=. Every type =X= is translated in this manner; the pair of =discard-X= and =copy-X=. These exponentializers - something that allows us to create n copies of =x= from a single =x= - are used in its continuation so that every variable of this type (=str= in this example) is used linearly.
 
 Incidentally, in the actual implementation, the result of =TRANSLATE(string)= is not a pair, but a function as in the pseudo-code below:
 #+BEGIN_SRC haskell
-cartesian-string (i, e) :=
+cartesian-string i e :=
   if i == 0
   then discard-string(e)
   else copy-string(e)
@@ -468,7 +468,7 @@ The code is already judged to be inefficient in that it allocates/deallocates me
 
 Now you might think: If the sizes of memory being allocated/deallocated are known at compile-time, isn't it possible to compare the sizes of them at compile-time and emit a code that reuses the allocated memory?
 
-And it is indeed possible. When the option =--no-alloc-cancellation= is not passed, the compiler translates code pieces something like this:
+Indeed it is possible. When the option =--no-alloc-cancellation= is not passed, the compiler translates code pieces something like this:
 #+BEGIN_SRC llvm
 define TYPE @FUNCTION_NAME(...) {
   (...)
