@@ -1,5 +1,5 @@
 #+TITLE: Neut
-Neut is a dependently-typed programming language based on [[https://en.wikipedia.org/wiki/Calculus_of_constructions][the Calculus of Constructions (CoC)]]. The interesting point is that this language determines how to allocate/deallocate memory at compile-time, without extra annotations to the type system. In other words, Neut in its source language is the ordinary lambda-calculus after all (imagine something like Haskell, OCaml, Idris, Coq, Agda, or Lean), and at the same time it handles memory without using, for example:
+Neut is a dependently-typed programming language based on [[https://ncatlab.org/nlab/show/calculus+of+constructions][the Calculus of Constructions (CoC)]]. The interesting point is that this language determines how to allocate/deallocate memory at compile-time, without extra annotations to the type system. In other words, Neut in its source language is the ordinary lambda-calculus after all (imagine something like Haskell, OCaml, Idris, Coq, Agda, or Lean), and at the same time it handles memory without using, for example:
 
 - explicit malloc/free,
 - garbage collection,
@@ -554,7 +554,7 @@ Next. Notes on primitives: (0) The following primitive types are available: =i1=
 
 Next. Notes on the compiler subcommands. (0) You can build a program with =$ neut build path/to/file.neut=. (1) You can create an =tar.gz= archive of a project via =$ neut archive path/to/dir=. Then you can upload the archive to somewhere, allowing others to =ensure= and =include= it.
 
-Now I think you are basically ready to, for example, start reading [[https://github.com/u2zv1wx/neut/tree/master/test/data][the files in the test directory]], or [[https://github.com/u2zv1wx/neut-core][the files in the core library]], referring the sections below as necessary. After that you should know how to write lambdas, recursive functions, inductive types, tuples. Needs state? You can use the state monad. Multiple effects? The free monad. You have the full power of lambda calculus.
+Now I think you are basically ready to, for example, start reading [[https://github.com/u2zv1wx/neut/tree/master/test/data][the files in the test directory]], or [[https://github.com/u2zv1wx/neut-core][the files in the core library]], referring the sections below as necessary. After that you should know how to write lambdas, recursive functions, inductive types, tuples. You need state? You can use the state monad. Multiple effects? The free monad. You have the full power of lambda calculus.
 
 That pretty much should do it. I hope you enjoy.
 
