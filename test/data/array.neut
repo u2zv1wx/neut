@@ -1,9 +1,9 @@
 (ensure core/0.1.0.0
-  "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz") ;; dummy URL
+  "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz")
 
 (include "core/0.1.0.0/core.neut")
 
-;; empty array
+; empty array
 (let _
   (array-introduction i64))
 
@@ -13,7 +13,7 @@
 (let xs
   (array-introduction i64 1 2 -30 20))
 
-;; float array
+; float array
 (let _
   (array-introduction f16 3.28 2.14 2.0 9.82))
 
@@ -27,7 +27,7 @@
   (array-elimination i64 (a b c d) xs
     (i64.add a (i64.add b (i64.add c d)))))
 
-(i64.print k) ;; -7
+(i64.print k) ; -7
 
 (let l
   (with identity.bind
@@ -38,4 +38,4 @@
     (erase xs)
     (i64.add a (i64.add b (i64.add c d)))))
 
-(i64.print l) ;; -7
+(i64.print l) ; -7

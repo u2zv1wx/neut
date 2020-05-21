@@ -1,5 +1,5 @@
 (ensure core/0.1.0.0
-  "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz") ;; dummy URL
+  "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz")
 
 (include "core/0.1.0.0/notation.neut")
 
@@ -12,7 +12,7 @@
      (_ (hom b (µ f))))
     (µ f)))
 
-;; F (µ F) -> µF
+; F (µ F) -> µF
 (define µ.in
   ((f (hom tau tau))
    (x (f (µ f))))
@@ -24,7 +24,7 @@
       (λ (y)
         y))))
 
-;; µ F -> F (µ F)
+; µ F -> F (µ F)
 (define µ.out
   ((f (hom tau tau))
    (F (functor f))

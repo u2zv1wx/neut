@@ -1,6 +1,6 @@
 (enum bool (true 1) (false 0))
 
-;; simple inductive
+; simple inductive
 (inductive nat ()
   (zero
     ()
@@ -9,7 +9,7 @@
     ((_ (nat)))
     (nat)))
 
-;; simple inductive (2)
+; simple inductive (2)
 (inductive list ((A tau))
   (nil
     ()
@@ -28,7 +28,7 @@
      (_ (list2 A)))
     (list2 A)))
 
-;; dependent inductive type with GADT
+; dependent inductive type with GADT
 (inductive vec ((A tau) (_ (nat)))
   (nil
     ()
@@ -39,7 +39,7 @@
      (_ (vec A m)))
     (vec A (nat.succ m))))
 
-;; nested inductive type
+; nested inductive type
 (inductive item ((A tau))
   (cons ()
     (item A))
@@ -96,37 +96,7 @@
      (_ self))
     (item2 A self)))
 
-
-;; (inductive shallow ((A tau))
-;;   (cons ()
-;;     (shallow A))
-;;   (cons0
-;;     ((_ (shallow A))
-;;      (_ (shallow A)))
-;;     (shallow A))
-;;   (cons1
-;;     ((_ (shallow A))
-;;      (_ (list (shallow A))))
-;;     (shallow A))
-;;   (cons2
-;;     ((_ (shallow A))
-;;      (_ (list2 (shallow A))))
-;;     (shallow A))
-;;   (cons3
-;;     ((_ (shallow A))
-;;      (_ (list (shallow A))))
-;;     (shallow A))
-;;   (cons4
-;;     ((_ (shallow A))
-;;      (_ (list2 (shallow A))))
-;;     (shallow A))
-;;   (cons5
-;;     ((_ A)
-;;      (_ (shallow A)))
-;;     (shallow A)))
-
-
-;; mutually inductive type
+; mutually inductive type
 (inductive
   (even ((_ (nat)))
     (zero-is-even

@@ -1,18 +1,18 @@
 (ensure core/0.1.0.0
-  "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz") ;; dummy URL
+  "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz")
 
 (include "core/0.1.0.0/core.neut")
 
-;; "bypass" the variable binding using `constant`
+; "bypass" the variable binding using `constant`
 (let _
   (lambda ((add-i64 tau))
     ((constant add-i64) 1 2)))
 
-;; variable with the same name of a constant
+; variable with the same name of a constant
 (let _
   (lambda ((i64:add (pi ((_ i64) (_ i64)) i64)))
     (i64:add 1 2)))
 
-;; ?i64:trunc:i32
+; ?i64:trunc:i32
 
-;; (i64:print (fptosi-f64-i64 (fadd-f64 31.288 2.99)))
+; (i64:print (fptosi-f64-i64 (fadd-f64 31.288 2.99)))

@@ -1,45 +1,45 @@
 (ensure core/0.1.0.0
-  "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz") ;; dummy URL
+  "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz")
 
 (include "core/0.1.0.0/core.neut")
 
-;; nullary sigma-intro
+; nullary sigma-intro
 (let a0 (sigma-introduction))
 
-;; nullary sigma-elim
+; nullary sigma-elim
 (sigma-elimination () a0
   (string.print "0"))
 
-;; unary sigma-intro
+; unary sigma-intro
 (let a1
   (tuple (i64 1)))
 
-;; unary sigma-elim
+; unary sigma-elim
 (sigma-elimination (x) a1
   (i64.print x))
 
-;; binary sigma-intro without dependence
+; binary sigma-intro without dependence
 (let a2
   (tuple (i64 2) (i64 2)))
 
-;; binary sigma-elim without dependence
+; binary sigma-elim without dependence
 (sigma-elimination (x _) a2
   (i64.print x))
 
-;; binary sigma-elim with dependence
+; binary sigma-elim with dependence
 (let a3
   (witness (sigma ((a tau)) a)
     (tuple i64 2)))
 
-;; binary sigma-elim with dependence
+; binary sigma-elim with dependence
 (sigma-elimination (_ _) a3
   (i64.print 3))
 
-;; 4-ary sigma-intro
+; 4-ary sigma-intro
 (let a4
   (witness (product i8 i64 i64 i3)
     (tuple 4 4 4 4)))
 
-;; 4-ary sigma-elim
+; 4-ary sigma-elim
 (destruct a4 (_ _ i _)
   (i64.print i))

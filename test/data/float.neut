@@ -1,13 +1,12 @@
-;; float literal
+; float literal
 (let _ (f16 3.2))
 
 (let _ (f32 3.88))
 
 (let _ (f64 2.8888882))
 
-;; infer float
-;; (let (_ f16) 31234) ;; should raise an error (because the number is interpreted as int)
-(let (_ f16) 31234.0) ;; ".0" is necessary
+; infer float
+(let (_ f16) 31234.0) ; ".0" is necessary
 
 (let (_ f32) 3.882)
 

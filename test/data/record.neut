@@ -1,5 +1,5 @@
 (ensure core/0.1.0.0
-  "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz") ;; dummy URL
+  "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz")
 
 (include "core/0.1.0.0/core.neut")
 
@@ -10,11 +10,6 @@
     i64)
   (item-3
     top))
-
-
-?my-record.item-1
-;; ?my-record.fold
-?my-record.new
 
 (let item
   (my-record.new
@@ -28,7 +23,3 @@
 (i64.print (my-record.item-2 i64 item))
 
 (record empty-record ())
-
-;; ?empty-record.fold
-
-?empty-record.new
