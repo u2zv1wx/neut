@@ -3,6 +3,7 @@
 
 (include "core/0.1.0.0/core.neut")
 
+; degenerates to (λ () (i64 0))
 (let f0
   (fix _ ()
     (i64 0)))
