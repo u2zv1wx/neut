@@ -864,7 +864,7 @@ The =var= in =(introspect var (...))= must be a valid compile-time variable. The
 The =notation= statement registers a notation (macro).
 *** Example
 #+BEGIN_SRC neut
-(notation λ pi-introduction)
+(notation λ Π-introduction)
 
 ((λ (x) (add-i64 x 1)) 10) ; ~> 11
 
@@ -1236,22 +1236,22 @@ The name of a variable is interpreted in relation with the keyword environment. 
 =Π= is the universal quantification.
 *** Example
 #+BEGIN_SRC neut
-; unary pi-introduction
+; unary Π-introduction
 (let f2
   (Π-introduction ((x i64)) x))
 
-; pi-elimination
+; Π-elimination
 (Π-elimination i64.print (Π-elimination f2 2))
 
-; pi-elimination with the familar (or, implicit) syntax
+; Π-elimination with the familar (or, implicit) syntax
 (i64.print (f2 2))
 
-; nullary pi-introduction
+; nullary Π-introduction
 ; (you need to include core/VERSION/notation.neut to use `lambda` or `λ`)
 (let f1
-  (lambda () (i64 1))) ; 'lambda' can be used instead of 'pi-introduction'
+  (lambda () (i64 1))) ; 'lambda' can be used instead of 'Π-introduction'
 
-; binary pi-introduction
+; binary Π-introduction
 (let f3
   (λ ((x i64)   ; an argument with type annotation
       y)        ; an argument without type annotation
@@ -1295,7 +1295,7 @@ LEAF_PLUS ::= LEAF | (LEAF TREE)
 *** Notes
 If a tree =(e e1 ... en)= is not parsed into any other terms, the tree is regarded as =(Π-elimination e e1 ... en)=.
 
-If the name of an argument of a pi-introduction is "_", the compiler automatically generates a fresh name so that the variable cannot be used in its scope.
+If the name of an argument of a Π-introduction is "_", the compiler automatically generates a fresh name so that the variable cannot be used in its scope.
 
 Note that the arguments of a lambda-abstraction is generalized from unary to n-ary. This enables the compiler to emit more performant code when a lambda-abstraction receives multiple arguments; Without that generalization, the arguments must be represented as a tuple, discarding the possibility to pass the arguments of a function using multiple registers.
 
@@ -2038,7 +2038,7 @@ You can easily break the resource management system of Neut using this constant.
 
 (let bar z) ; (*2)
 #+END_SRC
-The code above uses the variable =z= for the two times. Since =z= is casted to a Pi-type, The resulting code tries to copy the integer =1= as if it were a closure. Since the internal representation of a closure at least uses 3 words, this causes an access to an invalid memory region, that is, a segmentation fault.
+The code above uses the variable =z= for the two times. Since =z= is casted to a Π-type, The resulting code tries to copy the integer =1= as if it were a closure. Since the internal representation of a closure at least uses 3 words, this causes an access to an invalid memory region, that is, a segmentation fault.
 
 * Compiler Subcommands
 The =neut= binary provides the subcommands in this section.
