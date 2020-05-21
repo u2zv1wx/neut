@@ -241,8 +241,6 @@ cartesian-sigma i sig :=
 #+END_SRC
 and translate =∑ [a : type, x : a]= into the =cartesian-sigma= above. In this way we can copy/discard a closure.
 
-(One might be lead to say that this translation is a generalized eta-expansion)
-
 # Incidentally, the 3-element representation of a closure can be justified proof-theoretically. Let us consider a depenedent variant of CBPV, where the inference rules =thunk= / =force= can be used only when the assumption is empty:
 # #+BEGIN_SRC text
 # (empty) |- e : N
@@ -468,7 +466,7 @@ define i64 @main() {
 #+END_SRC
 The code is already judged to be inefficient in that it allocates/deallocates memory unnecessarily. More specifically, it is inefficient in that it deallocates the memory that can actually be reused.
 
-Still, if the sizes of memory being allocated/deallocated are known at compile-time, isn't it possible to compare the sizes of them in compile-time and emit a code that reuses the allocated memory?
+Now you might think: If the sizes of memory being allocated/deallocated are known at compile-time, isn't it possible to compare the sizes of them at compile-time and emit a code that reuses the allocated memory?
 
 And it is indeed possible. When the option =--no-alloc-cancellation= is not passed, the compiler translates code pieces something like this:
 #+BEGIN_SRC llvm
