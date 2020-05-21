@@ -1941,7 +1941,7 @@ The =e= in =(let x e)= is automatically surrounded by =with=.
 
 *** Sematics
 #+BEGIN_SRC text
-(e e1 ... en)  [with (e_{i1} = _, ..., e_{im} = _)]
+(e e1 ... en)  [where e_{i1} = _, ..., e_{im} = _]
 ~> (λ (x1 ... xm) (e e1 ... en)) [replacing e_{ik} with xk]
 #+END_SRC
 
