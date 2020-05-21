@@ -57,6 +57,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#asterisk][asterisk]]
   - [[#sigma][sigma]]
   - [[#with][with]]
+  - [[#partial-application][Partial Application]]
 - [[#primitives][Primitives]]
   - [[#llvm-based-primitives][LLVM-Based Primitives]]
   - [[#syscalls][Syscalls]]
@@ -1920,6 +1921,29 @@ The "borrowing" is covered by the first rule of the semantics; As you can see fr
 Note that the =bind= operator is not restricted to monadic bind; You can set any term there as long as the resulting term of this syntactic translation is well-typed.
 
 The =e= in =(let x e)= is automatically surrounded by =with=.
+
+** Partial Application
+*** Example
+#+BEGIN_SRC neut
+(define id ((a tau) (x a)) x)
+
+; ordinary application
+(id bool bool.true)
+
+; partial application
+((id bool _) bool.true)
+
+; of course you can bind it
+(let id-bool (id bool _))
+
+(id-bool bool.true)
+#+END_SRC
+
+*** Sematics
+#+BEGIN_SRC text
+(e e1 ... en)  [with (e_{i1} = _, ..., e_{im} = _)]
+~> (λ (x1 ... xm) (e e1 ... en)) [replacing e_{ik} with xk]
+#+END_SRC
 
 * Primitives
 ** LLVM-Based Primitives
