@@ -43,7 +43,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
 - [[#syntax-and-semantics-of-terms][Syntax and Semantics of Terms]]
   - [[#tau][tau]]
   - [[#variable][variable]]
-  - [[#pi][pi]]
+  - [[#π][Π]]
   - [[#fix][fix]]
   - [[#constant-1][constant]]
   - [[#int][int]]
@@ -1176,8 +1176,6 @@ Each =section= must be paired with an =end= with the corresponding name.
 (define id ((a tau) (x a)) x)
 
 (id i64 10)
-
-(id tau tau) ; valid since `tau : tau`
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
@@ -1234,7 +1232,7 @@ The name of a variable is interpreted in relation with the keyword environment. 
 4. If not found, look up a bound variable named =buz.qux= in current scope.
 5. If not found, report the error: "undefined variable".
 
-** pi
+** Π
 =pi= is the universal quantification.
 *** Example
 #+BEGIN_SRC neut
