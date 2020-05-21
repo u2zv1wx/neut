@@ -58,11 +58,6 @@ interpret inputTree =
               return (m, WeakTermUpsilon $ asIdent atom)
     (m, TreeNode (leaf@(_, TreeLeaf headAtom) : rest)) ->
       case headAtom of
-        "upsilon"
-          | [(_, TreeLeaf x)] <- rest ->
-            return (m, WeakTermUpsilon $ asIdent x)
-          | otherwise ->
-            raiseSyntaxError m "(upsilon TREE)"
         "pi"
           | [(_, TreeNode xts), t] <- rest -> do
             (xts', t') <- interpretBinder xts t

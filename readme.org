@@ -42,7 +42,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#sectionend][section/end]]
 - [[#syntax-and-semantics-of-terms][Syntax and Semantics of Terms]]
   - [[#tau][tau]]
-  - [[#upsilon][upsilon]]
+  - [[#variable][variable]]
   - [[#pi][pi]]
   - [[#fix][fix]]
   - [[#constant-1][constant]]
@@ -554,7 +554,7 @@ Next. Notes on the compiler subcommands. (0) You can build a program with =$ neu
 
 Now I think you are basically ready to, for example, start reading [[https://github.com/u2zv1wx/neut/tree/master/test/data][the files in the test directory]], or [[https://github.com/u2zv1wx/neut-core][the files in the core library]], referring the sections below as necessary. After that you should know how to write lambdas, recursive functions, inductive types, tuples. You need state? You can use the state monad. Multiple effects? The free monad. You have the full power of lambda calculus.
 
-That pretty much should do it. I hope you enjoy.
+That pretty much should do it. I hope you enjoy this language.
 
 * Syntax and Semantics of Statements
 A program of Neut is a list of statements. Each statement is one of the following statements described in this section.
@@ -1196,21 +1196,17 @@ well-formed(Γ)
 *** Semantics
 =tau= doesn't have any operational semantics.
 
-** upsilon
-=upsilion= is a variable.
+** variable
 *** Example
 #+BEGIN_SRC neut
 (let x (i64 10))
 
-; "explicit" notation
-(i64.print (upsilon x)) ; ~> 10
+(i64.print x) ; ~> 10
 
-; "implicit" notation
-(i64.print x)           ; ~> 10
+(let _ (i64 20)) ; anonymous variable
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
-(upsilon LEAF)
 LEAF
 #+END_SRC
 *** Inference Rule
@@ -1221,14 +1217,14 @@ well-formed(Γ, x : A)
 
 
 well-formed(Γ)  (x : A) ∈ Γ
----------------------------- (upsilon)
-   Γ |- (upsilon x) : A
+---------------------------- (var)
+       Γ |- x : A
 #+END_SRC
 *** Semantics
-=upsilon= doesn't have any operational semantics.
+A variable doesn't have any operational semantics by itself.
 
 *** Notes
-If a leaf is not parsed into any other syntactic construct, the leaf =x= is regarded as =(upsilon x)=.
+If a leaf is not parsed into any other syntactic construct, the leaf =x= is regarded as a variable.
 
 The name of a variable is interpreted in relation with the keyword environment. For example, if the keyword environment is =["foo", "bar", "buz"]=, the name =qux= is interpreted in the following way:
 1. Look up a bound variable named =qux= in current scope.
