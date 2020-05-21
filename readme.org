@@ -87,7 +87,7 @@ Let's see how Neut manages resources. The following code prints the string "a" f
   (let _ (string.print str))
   (string.print str))
 #+END_SRC
-The =(with identity.bind (...))= is the same as so-called do-notation in Haskell or other languages, specilized to the identity monad.
+The =(with identity.bind (...))= is the same as the do-notation in Haskell or other languages, specilized to the identity monad.
 
 By running =$ neut build --no-alloc-cancellation --emit llvm filename.neut=, we obtain schematically the following LLVM IR (the =--no-alloc-cancellation= is to disable certain optimization that we will see later):
 #+BEGIN_SRC llvm
@@ -106,7 +106,7 @@ The non-schematic, actual output can also be found in the [[#llvm-ir-for-the-fir
 
 The resulting LLVM IR creates a string in memory, print it, and free it for the 3 times. The point here is that the resulting code creates 2 copies of the original string. This is because the variable =str= is used for the 3 times; The content of a variable is copied to create n instances when the variable is used for the n times (n > 1). If the variable isn't used at all (n < 1), the content of the variable is discarded (deallocated). If the variable is used exactly once, or linearly (n = 1), the content of the variable is used without any discarding/copying operation.
 
-By translating the source calculus in the way sketched above, every variable is ensured to be used linearly, except for the ones in the functions that realize those copying/discarding operations. Thus, by checking that those exponentializers use resources properly, we can ensure that the target calculus of this translation handles memory properly too. And indeed those exponentializers are sane - This is the basic storyline.
+By translating the source calculus in the way sketched above, every variable is ensured to be used linearly, except for the ones in the functions that realize those copying/discarding operations. Thus, by checking that those exponentializers use resources properly, we can ensure that the target calculus of this translation handles memory properly too. Then we check that those exponentializers are indeed sane - This is the basic storyline.
 
 The way how a variable is copied/discarded is determined by the type of the variable. For example, if the type of a variable is the array type as in the example above, the copying operation is something that you would do in C to copy an array (memory allocation followed by value insertion). If the type is an immediate type like an integer type, the "copying" operation is the one that uses the original value for the cloned value. Every type is translated into a term that copies/discards the terms of the type, including the type of the type itself.
 
@@ -141,7 +141,7 @@ let (str1, tmp) := cartesian-string(1, tmp);
 let (str2, str3) := cartesian-string(1, tmp);
 {- THE CODE THAT USES `str1`, `str2`, AND `str3` LINEARLY -}
 #+END_SRC
-By translating types in this way, we can omit creating tuples every time when we translate a type. Thus, in the actual implementation, a type is translated into a closed function, which is lowered to a pointer to the function (1 word).
+By translating types in this way, we can bypass creating tuples every time when we translate a type. Thus, in the actual implementation, a type is translated into a closed function, which is lowered to a pointer to the function (1 word).
 
 It would be worth noting here that these functions like =cartesian-string= are β-reduced (inlined) aggressively; These are ordinary functions that can be defined in the target language, after all.
 
@@ -177,7 +177,7 @@ cartesian-closure i closure = do
     -- construct the 2 closures, and the wrapper tuple (thus do malloc for the 3 times)
     return ((typeOfChain, chainA, label), (typeOfChain, chainB, label))
 #+END_SRC
-Thus, we can translate every Π-type into the function =cartesian-closure=. Every Closure is copied/discarded in the same way, regardless of its actual details. So, information like =i64= or =bool= in =i64 -> bool= is indeed useless here; It simply isn't a problem since every closure knows how to copy/discard itself.
+Thus, we can translate every Π-type into the function =cartesian-closure=. Every Closure is copied/discarded in the same way, regardless of its actual details. So, information like =i64= or =bool= in =i64 -> bool= is indeed useless here; It simply isn't necessary since every closure knows how to copy/discard itself.
 
 The remaining piece is how a type of a closed chain like =∑ [a : type, x : a]= is translated. This is where eta-expansion plays its role. Suppose we have a term =e= of type =∑ [a : type, x : a]=. Since we already know the type of =e=, we can eta-expand this term as follows:
 #+BEGIN_SRC haskell
@@ -546,17 +546,17 @@ As for editor support, you can currently try [[https://github.com/u2zv1wx/neut-m
 * Highly-Accelerated Tutorial
 You can find a detailed description of the syntax, the logic, and the semantics of Neut in the succeeding sections. Those should suffice to read/write a program of Neut. Having said that though, some might prefer learning from actual source code after taking a brief look at this and that basic stuff. So here I introduce you some necessities that would be required to understand - or guess the meaning of - a program of Neut.
 
-Let's start. Notes on programs. (0) A program of Neut is a list of statements, processed one by one. (1) [[#ensure][ensure]] and [[#include][include]] are the ones that uses codes written in other files. I recommend you to read the linked notes; both of them are not so long. (2) [[#useunuse][use/unuse]] and [[#sectionend][section/end]] are the ones that manages namespace. Again I recommend you to read them.
+Let's start. Notes on programs. (0) A program of Neut is a list of statements, processed one by one. (1) [[#ensure][ensure]] and [[#include][include]] are the ones that use codes written in other files. I recommend you to read the linked notes; both of them are not so long. (2) [[#useunuse][use/unuse]] and [[#sectionend][section/end]] are the ones that handle namespace. Again I recommend you to read them.
 
-Next. Notes on terms. (0) Note that what follows presupposes the core library =core/VERSION/notation.neut=; Some of these won't work without including the file. (1) =tau=, or =type= is the type of types. (2) =Π= or =pi= is the universal quantification. Note that =Π (x : A). B= is the same as the arrow type =A -> B= if =x ∉ freevar(B)=. Also note that a lambda-abstraction in Neut is n-ary; =(λ ((x A) (y B)) e)= is not the same as =(λ ((x A)) (λ ((y B)) e))=. (3) If you want to create a tuple, you can use =(sigma-introduction e1 ... en)= or =(tuple e1 ... en)=. The elements of a term of a sigma type can be extracted by =(sigma-elimination (x1 ... xn) e cont)=. (4) You can write =(question e)= or =?x= when you want the compiler to show the type of =e= or =x=. (5) You can write =*= to have the compiler infer the specified part. For example, assuming =(define id ((a tau) (x a)) x)=, you can write =(id * bool.true)= instead of =(id bool bool.true)=. (6) You will notice that =(witness t e)= is used here and there. This is a notation defined by =(notation (witness t e) ((λ ((x t)) x) e))=; A notation that tells the compiler that the term of =e= is =t=.
+Next. Notes on terms. (0) Note that what follows presupposes the =notation.neut= in [[https://github.com/u2zv1wx/neut-core][the core library]]; Some of these won't work without including the file. (1) =tau=, or =type= is the type of types. (2) =Π= or =pi= is the universal quantification. Note that =Π (x : A). B= is the same as the arrow type =A -> B= if =x ∉ freevar(B)=. Also note that a lambda-abstraction in Neut is n-ary; =(λ ((x A) (y B)) e)= is not the same as =(λ ((x A)) (λ ((y B)) e))=. (3) If you want to create a tuple, you can use =(sigma-introduction e1 ... en)= or =(tuple e1 ... en)=. The elements of a term of a sigma type can be extracted by =(sigma-elimination (x1 ... xn) e cont)=. (4) You can write =(question e)= or =?x= when you want the compiler to show the type of =e= or =x=. (5) You can write =*= to have the compiler infer the specified part. For example, assuming =(define id ((a tau) (x a)) x)=, you can write =(id * bool.true)= instead of =(id bool bool.true)=. (6) You will notice that =(witness t e)= is used here and there. This is a notation defined by =(notation (witness t e) ((λ ((x t)) x) e))=; A notation that tells the compiler that the term of =e= is =t=.
 
-Next. Notes on primitives: (0) The following primitive types are available: =i1=, =i2=, =i3=, ..., =i64=. These are the same as the integer types in LLVM. (1) You can also use =f16=, =f32=, and =f64=. These are LLVM's =half=, =float=, and =double=, respectively. (2) You will soon come to want primitives - like =add=, =mul=, or =xor= - that can operate on terms of these types. You can find information on them [[#llvm-based-primitives][here]]. (3) In the section you can also find notes on unsafe casting, array accessing, and syscall. I think these should also count as necessities.
+Next. Notes on primitives: (0) The following primitive types are available: =i1=, =i2=, =i3=, ..., =i64=. These are the same as the integer types in LLVM. (1) You can also use =f16=, =f32=, and =f64=. These are LLVM's =half=, =float=, and =double=, respectively. (2) You will soon come to want primitive instructions - like =add=, =mul=, or =xor= - that can operate on terms of these types. You can find information on them [[#primitives][in this section]]. (3) In the section you can also find notes on unsafe casting, array accessing, and syscall. I think these should also count as necessities.
 
-Next. Notes on the compiler command. (0) You can build a program with =$ neut build path/to/file.neut=. (1) You can create an =tar.gz= archive of a project via =$ neut archive path/to/dir=. Then you can upload the archive to somewhere, allowing others to =ensure= and =include= it.
+Next. Notes on the compiler subcommands. (0) You can build a program with =$ neut build path/to/file.neut=. (1) You can create an =tar.gz= archive of a project via =$ neut archive path/to/dir=. Then you can upload the archive to somewhere, allowing others to =ensure= and =include= it.
 
-Now you are ready to, for example, start reading [[https://github.com/u2zv1wx/neut/tree/master/test/data][the files in the test directory]], or [[https://github.com/u2zv1wx/neut-core][the files in the core library]]. After that you should know how to write lambdas, recursive functions, inductive types, tuples. Needs state? You can use the state monad. Multiple effects? The free monad. You have the full power of lambda calculus.
+Now I think you are basically ready to, for example, start reading [[https://github.com/u2zv1wx/neut/tree/master/test/data][the files in the test directory]], or [[https://github.com/u2zv1wx/neut-core][the files in the core library]], referring the sections below as necessary. After that you should know how to write lambdas, recursive functions, inductive types, tuples. Needs state? You can use the state monad. Multiple effects? The free monad. You have the full power of lambda calculus.
 
-So that pretty much should do it. I hope you enjoy.
+That pretty much should do it. I hope you enjoy.
 
 * Syntax and Semantics of Statements
 A program of Neut is a list of statements. Each statement is one of the following statements described in this section.
