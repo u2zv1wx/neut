@@ -21,7 +21,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
 
 * Table of Contents                                                    :TOC:
 - [[#examples][Examples]]
-  - [[#compile-time-mallocfree-determination][Compile-Time malloc/free Determination]]
+  - [[#proof-theoretic-memory-management][Proof-Theoretic Memory Management]]
   - [[#manual-optimization-via-borrowing][Manual Optimization via Borrowing]]
   - [[#automatic-optimization-via-mallocfree-cancellation][Automatic Optimization via malloc/free Cancellation]]
   - [[#summary][Summary]]
@@ -71,7 +71,7 @@ Here I briefly summerize the basic properties of Neut before diving into the det
   - [[#llvm-ir-for-the-second-example][LLVM IR for the Second Example]]
 
 * Examples
-** Compile-Time malloc/free Determination
+** Proof-Theoretic Memory Management
 *** Basics
 Let's see how Neut manages resources. The following code prints the string "a" for the 3 times:
 #+BEGIN_SRC neut
