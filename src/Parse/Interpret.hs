@@ -74,7 +74,7 @@ interpret inputTree =
           | e : es <- rest ->
             interpretPiElim m e es
           | otherwise ->
-            raiseSyntaxError m "(Π-elimination TREE TREE*)" -- e' <- interpret e
+            raiseSyntaxError m "(Π-elimination TREE TREE*)"
         "fix"
           | [xt, xts@(_, TreeNode _), e] <- rest -> do
             (m', xt', xts', e') <- interpretFix (m, TreeNode [xt, xts, e])
