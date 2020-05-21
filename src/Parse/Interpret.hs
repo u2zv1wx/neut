@@ -58,23 +58,23 @@ interpret inputTree =
               return (m, WeakTermUpsilon $ asIdent atom)
     (m, TreeNode (leaf@(_, TreeLeaf headAtom) : rest)) ->
       case headAtom of
-        "pi"
+        "Π"
           | [(_, TreeNode xts), t] <- rest -> do
             (xts', t') <- interpretBinder xts t
             return (m, WeakTermPi xts' t')
           | otherwise ->
-            raiseSyntaxError m "(pi (TREE*) TREE)"
-        "pi-introduction"
+            raiseSyntaxError m "(Π (TREE*) TREE)"
+        "Π-introduction"
           | [(_, TreeNode xts), e] <- rest -> do
             (xts', e') <- interpretBinder xts e
             return (m, WeakTermPiIntro xts' e')
           | otherwise ->
-            raiseSyntaxError m "(pi-introduction (TREE*) TREE)"
-        "pi-elimination"
+            raiseSyntaxError m "(Π-introduction (TREE*) TREE)"
+        "Π-elimination"
           | e : es <- rest ->
             interpretPiElim m e es
           | otherwise ->
-            raiseSyntaxError m "(pi-elimination TREE TREE*)" -- e' <- interpret e
+            raiseSyntaxError m "(Π-elimination TREE TREE*)" -- e' <- interpret e
         "fix"
           | [xt, xts@(_, TreeNode _), e] <- rest -> do
             (m', xt', xts', e') <- interpretFix (m, TreeNode [xt, xts, e])

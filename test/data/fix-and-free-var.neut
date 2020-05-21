@@ -8,7 +8,7 @@
 (enum bool (true 1) (false 0))
 
 (let app
-  (lambda ((_ (pi () top)))
+  (lambda ((_ (Π () top)))
     top.unit))
 
 (let f

@@ -5,7 +5,7 @@
 
 ; nullary lambda (pi-introduction)
 (let f1
-  (pi-introduction () (i64 1)))
+  (Π-introduction () (i64 1)))
 
 (i64.print (f1))
 

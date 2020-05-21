@@ -254,7 +254,7 @@ and translate =∑ [a : type, x : a]= into the =cartesian-sigma= above. In this 
 # #+END_SRC
 # In such a calculus, we have the following type-isomorphism:
 # #+BEGIN_SRC text
-# Π (x : A). B ~ ∑ (C : Univ). C × ↓(Pi (x : A, env : C). B)
+# Π (x : A). B ~ ∑ (C : Univ). C × ↓(Π (x : A, env : C). B)
 # #+END_SRC
 # Regarding the =C= part as the type of environment, this type-isomorphism (left-to-right) can be understood as a description of closure conversion.
 
@@ -1240,10 +1240,10 @@ The name of a variable is interpreted in relation with the keyword environment. 
 #+BEGIN_SRC neut
 ; unary pi-introduction
 (let f2
-  (pi-introduction ((x i64)) x))
+  (Π-introduction ((x i64)) x))
 
 ; pi-elimination
-(pi-elimination i64.print (pi-elimination f2 2))
+(Π-elimination i64.print (Π-elimination f2 2))
 
 ; pi-elimination with the familar (or, implicit) syntax
 (i64.print (f2 2))
@@ -1263,9 +1263,9 @@ The name of a variable is interpreted in relation with the keyword environment. 
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
-(pi (LEAF_PLUS*) B)
-(pi-introduction (LEAF_PLUS*) e)
-(pi-elimination TREE+)
+(Π (LEAF_PLUS*) B)
+(Π-introduction (LEAF_PLUS*) e)
+(Π-elimination TREE+)
 (TREE+)
 
 LEAF_PLUS ::= LEAF | (LEAF TREE)
@@ -1273,43 +1273,43 @@ LEAF_PLUS ::= LEAF | (LEAF TREE)
 *** Inference Rule
 #+BEGIN_SRC text
 Γ |- A1 : tau    Γ, x1 : A1 |- A2 : tau    (...)    Γ, x1 : A1, ..., xn : An |- B : tau
----------------------------------------------------------------------------------------- (pi)
-                    Γ |- (pi ((x1 A1) ... (xn An)) B) : tau
+---------------------------------------------------------------------------------------- (Π)
+                    Γ |- (Π ((x1 A1) ... (xn An)) B) : tau
 
 
              Γ, x1 : A1, ..., xn : An |- e : B
-------------------------------------------------------------------------------- (pi-introduction)
- Γ |- (pi-introduction ((x1 A1) ... (xn An)) e) : (pi ((x1 A1) ... (xn An)) B)
+------------------------------------------------------------------------------- (Π-introduction)
+ Γ |- (Π-introduction ((x1 A1) ... (xn An)) e) : (Π ((x1 A1) ... (xn An)) B)
 
 
-Γ |- e : (pi ((x1 A1) ... (xn An)) B)   Γ |- e1 : A1   (...)   Γ |- en : An {xi := ei}
--------------------------------------------------------------------------------------- (pi-elimination)
-              Γ |- (pi-elimination e e1 ... en) : B {xi := ei}
+Γ |- e : (Π ((x1 A1) ... (xn An)) B)   Γ |- e1 : A1   (...)   Γ |- en : An {xi := ei}
+-------------------------------------------------------------------------------------- (Π-elimination)
+              Γ |- (Π-elimination e e1 ... en) : B {xi := ei}
 #+END_SRC
 *** Semantics
 #+BEGIN_SRC neut
-(pi-elimination e e1 ... en)
-~> (pi-elimination v v1 ... vn)  [i.e. reduce e and ei into the values v and vi, from left to right]
+(Π-elimination e e1 ... en)
+~> (Π-elimination v v1 ... vn)  [i.e. reduce e and ei into the values v and vi, from left to right]
 
-(pi-elimination (pi-introduction ((x1 A1) ... (xn An)) e) v1 ... vn)
+(Π-elimination (Π-introduction ((x1 A1) ... (xn An)) e) v1 ... vn)
 ~> e {x1 := v1, ..., xn := vn}
 #+END_SRC
 *** Notes
-If a tree =(e e1 ... en)= is not parsed into any other terms, the tree is regarded as =(pi-elimination e e1 ... en)=.
+If a tree =(e e1 ... en)= is not parsed into any other terms, the tree is regarded as =(Π-elimination e e1 ... en)=.
 
 If the name of an argument of a pi-introduction is "_", the compiler automatically generates a fresh name so that the variable cannot be used in its scope.
 
 Note that the arguments of a lambda-abstraction is generalized from unary to n-ary. This enables the compiler to emit more performant code when a lambda-abstraction receives multiple arguments; Without that generalization, the arguments must be represented as a tuple, discarding the possibility to pass the arguments of a function using multiple registers.
 
-Some additional notations for pi are defined in =core/VERSION/notation.neut=:
+Some additional notations for Π are defined in =core/VERSION/notation.neut=:
 #+BEGIN_SRC neut
-(notation forall pi)
+(notation forall Π)
 
-(notation Π pi)
+(notation Pi Π)
 
-(notation lambda pi-introduction)
+(notation lambda Π-introduction)
 
-(notation λ pi-introduction)
+(notation λ Π-introduction)
 
 ; tells the compiler that the type of `e` is `t`
 (notation (witness t e)
@@ -1349,13 +1349,13 @@ LEAF_PLUS ::= LEAF | (LEAF TREE)
 #+END_SRC
 *** Inference Rule
 #+BEGIN_SRC text
-Γ, f : (pi ((x1 A1) ... (xn An)) B), x1 : A1, ..., xn : An |- e : B
+Γ, f : (Π ((x1 A1) ... (xn An)) B), x1 : A1, ..., xn : An |- e : B
 -------------------------------------------------------------------- (fix)
-Γ |- (fix f ((x1 A1) ... (xn An)) e) : (pi ((x1 A1) ... (xn An)) B)
+Γ |- (fix f ((x1 A1) ... (xn An)) e) : (Π ((x1 A1) ... (xn An)) B)
 #+END_SRC
 *** Semantics
 #+BEGIN_SRC neut
-(pi-elimination (fix self ((x1 A1) ... (xn An)) e) v1 ... vn)
+(Π-elimination (fix self ((x1 A1) ... (xn An)) e) v1 ... vn)
 ~> e {x1 := v1,
       ...,
       xn := vn,
@@ -1838,14 +1838,14 @@ LEAF_PLUS ::= LEAF | (LEAF TREE)
 *** Semantics
 #+BEGIN_SRC text
 (sigma ((x1 A1) ... (xn An)) B)
-~> (pi ((Z tau)
-        (_ (pi ((x1 A1) ... (xn An) (_ B)) Z)))
+~> (Π ((Z tau)
+        (_ (Π ((x1 A1) ... (xn An) (_ B)) Z)))
        Z))
 
 (sigma-introduction e1 ... en)
-~> (pi-introduction
+~> (Π-introduction
      ((Z tau)
-      (k (pi ((x1 hole) ... (xn hole)) Z)))
+      (k (Π ((x1 hole) ... (xn hole)) Z)))
      (k e1 ... en))
 
 (sigma-elimination ((x1 A1) ... (xn An)) e1 e2)
@@ -1963,7 +1963,7 @@ Neut supports syscalls, although its current support is far from complete. As yo
 It would be worth noting that a syscall can't produce/consume a resource. For example, the syscall =write= is declared to have the following type in Neut:
 #+BEGIN_SRC neut
 (constant os.write
-  (pi
+  (Π
     ((len i64)
      (out file-descriptor)
      (buf (array len i8))

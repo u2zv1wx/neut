@@ -10,8 +10,8 @@
 
 ; variable with the same name of a constant
 (let _
-  (lambda ((i64:add (pi ((_ i64) (_ i64)) i64)))
-    (i64:add 1 2)))
+  (lambda ((i64.add (Π ((_ i64) (_ i64)) i64)))
+    (i64.add 1 2)))
 
 ; ?i64:trunc:i32
 
