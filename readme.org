@@ -1,5 +1,5 @@
 #+TITLE: Neut
-Neut is a dependently-typed programming language based on [[https://en.wikipedia.org/wiki/Calculus_of_constructions][the Calculus of Constructions (CoC)]]. The interesting point is that this language determines how to allocate/deallocate memory at compile-time, without extra annotations to the source language. In other words, Neut in its source language is the ordinary lambda-calculus after all (imagine something like Haskell, OCaml, Idris, Coq, Agda, or Lean), and at the same time it handles memory without using, for example:
+Neut is a dependently-typed programming language based on [[https://en.wikipedia.org/wiki/Calculus_of_constructions][the Calculus of Constructions (CoC)]]. The interesting point is that this language determines how to allocate/deallocate memory at compile-time, without extra annotations to the type system. In other words, Neut in its source language is the ordinary lambda-calculus after all (imagine something like Haskell, OCaml, Idris, Coq, Agda, or Lean), and at the same time it handles memory without using, for example:
 
 - explicit malloc/free,
 - garbage collection,
@@ -302,7 +302,7 @@ We can't say the resulting LLVM IR of this code is efficient enough; We can't ig
 Fortunately, there is a workaround for this performance problem.
 
 ** Manual Optimization via Borrowing
-The point of the workaround is straightforward: If those copying/discarding result from using variables non-linearly, we simply have to use those variables linearly. Let's go back to the first example code:
+The point of the workaround is straightforward: If those copying/discarding operations result from using variables non-linearly, we simply have to use variables linearly. Let's go back to the first example code:
 #+BEGIN_SRC neut
 (ensure core/0.1.0.0
   "https://github.com/u2zv1wx/neut-core/archive/0.1.0.0.tar.gz")
@@ -319,7 +319,7 @@ We would like to use the variable =str= linearly. To this end, we can request =s
 #+BEGIN_SRC haskell
 string.print :: string -> string * top
 string.print str = do
-  {print the string `str` without consuming it}
+  {print the string `str`}
   return (str, unit)
 #+END_SRC
 With that definition of =string.print=, we can use the variable =str= linearly (again, in pseudo-code):
@@ -402,7 +402,7 @@ define i64 @main() {
 #+END_SRC
 Again, the non-schematic output can be found in the [[#llvm-ir-for-the-second-example][appendix]]. The output in this time is actually short enough to include it here (36 lines including comments), though I chose not to. The point here is that the string "a" is reused without copying, as expected.
 
-The resulting assembly code, which can be obtained by =--emit asm=, is reasonably small too (works on macOS; when you compile the same code on Linux, the =write= operations are lowered into corresponding syscalls):
+The resulting assembly code, which can be obtained by =--emit asm=, is reasonably small too (works on macOS; when you compile the same code on Linux, the =write= operations are lowered into the corresponding syscalls):
 #+BEGIN_SRC asm
 	.section	__TEXT,__text,regular,pure_instructions
 	.macosx_version_min 12, 15
@@ -468,7 +468,7 @@ define i64 @main() {
 #+END_SRC
 The code is already judged to be inefficient in that it allocates/deallocates memory unnecessarily. More specifically, it is inefficient in that it deallocates the memory that can actually be reused.
 
-But, if the sizes of memory being allocated/deallocated are known at compile-time, isn't it possible to compare the sizes of them in compile-time and emit a code that reuses the allocated memory?
+Still, if the sizes of memory being allocated/deallocated are known at compile-time, isn't it possible to compare the sizes of them in compile-time and emit a code that reuses the allocated memory?
 
 And it is indeed possible. When the option =--no-alloc-cancellation= is not passed, the compiler translates code pieces something like this:
 #+BEGIN_SRC llvm
@@ -1397,7 +1397,7 @@ LEAF
 #+END_SRC
 *** Inference Rule
 #+BEGIN_SRC text
-well-formed(Γ)       {`c` is declared to be a constant of type `A`}
+Γ |- A : tau          {`c` is declared to be a constant of type `A`}
 --------------------------------------------------------------------- (constant)
          Γ |- (constant c) : A
 #+END_SRC
