@@ -1933,7 +1933,7 @@ The =e= in =(let x e)= is automatically surrounded by =with=.
 ; partial application
 ((id bool _) bool.true)
 
-; of course you can bind it
+; of course you can bind the partially-applied function to a variable
 (let id-bool (id bool _))
 
 (id-bool bool.true)
