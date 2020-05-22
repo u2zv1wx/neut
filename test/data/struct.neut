@@ -1,4 +1,4 @@
-(ensure core/1.0.0.0
+(ensure core/0.1.0.0
   "https://github.com/u2zv1wx/neut-core/raw/master/release/0.1.0.0.tar.gz")
 
 (include "core/0.1.0.0/integer.neut")
