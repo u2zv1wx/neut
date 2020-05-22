@@ -537,7 +537,7 @@ $ stack upgrade --binary-only # not required if your stack is already up-to-date
 
 Also make sure that you have =~/.local/bin= in your =$PATH=.
 
-After that, clone the repository and build it:
+Then, clone the repository and build it:
 #+BEGIN_SRC shell
 $ git clone https://github.com/u2zv1wx/neut
 $ cd neut
