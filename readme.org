@@ -1980,7 +1980,7 @@ ssize_t write(int fildes, const void *buf, size_t nbyte);
 #+END_SRC
 Ignoring the =(len i64)= part that is necessary to receive an array of arbitrary length, the crucial difference here is the types of the codomains. While the latter one returns ordinary =ssize_t= (integer), the former one also returns the original array. This is because the syscall =write= doesn't consume (i.e. deallocate) given string. If we =write= in Neut doesn't return the original string, the string is never freed in the succeeding program, causing space leak.
 
-Regarding macOS: You may note that the "syscalls" are lowered to some external interface functions on macOS. This is because macOS (>= 10.12) doesn't support using a syscall directly; Indeed, for example, if we were to use the syscall =fork= directly (0x2000002), succeeding =malloc= causes a fatal error, saying something like =mach_vm_map(size=1048576) failed (error code=268435459)=.
+Regarding macOS: You may note that the "syscalls" are lowered to some external interface functions on macOS. This is because macOS (>= 10.12) doesn't support using a syscall directly; Indeed, for example, if we were to use the syscall =fork= directly (0x2000002), a succeeding =malloc= causes a fatal error, saying something like =mach_vm_map(size=1048576) failed (error code=268435459)=.
 
 Implementation note: A syscall can be added via the following procedure:
 1. Declare corresponding constant (like =os.write=) using the [[#constant][constant]] statement
