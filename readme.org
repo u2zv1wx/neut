@@ -273,7 +273,7 @@ This function =to-tuple= is, for example, used as follows:
 (to-tuple bool bool.true) ; ~> (tuple bool.true bool.true)
 (to-tuple string "a")     ; ~> (tuple "a" "a")
 #+END_SRC
-Note that the type =i64= is used in exactly the same way as =1=; A type is nothing but an ordinary term of type =tau=. And these very terms =i64=, =bool=, and =string= in the example are translated into ordinary closed functions that copies/discards the terms of the types. Thus, the =to-tuple= function can copy the resource =x= of type =a= conceptually as follows:
+Note that the type =i64= is used in exactly the same way as =1=; A type is nothing but an ordinary term of type =tau=. And these very terms =i64=, =bool=, and =string= in the example are translated into ordinary closed functions that copies/discards the terms of the types. The =to-tuple= function can therefore copy the resource =x= of type =a= conceptually as follows:
 #+BEGIN_SRC haskell
 to-tuple :: Π (a : tau, x : a). a * a
 to-tuple a x :=
