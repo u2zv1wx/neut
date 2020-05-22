@@ -142,7 +142,7 @@ let (str1, tmp) := cartesian-string(1, tmp);
 let (str2, str3) := cartesian-string(1, tmp);
 {- THE CODE THAT USES `str1`, `str2`, AND `str3` LINEARLY -}
 #+END_SRC
-By translating types in this way, we can bypass creating tuples every time when we translate a type. Thus, in the actual implementation, a type is translated into a closed function, which is lowered to a pointer to the function (1 word).
+This alternative translation frees us from having to create a tuple every time when we translate a type. Thus, in the actual implementation, every type is translated into a closed function, which is then lowered to a pointer (1 word).
 
 It would be worth noting here that these functions like =cartesian-string= are β-reduced (inlined) aggressively; These are ordinary functions that can be defined in the target language, after all.
 
