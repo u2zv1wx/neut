@@ -125,7 +125,7 @@ let (str1, tmp) := copy-string(str);
 let (str2, str3) := copy-string(tmp);
 {- THE CODE THAT USES `str1`, `str2`, AND `str3` LINEARLY -}
 #+END_SRC
-Note that the second line uses the pair =(discard-string, copy-string)=, which is the result of translation of the type =string=. Every type =X= is translated in this manner; the pair of =discard-X= and =copy-X=. These exponentializers - something that allows us to create n copies of =x= from a single =x= - are used in its continuation so that every variable of this type (=str= in this example) is used linearly.
+Note that the second line extracts =discard-string= and =copy-string= from the tuple =TRANSLATE(string)=. Every type =X= is translated in this manner; the pair of =discard-X= and =copy-X=. These exponentializers - something that allows us to create n copies of =x= from a single =x= - are used in its continuation so that every variable of this type (=str= in this example) is used linearly.
 
 Incidentally, in the actual implementation, the result of =TRANSLATE(string)= is not a pair, but a function as in the pseudo-code below:
 #+BEGIN_SRC haskell
