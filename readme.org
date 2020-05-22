@@ -161,7 +161,7 @@ Let us continue the example of =λ (y : i64), (x, y)=. Using the closed chain we
 #+BEGIN_SRC text
 (∑ [a : type, x : a], (a, x), LABEL_TO_A_CLOSED_FUNCTION)
 #+END_SRC
-That is, a lambda-abstraction is translated into *(0) the type of its closed chain*, (1) its closed chain, and (2) a pointer to an appropriately-arranged closed function. Now, remember that every type is translated into a term that copies/discards the terms of the type. Also remember that every type is translated into a function pointer, which can be copied/discarded without any malloc/free operations. Thus, we can generate a function that copies/discards a closure conceptually as follows:
+That is, a lambda-abstraction is translated into a tuple consists of *(0) the type of its closed chain*, (1) its closed chain, and (2) a pointer to an appropriately-arranged closed function. Now, remember that every type is translated into a term that copies/discards the terms of the type. Also remember that every type is translated into a function pointer, which can be copied/discarded without any malloc/free operations. Thus, we can generate a function that copies/discards a closure conceptually as follows:
 #+BEGIN_SRC haskell
 cartesian-closure i closure = do
   -- extract the element of the closure, freeing the outer 3-word tuple
