@@ -147,7 +147,7 @@ This alternative translation frees us from having to create a tuple every time w
 It would be worth noting here that these functions like =cartesian-string= are β-reduced (inlined) aggressively; These are ordinary functions that can be defined in the target language, after all.
 
 *** Notes on Closures
-You may be wondering now: "How can we copy/discard a closure? In ordinary closure conversion, a lambda-abstraction is translated into a pair consists of (1) all the free variables in the abstraction, and (2) a pointer to an appropriately-arranged closed function. How can that tuple be copied/discarded just by using type information like =i64 -> bool=, which is seemingly useless here?"
+You may be wondering now: "How can we copy/discard a closure? In ordinary closure conversion, a lambda-abstraction is translated into a pair consists of (1) all the free variables in the abstraction, and (2) a pointer to an appropriately-arranged closed function. How can that tuple be copied/discarded just by using type information like =i64 -> bool=, which is seemingly useless here? How should we translate the type =i64 -> bool=?"
 
 That is a valid question. The key to give the answer to this question is generalizing the concept of "all the free variables". Consider the following term:
 #+BEGIN_SRC haskell
