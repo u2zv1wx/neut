@@ -1849,7 +1849,7 @@ LEAF_PLUS ::= LEAF | (LEAF TREE)
 ~> (e1 hole (lambda ((x1 A1) ... (xn An)) e2))
 #+END_SRC
 *** Notes
-Actual definition of =sigma= is found in =core/VERSION/notation.neut=; =sigma= is just a convenient notation of a certain use of =Π=. This enocding is the ordinary one in CoC.
+Actual definition of =sigma= is found in =core/VERSION/notation.neut=; =sigma= is just a convenient notation of a certain use of =Π=. This encoding is the ordinary one in CoC.
 
 Sigma-type with dependence can be used, for example, to realize the type of string as follows:
 #+BEGIN_SRC text
