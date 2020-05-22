@@ -1,4 +1,4 @@
 .stack-work/
 neut.cabal
 .DS_Store
-stack*.yaml.lock
+stack.yaml.lock
