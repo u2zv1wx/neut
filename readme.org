@@ -528,17 +528,24 @@ Although the compiler can cancel memory allocations/deallocations, it cannot can
 * Installation
 The currently supported platforms are: Linux (x64), macOS (x64).
 
-Make sure you have already installed [[https://docs.haskellstack.org/en/stable/README/][stack]] (>= 2.3.0) and [[https://clang.llvm.org/][clang]] (>= 10.0.0). Then, clone the repository and build it:
+Make sure that you have already installed [[https://zlib.net/][zlib]] (>= 1.2.11), [[https://wiki.openssl.org/index.php/Libssl_API][libssl]] (>= 1.1.1), [[https://docs.haskellstack.org/en/stable/README/][stack]] (>= 2.3.0) and [[https://clang.llvm.org/][clang]] (>= 10.0.0). On Debian, for example, the first three can be installed as follows:
+#+BEGIN_SRC shell
+$ sudo apt install zlib1g-dev libssl-dev haskell-stack
+$ stack upgrade --binary-only # not required if your stack is already up-to-date
+#+END_SRC
+=clang= can be installed in the way described [[https://apt.llvm.org/][here]].
+
+Also make sure that you have =~/.local/bin= in your =$PATH=.
+
+After that, clone the repository and build it:
 #+BEGIN_SRC shell
 $ git clone https://github.com/u2zv1wx/neut
 $ cd neut
 $ git checkout 0.1.0.0
 $ stack test    # this builds the project and test its behavior
-$ stack install # this installs the binary `neut` into `~/.local/bin`
+$ stack install # this installs the executable `neut` into `~/.local/bin`
 #+END_SRC
-Also make sure that you have =~/.local/bin= in your =$PATH=.
-
-To uninstall, you just have to remove the binary =~/.local/bin/neut= and the directory =~/.local/share/neut=; Neut won't clutter your system.
+To uninstall, you just have to remove the binary =~/.local/bin/neut= and the directory =~/.local/share/neut=.
 
 As for editor support, you can currently try [[https://github.com/u2zv1wx/neut-mode][neut-mode]] and [[https://github.com/u2zv1wx/flycheck-neut][flycheck-neut]] if you're using Emacs. The former package is for syntax highlighting, and the latter one for linting.
 
