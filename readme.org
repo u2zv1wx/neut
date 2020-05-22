@@ -469,7 +469,7 @@ The code is already judged to be inefficient in that it allocates/deallocates me
 
 Now you might think: If the sizes of memory being allocated/deallocated are known at compile-time, isn't it possible to compare the sizes of them at compile-time and emit a code that reuses the allocated memory?
 
-In that case you are right. When the option =--no-alloc-cancellation= is not passed, the compiler translates code pieces something like this:
+You are right. When the option =--no-alloc-cancellation= is not passed, the compiler translates code pieces something like this:
 #+BEGIN_SRC llvm
 define TYPE @FUNCTION_NAME(...) {
   (...)
