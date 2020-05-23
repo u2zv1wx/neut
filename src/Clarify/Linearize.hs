@@ -1,7 +1,5 @@
 module Clarify.Linearize
   ( linearize,
-    withHeaderAffine,
-    distinguishCode,
   )
 where
 
