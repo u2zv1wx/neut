@@ -233,7 +233,12 @@ copy-sigma sig :=
   let (x1, x2) := a1(1, x) in
   ((a2, x1), (a3, x2))
 #+END_SRC
-By using this term, we can now copy the tuple =(a, x)= in the closure =(∑ [a : type, x : a], (a, x), LABEL)=. The discarding function is defined similarly. Then we just have to construct the following term:
+By using this term, we can now copy the tuple =(a, x)= in the closure =(∑ [a : type, x : a], (a, x), LABEL)=. The discarding function is defined similarly. That is, we change the starting point to
+#+BEGIN_SRC haskell
+let (a, x) := e in
+()
+#+END_SRC
+and do the same inductive procedure. Now we just have to construct the following term:
 #+BEGIN_SRC haskell
 cartesian-sigma i sig :=
   if i == 0
