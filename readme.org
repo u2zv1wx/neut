@@ -547,7 +547,7 @@ Then, clone the repository and build it:
 $ git clone https://github.com/u2zv1wx/neut
 $ cd neut
 $ git checkout 0.1.0.0
-$ stack test    # this builds the project and test its behavior
+$ stack test    # this builds the project and tests its behavior
 $ stack install # this installs the executable `neut` into `~/.local/bin`
 #+END_SRC
 To uninstall, you just have to remove the binary =~/.local/bin/neut= and the directory =~/.local/share/neut=.
