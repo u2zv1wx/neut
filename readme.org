@@ -1137,17 +1137,17 @@ The prefix environment modifies [[#upsilon][how the compiler interprets a variab
 (i64.print foo)          ; ~> 10
 (i64.print pohe.foo)     ; ~> 10
 
-; (i64.print bar)        ; ~> undefined variable
+(i64.print bar)          ; ~> undefined variable
 (i64.print qux.bar)      ; ~> 20
 (i64.print pohe.qux.bar) ; ~> 20
 
 (end pohe)
 
-; (i64.print foo)        ; ~> undefined variable
+(i64.print foo)          ; ~> undefined variable
 (i64.print pohe.foo)     ; ~> 10
 
-; (i64.print bar)        ; ~> undefined variable
-; (i64.print qux.bar)    ; ~> undefined variable
+(i64.print bar)          ; ~> undefined variable
+(i64.print qux.bar  )    ; ~> undefined variable
 (i64.print pohe.qux.bar) ; ~> 20
 #+END_SRC
 *** Syntax
