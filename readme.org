@@ -576,7 +576,7 @@ Please note that the descriptions in the followings are not that formal yet.
 
 In the following, I use the symbols =LEAF= and =TREE= defined as follows:
 #+BEGIN_SRC text
-LEAF ::= {a sequence of character that doesn't contain '(', ')', or '${ANY_WHITESPACE_CHARACTER}'}
+LEAF ::= {a sequence of character that doesn't contain '(', ')', ' ', '\n', or '"'}
 TREE ::= LEAF | (TREE ... TREE)
 #+END_SRC
 I also define the symbol =STRING= to be a double-quoted string.
