@@ -88,7 +88,7 @@ Let's see how Neut manages resources. The following code prints the string "a" f
   (let _ (string.print str))
   (string.print str))
 #+END_SRC
-The =(with identity.bind (...))= is the same as the do-notation in Haskell or other languages, specilized to the identity monad.
+The =(with identity.bind (...))= is the same as the do-notation in Haskell or other languages, specialized to the identity monad.
 
 By running =$ neut build --no-alloc-cancellation --emit llvm filename.neut=, we obtain schematically the following LLVM IR (the =--no-alloc-cancellation= is to disable certain optimization that we will see later):
 #+BEGIN_SRC llvm
