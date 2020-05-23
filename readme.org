@@ -9,7 +9,7 @@ Theoretically, this is made possible by translating the source language into a d
 
 Practically, this means that you can write your program in the ordinary lambda-calculus without any extra restrictions or esoteric annotations, and at the same time are allowed to control how resources are used in the program. If you want an ordinary-lambda-calculus based programming language with a human-predictable semantics (including its memory management), this might be for you.
 
-Here I briefly summerize the basic properties of Neut before diving into the details:
+Here I briefly summarize the basic properties of Neut before diving into the details:
 
 - A compiled language
 - The output is [[https://llvm.org/docs/LangRef.html][LLVM IR]] / assembly / executable binary (the last two are via clang)
