@@ -185,7 +185,7 @@ The remaining piece is how a type of a closed chain like =∑ [a : type, x : a]=
 let (a, x) := e in
 (a, x)
 #+END_SRC
-Now, at this point, note that if we can copy/discard both =a : type= and =x : a=, we can then copy/discard =e= as follows:
+Now, at this point, note that if we can copy both =a : type= and =x : a=, we can then copy =e= as follows:
 #+BEGIN_SRC haskell
 let (a, x) := e in
 let (a1, a2) := {COPY_a} a in
