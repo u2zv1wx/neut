@@ -1029,7 +1029,7 @@ The =record= statement creates a record type, its elimination rules (destructors
 #+END_SRC
 *** Syntax
 #+BEGIN_SRC neut
-(inductive LEAF ((LEAF TREE) ... (LEAF TREE))
+(record LEAF ((LEAF TREE) ... (LEAF TREE))
   (LEAF TREE)
   ...
   (LEAF TREE))
