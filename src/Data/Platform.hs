@@ -17,8 +17,11 @@ showOS os =
 
 data Arch
   = Arch64
+  | ArchAArch64
   deriving (Eq, Show)
 
 showArch :: Arch -> T.Text
 showArch Arch64 =
   "x64"
+showArch ArchAArch64 =
+  "aarch64"

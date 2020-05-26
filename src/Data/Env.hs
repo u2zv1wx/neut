@@ -188,6 +188,8 @@ getArch =
   case arch of
     "x86_64" ->
       return Arch64
+    "aarch64" ->
+      return ArchAArch64
     s ->
       raiseCritical' $ "unsupported target arch: " <> T.pack (show s)
 
@@ -364,6 +366,10 @@ lowTypeToArrayKind m lowType =
 raiseError :: Meta -> T.Text -> WithEnv a
 raiseError m text =
   throw $ Error [logError (getPosInfo m) text]
+
+raiseError' :: T.Text -> WithEnv a
+raiseError' text =
+  throw $ Error [logError' text]
 
 raiseCritical :: Meta -> T.Text -> WithEnv a
 raiseCritical m text =
