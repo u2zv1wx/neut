@@ -294,6 +294,12 @@ emitSyscallOp num ds = do
       let regStr = "\"=r" <> showRegList (take (length args) regList) <> "\""
       return $
         unwordsL ["call fastcc i8* asm sideeffect \"syscall\",", regStr, argStr]
+    ArchAArch64 -> do
+      let args = (LLVMDataInt num, LowTypeInt 64) : zip ds (repeat voidPtr)
+      let argStr = "(" <> showIndex args <> ")"
+      let regStr = "\"=r" <> showRegList (take (length args) regList) <> "\""
+      return $
+        unwordsL ["call fastcc i8* asm sideeffect \"svc 0\",", regStr, argStr]
 
 emitOp :: Builder -> WithEnv [Builder]
 emitOp s =
@@ -395,11 +401,16 @@ showLowTypeAsIfNonPtr lowType =
 getRegList :: WithEnv [Builder]
 getRegList = do
   targetOS <- getOS
-  case targetOS of
-    OSLinux ->
+  targetArch <- getArch
+  case (targetOS, targetArch) of
+    (OSLinux, Arch64) ->
       return ["rax", "rdi", "rsi", "rdx", "rcx", "r8", "r9"]
-    OSDarwin ->
+    (OSLinux, ArchAArch64) ->
+      return ["x8", "x0", "x1", "x2", "x3", "x4", "x5"]
+    (OSDarwin, Arch64) ->
       return ["rax", "rdi", "rsi", "rdx", "r10", "r8", "r9"]
+    (OSDarwin, ArchAArch64) ->
+      raiseError' $ "unsupported target: " <> showOS targetOS <> " (" <> showArch targetArch <> ")"
 
 showLowType :: LowType -> Builder
 showLowType lowType =

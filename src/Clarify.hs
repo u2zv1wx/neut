@@ -151,7 +151,8 @@ clarifyConst tenv m x
     clarifyCast tenv m
   | otherwise = do
     os <- getOS
-    case asSyscallMaybe os x of
+    arch <- getArch
+    case asSyscallMaybe os arch x of
       Just (syscall, argInfo) ->
         clarifySyscall tenv x syscall argInfo m
       _ ->

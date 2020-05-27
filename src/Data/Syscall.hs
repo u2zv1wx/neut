@@ -17,10 +17,10 @@ data Arg
   | ArgUnused
   deriving (Show)
 
-asSyscallMaybe :: OS -> T.Text -> Maybe (Syscall, [Arg])
-asSyscallMaybe os name =
-  case os of
-    OSLinux
+asSyscallMaybe :: OS -> Arch -> T.Text -> Maybe (Syscall, [Arg])
+asSyscallMaybe os arch name =
+  case (os, arch) of
+    (OSLinux, Arch64)
       | name == nsOS <> "read" ->
         return (Right ("read", 0), [ArgUnused, ArgImm, ArgArray, ArgImm])
       | name == nsOS <> "write" ->
@@ -47,7 +47,32 @@ asSyscallMaybe os name =
         return (Right ("wait4", 61), [ArgImm, ArgArray, ArgImm, ArgStruct])
       | otherwise ->
         Nothing
-    OSDarwin
+    (OSLinux, ArchAArch64)
+      | name == nsOS <> "close" ->
+        return (Right ("close", 0x39), [ArgImm])
+      | name == nsOS <> "read" ->
+        return (Right ("read", 0x3f), [ArgUnused, ArgImm, ArgArray, ArgImm])
+      | name == nsOS <> "write" ->
+        return (Right ("write", 0x40), [ArgUnused, ArgImm, ArgArray, ArgImm])
+      | name == nsOS <> "socket" ->
+        return (Right ("socket", 0xC6), [ArgImm, ArgImm, ArgImm])
+      | name == nsOS <> "bind" ->
+        return (Right ("bind", 0xC8), [ArgImm, ArgStruct, ArgImm])
+      | name == nsOS <> "listen" ->
+        return (Right ("listen", 0xC9), [ArgImm, ArgImm])
+      | name == nsOS <> "accept" ->
+        return (Right ("accept", 0xCA), [ArgImm, ArgStruct, ArgArray])
+      | name == nsOS <> "connect" ->
+        return (Right ("connect", 0xCB), [ArgImm, ArgStruct, ArgImm])
+      | name == nsOS <> "exit" ->
+        return (Right ("exit", 0x5D), [ArgUnused, ArgImm])
+      | name == nsOS <> "wait4" ->
+        return (Right ("wait4", 0x104), [ArgImm, ArgArray, ArgImm, ArgStruct])
+      | name == nsOS <> "open" ->
+        return (Right ("open", 0x400), [ArgUnused, ArgArray, ArgImm, ArgImm])
+      | otherwise ->
+        Nothing
+    (OSDarwin, Arch64)
       | name == nsOS <> "exit" ->
         return (Left "exit", [ArgUnused, ArgImm]) -- 0x2000001
       | name == nsOS <> "fork" ->
@@ -74,3 +99,5 @@ asSyscallMaybe os name =
         return (Left "listen", [ArgImm, ArgImm]) -- 0x2000106
       | otherwise ->
         Nothing
+    (OSDarwin, ArchAArch64) ->
+      Nothing
