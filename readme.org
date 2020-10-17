@@ -72,6 +72,8 @@ Here I briefly summarize the basic properties of Neut before diving into the det
   - [[#llvm-ir-for-the-second-example][LLVM IR for the Second Example]]
 
 * Examples
+What follows in this section is a very quick explanation of the language. For more in-depth information like its background, see: [[https://veka41.gitlab.io/post/2020-10-17.html][(English)]] / [[https://veka41.gitlab.io/post/2020-10-03.html][(Japanese)]]
+
 ** Proof-Theoretic Memory Management
 *** Basics
 Let's see how Neut manages resources. The following code prints the string "a" for the 3 times:
