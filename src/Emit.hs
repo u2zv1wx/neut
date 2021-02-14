@@ -9,7 +9,7 @@ import Data.Env
 import qualified Data.HashMap.Lazy as HashMap
 import Data.Ident
 import qualified Data.IntMap as IntMap
-import Data.LLVM
+import Data.LowComp
 import Data.LowType
 import qualified Data.Map as Map
 import Data.Platform
@@ -19,18 +19,18 @@ import Data.Size
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Numeric.Half
-import Reduce.LLVM
+import Reduce.LowComp
 
-emit :: LLVM -> WithEnv Builder
+emit :: LowComp -> WithEnv Builder
 emit mainTerm = do
   g <- emitDeclarations
-  mainTerm' <- reduceLLVM IntMap.empty Map.empty mainTerm
+  mainTerm' <- reduceLowComp IntMap.empty Map.empty mainTerm
   zs <- emitDefinition "i64" "main" [] mainTerm'
-  lenv <- gets llvmEnv
+  lenv <- gets lowCompEnv
   xs <-
     forM (HashMap.toList lenv) $ \(name, (args, body)) -> do
-      let args' = map (showLLVMValue . LLVMValueLocal) args
-      body' <- reduceLLVM IntMap.empty Map.empty body
+      let args' = map (showLowValue . LowValueLocal) args
+      body' <- reduceLowComp IntMap.empty Map.empty body
       emitDefinition "i8*" (TE.encodeUtf8Builder name) args' body'
   return $ unlinesL $ g : zs <> concat xs
 
@@ -50,10 +50,10 @@ declToBuilder (name, (dom, cod)) = do
     <> showItems showLowType dom
     <> ")"
 
-emitDefinition :: Builder -> Builder -> [Builder] -> LLVM -> WithEnv [Builder]
+emitDefinition :: Builder -> Builder -> [Builder] -> LowComp -> WithEnv [Builder]
 emitDefinition retType name args asm = do
   let header = sig retType name args <> " {"
-  content <- emitLLVM retType asm
+  content <- emitLowComp retType asm
   let footer = "}"
   return $ [header] <> content <> [footer]
 
@@ -61,29 +61,29 @@ sig :: Builder -> Builder -> [Builder] -> Builder
 sig retType name args =
   "define fastcc " <> retType <> " @" <> name <> showLocals args
 
-emitBlock :: Builder -> Ident -> LLVM -> WithEnv [Builder]
+emitBlock :: Builder -> Ident -> LowComp -> WithEnv [Builder]
 emitBlock funName (I (_, i)) asm = do
-  a <- emitLLVM funName asm
+  a <- emitLowComp funName asm
   return $ emitLabel ("_" <> intDec i) : a
 
-emitLLVM :: Builder -> LLVM -> WithEnv [Builder]
-emitLLVM retType llvm =
+emitLowComp :: Builder -> LowComp -> WithEnv [Builder]
+emitLowComp retType llvm =
   case llvm of
-    LLVMReturn d ->
+    LowCompReturn d ->
       emitRet retType d
-    LLVMCall f args -> do
+    LowCompCall f args -> do
       tmp <- newNameWith' "tmp"
       op <-
         emitOp $
           unwordsL
-            [ showLLVMValue (LLVMValueLocal tmp),
+            [ showLowValue (LowValueLocal tmp),
               "=",
               "tail call fastcc i8*",
-              showLLVMValue f <> showArgs args
+              showLowValue f <> showArgs args
             ]
-      a <- emitRet retType (LLVMValueLocal tmp)
+      a <- emitRet retType (LowValueLocal tmp)
       return $ op <> a
-    LLVMSwitch (d, lowType) defaultBranch branchList -> do
+    LowCompSwitch (d, lowType) defaultBranch branchList -> do
       defaultLabel <- newNameWith' "default"
       labelList <- constructLabelList branchList
       op <-
@@ -91,9 +91,9 @@ emitLLVM retType llvm =
           unwordsL
             [ "switch",
               showLowType lowType,
-              showLLVMValue d <> ",",
+              showLowValue d <> ",",
               "label",
-              showLLVMValue (LLVMValueLocal defaultLabel),
+              showLowValue (LowValueLocal defaultLabel),
               showBranchList lowType $ zip (map fst branchList) labelList
             ]
       let asmList = map snd branchList
@@ -101,201 +101,201 @@ emitLLVM retType llvm =
         forM (zip labelList asmList <> [(defaultLabel, defaultBranch)]) $
           uncurry (emitBlock retType)
       return $ op <> concat xs
-    LLVMCont op cont -> do
-      s <- emitLLVMOp op
+    LowCompCont op cont -> do
+      s <- emitLowOp op
       str <- emitOp s
-      a <- emitLLVM retType cont
+      a <- emitLowComp retType cont
       return $ str <> a
-    LLVMLet x op cont -> do
-      s <- emitLLVMOp op
-      str <- emitOp $ showLLVMValue (LLVMValueLocal x) <> " = " <> s
-      a <- emitLLVM retType cont
+    LowCompLet x op cont -> do
+      s <- emitLowOp op
+      str <- emitOp $ showLowValue (LowValueLocal x) <> " = " <> s
+      a <- emitLowComp retType cont
       return $ str <> a
-    LLVMUnreachable ->
+    LowCompUnreachable ->
       emitOp $ unwordsL ["unreachable"]
 
-emitLLVMOp :: LLVMOp -> WithEnv Builder
-emitLLVMOp llvmOp =
+emitLowOp :: LowOp -> WithEnv Builder
+emitLowOp llvmOp =
   case llvmOp of
-    LLVMOpCall d ds ->
-      return $ unwordsL ["call fastcc i8*", showLLVMValue d <> showArgs ds]
-    LLVMOpGetElementPtr (base, n) is ->
+    LowOpCall d ds ->
+      return $ unwordsL ["call fastcc i8*", showLowValue d <> showArgs ds]
+    LowOpGetElementPtr (base, n) is ->
       return $
         unwordsL
           [ "getelementptr",
             showLowTypeAsIfNonPtr n <> ",",
             showLowType n,
-            showLLVMValue base <> ",",
+            showLowValue base <> ",",
             showIndex is
           ]
-    LLVMOpBitcast d fromType toType ->
-      emitLLVMConvOp "bitcast" d fromType toType
-    LLVMOpIntToPointer d fromType toType ->
-      emitLLVMConvOp "inttoptr" d fromType toType
-    LLVMOpPointerToInt d fromType toType ->
-      emitLLVMConvOp "ptrtoint" d fromType toType
-    LLVMOpLoad d lowType ->
+    LowOpBitcast d fromType toType ->
+      emitLowCompConvOp "bitcast" d fromType toType
+    LowOpIntToPointer d fromType toType ->
+      emitLowCompConvOp "inttoptr" d fromType toType
+    LowOpPointerToInt d fromType toType ->
+      emitLowCompConvOp "ptrtoint" d fromType toType
+    LowOpLoad d lowType ->
       return $
         unwordsL
           [ "load",
             showLowType lowType <> ",",
             showLowTypeAsIfPtr lowType,
-            showLLVMValue d
+            showLowValue d
           ]
-    LLVMOpStore t d1 d2 ->
+    LowOpStore t d1 d2 ->
       return $
         unwordsL
           [ "store",
             showLowType t,
-            showLLVMValue d1 <> ",",
+            showLowValue d1 <> ",",
             showLowTypeAsIfPtr t,
-            showLLVMValue d2
+            showLowValue d2
           ]
-    LLVMOpAlloc d _ ->
-      return $ unwordsL ["call fastcc", "i8*", "@malloc(i64 " <> showLLVMValue d <> ")"]
-    LLVMOpFree d _ j -> do
+    LowOpAlloc d _ ->
+      return $ unwordsL ["call fastcc", "i8*", "@malloc(i64 " <> showLowValue d <> ")"]
+    LowOpFree d _ j -> do
       nenv <- gets nopFreeSet
       if S.member j nenv
         then return "bitcast i8* null to i8*" -- nop
-        else return $ unwordsL ["call fastcc", "void", "@free(i8* " <> showLLVMValue d <> ")"]
-    LLVMOpSyscall num ds ->
+        else return $ unwordsL ["call fastcc", "void", "@free(i8* " <> showLowValue d <> ")"]
+    LowOpSyscall num ds ->
       emitSyscallOp num ds
-    LLVMOpUnaryOp (UnaryOpFNeg t) d ->
+    LowOpUnaryOp (UnaryOpFNeg t) d ->
       emitUnaryOp t "fneg" d
-    LLVMOpUnaryOp (UnaryOpTrunc t1 t2) d ->
-      emitLLVMConvOp "trunc" d t1 t2
-    LLVMOpUnaryOp (UnaryOpFpTrunc t1 t2) d ->
-      emitLLVMConvOp "fptrunc" d t1 t2
-    LLVMOpUnaryOp (UnaryOpZext t1 t2) d ->
-      emitLLVMConvOp "zext" d t1 t2
-    LLVMOpUnaryOp (UnaryOpSext t1 t2) d ->
-      emitLLVMConvOp "sext" d t1 t2
-    LLVMOpUnaryOp (UnaryOpFpExt t1 t2) d ->
-      emitLLVMConvOp "fpext" d t1 t2
-    LLVMOpUnaryOp (UnaryOpUF t1 t2) d ->
-      emitLLVMConvOp "uitofp" d t1 t2
-    LLVMOpUnaryOp (UnaryOpSF t1 t2) d ->
-      emitLLVMConvOp "sitofp" d t1 t2
-    LLVMOpUnaryOp (UnaryOpFU t1 t2) d ->
-      emitLLVMConvOp "fptoui" d t1 t2
-    LLVMOpUnaryOp (UnaryOpFS t1 t2) d ->
-      emitLLVMConvOp "fptosi" d t1 t2
-    LLVMOpBinaryOp (BinaryOpAdd t) d1 d2 ->
+    LowOpUnaryOp (UnaryOpTrunc t1 t2) d ->
+      emitLowCompConvOp "trunc" d t1 t2
+    LowOpUnaryOp (UnaryOpFpTrunc t1 t2) d ->
+      emitLowCompConvOp "fptrunc" d t1 t2
+    LowOpUnaryOp (UnaryOpZext t1 t2) d ->
+      emitLowCompConvOp "zext" d t1 t2
+    LowOpUnaryOp (UnaryOpSext t1 t2) d ->
+      emitLowCompConvOp "sext" d t1 t2
+    LowOpUnaryOp (UnaryOpFpExt t1 t2) d ->
+      emitLowCompConvOp "fpext" d t1 t2
+    LowOpUnaryOp (UnaryOpUF t1 t2) d ->
+      emitLowCompConvOp "uitofp" d t1 t2
+    LowOpUnaryOp (UnaryOpSF t1 t2) d ->
+      emitLowCompConvOp "sitofp" d t1 t2
+    LowOpUnaryOp (UnaryOpFU t1 t2) d ->
+      emitLowCompConvOp "fptoui" d t1 t2
+    LowOpUnaryOp (UnaryOpFS t1 t2) d ->
+      emitLowCompConvOp "fptosi" d t1 t2
+    LowOpBinaryOp (BinaryOpAdd t) d1 d2 ->
       emitBinaryOp t "add" d1 d2
-    LLVMOpBinaryOp (BinaryOpFAdd t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpFAdd t) d1 d2 ->
       emitBinaryOp t "fadd" d1 d2
-    LLVMOpBinaryOp (BinaryOpSub t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpSub t) d1 d2 ->
       emitBinaryOp t "sub" d1 d2
-    LLVMOpBinaryOp (BinaryOpFSub t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpFSub t) d1 d2 ->
       emitBinaryOp t "fsub" d1 d2
-    LLVMOpBinaryOp (BinaryOpMul t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpMul t) d1 d2 ->
       emitBinaryOp t "mul" d1 d2
-    LLVMOpBinaryOp (BinaryOpFMul t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpFMul t) d1 d2 ->
       emitBinaryOp t "fmul" d1 d2
-    LLVMOpBinaryOp (BinaryOpSDiv t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpSDiv t) d1 d2 ->
       emitBinaryOp t "sdiv" d1 d2
-    LLVMOpBinaryOp (BinaryOpUDiv t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpUDiv t) d1 d2 ->
       emitBinaryOp t "udiv" d1 d2
-    LLVMOpBinaryOp (BinaryOpFDiv t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpFDiv t) d1 d2 ->
       emitBinaryOp t "fdiv" d1 d2
-    LLVMOpBinaryOp (BinaryOpSRem t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpSRem t) d1 d2 ->
       emitBinaryOp t "srem" d1 d2
-    LLVMOpBinaryOp (BinaryOpURem t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpURem t) d1 d2 ->
       emitBinaryOp t "urem" d1 d2
-    LLVMOpBinaryOp (BinaryOpFRem t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpFRem t) d1 d2 ->
       emitBinaryOp t "frem" d1 d2
-    LLVMOpBinaryOp (BinaryOpShl t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpShl t) d1 d2 ->
       emitBinaryOp t "shl" d1 d2
-    LLVMOpBinaryOp (BinaryOpLshr t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpLshr t) d1 d2 ->
       emitBinaryOp t "lshr" d1 d2
-    LLVMOpBinaryOp (BinaryOpAshr t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpAshr t) d1 d2 ->
       emitBinaryOp t "ashr" d1 d2
-    LLVMOpBinaryOp (BinaryOpAnd t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpAnd t) d1 d2 ->
       emitBinaryOp t "and" d1 d2
-    LLVMOpBinaryOp (BinaryOpOr t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpOr t) d1 d2 ->
       emitBinaryOp t "or" d1 d2
-    LLVMOpBinaryOp (BinaryOpXor t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpXor t) d1 d2 ->
       emitBinaryOp t "xor" d1 d2
-    LLVMOpBinaryOp (BinaryOpICmpEQ t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpICmpEQ t) d1 d2 ->
       emitBinaryOp t "icmp eq" d1 d2
-    LLVMOpBinaryOp (BinaryOpICmpNE t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpICmpNE t) d1 d2 ->
       emitBinaryOp t "icmp ne" d1 d2
-    LLVMOpBinaryOp (BinaryOpICmpUGT t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpICmpUGT t) d1 d2 ->
       emitBinaryOp t "icmp ugt" d1 d2
-    LLVMOpBinaryOp (BinaryOpICmpUGE t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpICmpUGE t) d1 d2 ->
       emitBinaryOp t "icmp uge" d1 d2
-    LLVMOpBinaryOp (BinaryOpICmpULT t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpICmpULT t) d1 d2 ->
       emitBinaryOp t "icmp ult" d1 d2
-    LLVMOpBinaryOp (BinaryOpICmpULE t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpICmpULE t) d1 d2 ->
       emitBinaryOp t "icmp ule" d1 d2
-    LLVMOpBinaryOp (BinaryOpICmpSGT t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpICmpSGT t) d1 d2 ->
       emitBinaryOp t "icmp sgt" d1 d2
-    LLVMOpBinaryOp (BinaryOpICmpSGE t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpICmpSGE t) d1 d2 ->
       emitBinaryOp t "icmp sge" d1 d2
-    LLVMOpBinaryOp (BinaryOpICmpSLT t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpICmpSLT t) d1 d2 ->
       emitBinaryOp t "icmp slt" d1 d2
-    LLVMOpBinaryOp (BinaryOpICmpSLE t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpICmpSLE t) d1 d2 ->
       emitBinaryOp t "icmp sle" d1 d2
-    LLVMOpBinaryOp (BinaryOpFCmpFALSE t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpFCmpFALSE t) d1 d2 ->
       emitBinaryOp t "fcmp false" d1 d2
-    LLVMOpBinaryOp (BinaryOpFCmpOEQ t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpFCmpOEQ t) d1 d2 ->
       emitBinaryOp t "fcmp oeq" d1 d2
-    LLVMOpBinaryOp (BinaryOpFCmpOGT t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpFCmpOGT t) d1 d2 ->
       emitBinaryOp t "fcmp ogt" d1 d2
-    LLVMOpBinaryOp (BinaryOpFCmpOGE t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpFCmpOGE t) d1 d2 ->
       emitBinaryOp t "fcmp oge" d1 d2
-    LLVMOpBinaryOp (BinaryOpFCmpOLT t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpFCmpOLT t) d1 d2 ->
       emitBinaryOp t "fcmp olt" d1 d2
-    LLVMOpBinaryOp (BinaryOpFCmpOLE t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpFCmpOLE t) d1 d2 ->
       emitBinaryOp t "fcmp ole" d1 d2
-    LLVMOpBinaryOp (BinaryOpFCmpONE t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpFCmpONE t) d1 d2 ->
       emitBinaryOp t "fcmp one" d1 d2
-    LLVMOpBinaryOp (BinaryOpFCmpORD t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpFCmpORD t) d1 d2 ->
       emitBinaryOp t "fcmp ord" d1 d2
-    LLVMOpBinaryOp (BinaryOpFCmpUEQ t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpFCmpUEQ t) d1 d2 ->
       emitBinaryOp t "fcmp ueq" d1 d2
-    LLVMOpBinaryOp (BinaryOpFCmpUGT t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpFCmpUGT t) d1 d2 ->
       emitBinaryOp t "fcmp ugt" d1 d2
-    LLVMOpBinaryOp (BinaryOpFCmpUGE t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpFCmpUGE t) d1 d2 ->
       emitBinaryOp t "fcmp uge" d1 d2
-    LLVMOpBinaryOp (BinaryOpFCmpULT t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpFCmpULT t) d1 d2 ->
       emitBinaryOp t "fcmp ult" d1 d2
-    LLVMOpBinaryOp (BinaryOpFCmpULE t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpFCmpULE t) d1 d2 ->
       emitBinaryOp t "fcmp ule" d1 d2
-    LLVMOpBinaryOp (BinaryOpFCmpUNE t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpFCmpUNE t) d1 d2 ->
       emitBinaryOp t "fcmp une" d1 d2
-    LLVMOpBinaryOp (BinaryOpFCmpUNO t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpFCmpUNO t) d1 d2 ->
       emitBinaryOp t "fcmp uno" d1 d2
-    LLVMOpBinaryOp (BinaryOpFCmpTRUE t) d1 d2 ->
+    LowOpBinaryOp (BinaryOpFCmpTRUE t) d1 d2 ->
       emitBinaryOp t "fcmp true" d1 d2
 
-emitUnaryOp :: LowType -> Builder -> LLVMValue -> WithEnv Builder
+emitUnaryOp :: LowType -> Builder -> LowValue -> WithEnv Builder
 emitUnaryOp t inst d =
-  return $ unwordsL [inst, showLowType t, showLLVMValue d]
+  return $ unwordsL [inst, showLowType t, showLowValue d]
 
-emitBinaryOp :: LowType -> Builder -> LLVMValue -> LLVMValue -> WithEnv Builder
+emitBinaryOp :: LowType -> Builder -> LowValue -> LowValue -> WithEnv Builder
 emitBinaryOp t inst d1 d2 =
   return $
-    unwordsL [inst, showLowType t, showLLVMValue d1 <> ",", showLLVMValue d2]
+    unwordsL [inst, showLowType t, showLowValue d1 <> ",", showLowValue d2]
 
-emitLLVMConvOp :: Builder -> LLVMValue -> LowType -> LowType -> WithEnv Builder
-emitLLVMConvOp cast d dom cod =
+emitLowCompConvOp :: Builder -> LowValue -> LowType -> LowType -> WithEnv Builder
+emitLowCompConvOp cast d dom cod =
   return $
-    unwordsL [cast, showLowType dom, showLLVMValue d, "to", showLowType cod]
+    unwordsL [cast, showLowType dom, showLowValue d, "to", showLowType cod]
 
-emitSyscallOp :: Integer -> [LLVMValue] -> WithEnv Builder
+emitSyscallOp :: Integer -> [LowValue] -> WithEnv Builder
 emitSyscallOp num ds = do
   regList <- getRegList
   currentArch <- getArch
   case currentArch of
     Arch64 -> do
-      let args = (LLVMValueInt num, LowTypeInt 64) : zip ds (repeat voidPtr)
+      let args = (LowValueInt num, LowTypeInt 64) : zip ds (repeat voidPtr)
       let argStr = "(" <> showIndex args <> ")"
       let regStr = "\"=r" <> showRegList (take (length args) regList) <> "\""
       return $
         unwordsL ["call fastcc i8* asm sideeffect \"syscall\",", regStr, argStr]
     ArchAArch64 -> do
-      let args = (LLVMValueInt num, LowTypeInt 64) : zip ds (repeat voidPtr)
+      let args = (LowValueInt num, LowTypeInt 64) : zip ds (repeat voidPtr)
       let argStr = "(" <> showIndex args <> ")"
       let regStr = "\"=r" <> showRegList (take (length args) regList) <> "\""
       return $
@@ -305,9 +305,9 @@ emitOp :: Builder -> WithEnv [Builder]
 emitOp s =
   return ["  " <> s]
 
-emitRet :: Builder -> LLVMValue -> WithEnv [Builder]
+emitRet :: Builder -> LowValue -> WithEnv [Builder]
 emitRet retType d =
-  emitOp $ unwordsL ["ret", retType, showLLVMValue d]
+  emitOp $ unwordsL ["ret", retType, showLowValue d]
 
 emitLabel :: Builder -> Builder
 emitLabel s =
@@ -335,13 +335,13 @@ showBranchList :: LowType -> [(Int, Ident)] -> Builder
 showBranchList lowType xs =
   "[" <> unwordsL (map (uncurry (showBranch lowType)) xs) <> "]"
 
-showIndex :: [(LLVMValue, LowType)] -> Builder
+showIndex :: [(LowValue, LowType)] -> Builder
 showIndex idxList =
   case idxList of
     [] ->
       ""
     [(d, t)] ->
-      showLowType t <> " " <> showLLVMValue d
+      showLowType t <> " " <> showLowValue d
     ((d, t) : dts) ->
       showIndex [(d, t)] <> ", " <> showIndex dts
 
@@ -351,17 +351,17 @@ showBranch lowType i label =
     <> " "
     <> intDec i
     <> ", label "
-    <> showLLVMValue (LLVMValueLocal label)
+    <> showLowValue (LowValueLocal label)
 
-showArg :: LLVMValue -> Builder
+showArg :: LowValue -> Builder
 showArg d =
-  "i8* " <> showLLVMValue d
+  "i8* " <> showLowValue d
 
 showLocal :: Builder -> Builder
 showLocal x =
   "i8* " <> x
 
-showArgs :: [LLVMValue] -> Builder
+showArgs :: [LowValue] -> Builder
 showArgs ds =
   "(" <> showItems showArg ds <> ")"
 
@@ -437,25 +437,25 @@ showLowType lowType =
     LowTypePtr t ->
       showLowType t <> "*"
 
-showLLVMValue :: LLVMValue -> Builder
-showLLVMValue llvmValue =
+showLowValue :: LowValue -> Builder
+showLowValue llvmValue =
   case llvmValue of
-    LLVMValueLocal (I (_, i)) ->
+    LowValueLocal (I (_, i)) ->
       "%_" <> intDec i
-    LLVMValueGlobal x ->
+    LowValueGlobal x ->
       "@" <> TE.encodeUtf8Builder x
-    LLVMValueInt i ->
+    LowValueInt i ->
       integerDec i
-    LLVMValueFloat FloatSize16 x -> do
+    LowValueFloat FloatSize16 x -> do
       let x' = realToFrac x :: Half
       "0x" <> doubleHexFixed (realToFrac x')
-    LLVMValueFloat FloatSize32 x -> do
+    LowValueFloat FloatSize32 x -> do
       let x' = realToFrac x :: Float
       "0x" <> doubleHexFixed (realToFrac x')
-    LLVMValueFloat FloatSize64 x -> do
+    LowValueFloat FloatSize64 x -> do
       let x' = realToFrac x :: Double
       "0x" <> doubleHexFixed (realToFrac x')
-    LLVMValueNull ->
+    LowValueNull ->
       "null"
 
 showItems :: (a -> Builder) -> [a] -> Builder

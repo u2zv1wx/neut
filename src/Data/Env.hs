@@ -8,9 +8,9 @@ import qualified Data.HashMap.Lazy as Map
 import Data.Hint
 import Data.Ident
 import qualified Data.IntMap as IntMap
-import Data.LLVM
 import Data.List (find)
 import Data.Log
+import Data.LowComp
 import Data.LowType
 import qualified Data.PQueue.Min as Q
 import Data.Platform
@@ -76,7 +76,7 @@ data Env = Env
     --
     -- LLVM
     --
-    llvmEnv :: Map.HashMap T.Text ([Ident], LLVM),
+    lowCompEnv :: Map.HashMap T.Text ([Ident], LowComp),
     declEnv :: Map.HashMap T.Text ([LowType], LowType),
     nopFreeSet :: S.Set Int
   }
@@ -102,7 +102,7 @@ initialEnv =
       typeEnv = IntMap.empty,
       constTypeEnv = Map.empty,
       codeEnv = Map.empty,
-      llvmEnv = Map.empty,
+      lowCompEnv = Map.empty,
       declEnv =
         Map.fromList
           [ ("malloc", ([LowTypeInt 64], voidPtr)),
