@@ -18,8 +18,6 @@ dependencies:
 - containers
 - directory
 - half
-- http-streams
-- io-streams
 - mtl
 - optparse-applicative
 - path
@@ -28,7 +26,6 @@ dependencies:
 - pretty-show
 - process
 - safe-exceptions
-- tar
 - text
 - unordered-containers
 - utf8-string
