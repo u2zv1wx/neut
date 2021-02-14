@@ -6,9 +6,9 @@
 (include "core/0.1.0.0/integer.neut")
 
 (define µ
-  ((f (Π ((_ tau)) tau)))
+  ((f (hom tau tau)))
   (Π
-    ((F (Π ((_ (Π ((_ tau)) tau))) tau))
+    ((F (hom (hom tau tau) tau))
      (_ (Π ((b tau) (_ (f b))) (F f))))
     (F f)))
 
