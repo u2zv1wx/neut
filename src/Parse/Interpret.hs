@@ -5,26 +5,26 @@ module Parse.Interpret
     interpretFix,
     interpretEnumItem,
     raiseSyntaxError,
-    interpretAST,
-    interpretCST,
+    interpretCode,
+    interpretData,
   )
 where
 
 import Codec.Binary.UTF8.String
 import Control.Monad.State.Lazy
+import Data.Code
 import Data.EnumCase
 import Data.Env
 import Data.Hint
 import Data.Ident
 import Data.LowType
 import Data.Maybe (catMaybes, fromMaybe)
-import Data.MetaAST
 import Data.Namespace
 import Data.Size
 import qualified Data.Text as T
 import Data.Tree
 import Data.WeakTerm
-import Parse.MacroExpand
+-- import Parse.MacroExpand
 import Text.Read (readMaybe)
 
 interpret :: TreePlus -> WithEnv WeakTermPlus
@@ -445,7 +445,8 @@ interpretWith tree =
       if not (null borrowVarList)
         then do
           sig <- newTextWith "borrow"
-          macroExpand >=> interpretWith $
+          -- macroExpand >=> interpretWith $
+          interpretWith $
             ( m,
               TreeNode
                 [ with,
@@ -512,61 +513,72 @@ interpretBorrow'' tree =
     t ->
       (Nothing, t)
 
-interpretAST :: TreePlus -> WithEnv MetaASTPlus
-interpretAST inputTree =
+interpretCode :: TreePlus -> WithEnv CodePlus
+interpretCode inputTree =
   case inputTree of
     (m, TreeLeaf atom) ->
-      return (m, MetaASTVar atom)
+      return (m, CodeVar atom)
     (m, TreeNode (leaf@(_, TreeLeaf headAtom) : rest)) ->
       case headAtom of
         "lambda!"
           | [(_, TreeNode xs), e] <- rest -> do
-            xs' <- undefined xs
-            e' <- interpretAST e
-            return (m, MetaASTAbs xs' e')
+            xs' <- mapM interpretText xs
+            e' <- interpretCode e
+            return (m, CodeAbs xs' e')
           | otherwise ->
             raiseSyntaxError m "(lambda! (TREE*) TREE)"
         "quote!"
           | [t] <- rest -> do
-            t' <- interpretCST t
-            return (m, MetaASTQuote t')
+            t' <- interpretData t
+            return (m, CodeQuote t')
           | otherwise ->
             raiseSyntaxError m "(quote! TREE)"
         _ ->
-          interpretASTApp m $ leaf : rest
+          interpretCodeApp m $ leaf : rest
     (m, TreeNode es) ->
-      interpretASTApp m es
+      interpretCodeApp m es
 
-interpretASTApp :: Hint -> [TreePlus] -> WithEnv MetaASTPlus
-interpretASTApp m es =
+interpretCodeApp :: Hint -> [TreePlus] -> WithEnv CodePlus
+interpretCodeApp m es =
   case es of
     [] ->
       raiseSyntaxError m "(TREE TREE*)"
     f : args ->
-      interpretASTApp' m f args
+      interpretCodeApp' m f args
 
-interpretASTApp' :: Hint -> TreePlus -> [TreePlus] -> WithEnv MetaASTPlus
-interpretASTApp' m f es = do
-  f' <- interpretAST f
-  es' <- mapM interpretAST es
-  return (m, MetaASTApp f' es')
+interpretCodeApp' :: Hint -> TreePlus -> [TreePlus] -> WithEnv CodePlus
+interpretCodeApp' m f es = do
+  f' <- interpretCode f
+  es' <- mapM interpretCode es
+  return (m, CodeApp f' es')
 
-interpretCST :: TreePlus -> WithEnv MetaCSTPlus
-interpretCST inputTree =
+interpretData :: TreePlus -> WithEnv DataPlus
+interpretData inputTree =
   case inputTree of
     (m, TreeLeaf atom) ->
-      return (m, MetaCSTLeaf atom)
+      return (m, DataLeaf atom)
     (m, TreeNode ts@((_, TreeLeaf headAtom) : rest)) ->
       case headAtom of
         "unquote!"
           | [e] <- rest -> do
-            e' <- interpretAST e
-            return (m, MetaCSTUnquote e')
+            e' <- interpretCode e
+            return (m, DataUnquote e')
           | otherwise ->
             raiseSyntaxError m "(unquote! TREE)"
         _ -> do
-          ts' <- mapM interpretCST ts
-          return (m, MetaCSTNode ts')
+          ts' <- mapM interpretData ts
+          return (m, DataNode ts')
     (m, TreeNode ts) -> do
-      ts' <- mapM interpretCST ts
-      return (m, MetaCSTNode ts')
+      ts' <- mapM interpretData ts
+      return (m, DataNode ts')
+
+interpretText :: TreePlus -> WithEnv T.Text
+interpretText tree =
+  case tree of
+    -- (m, TreeLeaf "_") -> do
+    --   h <- newNameWith'' "H"
+    --   return (m, h)
+    (_, TreeLeaf x) ->
+      return x
+    t ->
+      raiseSyntaxError (fst t) "LEAF"

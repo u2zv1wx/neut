@@ -4,6 +4,7 @@ module Parse
 where
 
 import Control.Monad.State.Lazy hiding (get)
+import Data.Code
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import Data.Hint
@@ -18,11 +19,12 @@ import Data.WeakTerm
 import GHC.IO.Handle
 import Parse.Discern
 import Parse.Interpret
-import Parse.MacroExpand
+-- import Parse.MacroExpand
 import Parse.Rule
 import Parse.Tokenize
 import Path
 import Path.IO
+import Reduce.Code
 import System.Exit
 import System.Process hiding (env)
 import Text.Read (readMaybe)
@@ -39,7 +41,7 @@ visit path = do
   modify (\env -> env {fileEnv = Map.insert path VisitInfoActive (fileEnv env)})
   modify (\env -> env {phase = 1 + phase env})
   content <- liftIO $ TIO.readFile $ toFilePath path
-  tokenize content >>= parse'
+  tokenize content >>= mapM interpretData >>= parse' Map.empty
 
 leave :: WithEnv [WeakStmt]
 leave = do
@@ -58,25 +60,42 @@ popTrace :: WithEnv ()
 popTrace =
   modify (\env -> env {traceEnv = tail (traceEnv env)})
 
-parse' :: [TreePlus] -> WithEnv [WeakStmt]
-parse' stmtTreeList =
+parse' :: SubstCode -> [DataPlus] -> WithEnv [WeakStmt]
+parse' sub stmtTreeList =
   case stmtTreeList of
     [] ->
       leave
-    headStmt : restStmtList ->
+    headStmt : restStmtList -> do
+      headStmt' <- reduceData $ substData sub headStmt
+      p $ T.unpack $ showAsSExp headStmt'
+      parse'' sub [headStmt'] restStmtList
+
+parse'' :: SubstCode -> [TreePlus] -> [DataPlus] -> WithEnv [WeakStmt]
+parse'' sub headStmtList restStmtList = do
+  case headStmtList of
+    [] ->
+      parse' sub restStmtList
+    headStmt : expandedRestStmtList -> do
       case headStmt of
         (m, TreeNode (leaf@(_, TreeLeaf headAtom) : rest)) ->
           case headAtom of
             "constant"
               | [(_, TreeLeaf name), t] <- rest -> do
-                t' <- adjustPhase t >>= macroExpand >>= interpret >>= discern
+                t' <- adjustPhase t >>= interpret >>= discern
+                -- t' <- adjustPhase t >>= macroExpand >>= interpret >>= discern
                 m' <- adjustPhase' m
                 name' <- withSectionPrefix name
                 insertConstant m' name'
-                defList <- parse' restStmtList
+                defList <- parse' sub restStmtList
                 return $ WeakStmtConstDecl (m', name', t') : defList
               | otherwise ->
                 raiseSyntaxError m "(constant LEAF TREE)"
+            "denote"
+              | [(_, TreeLeaf name), body] <- rest -> do
+                body' <- interpretCode body
+                parse' (Map.insert name body' sub) restStmtList
+              | otherwise ->
+                raiseSyntaxError m "(denote LEAF TREE)"
             "end"
               | [(_, TreeLeaf s)] <- rest -> do
                 ns <- gets sectionEnv
@@ -87,7 +106,7 @@ parse' stmtTreeList =
                     | s == s' -> do
                       getCurrentSection >>= unuse
                       modify (\e -> e {sectionEnv = ns'})
-                      parse' restStmtList
+                      parse' sub restStmtList
                     | otherwise ->
                       raiseError m $
                         "the innermost section is not `" <> s <> "`, but is `" <> s' <> "`"
@@ -115,7 +134,7 @@ parse' stmtTreeList =
                   tarExitCode <- liftIO $ waitForProcess tarHandler
                   raiseIfFailure mUrl "tar" tarExitCode tarErrorHandler pkgDirPath
                   return ()
-                parse' restStmtList
+                parse' sub restStmtList
               | otherwise ->
                 raiseSyntaxError m "(ensure LEAF LEAF)"
             "enum"
@@ -123,7 +142,7 @@ parse' stmtTreeList =
                 m' <- adjustPhase' m
                 xis <- interpretEnumItem m' name ts
                 insEnumEnv m' name xis
-                parse' restStmtList
+                parse' sub restStmtList
               | otherwise ->
                 raiseSyntaxError m "(enum LEAF TREE ... TREE)"
             "erase"
@@ -131,23 +150,25 @@ parse' stmtTreeList =
                 nenv <- gets topNameEnv
                 s' <- asText <$> discernText ms s
                 modify (\env -> env {topNameEnv = Map.filterWithKey (\k _ -> k /= s') nenv})
-                parse' restStmtList
+                parse' sub restStmtList
               | otherwise ->
                 raiseSyntaxError m "(erase LEAF)"
             "include"
               | [(mPath, TreeLeaf pathString)] <- rest,
                 not (T.null pathString) ->
-                includeFile m mPath pathString restStmtList
+                includeFile sub m mPath pathString restStmtList
               | otherwise ->
                 raiseSyntaxError m "(include LEAF)"
             "data"
               | name@(mFun, TreeLeaf _) : xts@(_, TreeNode _) : es' <- rest ->
-                parse' $ (m, TreeNode [leaf, (mFun, TreeNode (name : xts : es'))]) : restStmtList
+                -- parse' sub $ (m, TreeNode [leaf, (mFun, TreeNode (name : xts : es'))]) : restStmtList
+                parse'' sub ((m, TreeNode [leaf, (mFun, TreeNode (name : xts : es'))]) : expandedRestStmtList) restStmtList
               | otherwise -> do
-                rest' <- mapM (adjustPhase >=> macroExpand) rest
+                rest' <- mapM adjustPhase rest
+                -- rest' <- mapM (adjustPhase >=> macroExpand) rest
                 m' <- adjustPhase' m
                 stmtList1 <- parseData m' rest'
-                stmtList2 <- parse' restStmtList
+                stmtList2 <- parse' sub restStmtList
                 return $ stmtList1 ++ stmtList2
             "introspect"
               | ((mx, TreeLeaf x) : stmtClauseList) <- rest -> do
@@ -155,36 +176,40 @@ parse' stmtTreeList =
                 stmtClauseList' <- mapM parseStmtClause stmtClauseList
                 case lookup val stmtClauseList' of
                   Nothing ->
-                    parse' restStmtList
+                    parse' sub restStmtList
                   Just as1 ->
-                    parse' $ as1 ++ restStmtList
+                    parse' sub $ as1 ++ restStmtList
               | otherwise ->
                 raiseSyntaxError m "(introspect LEAF TREE*)"
             "let"
               | [(mx, TreeLeaf x), t, e] <- rest -> do
                 let xt = (mx, TreeNode [(mx, TreeLeaf x), t])
-                parse' ((m, TreeNode [(m, TreeLeaf "let"), xt, e]) : restStmtList)
+                -- parse' sub ((m, TreeNode [(m, TreeLeaf "let"), xt, e]) : restStmtList)
+                parse'' sub ((m, TreeNode [(m, TreeLeaf "let"), xt, e]) : expandedRestStmtList) restStmtList
               | [xt, e] <- rest -> do
                 m' <- adjustPhase' m
-                e' <- adjustPhase e >>= macroExpand >>= interpret >>= discern
-                xt' <- adjustPhase xt >>= macroExpand >>= prefixTextPlus >>= interpretIdentPlus >>= discernIdentPlus
-                defList <- parse' restStmtList
+                e' <- adjustPhase e >>= interpret >>= discern
+                xt' <- adjustPhase xt >>= prefixTextPlus >>= interpretIdentPlus >>= discernIdentPlus
+                -- e' <- adjustPhase e >>= macroExpand >>= interpret >>= discern
+                -- xt' <- adjustPhase xt >>= macroExpand >>= prefixTextPlus >>= interpretIdentPlus >>= discernIdentPlus
+                defList <- parse' sub restStmtList
                 return $ WeakStmtLet m' xt' e' : defList
               | otherwise ->
                 raiseSyntaxError m "(let LEAF TREE TREE) | (let TREE TREE)"
-            "notation"
-              | [from, to] <- rest -> do
-                name <- checkNotationSanity from
-                modify (\env -> env {notationEnv = Map.insertWith (++) name [(from, to)] (notationEnv env)})
-                parse' restStmtList
-              | otherwise ->
-                raiseSyntaxError m "(notation TREE TREE)"
+            -- "notation"
+            --   | [from, to] <- rest -> do
+            --     name <- checkNotationSanity from
+            --     modify (\env -> env {notationEnv = Map.insertWith (++) name [(from, to)] (notationEnv env)})
+            --     parse' sub restStmtList
+            --   | otherwise ->
+            --     raiseSyntaxError m "(notation TREE TREE)"
             "record"
               | (_, TreeLeaf _) : (_, TreeNode _) : _ <- rest -> do
-                rest' <- mapM (adjustPhase >=> macroExpand) rest >>= asData m
+                rest' <- mapM adjustPhase rest >>= asData m
+                -- rest' <- mapM (adjustPhase >=> macroExpand) rest >>= asData m
                 stmtList1 <- parseData m [rest']
                 stmtList2 <- generateProjections rest'
-                stmtList3 <- parse' restStmtList
+                stmtList3 <- parse' sub restStmtList
                 return $ stmtList1 ++ stmtList2 ++ stmtList3
               | otherwise ->
                 raiseSyntaxError m "(record name (TREE ... TREE) TREE ... TREE)"
@@ -192,37 +217,38 @@ parse' stmtTreeList =
               | [(_, TreeLeaf s)] <- rest -> do
                 modify (\e -> e {sectionEnv = s : sectionEnv e})
                 getCurrentSection >>= use
-                parse' restStmtList
+                parse' sub restStmtList
               | otherwise ->
                 raiseSyntaxError m "(section LEAF)"
             "statement" ->
-              parse' $ rest ++ restStmtList
+              parse'' sub rest restStmtList
             "use"
               | [(_, TreeLeaf s)] <- rest ->
-                use s >> parse' restStmtList
+                use s >> parse' sub restStmtList
               | otherwise ->
                 raiseSyntaxError m "(use LEAF)"
             "unuse"
               | [(_, TreeLeaf s)] <- rest ->
-                unuse s >> parse' restStmtList
+                unuse s >> parse' sub restStmtList
               | otherwise ->
                 raiseSyntaxError m "(unuse LEAF)"
             _ ->
-              interpretAux headStmt restStmtList
+              interpretAux sub headStmt expandedRestStmtList restStmtList
         _ ->
-          interpretAux headStmt restStmtList
+          interpretAux sub headStmt expandedRestStmtList restStmtList
 
-interpretAux :: TreePlus -> [TreePlus] -> WithEnv [WeakStmt]
-interpretAux headStmt restStmtList = do
-  headStmt' <- adjustPhase headStmt >>= macroExpand
+interpretAux :: SubstCode -> TreePlus -> [TreePlus] -> [DataPlus] -> WithEnv [WeakStmt]
+interpretAux sub headStmt expandedRestStmtList restStmtList = do
+  headStmt' <- adjustPhase headStmt
+  -- headStmt' <- adjustPhase headStmt >>= macroExpand
   if isSpecialForm headStmt'
-    then parse' $ headStmt' : restStmtList
+    then parse'' sub (headStmt' : expandedRestStmtList) restStmtList
     else do
       e <- interpret headStmt' >>= discern
       h <- newNameWith'' "_"
       m' <- adjustPhase' $ metaOf e
       t <- newAster m'
-      defList <- parse' restStmtList
+      defList <- parse' sub restStmtList
       return $ WeakStmtLet m' (m', h, t) e : defList
 
 use :: T.Text -> WithEnv ()
@@ -262,12 +288,13 @@ readStrOrThrow m quotedStr =
       return str
 
 includeFile ::
+  SubstCode ->
   Hint ->
   Hint ->
   T.Text ->
-  [TreePlus] ->
+  [DataPlus] ->
   WithEnv [WeakStmt]
-includeFile m mPath pathString as = do
+includeFile sub m mPath pathString as = do
   m' <- adjustPhase' m
   mPath' <- adjustPhase' mPath
   ensureEnvSanity m'
@@ -286,10 +313,10 @@ includeFile m mPath pathString as = do
       let cyclicPath = dropWhile (/= newPath) (reverse tenv) ++ [newPath]
       raiseError m' $ "found cyclic inclusion:\n" <> showCyclicPath cyclicPath
     Just VisitInfoFinish ->
-      parse' as
+      parse' sub as
     Nothing -> do
       includedWeakStmtList <- visit newPath
-      defList <- parse' as
+      defList <- parse' sub as
       return $ includedWeakStmtList ++ defList
 
 ensureEnvSanity :: Hint -> WithEnv ()
@@ -316,11 +343,12 @@ prefixTextPlus tree =
     t ->
       raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
 
-parseStmtClause :: TreePlus -> WithEnv (T.Text, [TreePlus])
+parseStmtClause :: TreePlus -> WithEnv (T.Text, [DataPlus])
 parseStmtClause tree =
   case tree of
-    (_, TreeNode ((_, TreeLeaf x) : stmtList)) ->
-      return (x, stmtList)
+    (_, TreeNode ((_, TreeLeaf x) : stmtList)) -> do
+      stmtList' <- mapM interpretData stmtList
+      return (x, stmtList')
     (m, _) ->
       raiseSyntaxError m "(LEAF TREE*)"
 
@@ -346,6 +374,7 @@ keywordSet :: S.Set T.Text
 keywordSet =
   S.fromList
     [ "constant",
+      "denote",
       "end",
       "ensure",
       "enum",
@@ -353,7 +382,7 @@ keywordSet =
       "data",
       "introspect",
       "let",
-      "notation",
+      -- "notation",
       "record",
       "section",
       "statement",
