@@ -146,7 +146,7 @@ parse' stmtTreeList =
               | otherwise -> do
                 rest' <- mapM (adjustPhase >=> macroExpand) rest
                 m' <- adjustPhase' m
-                stmtList1 <- parseInductive m' rest'
+                stmtList1 <- parseData m' rest'
                 stmtList2 <- parse' restStmtList
                 return $ stmtList1 ++ stmtList2
             "introspect"
@@ -181,8 +181,8 @@ parse' stmtTreeList =
                 raiseSyntaxError m "(notation TREE TREE)"
             "record"
               | (_, TreeLeaf _) : (_, TreeNode _) : _ <- rest -> do
-                rest' <- mapM (adjustPhase >=> macroExpand) rest >>= asInductive m
-                stmtList1 <- parseInductive m [rest']
+                rest' <- mapM (adjustPhase >=> macroExpand) rest >>= asData m
+                stmtList1 <- parseData m [rest']
                 stmtList2 <- generateProjections rest'
                 stmtList3 <- parse' restStmtList
                 return $ stmtList1 ++ stmtList2 ++ stmtList3

@@ -1,6 +1,6 @@
 module Parse.Rule
-  ( parseInductive,
-    asInductive,
+  ( parseData,
+    asData,
     generateProjections,
   )
 where
@@ -32,22 +32,22 @@ type Connective =
     [Rule] -- list of introduction rule when inductive / list of elimination rule when coinductive
   )
 
-parseInductive :: Meta -> [TreePlus] -> WithEnv [WeakStmt]
-parseInductive m ts = do
-  ts' <- mapM setupIndPrefix ts
-  parseConnective m ts' toInductive toInductiveIntroList
+parseData :: Meta -> [TreePlus] -> WithEnv [WeakStmt]
+parseData m ts = do
+  ts' <- mapM setupDataPrefix ts
+  parseConnective m ts'
 
-setupIndPrefix :: TreePlus -> WithEnv TreePlus
-setupIndPrefix inputTree =
+setupDataPrefix :: TreePlus -> WithEnv TreePlus
+setupDataPrefix inputTree =
   case inputTree of
     (m, TreeNode ((ma, TreeLeaf a) : xts : rules)) -> do
-      rules' <- mapM (setupIndPrefix' a) rules
+      rules' <- mapM (setupDataPrefix' a) rules
       return (m, TreeNode ((ma, TreeLeaf a) : xts : rules'))
     _ ->
       raiseSyntaxError (fst inputTree) "(LEAF (TREE ... TREE) TREE)"
 
-setupIndPrefix' :: T.Text -> TreePlus -> WithEnv TreePlus
-setupIndPrefix' a inputTree =
+setupDataPrefix' :: T.Text -> TreePlus -> WithEnv TreePlus
+setupDataPrefix' a inputTree =
   case inputTree of
     (m, TreeNode ((mb, TreeLeaf b) : rest)) ->
       return (m, TreeNode ((mb, TreeLeaf (a <> nsSep <> b)) : rest))
@@ -59,20 +59,15 @@ setupIndPrefix' a inputTree =
 --   b : the name of an introduction/elimination rule, like `zero`, `cons`, `head`, etc.
 --   x : the name of an argument of a formation rule, like `A` in `list A` or `stream A`.
 --   y : the name of an argument of an introduction/elimination rule, like `w` or `ws` in `cons : Pi (w : A, ws : list A). list A`.
-parseConnective ::
-  Meta ->
-  [TreePlus] ->
-  ([WeakTextPlus] -> [WeakTextPlus] -> [Connective] -> WithEnv [WeakStmt]) ->
-  ([WeakTextPlus] -> [WeakTextPlus] -> Connective -> WithEnv [WeakStmt]) ->
-  WithEnv [WeakStmt]
-parseConnective m ts f g = do
+parseConnective :: Meta -> [TreePlus] -> WithEnv [WeakStmt]
+parseConnective m ts = do
   connectiveList <- mapM parseConnective' ts
   fs <- mapM formationRuleOf connectiveList
   ats <- mapM ruleAsWeakTextPlus fs
   bts <- concat <$> mapM toInternalRuleList connectiveList
   checkNameSanity m $ ats ++ bts
-  connectiveList' <- f ats bts connectiveList
-  ruleList <- concat <$> mapM (g ats bts) connectiveList
+  connectiveList' <- toData ats bts connectiveList
+  ruleList <- concat <$> mapM (toDataIntroList ats bts) connectiveList
   return $ connectiveList' ++ ruleList
 
 parseConnective' :: TreePlus -> WithEnv Connective
@@ -85,8 +80,8 @@ parseConnective' inputTree =
     _ ->
       raiseSyntaxError (fst inputTree) "(LEAF (TREE ... TREE) ...)"
 
-toIndInfo :: TreePlus -> WithEnv (WeakTextPlus, [WeakIdentPlus])
-toIndInfo ts = do
+toDataInfo :: TreePlus -> WithEnv (WeakTextPlus, [WeakIdentPlus])
+toDataInfo ts = do
   connectiveList <- parseConnective' ts
   fs <- formationRuleOf connectiveList
   at <- ruleAsWeakTextPlus fs
@@ -99,7 +94,7 @@ toIndInfo ts = do
 
 generateProjections :: TreePlus -> WithEnv [WeakStmt]
 generateProjections t = do
-  ((ma, a, ta), bts) <- toIndInfo t
+  ((ma, a, ta), bts) <- toDataInfo t
   (xts, _) <- separatePi ta
   h <- newNameWith'' "_"
   let dom = (ma, h, (ma, WeakTermPiElim (ma, WeakTermUpsilon $ asIdent a) (map toVar' xts)))
@@ -148,8 +143,8 @@ checkNameSanity m atsbts = do
       m
       "the names of the rules of inductive/coinductive type must be distinct"
 
-toInductive :: [WeakTextPlus] -> [WeakTextPlus] -> [Connective] -> WithEnv [WeakStmt]
-toInductive ats bts connectiveList =
+toData :: [WeakTextPlus] -> [WeakTextPlus] -> [Connective] -> WithEnv [WeakStmt]
+toData ats bts connectiveList =
   case connectiveList of
     [] ->
       return []
@@ -168,7 +163,7 @@ toInductive ats bts connectiveList =
       let univVar = (m, WeakTermUpsilon univVarName)
       bts' <- mapM (toCaseBranchType univVar) bts
       let indArgs = [(m, univVarName, (m, WeakTermTau))] ++ xts ++ [zt] ++ bts'
-      rest' <- toInductive ats bts rest
+      rest' <- toData ats bts rest
       caseBody <-
         discern
           (m, WeakTermPiIntro indArgs (m, WeakTermPiElim (toVar' zt) (map toVar' atsbts)))
@@ -177,8 +172,7 @@ toInductive ats bts connectiveList =
           (m, asIdent $ ai <> nsSep <> "case", (m, WeakTermPi indArgs univVar))
       let stmtLet = WeakStmtLet (m {metaIsReducible = False}) at' indType
       let stmtCase = WeakStmtLetBypass m caseIdent caseBody
-      return $
-        [stmtLet] ++ rest' ++ [stmtCase]
+      return $ [stmtLet] ++ rest' ++ [stmtCase]
 
 toCaseBranchType :: WeakTermPlus -> WeakTextPlus -> WithEnv WeakIdentPlus
 toCaseBranchType univVar (mx, x, t) =
@@ -188,21 +182,20 @@ toCaseBranchType univVar (mx, x, t) =
     _ ->
       raiseCritical' "toCaseBranchType"
 
-toInductiveIntroList :: [WeakTextPlus] -> [WeakTextPlus] -> Connective -> WithEnv [WeakStmt]
-toInductiveIntroList ats bts (_, a, xts, rules) = do
+toDataIntroList :: [WeakTextPlus] -> [WeakTextPlus] -> Connective -> WithEnv [WeakStmt]
+toDataIntroList ats bts (_, a, xts, rules) = do
   let ats' = map textPlusToWeakIdentPlus ats
   let bts' = map textPlusToWeakIdentPlus bts
-  concat <$> mapM (toInductiveIntro ats' bts' xts a) rules
+  concat <$> mapM (toDataIntro ats' bts' xts a) rules
 
--- represent the introduction rule within CoC
-toInductiveIntro ::
+toDataIntro ::
   [WeakIdentPlus] ->
   [WeakIdentPlus] ->
   [WeakIdentPlus] ->
   T.Text ->
   Rule ->
   WithEnv [WeakStmt]
-toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
+toDataIntro ats bts xts ai (mb, bi, m, yts, cod)
   | (_, WeakTermPiElim (_, WeakTermUpsilon a') es) <- cod,
     ai == asText a',
     length xts == length es = do
@@ -260,8 +253,8 @@ toApp m a xts = do
   argList <- mapM extractArg xts
   return (m, TreeNode (a : argList))
 
-asInductive :: Meta -> [TreePlus] -> WithEnv TreePlus
-asInductive m ts =
+asData :: Meta -> [TreePlus] -> WithEnv TreePlus
+asData m ts =
   case ts of
     (a : (_, TreeNode xts) : rules) -> do
       app <- toApp m a xts
