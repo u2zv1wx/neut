@@ -140,7 +140,7 @@ parse' stmtTreeList =
                 includeFile m mPath pathString restStmtList
               | otherwise ->
                 raiseSyntaxError m "(include LEAF)"
-            "inductive"
+            "data"
               | name@(mFun, TreeLeaf _) : xts@(_, TreeNode _) : es' <- rest ->
                 parse' $ (m, TreeNode [leaf, (mFun, TreeNode (name : xts : es'))]) : restStmtList
               | otherwise -> do
@@ -350,7 +350,7 @@ keywordSet =
       "ensure",
       "enum",
       "include",
-      "inductive",
+      "data",
       "introspect",
       "let",
       "notation",

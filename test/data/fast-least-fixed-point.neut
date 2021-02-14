@@ -24,7 +24,7 @@
   (witness (f (µ f))
     (unsafe.cast (µ f) (f (µ f)) x)))
 
-(inductive list-f
+(data list-f
   ((a tau)
    (r tau))
   (nil ()

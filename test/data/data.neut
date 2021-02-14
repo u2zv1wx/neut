@@ -1,7 +1,7 @@
 (enum bool (true 1) (false 0))
 
-; simple inductive
-(inductive nat ()
+; simple data
+(data nat ()
   (zero
     ()
     (nat))
@@ -9,8 +9,8 @@
     ((_ (nat)))
     (nat)))
 
-; simple inductive (2)
-(inductive list ((A tau))
+; simple data (2)
+(data list ((A tau))
   (nil
     ()
     (list A))
@@ -19,7 +19,7 @@
      (_ (list A)))
     (list A)))
 
-(inductive list2 ((A tau))
+(data list2 ((A tau))
   (nil
     ()
     (list2 A))
@@ -29,7 +29,7 @@
     (list2 A)))
 
 ; dependent inductive type with GADT
-(inductive vec ((A tau) (_ (nat)))
+(data vec ((A tau) (_ (nat)))
   (nil
     ()
     (vec A (nat.zero)))
@@ -40,7 +40,7 @@
     (vec A (nat.succ m))))
 
 ; nested inductive type
-(inductive item ((A tau))
+(data item ((A tau))
   (cons ()
     (item A))
   (cons0
@@ -68,7 +68,7 @@
      (_ (item A)))
     (item A)))
 
-(inductive item2 ((A tau) (self tau))
+(data item2 ((A tau) (self tau))
   (cons ()
     (item2 A self))
   (cons0
@@ -97,7 +97,7 @@
     (item2 A self)))
 
 ; mutually inductive type
-(inductive
+(data
   (even ((_ (nat)))
     (zero-is-even
       ()

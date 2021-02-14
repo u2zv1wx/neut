@@ -5,7 +5,7 @@
 
 (include "core/0.1.0.0/integer.neut")
 
-(inductive µ ((f (hom tau tau)))
+(data µ ((f (hom tau tau)))
   (lan
     ((b tau)
      (_ (f b))
@@ -38,7 +38,7 @@
           k
           v)))))
 
-(inductive list-f ((a tau) (r tau))
+(data list-f ((a tau) (r tau))
   (nil ()
     (list-f a r))
   (cons ((_ a) (_ r))
