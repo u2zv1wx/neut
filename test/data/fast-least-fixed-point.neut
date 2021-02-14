@@ -1,5 +1,5 @@
 (ensure core/0.1.0.0
-  "https://github.com/u2zv1wx/neut-core/raw/master/release/0.1.0.0.tar.gz")
+  "https://gitlab.com/veka41/neut-core/-/raw/master/release/0.1.0.0.tar.xz")
 
 (include "core/0.1.0.0/notation.neut")
 
