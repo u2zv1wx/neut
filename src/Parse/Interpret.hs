@@ -5,6 +5,8 @@ module Parse.Interpret
     interpretFix,
     interpretEnumItem,
     raiseSyntaxError,
+    interpretAST,
+    interpretCST,
   )
 where
 
@@ -16,6 +18,7 @@ import Data.Hint
 import Data.Ident
 import Data.LowType
 import Data.Maybe (catMaybes, fromMaybe)
+import Data.MetaAST
 import Data.Namespace
 import Data.Size
 import qualified Data.Text as T
@@ -508,3 +511,62 @@ interpretBorrow'' tree =
         (Just (m, TreeLeaf $ T.tail s), (m, TreeLeaf $ T.tail s))
     t ->
       (Nothing, t)
+
+interpretAST :: TreePlus -> WithEnv MetaASTPlus
+interpretAST inputTree =
+  case inputTree of
+    (m, TreeLeaf atom) ->
+      return (m, MetaASTVar atom)
+    (m, TreeNode (leaf@(_, TreeLeaf headAtom) : rest)) ->
+      case headAtom of
+        "lambda!"
+          | [(_, TreeNode xs), e] <- rest -> do
+            xs' <- undefined xs
+            e' <- interpretAST e
+            return (m, MetaASTAbs xs' e')
+          | otherwise ->
+            raiseSyntaxError m "(lambda! (TREE*) TREE)"
+        "quote!"
+          | [t] <- rest -> do
+            t' <- interpretCST t
+            return (m, MetaASTQuote t')
+          | otherwise ->
+            raiseSyntaxError m "(quote! TREE)"
+        _ ->
+          interpretASTApp m $ leaf : rest
+    (m, TreeNode es) ->
+      interpretASTApp m es
+
+interpretASTApp :: Hint -> [TreePlus] -> WithEnv MetaASTPlus
+interpretASTApp m es =
+  case es of
+    [] ->
+      raiseSyntaxError m "(TREE TREE*)"
+    f : args ->
+      interpretASTApp' m f args
+
+interpretASTApp' :: Hint -> TreePlus -> [TreePlus] -> WithEnv MetaASTPlus
+interpretASTApp' m f es = do
+  f' <- interpretAST f
+  es' <- mapM interpretAST es
+  return (m, MetaASTApp f' es')
+
+interpretCST :: TreePlus -> WithEnv MetaCSTPlus
+interpretCST inputTree =
+  case inputTree of
+    (m, TreeLeaf atom) ->
+      return (m, MetaCSTLeaf atom)
+    (m, TreeNode ts@((_, TreeLeaf headAtom) : rest)) ->
+      case headAtom of
+        "unquote!"
+          | [e] <- rest -> do
+            e' <- interpretAST e
+            return (m, MetaCSTUnquote e')
+          | otherwise ->
+            raiseSyntaxError m "(unquote! TREE)"
+        _ -> do
+          ts' <- mapM interpretCST ts
+          return (m, MetaCSTNode ts')
+    (m, TreeNode ts) -> do
+      ts' <- mapM interpretCST ts
+      return (m, MetaCSTNode ts')
