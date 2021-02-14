@@ -2,7 +2,7 @@ module Data.Env where
 
 import Control.Exception.Safe
 import Control.Monad.State.Lazy
-import Data.Code
+import Data.Comp
 import Data.Constraint
 import qualified Data.HashMap.Lazy as Map
 import Data.Hint
@@ -19,7 +19,7 @@ import qualified Data.Set as S
 import Data.Size
 import Data.Term
 import qualified Data.Text as T
-import Data.Tree
+-- import Data.Tree
 import Data.Version (showVersion)
 import Data.WeakTerm
 import Path
@@ -48,7 +48,7 @@ data Env = Env
     -- parse
     --
     phase :: Int,
-    notationEnv :: Map.HashMap T.Text [(TreePlus, TreePlus)],
+    -- notationEnv :: Map.HashMap T.Text [(TreePlus, TreePlus)],
     constantSet :: S.Set T.Text,
     fileEnv :: Map.HashMap (Path Abs File) VisitInfo,
     traceEnv :: [Path Abs File],
@@ -89,7 +89,7 @@ initialEnv =
       shouldCancelAlloc = True,
       endOfEntry = "",
       phase = 0,
-      notationEnv = Map.empty,
+      -- notationEnv = Map.empty,
       constantSet = S.empty,
       enumEnv = Map.empty,
       fileEnv = Map.empty,
@@ -192,11 +192,11 @@ getArch =
     s ->
       raiseCritical' $ "unsupported target arch: " <> T.pack (show s)
 
-{-# INLINE newDataUpsilonWith #-}
-newDataUpsilonWith :: Hint -> T.Text -> WithEnv (Ident, DataPlus)
-newDataUpsilonWith m name = do
+{-# INLINE newValueUpsilonWith #-}
+newValueUpsilonWith :: Hint -> T.Text -> WithEnv (Ident, ValuePlus)
+newValueUpsilonWith m name = do
   x <- newNameWith' name
-  return (x, (m, DataUpsilon x))
+  return (x, (m, ValueUpsilon x))
 
 insTypeEnv :: Int -> TermPlus -> WithEnv ()
 insTypeEnv x t =

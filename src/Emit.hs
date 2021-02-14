@@ -29,7 +29,7 @@ emit mainTerm = do
   lenv <- gets llvmEnv
   xs <-
     forM (HashMap.toList lenv) $ \(name, (args, body)) -> do
-      let args' = map (showLLVMData . LLVMDataLocal) args
+      let args' = map (showLLVMValue . LLVMValueLocal) args
       body' <- reduceLLVM IntMap.empty Map.empty body
       emitDefinition "i8*" (TE.encodeUtf8Builder name) args' body'
   return $ unlinesL $ g : zs <> concat xs
@@ -76,12 +76,12 @@ emitLLVM retType llvm =
       op <-
         emitOp $
           unwordsL
-            [ showLLVMData (LLVMDataLocal tmp),
+            [ showLLVMValue (LLVMValueLocal tmp),
               "=",
               "tail call fastcc i8*",
-              showLLVMData f <> showArgs args
+              showLLVMValue f <> showArgs args
             ]
-      a <- emitRet retType (LLVMDataLocal tmp)
+      a <- emitRet retType (LLVMValueLocal tmp)
       return $ op <> a
     LLVMSwitch (d, lowType) defaultBranch branchList -> do
       defaultLabel <- newNameWith' "default"
@@ -91,9 +91,9 @@ emitLLVM retType llvm =
           unwordsL
             [ "switch",
               showLowType lowType,
-              showLLVMData d <> ",",
+              showLLVMValue d <> ",",
               "label",
-              showLLVMData (LLVMDataLocal defaultLabel),
+              showLLVMValue (LLVMValueLocal defaultLabel),
               showBranchList lowType $ zip (map fst branchList) labelList
             ]
       let asmList = map snd branchList
@@ -108,7 +108,7 @@ emitLLVM retType llvm =
       return $ str <> a
     LLVMLet x op cont -> do
       s <- emitLLVMOp op
-      str <- emitOp $ showLLVMData (LLVMDataLocal x) <> " = " <> s
+      str <- emitOp $ showLLVMValue (LLVMValueLocal x) <> " = " <> s
       a <- emitLLVM retType cont
       return $ str <> a
     LLVMUnreachable ->
@@ -118,14 +118,14 @@ emitLLVMOp :: LLVMOp -> WithEnv Builder
 emitLLVMOp llvmOp =
   case llvmOp of
     LLVMOpCall d ds ->
-      return $ unwordsL ["call fastcc i8*", showLLVMData d <> showArgs ds]
+      return $ unwordsL ["call fastcc i8*", showLLVMValue d <> showArgs ds]
     LLVMOpGetElementPtr (base, n) is ->
       return $
         unwordsL
           [ "getelementptr",
             showLowTypeAsIfNonPtr n <> ",",
             showLowType n,
-            showLLVMData base <> ",",
+            showLLVMValue base <> ",",
             showIndex is
           ]
     LLVMOpBitcast d fromType toType ->
@@ -140,24 +140,24 @@ emitLLVMOp llvmOp =
           [ "load",
             showLowType lowType <> ",",
             showLowTypeAsIfPtr lowType,
-            showLLVMData d
+            showLLVMValue d
           ]
     LLVMOpStore t d1 d2 ->
       return $
         unwordsL
           [ "store",
             showLowType t,
-            showLLVMData d1 <> ",",
+            showLLVMValue d1 <> ",",
             showLowTypeAsIfPtr t,
-            showLLVMData d2
+            showLLVMValue d2
           ]
     LLVMOpAlloc d _ ->
-      return $ unwordsL ["call fastcc", "i8*", "@malloc(i64 " <> showLLVMData d <> ")"]
+      return $ unwordsL ["call fastcc", "i8*", "@malloc(i64 " <> showLLVMValue d <> ")"]
     LLVMOpFree d _ j -> do
       nenv <- gets nopFreeSet
       if S.member j nenv
         then return "bitcast i8* null to i8*" -- nop
-        else return $ unwordsL ["call fastcc", "void", "@free(i8* " <> showLLVMData d <> ")"]
+        else return $ unwordsL ["call fastcc", "void", "@free(i8* " <> showLLVMValue d <> ")"]
     LLVMOpSyscall num ds ->
       emitSyscallOp num ds
     LLVMOpUnaryOp (UnaryOpFNeg t) d ->
@@ -269,33 +269,33 @@ emitLLVMOp llvmOp =
     LLVMOpBinaryOp (BinaryOpFCmpTRUE t) d1 d2 ->
       emitBinaryOp t "fcmp true" d1 d2
 
-emitUnaryOp :: LowType -> Builder -> LLVMData -> WithEnv Builder
+emitUnaryOp :: LowType -> Builder -> LLVMValue -> WithEnv Builder
 emitUnaryOp t inst d =
-  return $ unwordsL [inst, showLowType t, showLLVMData d]
+  return $ unwordsL [inst, showLowType t, showLLVMValue d]
 
-emitBinaryOp :: LowType -> Builder -> LLVMData -> LLVMData -> WithEnv Builder
+emitBinaryOp :: LowType -> Builder -> LLVMValue -> LLVMValue -> WithEnv Builder
 emitBinaryOp t inst d1 d2 =
   return $
-    unwordsL [inst, showLowType t, showLLVMData d1 <> ",", showLLVMData d2]
+    unwordsL [inst, showLowType t, showLLVMValue d1 <> ",", showLLVMValue d2]
 
-emitLLVMConvOp :: Builder -> LLVMData -> LowType -> LowType -> WithEnv Builder
+emitLLVMConvOp :: Builder -> LLVMValue -> LowType -> LowType -> WithEnv Builder
 emitLLVMConvOp cast d dom cod =
   return $
-    unwordsL [cast, showLowType dom, showLLVMData d, "to", showLowType cod]
+    unwordsL [cast, showLowType dom, showLLVMValue d, "to", showLowType cod]
 
-emitSyscallOp :: Integer -> [LLVMData] -> WithEnv Builder
+emitSyscallOp :: Integer -> [LLVMValue] -> WithEnv Builder
 emitSyscallOp num ds = do
   regList <- getRegList
   currentArch <- getArch
   case currentArch of
     Arch64 -> do
-      let args = (LLVMDataInt num, LowTypeInt 64) : zip ds (repeat voidPtr)
+      let args = (LLVMValueInt num, LowTypeInt 64) : zip ds (repeat voidPtr)
       let argStr = "(" <> showIndex args <> ")"
       let regStr = "\"=r" <> showRegList (take (length args) regList) <> "\""
       return $
         unwordsL ["call fastcc i8* asm sideeffect \"syscall\",", regStr, argStr]
     ArchAArch64 -> do
-      let args = (LLVMDataInt num, LowTypeInt 64) : zip ds (repeat voidPtr)
+      let args = (LLVMValueInt num, LowTypeInt 64) : zip ds (repeat voidPtr)
       let argStr = "(" <> showIndex args <> ")"
       let regStr = "\"=r" <> showRegList (take (length args) regList) <> "\""
       return $
@@ -305,9 +305,9 @@ emitOp :: Builder -> WithEnv [Builder]
 emitOp s =
   return ["  " <> s]
 
-emitRet :: Builder -> LLVMData -> WithEnv [Builder]
+emitRet :: Builder -> LLVMValue -> WithEnv [Builder]
 emitRet retType d =
-  emitOp $ unwordsL ["ret", retType, showLLVMData d]
+  emitOp $ unwordsL ["ret", retType, showLLVMValue d]
 
 emitLabel :: Builder -> Builder
 emitLabel s =
@@ -335,13 +335,13 @@ showBranchList :: LowType -> [(Int, Ident)] -> Builder
 showBranchList lowType xs =
   "[" <> unwordsL (map (uncurry (showBranch lowType)) xs) <> "]"
 
-showIndex :: [(LLVMData, LowType)] -> Builder
+showIndex :: [(LLVMValue, LowType)] -> Builder
 showIndex idxList =
   case idxList of
     [] ->
       ""
     [(d, t)] ->
-      showLowType t <> " " <> showLLVMData d
+      showLowType t <> " " <> showLLVMValue d
     ((d, t) : dts) ->
       showIndex [(d, t)] <> ", " <> showIndex dts
 
@@ -351,17 +351,17 @@ showBranch lowType i label =
     <> " "
     <> intDec i
     <> ", label "
-    <> showLLVMData (LLVMDataLocal label)
+    <> showLLVMValue (LLVMValueLocal label)
 
-showArg :: LLVMData -> Builder
+showArg :: LLVMValue -> Builder
 showArg d =
-  "i8* " <> showLLVMData d
+  "i8* " <> showLLVMValue d
 
 showLocal :: Builder -> Builder
 showLocal x =
   "i8* " <> x
 
-showArgs :: [LLVMData] -> Builder
+showArgs :: [LLVMValue] -> Builder
 showArgs ds =
   "(" <> showItems showArg ds <> ")"
 
@@ -437,25 +437,25 @@ showLowType lowType =
     LowTypePtr t ->
       showLowType t <> "*"
 
-showLLVMData :: LLVMData -> Builder
-showLLVMData llvmData =
-  case llvmData of
-    LLVMDataLocal (I (_, i)) ->
+showLLVMValue :: LLVMValue -> Builder
+showLLVMValue llvmValue =
+  case llvmValue of
+    LLVMValueLocal (I (_, i)) ->
       "%_" <> intDec i
-    LLVMDataGlobal x ->
+    LLVMValueGlobal x ->
       "@" <> TE.encodeUtf8Builder x
-    LLVMDataInt i ->
+    LLVMValueInt i ->
       integerDec i
-    LLVMDataFloat FloatSize16 x -> do
+    LLVMValueFloat FloatSize16 x -> do
       let x' = realToFrac x :: Half
       "0x" <> doubleHexFixed (realToFrac x')
-    LLVMDataFloat FloatSize32 x -> do
+    LLVMValueFloat FloatSize32 x -> do
       let x' = realToFrac x :: Float
       "0x" <> doubleHexFixed (realToFrac x')
-    LLVMDataFloat FloatSize64 x -> do
+    LLVMValueFloat FloatSize64 x -> do
       let x' = realToFrac x :: Double
       "0x" <> doubleHexFixed (realToFrac x')
-    LLVMDataNull ->
+    LLVMValueNull ->
       "null"
 
 showItems :: (a -> Builder) -> [a] -> Builder

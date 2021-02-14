@@ -13,36 +13,36 @@ import qualified Data.Map as Map
 import qualified Data.Set as S
 
 type SizeMap =
-  Map.Map SizeInfo [(Int, LLVMData)]
+  Map.Map SizeInfo [(Int, LLVMValue)]
 
 reduceLLVM :: SubstLLVM -> SizeMap -> LLVM -> WithEnv LLVM
 reduceLLVM sub sizeMap llvm = do
   cancelAllocFlag <- gets shouldCancelAlloc
   case llvm of
     LLVMReturn d ->
-      return $ LLVMReturn $ substLLVMData sub d
+      return $ LLVMReturn $ substLLVMValue sub d
     LLVMLet x op cont ->
       case op of
         LLVMOpBitcast d from to
           | from == to -> do
-            let sub' = IntMap.insert (asInt x) (substLLVMData sub d) sub
+            let sub' = IntMap.insert (asInt x) (substLLVMValue sub d) sub
             reduceLLVM sub' sizeMap cont
         LLVMOpAlloc _ (LowTypePtr (LowTypeArray 0 _)) -> do
-          let sub' = IntMap.insert (asInt x) LLVMDataNull sub
+          let sub' = IntMap.insert (asInt x) LLVMValueNull sub
           reduceLLVM sub' sizeMap cont
         LLVMOpAlloc _ (LowTypePtr (LowTypeStruct [])) -> do
-          let sub' = IntMap.insert (asInt x) LLVMDataNull sub
+          let sub' = IntMap.insert (asInt x) LLVMValueNull sub
           reduceLLVM sub' sizeMap cont
         LLVMOpAlloc _ size
           | cancelAllocFlag,
             Just ((j, d) : rest) <- Map.lookup size sizeMap -> do
             modify (\env -> env {nopFreeSet = S.insert j (nopFreeSet env)})
             let sizeMap' = Map.insert size rest sizeMap
-            let sub' = IntMap.insert (asInt x) (substLLVMData sub d) sub
+            let sub' = IntMap.insert (asInt x) (substLLVMValue sub d) sub
             reduceLLVM sub' sizeMap' cont
         _ -> do
           x' <- newNameWith x
-          let sub' = IntMap.insert (asInt x) (LLVMDataLocal x') sub
+          let sub' = IntMap.insert (asInt x) (LLVMValueLocal x') sub
           cont' <- reduceLLVM sub' sizeMap cont
           return $ LLVMLet x' (substLLVMOp sub op) cont'
     LLVMCont op@(LLVMOpFree d size j) cont -> do
@@ -55,14 +55,14 @@ reduceLLVM sub sizeMap llvm = do
       cont' <- reduceLLVM sub sizeMap cont
       return $ LLVMCont op' cont'
     LLVMSwitch (d, t) defaultBranch les -> do
-      let d' = substLLVMData sub d
+      let d' = substLLVMValue sub d
       let (ls, es) = unzip les
       defaultBranch' <- reduceLLVM sub sizeMap defaultBranch
       es' <- mapM (reduceLLVM sub sizeMap) es
       return $ LLVMSwitch (d', t) defaultBranch' (zip ls es')
     LLVMCall d ds -> do
-      let d' = substLLVMData sub d
-      let ds' = map (substLLVMData sub) ds
+      let d' = substLLVMValue sub d
+      let ds' = map (substLLVMValue sub) ds
       return $ LLVMCall d' ds'
     LLVMUnreachable ->
       return LLVMUnreachable

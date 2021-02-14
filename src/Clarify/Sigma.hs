@@ -8,7 +8,7 @@ where
 import Clarify.Linearize
 import Clarify.Utility
 import Control.Monad.State.Lazy
-import Data.Code
+import Data.Comp
 import Data.Env
 import Data.Hint
 import Data.Ident
@@ -19,24 +19,24 @@ cartesianSigma ::
   Maybe T.Text ->
   Hint ->
   ArrayKind ->
-  [Either CodePlus (Ident, CodePlus)] ->
-  WithEnv DataPlus
+  [Either CompPlus (Ident, CompPlus)] ->
+  WithEnv ValuePlus
 cartesianSigma mName m k mxts =
   case mName of
     Nothing -> do
       (args, e) <- makeSwitcher m (affineSigma m k mxts) (relevantSigma m k mxts)
       i <- newCount
       let h = "sigma-" <> T.pack (show i)
-      insCodeEnv h False args e
-      return (m, DataConst h)
+      insCompEnv h False args e
+      return (m, ValueConst h)
     Just name ->
       tryCache m name $ do
         (args, e) <- makeSwitcher m (affineSigma m k mxts) (relevantSigma m k mxts)
-        insCodeEnv name False args e
+        insCompEnv name False args e
 
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
 -- affineSigma NAME LOC [(x1, t1), ..., (xn, tn)]   ~>
---   update CodeEnv with NAME ~> (thunk LAM), where LAM is:
+--   update CompEnv with NAME ~> (thunk LAM), where LAM is:
 --   lam z.
 --     let (x1, ..., xn) := z in
 --     <LINEARIZE_HEADER for x1, .., xn> in                     ---
@@ -52,21 +52,21 @@ cartesianSigma mName m k mxts =
 affineSigma ::
   Hint ->
   ArrayKind ->
-  [Either CodePlus (Ident, CodePlus)] ->
-  DataPlus ->
-  WithEnv CodePlus
+  [Either CompPlus (Ident, CompPlus)] ->
+  ValuePlus ->
+  WithEnv CompPlus
 affineSigma m k mxts argVar = do
   xts <- mapM supplyName mxts
   -- as == [APP-1, ..., APP-n]   (`a` here stands for `app`)
   as <- forM xts $ \(x, t) -> toAffineApp m x t
   ys <- mapM (const $ newNameWith' "arg") xts
-  let body = bindLet (zip ys as) (m, CodeUpIntro (m, sigmaIntro []))
+  let body = bindLet (zip ys as) (m, CompUpIntro (m, sigmaIntro []))
   body' <- linearize xts body
-  return (m, CodeSigmaElim k (map fst xts) argVar body')
+  return (m, CompSigmaElim k (map fst xts) argVar body')
 
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
 -- relevantSigma NAME LOC [(x1, t1), ..., (xn, tn)]   ~>
---   update CodeEnv with NAME ~> (thunk LAM), where LAM is:
+--   update CompEnv with NAME ~> (thunk LAM), where LAM is:
 --   lam z.
 --     let (x1, ..., xn) := z in
 --     <LINEARIZE_HEADER for x1, .., xn> in                                      ---
@@ -84,9 +84,9 @@ affineSigma m k mxts argVar = do
 relevantSigma ::
   Hint ->
   ArrayKind ->
-  [Either CodePlus (Ident, CodePlus)] ->
-  DataPlus ->
-  WithEnv CodePlus
+  [Either CompPlus (Ident, CompPlus)] ->
+  ValuePlus ->
+  WithEnv CompPlus
 relevantSigma m k mxts argVar = do
   xts <- mapM supplyName mxts
   -- as == [APP-1, ..., APP-n]
@@ -96,11 +96,11 @@ relevantSigma m k mxts argVar = do
   transposedPair <- transposeSigma m k pairVarTypeList
   let body = bindLet (zip pairVarNameList as) transposedPair
   body' <- linearize xts body
-  return (m, CodeSigmaElim k (map fst xts) argVar body')
+  return (m, CompSigmaElim k (map fst xts) argVar body')
 
-toPairInfo :: (Ident, CodePlus) -> WithEnv (Ident, (DataPlus, CodePlus))
+toPairInfo :: (Ident, CompPlus) -> WithEnv (Ident, (ValuePlus, CompPlus))
 toPairInfo (_, t@(m, _)) = do
-  (name, var) <- newDataUpsilonWith m "pair"
+  (name, var) <- newValueUpsilonWith m "pair"
   return (name, (var, t))
 
 -- transposeSigma [d1, ..., dn] :=
@@ -108,22 +108,22 @@ toPairInfo (_, t@(m, _)) = do
 --   ...
 --   let (xn, yn) := dn in
 --   return ((x1, ..., xn), (y1, ..., yn))
-transposeSigma :: Hint -> ArrayKind -> [(DataPlus, CodePlus)] -> WithEnv CodePlus
+transposeSigma :: Hint -> ArrayKind -> [(ValuePlus, CompPlus)] -> WithEnv CompPlus
 transposeSigma m k ds = do
-  (xList, xVarList) <- unzip <$> mapM (const $ newDataUpsilonWith m "sig-x") ds
-  (yList, yVarList) <- unzip <$> mapM (const $ newDataUpsilonWith m "sig-y") ds
+  (xList, xVarList) <- unzip <$> mapM (const $ newValueUpsilonWith m "sig-x") ds
+  (yList, yVarList) <- unzip <$> mapM (const $ newValueUpsilonWith m "sig-y") ds
   return $
     bindSigmaElim
       (zip (zip xList yList) ds)
       ( m,
-        CodeUpIntro
+        CompUpIntro
           ( m,
             sigmaIntro
-              [(m, DataSigmaIntro k xVarList), (m, DataSigmaIntro k yVarList)]
+              [(m, ValueSigmaIntro k xVarList), (m, ValueSigmaIntro k yVarList)]
           )
       )
 
-bindSigmaElim :: [((Ident, Ident), (DataPlus, CodePlus))] -> CodePlus -> CodePlus
+bindSigmaElim :: [((Ident, Ident), (ValuePlus, CompPlus))] -> CompPlus -> CompPlus
 bindSigmaElim binder cont =
   case binder of
     [] ->
@@ -144,30 +144,30 @@ cartArrayName :: T.Text
 cartArrayName =
   "cartesian-array"
 
-returnArrayType :: Hint -> WithEnv CodePlus
+returnArrayType :: Hint -> WithEnv CompPlus
 returnArrayType m = do
-  (arr, arrVar) <- newDataUpsilonWith m "arr"
+  (arr, arrVar) <- newValueUpsilonWith m "arr"
   retImmType <- returnCartesianImmediate m
   t <-
     cartesianSigma
       (Just cartArrayName)
       m
       arrVoidPtr
-      [Right (arr, retImmType), Left (m, CodeUpIntro arrVar)]
-  return (m, CodeUpIntro t)
+      [Right (arr, retImmType), Left (m, CompUpIntro arrVar)]
+  return (m, CompUpIntro t)
 
 cartClsName :: T.Text
 cartClsName =
   "cartesian-closure"
 
-returnClosureType :: Hint -> WithEnv CodePlus
+returnClosureType :: Hint -> WithEnv CompPlus
 returnClosureType m = do
-  (env, envVar) <- newDataUpsilonWith m "env"
+  (env, envVar) <- newValueUpsilonWith m "env"
   retImmType <- returnCartesianImmediate m
   t <-
     cartesianSigma
       (Just cartClsName)
       m
       arrVoidPtr
-      [Right (env, retImmType), Left (m, CodeUpIntro envVar), Left retImmType]
-  return (m, CodeUpIntro t)
+      [Right (env, retImmType), Left (m, CompUpIntro envVar), Left retImmType]
+  return (m, CompUpIntro t)
