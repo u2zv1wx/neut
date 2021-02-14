@@ -1,10 +1,10 @@
 module Data.WeakTerm where
 
 import Data.EnumCase
+import Data.Hint
 import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.LowType
-import Data.Meta
 import qualified Data.Set as S
 import Data.Size
 import qualified Data.Text as T
@@ -28,44 +28,44 @@ data WeakTerm
   | WeakTermArrayElim ArrayKind [WeakIdentPlus] WeakTermPlus WeakTermPlus
   | WeakTermStruct [ArrayKind]
   | WeakTermStructIntro [(WeakTermPlus, ArrayKind)]
-  | WeakTermStructElim [(Meta, Ident, ArrayKind)] WeakTermPlus WeakTermPlus
+  | WeakTermStructElim [(Hint, Ident, ArrayKind)] WeakTermPlus WeakTermPlus
   | WeakTermQuestion WeakTermPlus WeakTermPlus -- e : t (output the type `t` as note)
-  | WeakTermErase [(Meta, T.Text)] WeakTermPlus
+  | WeakTermErase [(Hint, T.Text)] WeakTermPlus
   deriving (Show, Eq)
 
 type WeakTermPlus =
-  (Meta, WeakTerm)
+  (Hint, WeakTerm)
 
 type SubstWeakTerm =
   IntMap.IntMap WeakTermPlus
 
 type WeakIdentPlus =
-  (Meta, Ident, WeakTermPlus)
+  (Hint, Ident, WeakTermPlus)
 
 type WeakTextPlus =
-  (Meta, T.Text, WeakTermPlus)
+  (Hint, T.Text, WeakTermPlus)
 
 type Def =
-  (Meta, WeakIdentPlus, [WeakIdentPlus], WeakTermPlus)
+  (Hint, WeakIdentPlus, [WeakIdentPlus], WeakTermPlus)
 
 type IdentDef =
   (Ident, Def)
 
-toVar :: Meta -> Ident -> WeakTermPlus
+toVar :: Hint -> Ident -> WeakTermPlus
 toVar m x =
   (m, WeakTermUpsilon x)
 
-i8 :: Meta -> WeakTermPlus
+i8 :: Hint -> WeakTermPlus
 i8 m =
   (m, WeakTermConst (showIntSize 8))
 
-i64 :: Meta -> WeakTermPlus
+i64 :: Hint -> WeakTermPlus
 i64 m =
   (m, WeakTermConst (showIntSize 64))
 
 data WeakStmt
-  = WeakStmtLet Meta WeakIdentPlus WeakTermPlus
-  | WeakStmtLetBypass Meta WeakIdentPlus WeakTermPlus
+  = WeakStmtLet Hint WeakIdentPlus WeakTermPlus
+  | WeakStmtLetBypass Hint WeakIdentPlus WeakTermPlus
   | WeakStmtConstDecl WeakTextPlus
   deriving (Show)
 
@@ -216,7 +216,7 @@ substWeakTermPlus sub term =
         Nothing ->
           term
         Just e2@(_, e) ->
-          (supMeta (metaOf term) (metaOf e2), e)
+          (supHint (metaOf term) (metaOf e2), e)
     (m, WeakTermPi xts t) -> do
       let (xts', t') = substWeakTermPlus'' sub xts t
       (m, WeakTermPi xts' t')
@@ -239,7 +239,7 @@ substWeakTermPlus sub term =
         Nothing ->
           term
         Just e2@(_, e) ->
-          (supMeta (metaOf term) (metaOf e2), e)
+          (supHint (metaOf term) (metaOf e2), e)
     (m, WeakTermInt t x) -> do
       let t' = substWeakTermPlus sub t
       (m, WeakTermInt t' x)
@@ -312,7 +312,7 @@ substWeakTermPlus'' sub binder e =
       let t' = substWeakTermPlus sub t
       ((m, x, t') : xts', e')
 
-metaOf :: WeakTermPlus -> Meta
+metaOf :: WeakTermPlus -> Hint
 metaOf =
   fst
 
@@ -391,7 +391,7 @@ inParen :: T.Text -> T.Text
 inParen s =
   "(" <> s <> ")"
 
-showArg :: (Meta, Ident, WeakTermPlus) -> T.Text
+showArg :: (Hint, Ident, WeakTermPlus) -> T.Text
 showArg (_, x, t) =
   inParen $ showVariable x <> " " <> toText t
 

@@ -9,10 +9,10 @@ import Data.Code
 import Data.EnumCase
 import Data.Env hiding (newNameWith'')
 import qualified Data.HashMap.Lazy as Map
+import Data.Hint
 import Data.Ident
 import Data.LLVM
 import Data.LowType
-import Data.Meta
 import Data.Primitive
 import Data.Size
 import Data.Syscall
@@ -156,13 +156,13 @@ loadContent' bp bt values cont =
     (i, (x, et)) : xis -> do
       cont' <- loadContent' bp bt xis cont
       (posName, pos) <- newDataLocal' (Just $ asText x)
-      return
-        $ LLVMLet
+      return $
+        LLVMLet
           posName
           (LLVMOpGetElementPtr (bp, bt) [(LLVMDataInt 0, LowTypeInt 32), i])
-        $ LLVMLet x (LLVMOpLoad pos et) cont'
+          $ LLVMLet x (LLVMOpLoad pos et) cont'
 
-lowerCodePrimitive :: Meta -> Primitive -> WithEnv LLVM
+lowerCodePrimitive :: Hint -> Primitive -> WithEnv LLVM
 lowerCodePrimitive _ codeOp =
   case codeOp of
     PrimitiveUnaryOp op v ->
@@ -274,16 +274,16 @@ llvmUncast mName result lowType =
       llvmUncastFloat mName result i
     _ -> do
       x <- newNameWith'' mName
-      return
-        $ LLVMLet x (LLVMOpBitcast result lowType voidPtr)
-        $ LLVMReturn (LLVMDataLocal x)
+      return $
+        LLVMLet x (LLVMOpBitcast result lowType voidPtr) $
+          LLVMReturn (LLVMDataLocal x)
 
 llvmUncastInt :: Maybe T.Text -> LLVMData -> LowType -> WithEnv LLVM
 llvmUncastInt mName result lowType = do
   x <- newNameWith'' mName
-  return
-    $ LLVMLet x (LLVMOpIntToPointer result lowType voidPtr)
-    $ LLVMReturn (LLVMDataLocal x)
+  return $
+    LLVMLet x (LLVMOpIntToPointer result lowType voidPtr) $
+      LLVMReturn (LLVMDataLocal x)
 
 llvmUncastFloat :: Maybe T.Text -> LLVMData -> FloatSize -> WithEnv LLVM
 llvmUncastFloat mName floatResult i = do
@@ -291,10 +291,10 @@ llvmUncastFloat mName floatResult i = do
   let intType = LowTypeInt $ sizeAsInt i
   tmp <- newNameWith'' mName
   x <- newNameWith'' mName
-  return
-    $ LLVMLet tmp (LLVMOpBitcast floatResult floatType intType)
-    $ LLVMLet x (LLVMOpIntToPointer (LLVMDataLocal tmp) intType voidPtr)
-    $ LLVMReturn (LLVMDataLocal x)
+  return $
+    LLVMLet tmp (LLVMOpBitcast floatResult floatType intType) $
+      LLVMLet x (LLVMOpIntToPointer (LLVMDataLocal tmp) intType voidPtr) $
+        LLVMReturn (LLVMDataLocal x)
 
 llvmUncastLet :: Ident -> LLVMData -> LowType -> LLVM -> WithEnv LLVM
 llvmUncastLet x@(I (s, _)) d lowType cont = do
@@ -367,9 +367,9 @@ syscallToLLVM syscall ds =
       return $ LLVMCall (LLVMDataGlobal name) ds
     Right (_, num) -> do
       res <- newNameWith' "result"
-      return
-        $ LLVMLet res (LLVMOpSyscall num ds)
-        $ LLVMReturn (LLVMDataLocal res)
+      return $
+        LLVMLet res (LLVMOpSyscall num ds) $
+          LLVMReturn (LLVMDataLocal res)
 
 lowerDataLet' :: [(Ident, DataPlus)] -> LLVM -> WithEnv LLVM
 lowerDataLet' binder cont =
@@ -413,7 +413,7 @@ toLowType aggPtrType =
       LowTypePtr $ LowTypeStruct ts
 
 storeContent ::
-  Meta ->
+  Hint ->
   Ident ->
   AggPtrType ->
   [(DataPlus, LowType)] ->
@@ -447,25 +447,25 @@ storeContent' bp bt values cont =
       (locName, loc) <- newDataLocal $ takeBaseName d <> "-location"
       (cast, castThen) <- llvmCast (Just $ takeBaseName d) d et
       let it = indexTypeOf bt
-      castThen
-        $ LLVMLet
+      castThen $
+        LLVMLet
           locName
           (LLVMOpGetElementPtr (bp, bt) [(LLVMDataInt 0, i32), (LLVMDataInt i, it)])
-        $ LLVMCont (LLVMOpStore et cast loc) cont'
+          $ LLVMCont (LLVMOpStore et cast loc) cont'
 
 storeContent'' :: Ident -> LowType -> SizeInfo -> Int -> LLVM -> WithEnv LLVM
 storeContent'' reg elemType sizeInfo len cont = do
   (c, cVar) <- newDataLocal $ "sizeof-" <> asText reg
   (i, iVar) <- newDataLocal $ "sizeof-" <> asText reg
-  return
-    $ LLVMLet
+  return $
+    LLVMLet
       c
       ( LLVMOpGetElementPtr
           (LLVMDataNull, LowTypePtr elemType)
           [(LLVMDataInt (toInteger len), i64)]
       )
-    $ LLVMLet i (LLVMOpPointerToInt cVar (LowTypePtr elemType) (LowTypeInt 64))
-    $ LLVMLet reg (LLVMOpAlloc iVar sizeInfo) cont
+      $ LLVMLet i (LLVMOpPointerToInt cVar (LowTypePtr elemType) (LowTypeInt 64)) $
+        LLVMLet reg (LLVMOpAlloc iVar sizeInfo) cont
 
 indexTypeOf :: LowType -> LowType
 indexTypeOf lowType =
@@ -505,11 +505,11 @@ newNameWith'' mName =
     Just name ->
       newNameWith' name
 
-enumValueToInteger :: Meta -> T.Text -> WithEnv Integer
+enumValueToInteger :: Hint -> T.Text -> WithEnv Integer
 enumValueToInteger m l =
   toInteger <$> getEnumNum m l
 
-getEnumNum :: Meta -> T.Text -> WithEnv Int
+getEnumNum :: Hint -> T.Text -> WithEnv Int
 getEnumNum m label = do
   renv <- gets revEnumEnv
   case Map.lookup label renv of
@@ -544,7 +544,7 @@ commConv x llvm cont2 =
     LLVMUnreachable ->
       return LLVMUnreachable
 
-lookupTypeEnvMaybe :: Meta -> T.Text -> WithEnv (Maybe TermPlus)
+lookupTypeEnvMaybe :: Hint -> T.Text -> WithEnv (Maybe TermPlus)
 lookupTypeEnvMaybe m x =
   catch (lookupConstTypeEnv m x >>= \e -> return (Just e)) returnNothing
 

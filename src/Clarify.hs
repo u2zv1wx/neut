@@ -13,11 +13,11 @@ import Control.Monad.State.Lazy
 import Data.Code
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import Data.Hint
 import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.List (nubBy)
 import Data.LowType
-import Data.Meta
 import Data.Namespace
 import Data.Primitive
 import Data.Syscall
@@ -120,7 +120,7 @@ constructEnumFVS :: TypeEnv -> [TermPlus] -> WithEnv [IdentPlus]
 constructEnumFVS tenv es =
   nubFVS <$> concat <$> mapM (chainOf tenv) es
 
-alignFVS :: TypeEnv -> Meta -> [IdentPlus] -> [CodePlus] -> WithEnv [CodePlus]
+alignFVS :: TypeEnv -> Hint -> [IdentPlus] -> [CodePlus] -> WithEnv [CodePlus]
 alignFVS tenv m fvs es = do
   es' <- mapM (retClosure tenv Nothing fvs m []) es
   mapM (\cls -> callClosure m cls []) es'
@@ -129,7 +129,7 @@ nubFVS :: [IdentPlus] -> [IdentPlus]
 nubFVS =
   nubBy (\(_, x, _) (_, y, _) -> x == y)
 
-clarifyConst :: TypeEnv -> Meta -> T.Text -> WithEnv CodePlus
+clarifyConst :: TypeEnv -> Hint -> T.Text -> WithEnv CodePlus
 clarifyConst tenv m x
   | Just op <- asUnaryOpMaybe x =
     clarifyUnaryOp tenv x op m
@@ -158,7 +158,7 @@ clarifyConst tenv m x
       _ ->
         return (m, CodeUpIntro (m, DataConst x)) -- external constant
 
-clarifyCast :: TypeEnv -> Meta -> WithEnv CodePlus
+clarifyCast :: TypeEnv -> Hint -> WithEnv CodePlus
 clarifyCast tenv m = do
   a <- newNameWith' "t1"
   b <- newNameWith' "t2"
@@ -169,7 +169,7 @@ clarifyCast tenv m = do
     tenv
     (m, TermPiIntro [(m, a, u), (m, b, u), (m, z, varA)] (m, TermUpsilon z))
 
-clarifyUnaryOp :: TypeEnv -> T.Text -> UnaryOp -> Meta -> WithEnv CodePlus
+clarifyUnaryOp :: TypeEnv -> T.Text -> UnaryOp -> Hint -> WithEnv CodePlus
 clarifyUnaryOp tenv name op m = do
   t <- lookupConstTypeEnv m name
   let t' = reduceTermPlus t
@@ -186,7 +186,7 @@ clarifyUnaryOp tenv name op m = do
     _ ->
       raiseCritical m $ "the arity of " <> name <> " is wrong"
 
-clarifyBinaryOp :: TypeEnv -> T.Text -> BinaryOp -> Meta -> WithEnv CodePlus
+clarifyBinaryOp :: TypeEnv -> T.Text -> BinaryOp -> Hint -> WithEnv CodePlus
 clarifyBinaryOp tenv name op m = do
   t <- lookupConstTypeEnv m name
   let t' = reduceTermPlus t
@@ -204,7 +204,7 @@ clarifyBinaryOp tenv name op m = do
     _ ->
       raiseCritical m $ "the arity of " <> name <> " is wrong"
 
-clarifyArrayAccess :: TypeEnv -> Meta -> T.Text -> LowType -> WithEnv CodePlus
+clarifyArrayAccess :: TypeEnv -> Hint -> T.Text -> LowType -> WithEnv CodePlus
 clarifyArrayAccess tenv m name lowType = do
   arrayAccessType <- lookupConstTypeEnv m name
   let arrayAccessType' = reduceTermPlus arrayAccessType
@@ -228,7 +228,7 @@ clarifySyscall ::
   T.Text -> -- the name of theta
   Syscall ->
   [Arg] -> -- the length of the arguments of the theta
-  Meta -> -- the meta of the theta
+  Hint -> -- the meta of the theta
   WithEnv CodePlus
 clarifySyscall tenv name syscall args m = do
   syscallType <- lookupConstTypeEnv m name
@@ -252,7 +252,7 @@ iterativeApp functionList x =
     f : fs ->
       f (iterativeApp fs x)
 
-clarifyBinder :: TypeEnv -> [IdentPlus] -> WithEnv [(Meta, Ident, CodePlus)]
+clarifyBinder :: TypeEnv -> [IdentPlus] -> WithEnv [(Hint, Ident, CodePlus)]
 clarifyBinder tenv binder =
   case binder of
     [] ->
@@ -263,7 +263,7 @@ clarifyBinder tenv binder =
       return $ (m, x, t') : xts'
 
 toHeaderInfo ::
-  Meta ->
+  Hint ->
   Ident -> -- argument
   TermPlus -> -- the type of argument
   Arg -> -- the way of use of argument (specifically)
@@ -310,7 +310,7 @@ toHeaderInfo m x t argKind =
         )
 
 computeHeader ::
-  Meta ->
+  Hint ->
   [IdentPlus] ->
   [Arg] ->
   WithEnv ([IdentPlus], [DataPlus], [CodePlus -> CodePlus])
@@ -322,7 +322,7 @@ computeHeader m xts argInfoList = do
 
 toSyscallTail ::
   TypeEnv ->
-  Meta ->
+  Hint ->
   TermPlus -> -- cod type
   Syscall -> -- read, write, open, etc
   [DataPlus] -> -- args of syscall
@@ -338,7 +338,7 @@ toSyscallTail tenv m cod syscall args xs = do
 
 toArrayAccessTail ::
   TypeEnv ->
-  Meta ->
+  Hint ->
   LowType ->
   TermPlus -> -- cod type
   DataPlus -> -- array (inner)
@@ -358,7 +358,7 @@ toArrayAccessTail tenv m lowType cod arr index xts = do
 
 retWithBorrowedVars ::
   TypeEnv ->
-  Meta ->
+  Hint ->
   TermPlus ->
   [IdentPlus] ->
   Ident ->
@@ -376,7 +376,7 @@ retWithBorrowedVars tenv m cod xts resultVarName =
         tenv'
         (m, TermPiIntro [zu, kp] (m, TermPiElim (mk, TermUpsilon k) vs))
 
-rightmostOf :: TermPlus -> WithEnv (Meta, TermPlus)
+rightmostOf :: TermPlus -> WithEnv (Hint, TermPlus)
 rightmostOf term =
   case term of
     (_, TermPi xts _)
@@ -386,7 +386,7 @@ rightmostOf term =
     _ ->
       raiseCritical (fst term) "rightmost"
 
-sigToPi :: Meta -> TermPlus -> WithEnv (IdentPlus, IdentPlus)
+sigToPi :: Hint -> TermPlus -> WithEnv (IdentPlus, IdentPlus)
 sigToPi m tPi =
   case tPi of
     (_, TermPi [zu, kp] _) ->
@@ -396,9 +396,9 @@ sigToPi m tPi =
 
 makeClosure ::
   Maybe Ident ->
-  [(Meta, Ident, CodePlus)] -> -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
-  Meta -> -- meta of lambda
-  [(Meta, Ident, CodePlus)] -> -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
+  [(Hint, Ident, CodePlus)] -> -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
+  Hint -> -- meta of lambda
+  [(Hint, Ident, CodePlus)] -> -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
   CodePlus -> -- the `e` in `lam (x1, ..., xn). e`
   WithEnv DataPlus
 makeClosure mName mxts2 m mxts1 e = do
@@ -420,7 +420,7 @@ makeClosure mName mxts2 m mxts1 e = do
       return cls
 
 registerIfNecessary ::
-  Meta ->
+  Hint ->
   T.Text ->
   Bool ->
   [(Ident, CodePlus)] ->
@@ -440,7 +440,7 @@ makeClosure' ::
   TypeEnv ->
   Maybe Ident -> -- the name of newly created closure
   [IdentPlus] -> -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
-  Meta -> -- meta of lambda
+  Hint -> -- meta of lambda
   [IdentPlus] -> -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
   CodePlus -> -- the `e` in `lam (x1, ..., xn). e`
   WithEnv DataPlus
@@ -453,7 +453,7 @@ retClosure ::
   TypeEnv ->
   Maybe Ident -> -- the name of newly created closure
   [IdentPlus] -> -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
-  Meta -> -- meta of lambda
+  Hint -> -- meta of lambda
   [IdentPlus] -> -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
   CodePlus -> -- the `e` in `lam (x1, ..., xn). e`
   WithEnv CodePlus
@@ -461,7 +461,7 @@ retClosure tenv mName fvs m xts e = do
   cls <- makeClosure' tenv mName fvs m xts e
   return (m, CodeUpIntro cls)
 
-callClosure :: Meta -> CodePlus -> [(Ident, CodePlus, DataPlus)] -> WithEnv CodePlus
+callClosure :: Hint -> CodePlus -> [(Ident, CodePlus, DataPlus)] -> WithEnv CodePlus
 callClosure m e zexes = do
   let (zs, es', xs) = unzip3 zexes
   (clsVarName, clsVar) <- newDataUpsilonWith m "closure"

@@ -7,7 +7,7 @@ where
 import Control.Monad.State.Lazy
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
-import Data.Meta
+import Data.Hint
 import qualified Data.Text as T
 import Data.Tree
 
@@ -33,7 +33,7 @@ stepExpand t@(i, _) = do
     Just headAtom
       | Just candidateList <- Map.lookup headAtom nenv,
         Just (sub, skel) <- try (match t) candidateList ->
-        macroExpand $ applySubst sub $ replaceMeta i skel
+        macroExpand $ applySubst sub $ replaceHint i skel
     _ ->
       return t
 
@@ -102,11 +102,11 @@ applySubst sub notationTree =
         Nothing ->
           (i, TreeLeaf s)
         Just t ->
-          replaceMeta i t
+          replaceHint i t
     (i, TreeNode ts) ->
       (i, TreeNode $ map (applySubst sub) ts)
 
-toSpliceTree :: Meta -> [TreePlus] -> TreePlus
+toSpliceTree :: Hint -> [TreePlus] -> TreePlus
 toSpliceTree m ts =
   (m, TreeNode [(m, TreeLeaf "splice"), (m, TreeNode ts)])
 
@@ -122,7 +122,7 @@ extractHeadAtom tree@(m, _) =
     _ ->
       raiseError m "malformed notation"
 
-checkKeywordSanity :: Meta -> T.Text -> WithEnv ()
+checkKeywordSanity :: Hint -> T.Text -> WithEnv ()
 checkKeywordSanity m x
   | x == "" =
     raiseError m "empty string for a keyword"

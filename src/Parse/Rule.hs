@@ -8,7 +8,7 @@ where
 import Control.Monad.State.Lazy
 import Data.Env
 import Data.Ident
-import Data.Meta
+import Data.Hint
 import Data.Namespace
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -18,21 +18,21 @@ import Parse.Discern
 import Parse.Interpret
 
 type Rule = -- inference rule
-  ( Meta, -- location of the name
+  ( Hint, -- location of the name
     T.Text, -- the name of the rule
-    Meta, -- location of the rule
+    Hint, -- location of the rule
     [WeakIdentPlus], -- the antecedents of the inference rule (e.g. [(x, A), (xs, list A)])
     WeakTermPlus -- the consequent of the inference rule
   )
 
 type Connective =
-  ( Meta, -- location of the connective
+  ( Hint, -- location of the connective
     T.Text, -- the name of the connective (e.g. nat, list)
     [WeakIdentPlus], -- parameter of the connective (e.g. the `A` in `list A`)
     [Rule] -- list of introduction rule when inductive / list of elimination rule when coinductive
   )
 
-parseData :: Meta -> [TreePlus] -> WithEnv [WeakStmt]
+parseData :: Hint -> [TreePlus] -> WithEnv [WeakStmt]
 parseData m ts = do
   ts' <- mapM setupDataPrefix ts
   parseConnective m ts'
@@ -59,7 +59,7 @@ setupDataPrefix' a inputTree =
 --   b : the name of an introduction/elimination rule, like `zero`, `cons`, `head`, etc.
 --   x : the name of an argument of a formation rule, like `A` in `list A` or `stream A`.
 --   y : the name of an argument of an introduction/elimination rule, like `w` or `ws` in `cons : Pi (w : A, ws : list A). list A`.
-parseConnective :: Meta -> [TreePlus] -> WithEnv [WeakStmt]
+parseConnective :: Hint -> [TreePlus] -> WithEnv [WeakStmt]
 parseConnective m ts = do
   connectiveList <- mapM parseConnective' ts
   fs <- mapM formationRuleOf connectiveList
@@ -135,7 +135,7 @@ parseRule inputTree =
     _ ->
       raiseSyntaxError (fst inputTree) "(LEAF (TREE ... TREE) TREE)"
 
-checkNameSanity :: Meta -> [WeakTextPlus] -> WithEnv ()
+checkNameSanity :: Hint -> [WeakTextPlus] -> WithEnv ()
 checkNameSanity m atsbts = do
   let asbs = map (\(_, x, _) -> x) atsbts
   when (not $ isLinear asbs) $
@@ -248,12 +248,12 @@ toVar' :: WeakIdentPlus -> WeakTermPlus
 toVar' (m, x, _) =
   (m, WeakTermUpsilon x)
 
-toApp :: Meta -> TreePlus -> [TreePlus] -> WithEnv TreePlus
+toApp :: Hint -> TreePlus -> [TreePlus] -> WithEnv TreePlus
 toApp m a xts = do
   argList <- mapM extractArg xts
   return (m, TreeNode (a : argList))
 
-asData :: Meta -> [TreePlus] -> WithEnv TreePlus
+asData :: Hint -> [TreePlus] -> WithEnv TreePlus
 asData m ts =
   case ts of
     (a : (_, TreeNode xts) : rules) -> do

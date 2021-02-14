@@ -6,20 +6,19 @@ where
 import Control.Exception.Safe
 import Control.Monad.State.Lazy
 import Data.Env
+import Data.Hint
 import Data.Log
-import Data.Meta
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Tree
 import Path
 
-data TEnv
-  = TEnv
-      { text :: T.Text,
-        line :: Int,
-        column :: Int,
-        filePath :: Path Abs File
-      }
+data TEnv = TEnv
+  { text :: T.Text,
+    line :: Int,
+    column :: Int,
+    filePath :: Path Abs File
+  }
   deriving (Show)
 
 type Tokenizer a = StateT TEnv IO a
@@ -57,7 +56,7 @@ term = do
 
 leaf :: Tokenizer TreePlus
 leaf = do
-  m <- currentMeta
+  m <- currentHint
   s <- gets text
   case T.uncons s of
     Just ('"', _) -> do
@@ -79,7 +78,7 @@ leaf = do
 
 node :: Tokenizer TreePlus
 node = do
-  m <- currentMeta
+  m <- currentHint
   char '(' >> skip
   itemList <- many term
   skip >> char ')' >> skip
@@ -194,12 +193,12 @@ headStringLengthOf flag s i =
         incrementColumn
         headStringLengthOf False rest (i + 1)
 
-currentMeta :: Tokenizer Meta
-currentMeta = do
+currentHint :: Tokenizer Hint
+currentHint = do
   l <- gets line
   c <- gets column
   path <- gets filePath
-  return $ newMeta (fromEnum l) (fromEnum c) path
+  return $ newHint (fromEnum l) (fromEnum c) path
 
 {-# INLINE isSymbolChar #-}
 isSymbolChar :: Char -> Bool
@@ -241,5 +240,5 @@ incrementColumn =
 
 raiseTokenizeError :: T.Text -> Tokenizer a
 raiseTokenizeError txt = do
-  m <- currentMeta
+  m <- currentHint
   throw $ Error [logError (getPosInfo m) txt]

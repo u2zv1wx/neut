@@ -5,13 +5,13 @@ import Control.Monad.State.Lazy
 import Data.Code
 import Data.Constraint
 import qualified Data.HashMap.Lazy as Map
+import Data.Hint
 import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.LLVM
 import Data.List (find)
 import Data.Log
 import Data.LowType
-import Data.Meta
 import qualified Data.PQueue.Min as Q
 import Data.Platform
 import Data.Primitive
@@ -39,48 +39,47 @@ data VisitInfo
 type TypeEnv =
   IntMap.IntMap TermPlus
 
-data Env
-  = Env
-      { count :: Int,
-        shouldColorize :: Bool,
-        shouldCancelAlloc :: Bool,
-        endOfEntry :: String,
-        --
-        -- parse
-        --
-        phase :: Int,
-        notationEnv :: Map.HashMap T.Text [(TreePlus, TreePlus)],
-        constantSet :: S.Set T.Text,
-        fileEnv :: Map.HashMap (Path Abs File) VisitInfo,
-        traceEnv :: [Path Abs File],
-        -- [("choice", [("left", 0), ("right", 1)]), ...]
-        enumEnv :: Map.HashMap T.Text [(T.Text, Int)],
-        -- [("left", ("choice", 0)), ("right", ("choice", 1)), ...]
-        revEnumEnv :: Map.HashMap T.Text (T.Text, Int),
-        prefixEnv :: [T.Text],
-        sectionEnv :: [T.Text],
-        topNameEnv :: Map.HashMap T.Text Ident,
-        --
-        -- elaborate
-        --
-        weakTypeEnv :: IntMap.IntMap WeakTermPlus,
-        constTypeEnv :: Map.HashMap T.Text TermPlus,
-        constraintEnv :: [PreConstraint],
-        constraintQueue :: ConstraintQueue,
-        substEnv :: IntMap.IntMap WeakTermPlus,
-        opaqueEnv :: S.Set Ident,
-        --
-        -- clarify
-        --
-        typeEnv :: TypeEnv,
-        codeEnv :: Map.HashMap T.Text Definition,
-        --
-        -- LLVM
-        --
-        llvmEnv :: Map.HashMap T.Text ([Ident], LLVM),
-        declEnv :: Map.HashMap T.Text ([LowType], LowType),
-        nopFreeSet :: S.Set Int
-      }
+data Env = Env
+  { count :: Int,
+    shouldColorize :: Bool,
+    shouldCancelAlloc :: Bool,
+    endOfEntry :: String,
+    --
+    -- parse
+    --
+    phase :: Int,
+    notationEnv :: Map.HashMap T.Text [(TreePlus, TreePlus)],
+    constantSet :: S.Set T.Text,
+    fileEnv :: Map.HashMap (Path Abs File) VisitInfo,
+    traceEnv :: [Path Abs File],
+    -- [("choice", [("left", 0), ("right", 1)]), ...]
+    enumEnv :: Map.HashMap T.Text [(T.Text, Int)],
+    -- [("left", ("choice", 0)), ("right", ("choice", 1)), ...]
+    revEnumEnv :: Map.HashMap T.Text (T.Text, Int),
+    prefixEnv :: [T.Text],
+    sectionEnv :: [T.Text],
+    topNameEnv :: Map.HashMap T.Text Ident,
+    --
+    -- elaborate
+    --
+    weakTypeEnv :: IntMap.IntMap WeakTermPlus,
+    constTypeEnv :: Map.HashMap T.Text TermPlus,
+    constraintEnv :: [PreConstraint],
+    constraintQueue :: ConstraintQueue,
+    substEnv :: IntMap.IntMap WeakTermPlus,
+    opaqueEnv :: S.Set Ident,
+    --
+    -- clarify
+    --
+    typeEnv :: TypeEnv,
+    codeEnv :: Map.HashMap T.Text Definition,
+    --
+    -- LLVM
+    --
+    llvmEnv :: Map.HashMap T.Text ([Ident], LLVM),
+    declEnv :: Map.HashMap T.Text ([LowType], LowType),
+    nopFreeSet :: S.Set Int
+  }
 
 initialEnv :: Env
 initialEnv =
@@ -168,7 +167,7 @@ newTextWith s = do
   return $ "(" <> s <> "-" <> T.pack (show i) <> ")"
 
 {-# INLINE newAster #-}
-newAster :: Meta -> WithEnv WeakTermPlus
+newAster :: Hint -> WithEnv WeakTermPlus
 newAster m = do
   i <- newCount
   return (m, WeakTermAster i)
@@ -194,7 +193,7 @@ getArch =
       raiseCritical' $ "unsupported target arch: " <> T.pack (show s)
 
 {-# INLINE newDataUpsilonWith #-}
-newDataUpsilonWith :: Meta -> T.Text -> WithEnv (Ident, DataPlus)
+newDataUpsilonWith :: Hint -> T.Text -> WithEnv (Ident, DataPlus)
 newDataUpsilonWith m name = do
   x <- newNameWith' name
   return (x, (m, DataUpsilon x))
@@ -207,7 +206,7 @@ insTypeEnv' :: Int -> TermPlus -> TypeEnv -> TypeEnv
 insTypeEnv' =
   IntMap.insert
 
-lookupTypeEnv :: Meta -> Int -> T.Text -> WithEnv TermPlus
+lookupTypeEnv :: Hint -> Int -> T.Text -> WithEnv TermPlus
 lookupTypeEnv m x name = do
   tenv <- gets typeEnv
   case IntMap.lookup x tenv of
@@ -217,7 +216,7 @@ lookupTypeEnv m x name = do
       raiseCritical m $
         "the variable `" <> name <> "` is not found in the type environment."
 
-lookupTypeEnv' :: Meta -> Ident -> TypeEnv -> WithEnv TermPlus
+lookupTypeEnv' :: Hint -> Ident -> TypeEnv -> WithEnv TermPlus
 lookupTypeEnv' m (I (name, x)) tenv =
   case IntMap.lookup x tenv of
     Just t ->
@@ -230,7 +229,7 @@ insConstTypeEnv :: T.Text -> TermPlus -> WithEnv ()
 insConstTypeEnv x t =
   modify (\e -> e {constTypeEnv = Map.insert x t (constTypeEnv e)})
 
-lookupConstTypeEnv :: Meta -> T.Text -> WithEnv TermPlus
+lookupConstTypeEnv :: Hint -> T.Text -> WithEnv TermPlus
 lookupConstTypeEnv m x
   | Just _ <- asLowTypeMaybe x =
     return (m, TermTau)
@@ -248,7 +247,7 @@ lookupConstTypeEnv m x
         raiseCritical m $
           "the constant `" <> x <> "` is not found in the type environment."
 
-lowTypeToType :: Meta -> LowType -> WithEnv TermPlus
+lowTypeToType :: Hint -> LowType -> WithEnv TermPlus
 lowTypeToType m lowType =
   case lowType of
     LowTypeInt s ->
@@ -260,7 +259,7 @@ lowTypeToType m lowType =
     _ ->
       raiseCritical m "invalid argument passed to lowTypeToType"
 
-unaryOpToType :: Meta -> UnaryOp -> WithEnv TermPlus
+unaryOpToType :: Hint -> UnaryOp -> WithEnv TermPlus
 unaryOpToType m op = do
   let (dom, cod) = unaryOpToDomCod op
   dom' <- lowTypeToType m dom
@@ -269,7 +268,7 @@ unaryOpToType m op = do
   let xts = [(m, x, dom')]
   return (m, TermPi xts cod')
 
-binaryOpToType :: Meta -> BinaryOp -> WithEnv TermPlus
+binaryOpToType :: Hint -> BinaryOp -> WithEnv TermPlus
 binaryOpToType m op = do
   let (dom, cod) = binaryOpToDomCod op
   dom' <- lowTypeToType m dom
@@ -279,7 +278,7 @@ binaryOpToType m op = do
   let xts = [(m, x1, dom'), (m, x2, dom')]
   return (m, TermPi xts cod')
 
-arrayAccessToType :: Meta -> LowType -> WithEnv TermPlus
+arrayAccessToType :: Hint -> LowType -> WithEnv TermPlus
 arrayAccessToType m lowType = do
   t <- lowTypeToType m lowType
   k <- lowTypeToArrayKind m lowType
@@ -294,7 +293,7 @@ arrayAccessToType m lowType = do
   cod <- termSigma m [(m, x4, arr), (m, x5, t)]
   return (m, TermPi xts cod)
 
-inferKind :: Meta -> ArrayKind -> WithEnv TermPlus
+inferKind :: Hint -> ArrayKind -> WithEnv TermPlus
 inferKind m arrayKind =
   case arrayKind of
     ArrayKindInt size ->
@@ -304,7 +303,7 @@ inferKind m arrayKind =
     _ ->
       raiseCritical m "inferKind for void-pointer"
 
-termSigma :: Meta -> [IdentPlus] -> WithEnv TermPlus
+termSigma :: Hint -> [IdentPlus] -> WithEnv TermPlus
 termSigma m xts = do
   z <- newNameWith' "internal.sigma-tau"
   let vz = (m, TermUpsilon z)
@@ -312,7 +311,7 @@ termSigma m xts = do
   let yts = [(m, z, (m, TermTau)), (m, k, (m, TermPi xts vz))]
   return (m, TermPi yts vz)
 
-insEnumEnv :: Meta -> T.Text -> [(T.Text, Int)] -> WithEnv ()
+insEnumEnv :: Hint -> T.Text -> [(T.Text, Int)] -> WithEnv ()
 insEnumEnv m name xis = do
   eenv <- gets enumEnv
   let definedEnums = Map.keys eenv ++ map fst (concat (Map.elems eenv))
@@ -355,7 +354,7 @@ p' :: (Show a) => a -> WithEnv ()
 p' s =
   liftIO $ putStrLn $ Pr.ppShow s
 
-lowTypeToArrayKind :: Meta -> LowType -> WithEnv ArrayKind
+lowTypeToArrayKind :: Hint -> LowType -> WithEnv ArrayKind
 lowTypeToArrayKind m lowType =
   case lowTypeToArrayKindMaybe lowType of
     Just k ->
@@ -363,7 +362,7 @@ lowTypeToArrayKind m lowType =
     Nothing ->
       raiseCritical m "Infer.lowTypeToArrayKind"
 
-raiseError :: Meta -> T.Text -> WithEnv a
+raiseError :: Hint -> T.Text -> WithEnv a
 raiseError m text =
   throw $ Error [logError (getPosInfo m) text]
 
@@ -371,7 +370,7 @@ raiseError' :: T.Text -> WithEnv a
 raiseError' text =
   throw $ Error [logError' text]
 
-raiseCritical :: Meta -> T.Text -> WithEnv a
+raiseCritical :: Hint -> T.Text -> WithEnv a
 raiseCritical m text =
   throw $ Error [logCritical (getPosInfo m) text]
 
@@ -401,7 +400,7 @@ getDirPath base = do
   liftIO $ createDirectoryIfMissing True $ toFilePath path
   return path
 
-note :: Meta -> T.Text -> WithEnv ()
+note :: Hint -> T.Text -> WithEnv ()
 note m str = do
   b <- gets shouldColorize
   eoe <- gets endOfEntry
@@ -424,7 +423,7 @@ warn pos str = do
   eoe <- gets endOfEntry
   liftIO $ outputLog b eoe $ logWarning pos str
 
-insertConstant :: Meta -> T.Text -> WithEnv ()
+insertConstant :: Hint -> T.Text -> WithEnv ()
 insertConstant m x = do
   cset <- gets constantSet
   if S.member x cset

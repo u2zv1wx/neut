@@ -5,16 +5,16 @@ import Data.Code
 import Data.EnumCase
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import Data.Hint
 import Data.Ident
 import Data.LowType
-import Data.Meta
 import Data.Namespace
 import Data.Term
 import qualified Data.Text as T
 
 type Context = [(Ident, TermPlus)]
 
-toApp :: T.Text -> Meta -> Ident -> CodePlus -> WithEnv CodePlus
+toApp :: T.Text -> Hint -> Ident -> CodePlus -> WithEnv CodePlus
 toApp switcher m x t = do
   (expVarName, expVar) <- newDataUpsilonWith m "exp"
   return
@@ -32,14 +32,14 @@ toApp switcher m x t = do
 -- toAffineApp meta x t ~>
 --   bind exp := t in
 --   exp @ (0, x)
-toAffineApp :: Meta -> Ident -> CodePlus -> WithEnv CodePlus
+toAffineApp :: Hint -> Ident -> CodePlus -> WithEnv CodePlus
 toAffineApp =
   toApp boolFalse
 
 -- toRelevantApp meta x t ~>
 --   bind exp := t in
 --   exp @ (1, x)
-toRelevantApp :: Meta -> Ident -> CodePlus -> WithEnv CodePlus
+toRelevantApp :: Hint -> Ident -> CodePlus -> WithEnv CodePlus
 toRelevantApp =
   toApp boolTrue
 
@@ -51,7 +51,7 @@ bindLet binder cont =
     (x, e) : xes ->
       (fst e, CodeUpElim x e $ bindLet xes cont)
 
-returnCartesianImmediate :: Meta -> WithEnv CodePlus
+returnCartesianImmediate :: Hint -> WithEnv CodePlus
 returnCartesianImmediate m = do
   v <- cartesianImmediate m
   return (m, CodeUpIntro v)
@@ -64,14 +64,14 @@ cartImmName :: T.Text
 cartImmName =
   "cartesian-immediate"
 
-tryCache :: Meta -> T.Text -> WithEnv () -> WithEnv DataPlus
+tryCache :: Hint -> T.Text -> WithEnv () -> WithEnv DataPlus
 tryCache m key doInsertion = do
   cenv <- gets codeEnv
   when (not $ Map.member key cenv) doInsertion
   return (m, DataConst key)
 
 makeSwitcher ::
-  Meta ->
+  Hint ->
   (DataPlus -> WithEnv CodePlus) ->
   (DataPlus -> WithEnv CodePlus) ->
   WithEnv ([Ident], CodePlus)
@@ -89,7 +89,7 @@ makeSwitcher m compAff compRel = do
       )
     )
 
-cartesianImmediate :: Meta -> WithEnv DataPlus
+cartesianImmediate :: Hint -> WithEnv DataPlus
 cartesianImmediate m =
   tryCache m cartImmName $ do
     (args, e) <- makeSwitcher m affineImmediate relevantImmediate
@@ -103,7 +103,7 @@ relevantImmediate :: DataPlus -> WithEnv CodePlus
 relevantImmediate argVar@(m, _) =
   return (m, CodeUpIntro (m, sigmaIntro [argVar, argVar]))
 
-cartesianStruct :: Meta -> [ArrayKind] -> WithEnv DataPlus
+cartesianStruct :: Hint -> [ArrayKind] -> WithEnv DataPlus
 cartesianStruct m ks = do
   (args, e) <- makeSwitcher m (affineStruct ks) (relevantStruct ks)
   i <- newCount

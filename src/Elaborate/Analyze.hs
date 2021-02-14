@@ -10,10 +10,10 @@ where
 import Control.Monad.State.Lazy
 import Data.Constraint
 import Data.Env
+import Data.Hint
 import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.Maybe
-import Data.Meta
 import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -88,7 +88,7 @@ simp' constraintList =
           let ms1 = asStuckedTerm e1
           let ms2 = asStuckedTerm e2
           sub <- gets substEnv
-          let m = supMeta m1 m2
+          let m = supHint m1 m2
           let zs1 = asterWeakTermPlus e1
           let zs2 = asterWeakTermPlus e2
           -- list of stuck reasons (fmvs: free meta-variables)
@@ -141,10 +141,10 @@ simp' constraintList =
                         simp $ (substWeakTermPlus s e1', e2') : cs
                 (Just (StuckPiElimUpsilon x1 mx1 mess1), _)
                   | Just (mBody, body) <- IntMap.lookup (asInt x1) sub ->
-                    simp $ (toPiElim (supMeta mx1 mBody, body) mess1, e2) : cs
+                    simp $ (toPiElim (supHint mx1 mBody, body) mess1, e2) : cs
                 (_, Just (StuckPiElimUpsilon x2 mx2 mess2))
                   | Just (mBody, body) <- IntMap.lookup (asInt x2) sub ->
-                    simp $ (e1, toPiElim (supMeta mx2 mBody, body) mess2) : cs
+                    simp $ (e1, toPiElim (supHint mx2 mBody, body) mess2) : cs
                 (Just (StuckPiElimAsterStrict h1 ies1), _)
                   | xs1 <- concatMap getVarList ies1,
                     occurCheck h1 zs2,
@@ -190,7 +190,7 @@ simpBinder' sub args1 args2 =
   case (args1, args2) of
     ((m1, x1, t1) : xts1, (m2, x2, t2) : xts2) -> do
       simp [(t1, substWeakTermPlus sub t2)]
-      let var1 = (supMeta m1 m2, WeakTermUpsilon x1)
+      let var1 = (supHint m1 m2, WeakTermUpsilon x1)
       let sub' = IntMap.insert (asInt x2) var1 sub
       simpBinder' sub' xts1 xts2
     _ ->
@@ -236,7 +236,7 @@ simpFlexRigid h1 ies1 e1 e2 fmvs cs = do
   insConstraintQueue $ Enriched (e1, e2) fmvs (ConstraintFlexRigid h1 ies1 e2)
   simp cs
 
-asWeakIdentPlus :: Meta -> WeakTermPlus -> WithEnv WeakIdentPlus
+asWeakIdentPlus :: Hint -> WeakTermPlus -> WithEnv WeakIdentPlus
 asWeakIdentPlus m t = do
   h <- newNameWith' "aster"
   return (m, h, t)
@@ -259,11 +259,11 @@ asPairList list1 list2 =
       Nothing
 
 data Stuck
-  = StuckPiElimUpsilon Ident Meta [(Meta, [WeakTermPlus])]
+  = StuckPiElimUpsilon Ident Hint [(Hint, [WeakTermPlus])]
   | StuckPiElimAster Int [[WeakTermPlus]]
   | StuckPiElimAsterStrict Int [[WeakTermPlus]]
-  | StuckPiElimFix FixInfo [(Meta, [WeakTermPlus])]
-  | StuckPiElimConst T.Text Meta [(Meta, [WeakTermPlus])]
+  | StuckPiElimFix FixInfo [(Hint, [WeakTermPlus])]
+  | StuckPiElimConst T.Text Hint [(Hint, [WeakTermPlus])]
 
 asStuckedTerm :: WeakTermPlus -> Maybe Stuck
 asStuckedTerm term =
@@ -309,7 +309,7 @@ getVarList :: [WeakTermPlus] -> [Ident]
 getVarList xs =
   catMaybes $ map asUpsilon xs
 
-toPiElim :: WeakTermPlus -> [(Meta, [WeakTermPlus])] -> WeakTermPlus
+toPiElim :: WeakTermPlus -> [(Hint, [WeakTermPlus])] -> WeakTermPlus
 toPiElim e args =
   case args of
     [] ->

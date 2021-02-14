@@ -1,4 +1,4 @@
-module Data.Meta where
+module Data.Hint where
 
 import Path
 
@@ -14,61 +14,60 @@ type Column =
 type Loc =
   (Phase, Line, Column)
 
-data Meta
-  = Meta
-      { metaFileName :: Path Abs File,
-        metaLocation :: Loc,
-        metaIsReducible :: Bool
-      }
+data Hint = Hint
+  { metaFileName :: Path Abs File,
+    metaLocation :: Loc,
+    metaIsReducible :: Bool
+  }
 
 -- required to derive the eqality on WeakTerm
-instance Eq Meta where
+instance Eq Hint where
   _ == _ =
     True
 
-instance Show Meta where
+instance Show Hint where
   show _ =
     "_"
 
-instance Ord Meta where
+instance Ord Hint where
   compare _ _ =
     EQ
 
-showMeta :: Meta -> String
-showMeta m = do
+showHint :: Hint -> String
+showHint m = do
   let name = metaFileName m
   let (_, l, c) = metaLocation m
   toFilePath name ++ ":" ++ show l ++ ":" ++ show c
 
-showMeta' :: Meta -> String
-showMeta' m = do
+showHint' :: Hint -> String
+showHint' m = do
   let name = metaFileName m
   let (ph, l, c) = metaLocation m
   toFilePath name ++ ":" ++ show ph ++ ":" ++ show l ++ ":" ++ show c
 
-supMeta :: Meta -> Meta -> Meta
-supMeta m1 m2 =
-  Meta
+supHint :: Hint -> Hint -> Hint
+supHint m1 m2 =
+  Hint
     { metaFileName = supFileName m1 m2,
       metaLocation = supLocation m1 m2,
       metaIsReducible = metaIsReducible m1 && metaIsReducible m2
     }
 
-supFileName :: Meta -> Meta -> Path Abs File
+supFileName :: Hint -> Hint -> Path Abs File
 supFileName m1 m2 =
   case metaLocation m1 `compare` metaLocation m2 of
     GT -> metaFileName m1
     _ -> metaFileName m2
 
-supLocation :: Meta -> Meta -> Loc
+supLocation :: Hint -> Hint -> Loc
 supLocation m1 m2 =
   case metaLocation m1 `compare` metaLocation m2 of
     GT -> metaLocation m1
     _ -> metaLocation m2
 
-newMeta :: Int -> Int -> Path Abs File -> Meta
-newMeta l c path =
-  Meta
+newHint :: Int -> Int -> Path Abs File -> Hint
+newHint l c path =
+  Hint
     { metaFileName = path,
       metaLocation = (0, l, c),
       metaIsReducible = True
@@ -77,7 +76,7 @@ newMeta l c path =
 type PosInfo =
   (Path Abs File, Loc)
 
-getPosInfo :: Meta -> PosInfo
+getPosInfo :: Hint -> PosInfo
 getPosInfo m =
   (metaFileName m, metaLocation m)
 

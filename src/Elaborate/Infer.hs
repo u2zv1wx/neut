@@ -12,10 +12,10 @@ import Control.Monad.State.Lazy
 import Data.EnumCase
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import Data.Hint
 import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.LowType
-import Data.Meta
 import Data.Primitive
 import Data.Term
 import qualified Data.Text as T
@@ -149,7 +149,7 @@ infer' ctx term =
       infer' ctx e
 
 inferArgs ::
-  Meta ->
+  Hint ->
   [(WeakTermPlus, WeakTermPlus)] ->
   [WeakIdentPlus] ->
   WeakTermPlus ->
@@ -166,7 +166,7 @@ inferArgs m args1 args2 cod =
     _ ->
       raiseCritical m "invalid argument passed to inferArgs"
 
-inferExternal :: Meta -> T.Text -> WithEnv TermPlus -> WithEnv (WeakTermPlus, WeakTermPlus)
+inferExternal :: Hint -> T.Text -> WithEnv TermPlus -> WithEnv (WeakTermPlus, WeakTermPlus)
 inferExternal m x comp = do
   t <- comp
   return ((m, WeakTermConst x), (m, snd $ weaken t))
@@ -177,7 +177,7 @@ inferType' ctx t = do
   insConstraintEnv u (metaOf t, WeakTermTau)
   return t'
 
-inferWeakKind :: Meta -> ArrayKind -> WithEnv WeakTermPlus
+inferWeakKind :: Hint -> ArrayKind -> WithEnv WeakTermPlus
 inferWeakKind m kind =
   weaken <$> inferKind m kind
 
@@ -215,7 +215,7 @@ inferBinder ctx binder e =
 
 inferPiElim ::
   Context ->
-  Meta ->
+  Hint ->
   (WeakTermPlus, WeakTermPlus) ->
   [(WeakTermPlus, WeakTermPlus)] ->
   WithEnv (WeakTermPlus, WeakTermPlus)
@@ -240,7 +240,7 @@ inferPiElim ctx m (e, t) ets = do
 -- and return ?M @ (x1, ..., xn) : ?Mt @ (x1, ..., xn).
 -- Note that we can't just set `?M : Pi (x1 : A1, ..., xn : An). Univ` since
 -- WeakTermAster might be used as an ordinary term, that is, a term which is not a type.
-newAsterInCtx :: Context -> Meta -> WithEnv (WeakTermPlus, WeakTermPlus)
+newAsterInCtx :: Context -> Hint -> WithEnv (WeakTermPlus, WeakTermPlus)
 newAsterInCtx ctx m = do
   higherAster <- newAster m
   let varSeq = map (\(_, x, _) -> (m, WeakTermUpsilon x)) ctx
@@ -252,7 +252,7 @@ newAsterInCtx ctx m = do
 -- In a context (x1 : A1, ..., xn : An), this function creates a metavariable
 --   ?M  : Pi (x1 : A1, ..., xn : An). Univ{i}
 -- and return ?M @ (x1, ..., xn) : Univ{i}.
-newTypeAsterInCtx :: Context -> Meta -> WithEnv WeakTermPlus
+newTypeAsterInCtx :: Context -> Hint -> WithEnv WeakTermPlus
 newTypeAsterInCtx ctx m = do
   let varSeq = map (\(_, x, _) -> (m, WeakTermUpsilon x)) ctx
   aster <- newAster m
@@ -267,7 +267,7 @@ newTypeAsterInCtx ctx m = do
 --    (y{m}, ?M{m} @ (x1, ..., xn, y1, ..., y{m-1}))]
 --
 -- inserting type information `yi : ?Mi @ (x1, ..., xn, y1, ..., y{i-1})
-newTypeAsterListInCtx :: Context -> [(Ident, Meta)] -> WithEnv [WeakIdentPlus]
+newTypeAsterListInCtx :: Context -> [(Ident, Hint)] -> WithEnv [WeakIdentPlus]
 newTypeAsterListInCtx ctx ids =
   case ids of
     [] ->
@@ -307,7 +307,7 @@ insWeakTypeEnv :: Ident -> WeakTermPlus -> WithEnv ()
 insWeakTypeEnv (I (_, i)) t =
   modify (\e -> e {weakTypeEnv = IntMap.insert i t (weakTypeEnv e)})
 
-lookupWeakTypeEnv :: Meta -> Ident -> WithEnv WeakTermPlus
+lookupWeakTypeEnv :: Hint -> Ident -> WithEnv WeakTermPlus
 lookupWeakTypeEnv m s = do
   mt <- lookupWeakTypeEnvMaybe s
   case mt of
@@ -326,7 +326,7 @@ lookupWeakTypeEnvMaybe (I (_, s)) = do
     Just t ->
       return $ Just t
 
-lookupKind :: Meta -> T.Text -> WithEnv T.Text
+lookupKind :: Hint -> T.Text -> WithEnv T.Text
 lookupKind m name = do
   renv <- gets revEnumEnv
   case Map.lookup name renv of

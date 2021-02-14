@@ -4,9 +4,9 @@ module Reduce.WeakTerm
 where
 
 import Data.EnumCase
+import Data.Hint
 import Data.Ident
 import qualified Data.IntMap as IntMap
-import Data.Meta
 import Data.WeakTerm
 
 reduceWeakTermPlus :: WeakTermPlus -> WeakTermPlus

@@ -10,8 +10,8 @@ import Control.Monad.State.Lazy
 import Data.EnumCase
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import Data.Hint
 import Data.Ident
-import Data.Meta
 import Data.Namespace
 import qualified Data.Text as T
 import Data.WeakTerm
@@ -29,7 +29,7 @@ discernDef (m, xt, xts, e) = do
   (xt', xts', e') <- discernFix nenv xt xts e
   return (m, xt', xts', e')
 
-discernText :: Meta -> T.Text -> WithEnv Ident
+discernText :: Hint -> T.Text -> WithEnv Ident
 discernText m x = do
   nenv <- gets topNameEnv
   penv <- gets prefixEnv
@@ -140,12 +140,12 @@ discernIdentPlus (m, x, t) = do
   modify (\env -> env {topNameEnv = Map.insert (asText x) x' (topNameEnv env)})
   return (m, x', t')
 
-sanityCheck :: Meta -> Ident -> WithEnv ()
+sanityCheck :: Hint -> Ident -> WithEnv ()
 sanityCheck m x = do
   nenv <- gets topNameEnv
-  when (Map.member (asText x) nenv)
-    $ raiseError m
-    $ "the variable " <> asText x <> " is already defined at top level"
+  when (Map.member (asText x) nenv) $
+    raiseError m $
+      "the variable " <> asText x <> " is already defined at top level"
 
 discernBinder ::
   NameEnv ->
@@ -173,7 +173,7 @@ discernFix nenv self binder e = do
   (binder', e') <- discernBinder nenv (self : binder) e
   return (head binder', tail binder', e')
 
-discernEnumCase :: Meta -> EnumCase -> WithEnv EnumCase
+discernEnumCase :: Hint -> EnumCase -> WithEnv EnumCase
 discernEnumCase m weakCase =
   case weakCase of
     EnumCaseLabel l -> do
@@ -188,9 +188,9 @@ discernEnumCase m weakCase =
 
 discernStruct ::
   NameEnv ->
-  [(Meta, Ident, a)] ->
+  [(Hint, Ident, a)] ->
   WeakTermPlus ->
-  WithEnv ([(Meta, Ident, a)], WeakTermPlus)
+  WithEnv ([(Hint, Ident, a)], WeakTermPlus)
 discernStruct nenv binder e =
   case binder of
     [] -> do
@@ -205,7 +205,7 @@ insertName :: Ident -> Ident -> NameEnv -> NameEnv
 insertName (I (s, _)) =
   Map.insert s
 
-lookupName :: Meta -> [T.Text] -> NameEnv -> Ident -> WithEnv (Maybe Ident)
+lookupName :: Hint -> [T.Text] -> NameEnv -> Ident -> WithEnv (Maybe Ident)
 lookupName m penv nenv x =
   case Map.lookup (asText x) nenv of
     Just x' ->
@@ -213,7 +213,7 @@ lookupName m penv nenv x =
     Nothing ->
       lookupName' m penv nenv x
 
-lookupName' :: Meta -> [T.Text] -> NameEnv -> Ident -> WithEnv (Maybe Ident)
+lookupName' :: Hint -> [T.Text] -> NameEnv -> Ident -> WithEnv (Maybe Ident)
 lookupName' m penv nenv x =
   case penv of
     [] ->
@@ -226,7 +226,7 @@ lookupName' m penv nenv x =
         Just x' ->
           return $ Just x'
 
-lookupName'' :: Meta -> [T.Text] -> NameEnv -> Ident -> WithEnv Ident
+lookupName'' :: Hint -> [T.Text] -> NameEnv -> Ident -> WithEnv Ident
 lookupName'' m penv nenv x = do
   mx <- lookupName m penv nenv x
   case mx of
@@ -235,14 +235,14 @@ lookupName'' m penv nenv x = do
     Nothing ->
       raiseError m $ "(double-prime) undefined variable: " <> asText x
 
-lookupConstantMaybe :: Meta -> [T.Text] -> T.Text -> WithEnv (Maybe T.Text)
+lookupConstantMaybe :: Hint -> [T.Text] -> T.Text -> WithEnv (Maybe T.Text)
 lookupConstantMaybe m penv x = do
   b <- isConstant x
   if b
     then return $ Just x
     else lookupConstantMaybe' m penv x
 
-lookupConstantMaybe' :: Meta -> [T.Text] -> T.Text -> WithEnv (Maybe T.Text)
+lookupConstantMaybe' :: Hint -> [T.Text] -> T.Text -> WithEnv (Maybe T.Text)
 lookupConstantMaybe' m penv x =
   case penv of
     [] ->

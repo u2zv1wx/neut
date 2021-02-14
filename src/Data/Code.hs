@@ -1,11 +1,11 @@
 module Data.Code where
 
 import Data.EnumCase
+import Data.Hint
 import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.LowType
 import Data.Maybe (fromMaybe)
-import Data.Meta
 import Data.Primitive
 import Data.Size
 import Data.Syscall
@@ -47,10 +47,10 @@ data Definition
   deriving (Show)
 
 type DataPlus =
-  (Meta, Data)
+  (Hint, Data)
 
 type CodePlus =
-  (Meta, Code)
+  (Hint, Code)
 
 asUpsilon :: DataPlus -> Maybe Ident
 asUpsilon term =

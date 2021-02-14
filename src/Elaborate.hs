@@ -7,11 +7,11 @@ import Control.Monad.State.Lazy
 import Data.EnumCase
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import Data.Hint
 import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.List (nub)
 import Data.LowType
-import Data.Meta
 import qualified Data.Set as S
 import Data.Term
 import qualified Data.Text as T
@@ -30,7 +30,7 @@ elaborateStmt :: [WeakStmt] -> WithEnv TermPlus
 elaborateStmt stmt =
   case stmt of
     [] -> do
-      m <- newMeta 1 1 <$> getCurrentFilePath
+      m <- newHint 1 1 <$> getCurrentFilePath
       return (m, TermInt 64 0)
     WeakStmtLet m (mx, x, t) e : cont -> do
       (e', te) <- infer e
@@ -48,8 +48,8 @@ elaborateStmt stmt =
       elaborateStmt cont
 
 elaborateLet ::
-  Meta ->
-  Meta ->
+  Hint ->
+  Hint ->
   Ident ->
   WeakTermPlus ->
   WeakTermPlus ->
@@ -190,12 +190,12 @@ elaborate' term =
     (_, WeakTermErase _ e) ->
       elaborate' e
 
-elaboratePlus :: (Meta, a, WeakTermPlus) -> WithEnv (Meta, a, TermPlus)
+elaboratePlus :: (Hint, a, WeakTermPlus) -> WithEnv (Hint, a, TermPlus)
 elaboratePlus (m, x, t) = do
   t' <- elaborate' t
   return (m, x, t')
 
-caseCheckEnumIdent :: Meta -> T.Text -> [EnumCase] -> WithEnv ()
+caseCheckEnumIdent :: Hint -> T.Text -> [EnumCase] -> WithEnv ()
 caseCheckEnumIdent m x ls = do
   es <- lookupEnumSet m x
   let len = length (nub ls)
@@ -203,7 +203,7 @@ caseCheckEnumIdent m x ls = do
     then return ()
     else raiseError m "non-exhaustive pattern"
 
-lookupEnumSet :: Meta -> T.Text -> WithEnv [T.Text]
+lookupEnumSet :: Hint -> T.Text -> WithEnv [T.Text]
 lookupEnumSet m name = do
   eenv <- gets enumEnv
   case Map.lookup name eenv of

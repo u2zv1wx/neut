@@ -8,9 +8,9 @@ import Data.Code
 import Data.EnumCase
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import Data.Hint
 import Data.Ident
 import qualified Data.IntMap as IntMap
-import Data.Meta
 
 reduceCodePlus :: CodePlus -> WithEnv CodePlus
 reduceCodePlus term =

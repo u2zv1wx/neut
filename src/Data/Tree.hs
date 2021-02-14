@@ -1,6 +1,6 @@
 module Data.Tree where
 
-import Data.Meta
+import Data.Hint
 import qualified Data.Text as T
 
 data Tree
@@ -9,9 +9,9 @@ data Tree
   deriving (Show)
 
 type TreePlus =
-  (Meta, Tree)
+  (Hint, Tree)
 
-asLeaf :: TreePlus -> Maybe (Meta, T.Text)
+asLeaf :: TreePlus -> Maybe (Hint, T.Text)
 asLeaf tree =
   case tree of
     (m, TreeLeaf x) ->
@@ -37,11 +37,11 @@ showAsSExp tree =
     (_, TreeNode ts) ->
       "(" <> T.intercalate " " (map showAsSExp ts) <> ")"
 
-replaceMeta :: Meta -> TreePlus -> TreePlus
-replaceMeta m tree =
+replaceHint :: Hint -> TreePlus -> TreePlus
+replaceHint m tree =
   case tree of
     (m', TreeLeaf x) ->
-      (supMeta m m', TreeLeaf x)
+      (supHint m m', TreeLeaf x)
     (mt, TreeNode ts) -> do
-      let ts' = map (replaceMeta m) ts
-      (supMeta m mt, TreeNode ts')
+      let ts' = map (replaceHint m) ts
+      (supHint m mt, TreeNode ts')

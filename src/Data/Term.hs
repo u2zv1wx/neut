@@ -1,11 +1,11 @@
 module Data.Term where
 
 import Data.EnumCase
+import Data.Hint
 import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.LowType
 import Data.Maybe (fromMaybe)
-import Data.Meta
 import qualified Data.Set as S
 import Data.Size
 import qualified Data.Text as T
@@ -29,17 +29,17 @@ data Term
   | TermArrayElim ArrayKind [IdentPlus] TermPlus TermPlus
   | TermStruct [ArrayKind]
   | TermStructIntro [(TermPlus, ArrayKind)]
-  | TermStructElim [(Meta, Ident, ArrayKind)] TermPlus TermPlus
+  | TermStructElim [(Hint, Ident, ArrayKind)] TermPlus TermPlus
   deriving (Show)
 
 type TermPlus =
-  (Meta, Term)
+  (Hint, Term)
 
 type SubstTerm =
   IntMap.IntMap TermPlus
 
 type IdentPlus =
-  (Meta, Ident, TermPlus)
+  (Hint, Ident, TermPlus)
 
 asUpsilon :: TermPlus -> Maybe Ident
 asUpsilon term =
@@ -250,7 +250,7 @@ weaken term =
       let e' = weaken e
       (m, WeakTermStructElim xts v' e')
 
-weakenArgs :: [(Meta, Ident, TermPlus)] -> [(Meta, Ident, WeakTermPlus)]
+weakenArgs :: [(Hint, Ident, TermPlus)] -> [(Hint, Ident, WeakTermPlus)]
 weakenArgs xts = do
   let (ms, xs, ts) = unzip3 xts
   zip3 ms xs (map weaken ts)

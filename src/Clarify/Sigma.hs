@@ -10,14 +10,14 @@ import Clarify.Utility
 import Control.Monad.State.Lazy
 import Data.Code
 import Data.Env
+import Data.Hint
 import Data.Ident
 import Data.LowType
-import Data.Meta
 import qualified Data.Text as T
 
 cartesianSigma ::
   Maybe T.Text ->
-  Meta ->
+  Hint ->
   ArrayKind ->
   [Either CodePlus (Ident, CodePlus)] ->
   WithEnv DataPlus
@@ -50,7 +50,7 @@ cartesianSigma mName m k mxts =
 --     return ()                                     ---        ---
 --
 affineSigma ::
-  Meta ->
+  Hint ->
   ArrayKind ->
   [Either CodePlus (Ident, CodePlus)] ->
   DataPlus ->
@@ -82,7 +82,7 @@ affineSigma m k mxts argVar = do
 --     let (pn1, pn2) := pair-n in               ---                   ---       ---
 --     return ((p11, ..., pn1), (p12, ..., pn2)) ---                   ---       ---
 relevantSigma ::
-  Meta ->
+  Hint ->
   ArrayKind ->
   [Either CodePlus (Ident, CodePlus)] ->
   DataPlus ->
@@ -108,7 +108,7 @@ toPairInfo (_, t@(m, _)) = do
 --   ...
 --   let (xn, yn) := dn in
 --   return ((x1, ..., xn), (y1, ..., yn))
-transposeSigma :: Meta -> ArrayKind -> [(DataPlus, CodePlus)] -> WithEnv CodePlus
+transposeSigma :: Hint -> ArrayKind -> [(DataPlus, CodePlus)] -> WithEnv CodePlus
 transposeSigma m k ds = do
   (xList, xVarList) <- unzip <$> mapM (const $ newDataUpsilonWith m "sig-x") ds
   (yList, yVarList) <- unzip <$> mapM (const $ newDataUpsilonWith m "sig-y") ds
@@ -144,7 +144,7 @@ cartArrayName :: T.Text
 cartArrayName =
   "cartesian-array"
 
-returnArrayType :: Meta -> WithEnv CodePlus
+returnArrayType :: Hint -> WithEnv CodePlus
 returnArrayType m = do
   (arr, arrVar) <- newDataUpsilonWith m "arr"
   retImmType <- returnCartesianImmediate m
@@ -160,7 +160,7 @@ cartClsName :: T.Text
 cartClsName =
   "cartesian-closure"
 
-returnClosureType :: Meta -> WithEnv CodePlus
+returnClosureType :: Hint -> WithEnv CodePlus
 returnClosureType m = do
   (env, envVar) <- newDataUpsilonWith m "env"
   retImmType <- returnCartesianImmediate m

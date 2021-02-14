@@ -6,8 +6,8 @@ where
 import Control.Monad.State.Lazy hiding (get)
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import Data.Hint
 import Data.Ident
-import Data.Meta
 import Data.Namespace
 import Data.Platform
 import qualified Data.Set as S
@@ -253,7 +253,7 @@ getCurrentSection' nameStack =
     (n : ns) ->
       getCurrentSection' ns <> nsSep <> n
 
-readStrOrThrow :: (Read a) => Meta -> T.Text -> WithEnv a
+readStrOrThrow :: (Read a) => Hint -> T.Text -> WithEnv a
 readStrOrThrow m quotedStr =
   case readMaybe (T.unpack quotedStr) of
     Nothing ->
@@ -262,8 +262,8 @@ readStrOrThrow m quotedStr =
       return str
 
 includeFile ::
-  Meta ->
-  Meta ->
+  Hint ->
+  Hint ->
   T.Text ->
   [TreePlus] ->
   WithEnv [WeakStmt]
@@ -292,7 +292,7 @@ includeFile m mPath pathString as = do
       defList <- parse' as
       return $ includedWeakStmtList ++ defList
 
-ensureEnvSanity :: Meta -> WithEnv ()
+ensureEnvSanity :: Hint -> WithEnv ()
 ensureEnvSanity m = do
   penv <- gets prefixEnv
   if null penv
@@ -324,7 +324,7 @@ parseStmtClause tree =
     (m, _) ->
       raiseSyntaxError m "(LEAF TREE*)"
 
-retrieveCompileTimeVarValue :: Meta -> T.Text -> WithEnv T.Text
+retrieveCompileTimeVarValue :: Hint -> T.Text -> WithEnv T.Text
 retrieveCompileTimeVarValue m var =
   case var of
     "OS" ->
@@ -381,14 +381,14 @@ showCyclicPath' pathList =
     (path : ps) ->
       "\n  ~> " <> T.pack (toFilePath path) <> showCyclicPath' ps
 
-ensureFileExistence :: Meta -> Path Abs File -> WithEnv ()
+ensureFileExistence :: Hint -> Path Abs File -> WithEnv ()
 ensureFileExistence m path = do
   b <- doesFileExist path
   if b
     then return ()
     else raiseError m $ "no such file: " <> T.pack (toFilePath path)
 
-raiseIfFailure :: Meta -> String -> ExitCode -> Handle -> Path Abs Dir -> WithEnv ()
+raiseIfFailure :: Hint -> String -> ExitCode -> Handle -> Path Abs Dir -> WithEnv ()
 raiseIfFailure m procName exitCode h pkgDirPath =
   case exitCode of
     ExitSuccess ->
@@ -409,7 +409,7 @@ adjustPhase tree =
       ts' <- mapM adjustPhase ts
       return (m', TreeNode ts')
 
-adjustPhase' :: Meta -> WithEnv Meta
+adjustPhase' :: Hint -> WithEnv Hint
 adjustPhase' m = do
   i <- gets phase
   let (_, l, c) = metaLocation m

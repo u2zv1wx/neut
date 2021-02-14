@@ -1,7 +1,7 @@
 module Data.Constraint where
 
+import Data.Hint
 import Data.Ident
-import Data.Meta
 import qualified Data.Set as S
 import Data.WeakTerm
 
@@ -9,7 +9,7 @@ type PreConstraint =
   (WeakTermPlus, WeakTermPlus)
 
 type FixInfo =
-  (Meta, Ident, [WeakIdentPlus], WeakTermPlus, WeakTermPlus)
+  (Hint, Ident, [WeakIdentPlus], WeakTermPlus, WeakTermPlus)
 
 data Constraint
   = ConstraintAnalyzable

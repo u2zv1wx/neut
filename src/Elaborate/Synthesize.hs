@@ -7,11 +7,11 @@ import Control.Exception.Safe
 import Control.Monad.State.Lazy
 import Data.Constraint
 import Data.Env
+import Data.Hint
 import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.List (nub, sortOn)
 import Data.Log
-import Data.Meta
 import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -81,7 +81,7 @@ asAnalyzable (Enriched cs hs _) =
   Enriched cs hs ConstraintAnalyzable
 
 -- Try the list of alternatives.
-tryPlanList :: Meta -> [WithEnv a] -> WithEnv a
+tryPlanList :: Hint -> [WithEnv a] -> WithEnv a
 tryPlanList m planList =
   case planList of
     [] ->
@@ -91,7 +91,7 @@ tryPlanList m planList =
     plan : rest ->
       catch plan $ tryPlanList' m rest
 
-tryPlanList' :: Meta -> [WithEnv a] -> Error -> WithEnv a
+tryPlanList' :: Hint -> [WithEnv a] -> Error -> WithEnv a
 tryPlanList' m rest _ =
   tryPlanList m rest
 

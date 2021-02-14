@@ -1,6 +1,6 @@
 module Data.EnumCase where
 
-import Data.Meta
+import Data.Hint
 import qualified Data.Text as T
 
 data EnumCase
@@ -9,4 +9,4 @@ data EnumCase
   deriving (Show, Eq, Ord)
 
 type EnumCasePlus =
-  (Meta, EnumCase)
+  (Hint, EnumCase)

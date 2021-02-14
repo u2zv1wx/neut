@@ -12,10 +12,10 @@ import Codec.Binary.UTF8.String
 import Control.Monad.State.Lazy
 import Data.EnumCase
 import Data.Env
+import Data.Hint
 import Data.Ident
 import Data.LowType
 import Data.Maybe (catMaybes, fromMaybe)
-import Data.Meta
 import Data.Namespace
 import Data.Size
 import qualified Data.Text as T
@@ -198,7 +198,7 @@ interpret inputTree =
     (m, TreeNode es) ->
       interpretAux m es
 
-interpretAux :: Meta -> [TreePlus] -> WithEnv WeakTermPlus
+interpretAux :: Hint -> [TreePlus] -> WithEnv WeakTermPlus
 interpretAux m es =
   case es of
     [] ->
@@ -206,7 +206,7 @@ interpretAux m es =
     f : args ->
       interpretPiElim m f args
 
-interpretPiElim :: Meta -> TreePlus -> [TreePlus] -> WithEnv WeakTermPlus
+interpretPiElim :: Hint -> TreePlus -> [TreePlus] -> WithEnv WeakTermPlus
 interpretPiElim m f es = do
   f' <- interpret f
   (xts, args) <- interpretArg es
@@ -233,7 +233,7 @@ interpretArg es =
 --   (Σ
 --     ((len u64))
 --     (array len u8)))
-sigmaIntroString :: Meta -> [WeakTermPlus] -> WithEnv WeakTermPlus
+sigmaIntroString :: Hint -> [WeakTermPlus] -> WithEnv WeakTermPlus
 sigmaIntroString m u8s = do
   let z = asIdent "internal.sigma-tau"
   k <- newNameWith'' "sigma"
@@ -287,7 +287,7 @@ interpretFix tree =
     t ->
       raiseSyntaxError (fst t) "(TREE (TREE ... TREE) TREE)"
 
-interpretLeaf :: TreePlus -> WithEnv (Meta, Ident)
+interpretLeaf :: TreePlus -> WithEnv (Hint, Ident)
 interpretLeaf tree =
   case tree of
     (m, TreeLeaf "_") -> do
@@ -312,7 +312,7 @@ interpretIdentPlus tree =
     t ->
       raiseSyntaxError (fst t) "(LEAF TREE)"
 
-interpretLeafText :: TreePlus -> WithEnv (Meta, T.Text)
+interpretLeafText :: TreePlus -> WithEnv (Hint, T.Text)
 interpretLeafText tree =
   case tree of
     (m, TreeLeaf "_") -> do
@@ -361,7 +361,7 @@ interpretStructIntro tree =
     e ->
       raiseSyntaxError (fst e) "(TREE TREE)"
 
-interpretStructElim :: TreePlus -> WithEnv (Meta, Ident, ArrayKind)
+interpretStructElim :: TreePlus -> WithEnv (Hint, Ident, ArrayKind)
 interpretStructElim tree =
   case tree of
     (_, TreeNode [leaf, k]) -> do
@@ -371,7 +371,7 @@ interpretStructElim tree =
     e ->
       raiseSyntaxError (fst e) "(LEAF TREE)"
 
-interpretEnumItem :: Meta -> T.Text -> [TreePlus] -> WithEnv [(T.Text, Int)]
+interpretEnumItem :: Hint -> T.Text -> [TreePlus] -> WithEnv [(T.Text, Int)]
 interpretEnumItem m name ts = do
   xis <- interpretEnumItem' name $ reverse ts
   if isLinear (map snd xis)
@@ -430,7 +430,7 @@ asArrayKind tree =
     _ ->
       raiseSyntaxError (fst tree) "LEAF"
 
-raiseSyntaxError :: Meta -> T.Text -> WithEnv a
+raiseSyntaxError :: Hint -> T.Text -> WithEnv a
 raiseSyntaxError m form =
   raiseError m $ "couldn't match the input with the expected form: " <> form
 
@@ -481,7 +481,7 @@ interpretWith tree =
     t ->
       raiseSyntaxError (fst t) "(with TREE TREE+)"
 
-interpretBorrow :: Meta -> [TreePlus] -> WithEnv ([TreePlus], [TreePlus])
+interpretBorrow :: Hint -> [TreePlus] -> WithEnv ([TreePlus], [TreePlus])
 interpretBorrow m treeList =
   case treeList of
     [] ->
