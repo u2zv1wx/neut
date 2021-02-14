@@ -1,8 +1,6 @@
 module Main (main) where
 
 import Clarify
-import qualified Codec.Archive.Tar as Tar
-import qualified Codec.Compression.GZip as GZip
 import Control.Monad.State.Lazy
 import Data.ByteString.Builder
 import qualified Data.ByteString.Lazy as L
@@ -16,7 +14,6 @@ import Options.Applicative
 import Parse
 import Path
 import Path.IO
-import System.Directory (listDirectory)
 import System.Exit
 import System.Process hiding (env)
 import Text.Read (readMaybe)
@@ -203,11 +200,15 @@ run cmd =
         Left (Error err) ->
           seqIO (map (outputLog colorizeFlag eoe) err) >> exitWith (ExitFailure 1)
     Archive inputPathStr mOutputPathStr -> do
-      inputPath <- resolveDir' inputPathStr
-      contents <- listDirectory $ toFilePath inputPath
+      libDirPath <- resolveDir' inputPathStr
+      let parentDirPath = parent libDirPath
+      basename <- stripProperPrefix parentDirPath libDirPath
       mOutputPath <- mapM resolveFile' mOutputPathStr
-      outputPath <- toFilePath <$> constructOutputArchivePath inputPath mOutputPath
-      archive outputPath (toFilePath inputPath) contents
+      outputPath <- toFilePath <$> constructOutputArchivePath libDirPath mOutputPath
+      let tarCmd = proc "tar" ["cJf", outputPath, "-C", toFilePath parentDirPath, toFilePath basename]
+      (_, _, _, handler) <- createProcess tarCmd
+      tarExitCode <- waitForProcess handler
+      exitWith tarExitCode
 
 constructOutputPath :: Path Rel File -> Maybe (Path Abs File) -> OutputKind -> IO (Path Abs File)
 constructOutputPath basename mPath kind =
@@ -263,8 +264,3 @@ clangBaseOpt outputPath =
     "-o",
     toFilePath outputPath
   ]
-
-archive :: FilePath -> FilePath -> [FilePath] -> IO ()
-archive tarPath base dir = do
-  es <- Tar.pack base dir
-  L.writeFile tarPath $ GZip.compress $ Tar.write es
