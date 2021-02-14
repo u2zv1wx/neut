@@ -3,11 +3,7 @@ module Parse
   )
 where
 
-import qualified Codec.Archive.Tar as Tar
-import qualified Codec.Compression.GZip as GZip
 import Control.Monad.State.Lazy hiding (get)
-import Data.ByteString.Builder
-import qualified Data.ByteString.Lazy as L
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import Data.Ident
@@ -16,11 +12,10 @@ import Data.Namespace
 import Data.Platform
 import qualified Data.Set as S
 import qualified Data.Text as T
-import qualified Data.Text.Encoding as TE
 import qualified Data.Text.IO as TIO
 import Data.Tree
 import Data.WeakTerm
-import Network.Http.Client
+import GHC.IO.Handle
 import Parse.Discern
 import Parse.Interpret
 import Parse.MacroExpand
@@ -28,7 +23,8 @@ import Parse.Rule
 import Parse.Tokenize
 import Path
 import Path.IO
-import qualified System.IO.Streams as Streams
+import System.Exit
+import System.Process hiding (env)
 import Text.Read (readMaybe)
 
 parse :: Path Abs File -> WithEnv [WeakStmt]
@@ -99,18 +95,26 @@ parse' stmtTreeList =
                 raiseSyntaxError m "(end LEAF)"
             "ensure"
               | [(_, TreeLeaf pkg), (mUrl, TreeLeaf urlStr)] <- rest -> do
-                libDir <- getLibraryDirPath
+                libDirPath <- getLibraryDirPath
                 pkg' <- parseRelDir $ T.unpack pkg
-                let pkgDirPath = libDir </> pkg'
+                let pkgDirPath = libDirPath </> pkg'
                 isAlreadyInstalled <- doesDirExist pkgDirPath
                 when (not isAlreadyInstalled) $ do
+                  ensureDir pkgDirPath
                   urlStr' <- readStrOrThrow mUrl urlStr
-                  note' $ "downloading " <> pkg <> " from " <> TE.decodeUtf8 urlStr'
-                  item <- liftIO $ get urlStr' $ \_ i1 -> do
-                    i2 <- Streams.map byteString i1
-                    toLazyByteString <$> Streams.fold mappend mempty i2
+                  let curlCmd = proc "curl" ["-s", "-S", "-L", urlStr']
+                  let tarCmd = proc "tar" ["xJf", "-", "-C", toFilePath pkg', "--strip-components=1"]
+                  (_, Just stdoutHandler, Just curlErrorHandler, curlHandler) <-
+                    liftIO $ createProcess curlCmd {cwd = Just (toFilePath libDirPath), std_out = CreatePipe, std_err = CreatePipe}
+                  (_, _, Just tarErrorHandler, tarHandler) <-
+                    liftIO $ createProcess tarCmd {cwd = Just (toFilePath libDirPath), std_in = UseHandle stdoutHandler, std_err = CreatePipe}
+                  note' $ "downloading " <> pkg <> " from " <> T.pack urlStr'
+                  curlExitCode <- liftIO $ waitForProcess curlHandler
+                  raiseIfFailure mUrl "curl" curlExitCode curlErrorHandler pkgDirPath
                   note' $ "extracting " <> pkg <> " into " <> T.pack (toFilePath pkgDirPath)
-                  extract item pkgDirPath
+                  tarExitCode <- liftIO $ waitForProcess tarHandler
+                  raiseIfFailure mUrl "tar" tarExitCode tarErrorHandler pkgDirPath
+                  return ()
                 parse' restStmtList
               | otherwise ->
                 raiseSyntaxError m "(ensure LEAF LEAF)"
@@ -384,9 +388,15 @@ ensureFileExistence m path = do
     then return ()
     else raiseError m $ "no such file: " <> T.pack (toFilePath path)
 
-extract :: L.ByteString -> Path Abs Dir -> WithEnv ()
-extract bytestr pkgPath =
-  liftIO $ Tar.unpack (toFilePath pkgPath) $ Tar.read $ GZip.decompress bytestr
+raiseIfFailure :: Meta -> String -> ExitCode -> Handle -> Path Abs Dir -> WithEnv ()
+raiseIfFailure m procName exitCode h pkgDirPath =
+  case exitCode of
+    ExitSuccess ->
+      return ()
+    ExitFailure i -> do
+      removeDir pkgDirPath -- cleanup
+      errStr <- liftIO $ hGetContents h
+      raiseError m $ T.pack $ "the child process `" ++ procName ++ "` failed with the following message (exitcode = " ++ show i ++ "):\n" ++ errStr
 
 adjustPhase :: TreePlus -> WithEnv TreePlus
 adjustPhase tree =
