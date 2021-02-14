@@ -1,7 +1,6 @@
 module Elaborate.Infer
   ( infer,
     inferType,
-    inferSigma,
     insConstraintEnv,
     insWeakTypeEnv,
     newTypeAsterInCtx,
@@ -197,17 +196,6 @@ inferPi ctx binder cod =
       insWeakTypeEnv x t'
       (xtls', tlCod) <- inferPi (ctx ++ [(mx, x, t')]) xts cod
       return ((mx, x, t') : xtls', tlCod)
-
-inferSigma :: Context -> [WeakIdentPlus] -> WithEnv [WeakIdentPlus]
-inferSigma ctx binder =
-  case binder of
-    [] ->
-      return []
-    ((mx, x, t) : xts) -> do
-      t' <- inferType' ctx t
-      insWeakTypeEnv x t'
-      xts' <- inferSigma (ctx ++ [(mx, x, t')]) xts
-      return $ (mx, x, t') : xts'
 
 inferBinder ::
   Context ->
