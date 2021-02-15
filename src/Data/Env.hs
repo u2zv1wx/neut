@@ -59,6 +59,7 @@ data Env = Env
     prefixEnv :: [T.Text],
     sectionEnv :: [T.Text],
     topNameEnv :: Map.HashMap T.Text Ident,
+    topMetaNameEnv :: Map.HashMap T.Text Ident,
     --
     -- elaborate
     --
@@ -96,6 +97,7 @@ initialEnv =
       traceEnv = [],
       revEnumEnv = Map.empty,
       topNameEnv = Map.empty,
+      topMetaNameEnv = Map.empty,
       prefixEnv = [],
       sectionEnv = [],
       weakTypeEnv = IntMap.empty,
@@ -377,6 +379,10 @@ raiseCritical m text =
 raiseCritical' :: T.Text -> WithEnv a
 raiseCritical' text =
   throw $ Error [logCritical' text]
+
+raiseSyntaxError :: Hint -> T.Text -> WithEnv a
+raiseSyntaxError m form =
+  raiseError m $ "couldn't match the input with the expected form: " <> form
 
 getCurrentFilePath :: WithEnv (Path Abs File)
 getCurrentFilePath = do

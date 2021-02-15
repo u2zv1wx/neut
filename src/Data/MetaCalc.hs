@@ -1,12 +1,13 @@
 module Data.MetaCalc where
 
-import qualified Data.HashMap.Lazy as Map
 import Data.Hint
+import Data.Ident
+import qualified Data.IntMap as IntMap
 import qualified Data.Text as T
 
 data MetaCalc
-  = MetaCalcVar T.Text
-  | MetaCalcImpIntro [T.Text] MetaCalcPlus
+  = MetaCalcVar Ident
+  | MetaCalcImpIntro [Ident] MetaCalcPlus
   | MetaCalcImpElim MetaCalcPlus [MetaCalcPlus]
   | MetaCalcNecIntro MetaCalcPlus
   | MetaCalcNecElim MetaCalcPlus
@@ -18,7 +19,7 @@ type MetaCalcPlus =
   (Hint, MetaCalc)
 
 type SubstMetaCalc =
-  Map.HashMap T.Text MetaCalcPlus
+  IntMap.IntMap MetaCalcPlus
 
 substMetaCalc :: SubstMetaCalc -> MetaCalcPlus -> MetaCalcPlus
 substMetaCalc sub term =
@@ -29,7 +30,7 @@ substMetaCalc' level sub term =
   case term of
     (_, MetaCalcVar x)
       | level == 0 ->
-        case Map.lookup x sub of
+        case IntMap.lookup (asInt x) sub of
           Nothing ->
             term
           Just e ->
@@ -38,7 +39,7 @@ substMetaCalc' level sub term =
         term
     (m, MetaCalcImpIntro xs e)
       | level == 0 -> do
-        let sub' = foldr Map.delete sub xs
+        let sub' = foldr IntMap.delete sub (map asInt xs)
         let e' = substMetaCalc' level sub' e
         (m, MetaCalcImpIntro xs e')
       | otherwise -> do

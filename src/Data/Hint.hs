@@ -65,11 +65,11 @@ supLocation m1 m2 =
     GT -> metaLocation m1
     _ -> metaLocation m2
 
-newHint :: Int -> Int -> Path Abs File -> Hint
-newHint l c path =
+newHint :: Int -> Int -> Int -> Path Abs File -> Hint
+newHint p l c path =
   Hint
     { metaFileName = path,
-      metaLocation = (0, l, c),
+      metaLocation = (p, l, c),
       metaIsReducible = True
     }
 

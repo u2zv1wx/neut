@@ -30,7 +30,8 @@ elaborateStmt :: [WeakStmt] -> WithEnv TermPlus
 elaborateStmt stmt =
   case stmt of
     [] -> do
-      m <- newHint 1 1 <$> getCurrentFilePath
+      ph <- gets phase
+      m <- newHint ph 1 1 <$> getCurrentFilePath
       return (m, TermInt 64 0)
     WeakStmtLet m (mx, x, t) e : cont -> do
       (e', te) <- infer e

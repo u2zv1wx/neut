@@ -14,6 +14,7 @@ import Options.Applicative
 import Parse
 import Path
 import Path.IO
+import Preprocess
 import System.Exit
 import System.Process hiding (env)
 import Text.Read (readMaybe)
@@ -237,11 +238,11 @@ constructOutputArchivePath inputPath mPath =
 
 runBuild :: Path Abs File -> WithEnv Builder
 runBuild =
-  parse >=> elaborate >=> clarify >=> lower >=> emit
+  preprocess >=> parse >=> elaborate >=> clarify >=> lower >=> emit
 
 runCheck :: Path Abs File -> WithEnv ()
 runCheck =
-  parse >=> elaborate >=> \_ -> return ()
+  preprocess >=> parse >=> elaborate >=> \_ -> return ()
 
 seqIO :: [IO ()] -> IO ()
 seqIO =
