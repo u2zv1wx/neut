@@ -7,6 +7,7 @@ module Parse.Interpret
     raiseSyntaxError,
     interpretCode,
     interpretData,
+    interpretMetaCalc,
   )
 where
 
@@ -19,6 +20,7 @@ import Data.Hint
 import Data.Ident
 import Data.LowType
 import Data.Maybe (catMaybes, fromMaybe)
+import Data.MetaCalc
 import Data.Namespace
 import Data.Size
 import qualified Data.Text as T
@@ -575,10 +577,50 @@ interpretData inputTree =
 interpretText :: TreePlus -> WithEnv T.Text
 interpretText tree =
   case tree of
-    -- (m, TreeLeaf "_") -> do
-    --   h <- newNameWith'' "H"
-    --   return (m, h)
     (_, TreeLeaf x) ->
       return x
     t ->
       raiseSyntaxError (fst t) "LEAF"
+
+interpretMetaCalc :: TreePlus -> WithEnv MetaCalcPlus
+interpretMetaCalc tree =
+  case tree of
+    (m, TreeLeaf atom) ->
+      return (m, MetaCalcLeaf atom) -- ここではまずleafにしておく。あとで束縛されているやつをMetaCalcVarへと書き換える。
+    (m, TreeNode (leaf@(_, TreeLeaf headAtom) : rest)) ->
+      case headAtom of
+        "implication-introduction"
+          | [(_, TreeNode xs), e] <- rest -> do
+            xs' <- mapM interpretText xs
+            e' <- interpretMetaCalc e
+            return (m, MetaCalcImpIntro xs' e')
+          | otherwise ->
+            raiseSyntaxError m "(implication-introduction (TREE*) TREE)"
+        "implication-elimination"
+          | e : es <- rest -> do
+            e' <- interpretMetaCalc e
+            es' <- mapM interpretMetaCalc es
+            return (m, MetaCalcImpElim e' es')
+          | otherwise ->
+            raiseSyntaxError m "(implication-elimination TREE TREE*)"
+        "necessity-introduction"
+          | [e] <- rest -> do
+            e' <- interpretMetaCalc e
+            return (m, MetaCalcNecIntro e')
+          | otherwise ->
+            raiseSyntaxError m "(necessity-introduction TREE)"
+        "necessity-elimination"
+          | [e] <- rest -> do
+            e' <- interpretMetaCalc e
+            return (m, MetaCalcNecElim e')
+          | otherwise ->
+            raiseSyntaxError m "(necessity-elimination TREE)"
+        _ ->
+          interpretMetaCalcAux m $ leaf : rest
+    (m, TreeNode es) ->
+      interpretMetaCalcAux m es
+
+interpretMetaCalcAux :: Hint -> [TreePlus] -> WithEnv MetaCalcPlus
+interpretMetaCalcAux m es = do
+  es' <- mapM interpretMetaCalc es
+  return (m, MetaCalcNode es') -- あとでMetaCalcArrowElimへと必要に応じて書き換える
