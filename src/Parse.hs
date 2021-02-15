@@ -9,6 +9,8 @@ import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import Data.Hint
 import Data.Ident
+import qualified Data.IntMap as IntMap
+import Data.MetaCalc
 import Data.Namespace
 import Data.Platform
 import qualified Data.Set as S
@@ -19,12 +21,11 @@ import Data.WeakTerm
 import GHC.IO.Handle
 import Parse.Discern
 import Parse.Interpret
--- import Parse.MacroExpand
 import Parse.Rule
 import Parse.Tokenize
 import Path
 import Path.IO
-import Reduce.Code
+import Reduce.MetaCalc
 import System.Exit
 import System.Process hiding (env)
 import Text.Read (readMaybe)
@@ -33,56 +34,21 @@ parse :: Path Abs File -> WithEnv [WeakStmt]
 parse inputPath = do
   stmtList <- visit inputPath
   pushTrace inputPath
-  return stmtList
+  parse' Map.empty stmtList
 
-visit :: Path Abs File -> WithEnv [WeakStmt]
-visit path = do
-  pushTrace path
-  modify (\env -> env {fileEnv = Map.insert path VisitInfoActive (fileEnv env)})
-  modify (\env -> env {phase = 1 + phase env})
-  content <- liftIO $ TIO.readFile $ toFilePath path
-  tokenize content >>= mapM interpretData >>= parse' Map.empty
-
-leave :: WithEnv [WeakStmt]
-leave = do
-  path <- getCurrentFilePath
-  popTrace
-  modify (\env -> env {fileEnv = Map.insert path VisitInfoFinish (fileEnv env)})
-  modify (\env -> env {prefixEnv = []})
-  modify (\env -> env {sectionEnv = []})
-  return []
-
-pushTrace :: Path Abs File -> WithEnv ()
-pushTrace path =
-  modify (\env -> env {traceEnv = path : traceEnv env})
-
-popTrace :: WithEnv ()
-popTrace =
-  modify (\env -> env {traceEnv = tail (traceEnv env)})
-
-parse' :: SubstCode -> [DataPlus] -> WithEnv [WeakStmt]
+parse' :: SubstCode -> [TreePlus] -> WithEnv [WeakStmt]
 parse' sub stmtTreeList =
   case stmtTreeList of
     [] ->
-      leave
+      return []
     headStmt : restStmtList -> do
-      headStmt' <- reduceData $ substData sub headStmt
-      p $ T.unpack $ showAsSExp headStmt'
-      parse'' sub [headStmt'] restStmtList
-
-parse'' :: SubstCode -> [TreePlus] -> [DataPlus] -> WithEnv [WeakStmt]
-parse'' sub headStmtList restStmtList = do
-  case headStmtList of
-    [] ->
-      parse' sub restStmtList
-    headStmt : expandedRestStmtList -> do
       case headStmt of
         (m, TreeNode (leaf@(_, TreeLeaf headAtom) : rest)) ->
           case headAtom of
             "constant"
               | [(_, TreeLeaf name), t] <- rest -> do
                 t' <- adjustPhase t >>= interpret >>= discern
-                -- t' <- adjustPhase t >>= macroExpand >>= interpret >>= discern
+                -- t' <- adjustPhase t >>= macroExpand sub >>= interpret >>= discern
                 m' <- adjustPhase' m
                 name' <- withSectionPrefix name
                 insertConstant m' name'
@@ -90,12 +56,6 @@ parse'' sub headStmtList restStmtList = do
                 return $ WeakStmtConstDecl (m', name', t') : defList
               | otherwise ->
                 raiseSyntaxError m "(constant LEAF TREE)"
-            "denote"
-              | [(_, TreeLeaf name), body] <- rest -> do
-                body' <- interpretCode body
-                parse' (Map.insert name body' sub) restStmtList
-              | otherwise ->
-                raiseSyntaxError m "(denote LEAF TREE)"
             "end"
               | [(_, TreeLeaf s)] <- rest -> do
                 ns <- gets sectionEnv
@@ -112,31 +72,6 @@ parse'' sub headStmtList restStmtList = do
                         "the innermost section is not `" <> s <> "`, but is `" <> s' <> "`"
               | otherwise ->
                 raiseSyntaxError m "(end LEAF)"
-            "ensure"
-              | [(_, TreeLeaf pkg), (mUrl, TreeLeaf urlStr)] <- rest -> do
-                libDirPath <- getLibraryDirPath
-                pkg' <- parseRelDir $ T.unpack pkg
-                let pkgDirPath = libDirPath </> pkg'
-                isAlreadyInstalled <- doesDirExist pkgDirPath
-                when (not isAlreadyInstalled) $ do
-                  ensureDir pkgDirPath
-                  urlStr' <- readStrOrThrow mUrl urlStr
-                  let curlCmd = proc "curl" ["-s", "-S", "-L", urlStr']
-                  let tarCmd = proc "tar" ["xJf", "-", "-C", toFilePath pkg', "--strip-components=1"]
-                  (_, Just stdoutHandler, Just curlErrorHandler, curlHandler) <-
-                    liftIO $ createProcess curlCmd {cwd = Just (toFilePath libDirPath), std_out = CreatePipe, std_err = CreatePipe}
-                  (_, _, Just tarErrorHandler, tarHandler) <-
-                    liftIO $ createProcess tarCmd {cwd = Just (toFilePath libDirPath), std_in = UseHandle stdoutHandler, std_err = CreatePipe}
-                  note' $ "downloading " <> pkg <> " from " <> T.pack urlStr'
-                  curlExitCode <- liftIO $ waitForProcess curlHandler
-                  raiseIfFailure mUrl "curl" curlExitCode curlErrorHandler pkgDirPath
-                  note' $ "extracting " <> pkg <> " into " <> T.pack (toFilePath pkgDirPath)
-                  tarExitCode <- liftIO $ waitForProcess tarHandler
-                  raiseIfFailure mUrl "tar" tarExitCode tarErrorHandler pkgDirPath
-                  return ()
-                parse' sub restStmtList
-              | otherwise ->
-                raiseSyntaxError m "(ensure LEAF LEAF)"
             "enum"
               | (_, TreeLeaf name) : ts <- rest -> do
                 m' <- adjustPhase' m
@@ -153,18 +88,13 @@ parse'' sub headStmtList restStmtList = do
                 parse' sub restStmtList
               | otherwise ->
                 raiseSyntaxError m "(erase LEAF)"
-            "include"
-              | [(mPath, TreeLeaf pathString)] <- rest,
-                not (T.null pathString) ->
-                includeFile sub m mPath pathString restStmtList
-              | otherwise ->
-                raiseSyntaxError m "(include LEAF)"
             "data"
               | name@(mFun, TreeLeaf _) : xts@(_, TreeNode _) : es' <- rest ->
-                -- parse' sub $ (m, TreeNode [leaf, (mFun, TreeNode (name : xts : es'))]) : restStmtList
-                parse'' sub ((m, TreeNode [leaf, (mFun, TreeNode (name : xts : es'))]) : expandedRestStmtList) restStmtList
+                parse' sub $ (m, TreeNode [leaf, (mFun, TreeNode (name : xts : es'))]) : restStmtList
+              -- parse'' sub ((m, TreeNode [leaf, (mFun, TreeNode (name : xts : es'))]) : expandedRestStmtList) restStmtList
               | otherwise -> do
                 rest' <- mapM adjustPhase rest
+                -- rest' <- mapM (adjustPhase >=> macroExpand sub) rest
                 -- rest' <- mapM (adjustPhase >=> macroExpand) rest
                 m' <- adjustPhase' m
                 stmtList1 <- parseData m' rest'
@@ -184,25 +114,19 @@ parse'' sub headStmtList restStmtList = do
             "let"
               | [(mx, TreeLeaf x), t, e] <- rest -> do
                 let xt = (mx, TreeNode [(mx, TreeLeaf x), t])
-                -- parse' sub ((m, TreeNode [(m, TreeLeaf "let"), xt, e]) : restStmtList)
-                parse'' sub ((m, TreeNode [(m, TreeLeaf "let"), xt, e]) : expandedRestStmtList) restStmtList
+                parse' sub ((m, TreeNode [(m, TreeLeaf "let"), xt, e]) : restStmtList)
               | [xt, e] <- rest -> do
                 m' <- adjustPhase' m
                 e' <- adjustPhase e >>= interpret >>= discern
                 xt' <- adjustPhase xt >>= prefixTextPlus >>= interpretIdentPlus >>= discernIdentPlus
                 -- e' <- adjustPhase e >>= macroExpand >>= interpret >>= discern
                 -- xt' <- adjustPhase xt >>= macroExpand >>= prefixTextPlus >>= interpretIdentPlus >>= discernIdentPlus
+                -- e' <- adjustPhase e >>= macroExpand sub >>= interpret >>= discern
+                -- xt' <- adjustPhase xt >>= macroExpand sub >>= prefixTextPlus >>= interpretIdentPlus >>= discernIdentPlus
                 defList <- parse' sub restStmtList
                 return $ WeakStmtLet m' xt' e' : defList
               | otherwise ->
                 raiseSyntaxError m "(let LEAF TREE TREE) | (let TREE TREE)"
-            -- "notation"
-            --   | [from, to] <- rest -> do
-            --     name <- checkNotationSanity from
-            --     modify (\env -> env {notationEnv = Map.insertWith (++) name [(from, to)] (notationEnv env)})
-            --     parse' sub restStmtList
-            --   | otherwise ->
-            --     raiseSyntaxError m "(notation TREE TREE)"
             "record"
               | (_, TreeLeaf _) : (_, TreeNode _) : _ <- rest -> do
                 rest' <- mapM adjustPhase rest >>= asData m
@@ -220,8 +144,8 @@ parse'' sub headStmtList restStmtList = do
                 parse' sub restStmtList
               | otherwise ->
                 raiseSyntaxError m "(section LEAF)"
-            "statement" ->
-              parse'' sub rest restStmtList
+            -- "statement" ->
+            --   parse' sub $ rest ++ restStmtList
             "use"
               | [(_, TreeLeaf s)] <- rest ->
                 use s >> parse' sub restStmtList
@@ -233,16 +157,17 @@ parse'' sub headStmtList restStmtList = do
               | otherwise ->
                 raiseSyntaxError m "(unuse LEAF)"
             _ ->
-              interpretAux sub headStmt expandedRestStmtList restStmtList
+              interpretAux sub headStmt restStmtList
         _ ->
-          interpretAux sub headStmt expandedRestStmtList restStmtList
+          interpretAux sub headStmt restStmtList
 
-interpretAux :: SubstCode -> TreePlus -> [TreePlus] -> [DataPlus] -> WithEnv [WeakStmt]
-interpretAux sub headStmt expandedRestStmtList restStmtList = do
+interpretAux :: SubstCode -> TreePlus -> [TreePlus] -> WithEnv [WeakStmt]
+interpretAux sub headStmt restStmtList = do
   headStmt' <- adjustPhase headStmt
   -- headStmt' <- adjustPhase headStmt >>= macroExpand
+  -- headStmt' <- adjustPhase headStmt >>= macroExpand sub
   if isSpecialForm headStmt'
-    then parse'' sub (headStmt' : expandedRestStmtList) restStmtList
+    then parse' sub $ headStmt' : restStmtList
     else do
       e <- interpret headStmt' >>= discern
       h <- newNameWith'' "_"
@@ -287,38 +212,6 @@ readStrOrThrow m quotedStr =
     Just str ->
       return str
 
-includeFile ::
-  SubstCode ->
-  Hint ->
-  Hint ->
-  T.Text ->
-  [DataPlus] ->
-  WithEnv [WeakStmt]
-includeFile sub m mPath pathString as = do
-  m' <- adjustPhase' m
-  mPath' <- adjustPhase' mPath
-  ensureEnvSanity m'
-  path <- readStrOrThrow mPath' pathString
-  when (null path) $ raiseError m "found an empty path"
-  dirPath <-
-    if head path == '.'
-      then getCurrentDirPath
-      else getLibraryDirPath
-  newPath <- resolveFile dirPath path
-  ensureFileExistence m' newPath
-  denv <- gets fileEnv
-  case Map.lookup newPath denv of
-    Just VisitInfoActive -> do
-      tenv <- gets traceEnv
-      let cyclicPath = dropWhile (/= newPath) (reverse tenv) ++ [newPath]
-      raiseError m' $ "found cyclic inclusion:\n" <> showCyclicPath cyclicPath
-    Just VisitInfoFinish ->
-      parse' sub as
-    Nothing -> do
-      includedWeakStmtList <- visit newPath
-      defList <- parse' sub as
-      return $ includedWeakStmtList ++ defList
-
 ensureEnvSanity :: Hint -> WithEnv ()
 ensureEnvSanity m = do
   penv <- gets prefixEnv
@@ -343,12 +236,11 @@ prefixTextPlus tree =
     t ->
       raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
 
-parseStmtClause :: TreePlus -> WithEnv (T.Text, [DataPlus])
+parseStmtClause :: TreePlus -> WithEnv (T.Text, [TreePlus])
 parseStmtClause tree =
   case tree of
-    (_, TreeNode ((_, TreeLeaf x) : stmtList)) -> do
-      stmtList' <- mapM interpretData stmtList
-      return (x, stmtList')
+    (_, TreeNode ((_, TreeLeaf x) : stmtList)) ->
+      return (x, stmtList)
     (m, _) ->
       raiseSyntaxError m "(LEAF TREE*)"
 
@@ -376,16 +268,12 @@ keywordSet =
     [ "constant",
       "denote",
       "end",
-      "ensure",
       "enum",
-      "include",
       "data",
       "introspect",
       "let",
-      -- "notation",
       "record",
       "section",
-      "statement",
       "unuse",
       "use"
     ]
@@ -443,3 +331,148 @@ adjustPhase' m = do
   i <- gets phase
   let (_, l, c) = metaLocation m
   return $ m {metaLocation = (i, l, c)}
+
+parseMetaCalc :: [TreePlus] -> WithEnv [TreePlus]
+parseMetaCalc ts =
+  parseMetaCalc' IntMap.empty ts
+
+parseMetaCalc' :: SubstMetaCalc -> [TreePlus] -> WithEnv [TreePlus]
+parseMetaCalc' sub stmtList =
+  case stmtList of
+    [] ->
+      leave
+    headStmt : restStmtList ->
+      case headStmt of
+        (m, TreeNode ((_, TreeLeaf headAtom) : rest)) ->
+          case headAtom of
+            "denote"
+              | [(_, TreeLeaf name), body] <- rest -> do
+                body' <- interpretMetaCalc body >>= discernMetaCalc
+                body'' <- reduceMetaCalc' $ substMetaCalc sub body'
+                name' <- newNameWith $ asIdent name
+                modify (\env -> env {topMetaNameEnv = Map.insert name name' (topMetaNameEnv env)})
+                parseMetaCalc' (IntMap.insert (asInt name') body'' sub) restStmtList
+              | otherwise ->
+                raiseSyntaxError m "(denote LEAF TREE)"
+            "include"
+              | [(mPath, TreeLeaf pathString)] <- rest,
+                not (T.null pathString) ->
+                includeFile sub m mPath pathString restStmtList
+              | otherwise ->
+                raiseSyntaxError m "(include LEAF)"
+            "ensure"
+              | [(_, TreeLeaf pkg), (mUrl, TreeLeaf urlStr)] <- rest -> do
+                libDirPath <- getLibraryDirPath
+                pkg' <- parseRelDir $ T.unpack pkg
+                let pkgDirPath = libDirPath </> pkg'
+                isAlreadyInstalled <- doesDirExist pkgDirPath
+                when (not isAlreadyInstalled) $ do
+                  ensureDir pkgDirPath
+                  urlStr' <- readStrOrThrow mUrl urlStr
+                  let curlCmd = proc "curl" ["-s", "-S", "-L", urlStr']
+                  let tarCmd = proc "tar" ["xJf", "-", "-C", toFilePath pkg', "--strip-components=1"]
+                  (_, Just stdoutHandler, Just curlErrorHandler, curlHandler) <-
+                    liftIO $ createProcess curlCmd {cwd = Just (toFilePath libDirPath), std_out = CreatePipe, std_err = CreatePipe}
+                  (_, _, Just tarErrorHandler, tarHandler) <-
+                    liftIO $ createProcess tarCmd {cwd = Just (toFilePath libDirPath), std_in = UseHandle stdoutHandler, std_err = CreatePipe}
+                  note' $ "downloading " <> pkg <> " from " <> T.pack urlStr'
+                  curlExitCode <- liftIO $ waitForProcess curlHandler
+                  raiseIfFailure mUrl "curl" curlExitCode curlErrorHandler pkgDirPath
+                  note' $ "extracting " <> pkg <> " into " <> T.pack (toFilePath pkgDirPath)
+                  tarExitCode <- liftIO $ waitForProcess tarHandler
+                  raiseIfFailure mUrl "tar" tarExitCode tarErrorHandler pkgDirPath
+                  return ()
+                parseMetaCalc' sub restStmtList
+              | otherwise ->
+                raiseSyntaxError m "(ensure LEAF LEAF)"
+            "statement" ->
+              parseMetaCalc' sub $ rest ++ restStmtList
+            _ ->
+              parseMetaCalcAux sub headStmt restStmtList
+        _ ->
+          parseMetaCalcAux sub headStmt restStmtList
+
+parseMetaCalcAux :: SubstMetaCalc -> TreePlus -> [TreePlus] -> WithEnv [TreePlus]
+parseMetaCalcAux sub headStmt restStmtList = do
+  headStmt' <- interpretMetaCalc headStmt >>= discernMetaCalc
+  headStmt'' <- reduceMetaCalc $ substMetaCalc sub headStmt'
+  if isSpecialMetaForm headStmt''
+    then parseMetaCalc' sub $ headStmt'' : restStmtList -- ここのおかげでrecursiveに処理をおこなうことができる。
+    else do
+      treeList <- parseMetaCalc' sub restStmtList
+      return $ headStmt'' : treeList
+
+isSpecialMetaForm :: TreePlus -> Bool
+isSpecialMetaForm tree =
+  case tree of
+    (_, TreeNode ((_, TreeLeaf x) : _)) ->
+      S.member x metaKeywordSet
+    _ ->
+      False
+
+metaKeywordSet :: S.Set T.Text
+metaKeywordSet =
+  S.fromList
+    [ "denote",
+      "statement",
+      "include",
+      "ensure"
+    ]
+
+includeFile ::
+  SubstMetaCalc ->
+  Hint ->
+  Hint ->
+  T.Text ->
+  [TreePlus] ->
+  WithEnv [TreePlus]
+includeFile sub m mPath pathString as = do
+  m' <- adjustPhase' m
+  mPath' <- adjustPhase' mPath
+  ensureEnvSanity m'
+  path <- readStrOrThrow mPath' pathString
+  when (null path) $ raiseError m "found an empty path"
+  dirPath <-
+    if head path == '.'
+      then getCurrentDirPath
+      else getLibraryDirPath
+  newPath <- resolveFile dirPath path
+  ensureFileExistence m' newPath
+  denv <- gets fileEnv
+  case Map.lookup newPath denv of
+    Just VisitInfoActive -> do
+      tenv <- gets traceEnv
+      let cyclicPath = dropWhile (/= newPath) (reverse tenv) ++ [newPath]
+      raiseError m' $ "found cyclic inclusion:\n" <> showCyclicPath cyclicPath
+    Just VisitInfoFinish ->
+      parseMetaCalc' sub as
+    Nothing -> do
+      includedWeakStmtList <- visit newPath
+      defList <- parseMetaCalc' sub as
+      return $ includedWeakStmtList ++ defList
+
+visit :: Path Abs File -> WithEnv [TreePlus]
+visit path = do
+  pushTrace path
+  modify (\env -> env {fileEnv = Map.insert path VisitInfoActive (fileEnv env)})
+  modify (\env -> env {phase = 1 + phase env})
+  content <- liftIO $ TIO.readFile $ toFilePath path
+  -- tokenize content >>= parseMetaCalc >>= parse' Map.empty
+  tokenize content >>= parseMetaCalc
+
+leave :: WithEnv [TreePlus]
+leave = do
+  path <- getCurrentFilePath
+  popTrace
+  modify (\env -> env {fileEnv = Map.insert path VisitInfoFinish (fileEnv env)})
+  modify (\env -> env {prefixEnv = []})
+  modify (\env -> env {sectionEnv = []})
+  return []
+
+pushTrace :: Path Abs File -> WithEnv ()
+pushTrace path =
+  modify (\env -> env {traceEnv = path : traceEnv env})
+
+popTrace :: WithEnv ()
+popTrace =
+  modify (\env -> env {traceEnv = tail (traceEnv env)})
