@@ -9,8 +9,12 @@ import Data.Ident
 import Data.MetaTerm
 import Data.Tree
 
-reflect :: Int -> TreePlus -> WithEnv MetaTermPlus
-reflect level tree =
+reflect :: TreePlus -> WithEnv MetaTermPlus
+reflect tree =
+  reflect' 1 tree
+
+reflect' :: Int -> TreePlus -> WithEnv MetaTermPlus
+reflect' level tree =
   case tree of
     (m, TreeLeaf atom)
       | level > 1 ->
@@ -24,21 +28,21 @@ reflect level tree =
             case headAtom of
               "QUOTE"
                 | [e] <- rest -> do
-                  e' <- reflect (level + 1) e
+                  e' <- reflect' (level + 1) e
                   return (m, MetaTermNecIntro e')
                 | otherwise ->
                   raiseSyntaxError m "(QUOTE TREE)"
               "UNQUOTE"
                 | [e] <- rest -> do
-                  e' <- reflect (level - 1) e
+                  e' <- reflect' (level - 1) e
                   return (m, MetaTermNecElim e')
                 | otherwise ->
                   raiseSyntaxError m "(UNQUOTE TREE)"
               _ -> do
-                treeList' <- mapM (reflect level) treeList
+                treeList' <- mapM (reflect' level) treeList
                 return (m, MetaTermNode treeList')
           _ -> do
-            treeList' <- mapM (reflect level) treeList
+            treeList' <- mapM (reflect' level) treeList
             return (m, MetaTermNode treeList')
       | otherwise ->
         case treeList of
@@ -49,26 +53,26 @@ reflect level tree =
               "LAMBDA"
                 | [(_, TreeNode xs), e] <- rest -> do
                   xs' <- mapM reflectIdent xs
-                  e' <- reflect level e
+                  e' <- reflect' level e
                   return (m, MetaTermImpIntro xs' e')
                 | otherwise ->
                   raiseSyntaxError m "(LAMBDA (TREE*) TREE)"
               "APPLY"
                 | e : es <- rest -> do
-                  e' <- reflect level e
-                  es' <- mapM (reflect level) es
+                  e' <- reflect' level e
+                  es' <- mapM (reflect' level) es
                   return (m, MetaTermImpElim e' es')
                 | otherwise ->
                   raiseSyntaxError m "(APPLY TREE TREE*)"
               "QUOTE"
                 | [e] <- rest -> do
-                  e' <- reflect (level + 1) e
+                  e' <- reflect' (level + 1) e
                   return (m, MetaTermNecIntro e')
                 | otherwise ->
                   raiseSyntaxError m "(QUOTE TREE)"
               "UNQUOTE"
                 | [e] <- rest -> do
-                  e' <- reflect (level - 1) e
+                  e' <- reflect' (level - 1) e
                   return (m, MetaTermNecElim e')
                 | otherwise ->
                   raiseSyntaxError m "(UNQUOTE TREE)"
@@ -79,8 +83,8 @@ reflect level tree =
 
 reflectAux :: Int -> Hint -> TreePlus -> [TreePlus] -> WithEnv MetaTermPlus
 reflectAux level m f args = do
-  f' <- reflect level f
-  args' <- mapM (reflect level) args
+  f' <- reflect' level f
+  args' <- mapM (reflect' level) args
   return (m, MetaTermImpElim f' args')
 
 reflectIdent :: TreePlus -> WithEnv Ident

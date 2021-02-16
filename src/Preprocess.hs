@@ -71,7 +71,7 @@ preprocess'' sub stmtList =
           case headAtom of
             "denote"
               | [(_, TreeLeaf name), body] <- rest -> do
-                body' <- reflect 1 body >>= discernMetaTerm
+                body' <- reflect body >>= discernMetaTerm
                 body'' <- reduceMetaTerm $ substMetaTerm sub body'
                 name' <- newNameWith $ asIdent name
                 modify (\env -> env {topMetaNameEnv = Map.insert name name' (topMetaNameEnv env)})
@@ -118,11 +118,11 @@ preprocess'' sub stmtList =
 
 preprocessAux :: SubstMetaTerm -> TreePlus -> [TreePlus] -> WithEnv [TreePlus]
 preprocessAux sub headStmt restStmtList = do
-  headStmt' <- reflect 1 headStmt >>= discernMetaTerm
+  headStmt' <- reflect headStmt >>= discernMetaTerm
   headStmt'' <- reduceMetaTerm $ substMetaTerm sub headStmt'
   case headStmt'' of
     (_, MetaTermNecIntro e) -> do
-      ast <- reifyMetaTerm' <$> reduceMetaTerm e
+      ast <- reify <$> reduceMetaTerm e
       if isSpecialMetaForm ast
         then preprocess'' sub $ ast : restStmtList
         else do
