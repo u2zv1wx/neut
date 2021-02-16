@@ -1,6 +1,5 @@
 module Preprocess.Interpret
-  ( raiseSyntaxError,
-    interpretMetaTerm,
+  ( interpretMetaTerm,
   )
 where
 
