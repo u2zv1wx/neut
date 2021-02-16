@@ -1,57 +1,57 @@
 module Preprocess.Interpret
   ( raiseSyntaxError,
-    interpretMetaCalc,
+    interpretMetaTerm,
   )
 where
 
 import Data.Env
 import Data.Hint
 import Data.Ident
-import Data.MetaCalc
+import Data.MetaTerm
 import Data.Tree
 
-interpretMetaCalc :: TreePlus -> WithEnv MetaCalcPlus
-interpretMetaCalc tree =
+interpretMetaTerm :: TreePlus -> WithEnv MetaTermPlus
+interpretMetaTerm tree =
   case tree of
     (m, TreeLeaf atom) ->
-      return (m, MetaCalcVar $ asIdent atom)
+      return (m, MetaTermVar $ asIdent atom)
     (m, TreeNode (leaf@(_, TreeLeaf headAtom) : rest)) ->
       case headAtom of
         "implication-introduction"
           | [(_, TreeNode xs), e] <- rest -> do
             xs' <- mapM interpretIdent xs
-            e' <- interpretMetaCalc e
-            return (m, MetaCalcImpIntro xs' e')
+            e' <- interpretMetaTerm e
+            return (m, MetaTermImpIntro xs' e')
           | otherwise ->
             raiseSyntaxError m "(implication-introduction (TREE*) TREE)"
         "implication-elimination"
           | e : es <- rest -> do
-            e' <- interpretMetaCalc e
-            es' <- mapM interpretMetaCalc es
-            return (m, MetaCalcImpElim e' es')
+            e' <- interpretMetaTerm e
+            es' <- mapM interpretMetaTerm es
+            return (m, MetaTermImpElim e' es')
           | otherwise ->
             raiseSyntaxError m "(implication-elimination TREE TREE*)"
         "necessity-introduction"
           | [e] <- rest -> do
-            e' <- interpretMetaCalc e
-            return (m, MetaCalcNecIntro e')
+            e' <- interpretMetaTerm e
+            return (m, MetaTermNecIntro e')
           | otherwise ->
             raiseSyntaxError m "(necessity-introduction TREE)"
         "necessity-elimination"
           | [e] <- rest -> do
-            e' <- interpretMetaCalc e
-            return (m, MetaCalcNecElim e')
+            e' <- interpretMetaTerm e
+            return (m, MetaTermNecElim e')
           | otherwise ->
             raiseSyntaxError m "(necessity-elimination TREE)"
         _ ->
-          interpretMetaCalcAux m $ leaf : rest
+          interpretMetaTermAux m $ leaf : rest
     (m, TreeNode es) ->
-      interpretMetaCalcAux m es
+      interpretMetaTermAux m es
 
-interpretMetaCalcAux :: Hint -> [TreePlus] -> WithEnv MetaCalcPlus
-interpretMetaCalcAux m es = do
-  es' <- mapM interpretMetaCalc es
-  return (m, MetaCalcNode es')
+interpretMetaTermAux :: Hint -> [TreePlus] -> WithEnv MetaTermPlus
+interpretMetaTermAux m es = do
+  es' <- mapM interpretMetaTerm es
+  return (m, MetaTermNode es')
 
 interpretIdent :: TreePlus -> WithEnv Ident
 interpretIdent tree =

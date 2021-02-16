@@ -6,7 +6,7 @@ import qualified Data.HashMap.Lazy as Map
 import Data.Hint
 import Data.Ident
 import qualified Data.IntMap as IntMap
-import Data.MetaCalc
+import Data.MetaTerm
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
@@ -17,7 +17,7 @@ import Path.IO
 import Preprocess.Discern
 import Preprocess.Interpret
 import Preprocess.Tokenize
-import Reduce.MetaCalc
+import Reduce.MetaTerm
 import System.Exit
 import System.Process hiding (env)
 import Text.Read (readMaybe)
@@ -56,7 +56,7 @@ preprocess' :: [TreePlus] -> WithEnv [TreePlus]
 preprocess' ts =
   preprocess'' IntMap.empty ts
 
-preprocess'' :: SubstMetaCalc -> [TreePlus] -> WithEnv [TreePlus]
+preprocess'' :: SubstMetaTerm -> [TreePlus] -> WithEnv [TreePlus]
 preprocess'' sub stmtList =
   case stmtList of
     [] ->
@@ -67,8 +67,8 @@ preprocess'' sub stmtList =
           case headAtom of
             "denote"
               | [(_, TreeLeaf name), body] <- rest -> do
-                body' <- interpretMetaCalc body >>= discernMetaCalc
-                body'' <- reduceMetaCalc' $ substMetaCalc sub body'
+                body' <- interpretMetaTerm body >>= discernMetaTerm
+                body'' <- reduceMetaTerm' $ substMetaTerm sub body'
                 name' <- newNameWith $ asIdent name
                 modify (\env -> env {topMetaNameEnv = Map.insert name name' (topMetaNameEnv env)})
                 preprocess'' (IntMap.insert (asInt name') body'' sub) restStmtList
@@ -112,10 +112,10 @@ preprocess'' sub stmtList =
         _ ->
           preprocessAux sub headStmt restStmtList
 
-preprocessAux :: SubstMetaCalc -> TreePlus -> [TreePlus] -> WithEnv [TreePlus]
+preprocessAux :: SubstMetaTerm -> TreePlus -> [TreePlus] -> WithEnv [TreePlus]
 preprocessAux sub headStmt restStmtList = do
-  headStmt' <- interpretMetaCalc headStmt >>= discernMetaCalc
-  headStmt'' <- reduceMetaCalc $ substMetaCalc sub headStmt'
+  headStmt' <- interpretMetaTerm headStmt >>= discernMetaTerm
+  headStmt'' <- reduceMetaTerm $ substMetaTerm sub headStmt'
   if isSpecialMetaForm headStmt''
     then preprocess'' sub $ headStmt'' : restStmtList
     else do
@@ -140,7 +140,7 @@ metaKeywordSet =
     ]
 
 includeFile ::
-  SubstMetaCalc ->
+  SubstMetaTerm ->
   Hint ->
   Hint ->
   T.Text ->

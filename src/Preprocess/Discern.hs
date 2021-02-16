@@ -1,62 +1,62 @@
-module Preprocess.Discern (discernMetaCalc) where
+module Preprocess.Discern (discernMetaTerm) where
 
 import Control.Monad.State.Lazy
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import Data.Ident
-import Data.MetaCalc
+import Data.MetaTerm
 import qualified Data.Text as T
 
 type NameEnv = Map.HashMap T.Text Ident
 
-discernMetaCalc :: MetaCalcPlus -> WithEnv MetaCalcPlus
-discernMetaCalc e = do
+discernMetaTerm :: MetaTermPlus -> WithEnv MetaTermPlus
+discernMetaTerm e = do
   nenv <- gets topMetaNameEnv
-  discernMetaCalc' nenv e
+  discernMetaTerm' nenv e
 
-discernMetaCalc' :: NameEnv -> MetaCalcPlus -> WithEnv MetaCalcPlus
-discernMetaCalc' nenv term =
+discernMetaTerm' :: NameEnv -> MetaTermPlus -> WithEnv MetaTermPlus
+discernMetaTerm' nenv term =
   case term of
-    (m, MetaCalcVar x) -> do
+    (m, MetaTermVar x) -> do
       let mx = Map.lookup (asText x) nenv
       case mx of
         Just x' ->
-          return (m, MetaCalcVar x')
+          return (m, MetaTermVar x')
         Nothing ->
-          return (m, MetaCalcLeaf (asText x))
-    (m, MetaCalcImpIntro xs e) -> do
+          return (m, MetaTermLeaf (asText x))
+    (m, MetaTermImpIntro xs e) -> do
       (xs', e') <- discernBinder' nenv xs e
-      return (m, MetaCalcImpIntro xs' e')
-    (m, MetaCalcImpElim e es) -> do
-      e' <- discernMetaCalc' nenv e
-      es' <- mapM (discernMetaCalc' nenv) es
-      return (m, MetaCalcImpElim e' es')
-    (m, MetaCalcNecIntro e) -> do
-      e' <- discernMetaCalc' nenv e
-      return (m, MetaCalcNecIntro e')
-    (m, MetaCalcNecElim e) -> do
-      e' <- discernMetaCalc' nenv e
-      return (m, MetaCalcNecElim e')
-    (_, MetaCalcLeaf _) ->
+      return (m, MetaTermImpIntro xs' e')
+    (m, MetaTermImpElim e es) -> do
+      e' <- discernMetaTerm' nenv e
+      es' <- mapM (discernMetaTerm' nenv) es
+      return (m, MetaTermImpElim e' es')
+    (m, MetaTermNecIntro e) -> do
+      e' <- discernMetaTerm' nenv e
+      return (m, MetaTermNecIntro e')
+    (m, MetaTermNecElim e) -> do
+      e' <- discernMetaTerm' nenv e
+      return (m, MetaTermNecElim e')
+    (_, MetaTermLeaf _) ->
       return term
-    (m, MetaCalcNode es) -> do
-      es' <- mapM (discernMetaCalc' nenv) es
+    (m, MetaTermNode es) -> do
+      es' <- mapM (discernMetaTerm' nenv) es
       case es' of
-        e@(_, MetaCalcVar _) : rest
+        e@(_, MetaTermVar _) : rest
           | True ->
-            return (m, MetaCalcImpElim e rest)
+            return (m, MetaTermImpElim e rest)
         _ ->
-          return (m, MetaCalcNode es')
+          return (m, MetaTermNode es')
 
 discernBinder' ::
   NameEnv ->
   [Ident] ->
-  MetaCalcPlus ->
-  WithEnv ([Ident], MetaCalcPlus)
+  MetaTermPlus ->
+  WithEnv ([Ident], MetaTermPlus)
 discernBinder' nenv binder e =
   case binder of
     [] -> do
-      e' <- discernMetaCalc' nenv e
+      e' <- discernMetaTerm' nenv e
       return ([], e')
     x : xts -> do
       x' <- newNameWith x
