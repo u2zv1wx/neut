@@ -51,6 +51,10 @@ term :: Tokenizer TreePlus
 term = do
   s <- gets text
   case T.uncons s of
+    Just ('\'', _) ->
+      quote
+    Just (',', _) ->
+      unquote
     Just ('(', _) ->
       node
     _ ->
@@ -85,6 +89,22 @@ node = do
   itemList <- many term
   skip >> char ')' >> skip
   return (m, TreeNode itemList)
+
+quote :: Tokenizer TreePlus
+quote = do
+  m <- currentHint
+  char '\'' >> skip
+  item <- term
+  skip
+  return (m, TreeNode [(m, TreeLeaf "QUOTE"), item])
+
+unquote :: Tokenizer TreePlus
+unquote = do
+  m <- currentHint
+  char ',' >> skip
+  item <- term
+  skip
+  return (m, TreeNode [(m, TreeLeaf "UNQUOTE"), item])
 
 char :: Char -> Tokenizer ()
 char c = do
@@ -221,7 +241,7 @@ newlineSet =
 {-# INLINE nonSymbolSet #-}
 nonSymbolSet :: S.Set Char
 nonSymbolSet =
-  S.fromList "() \"\n;"
+  S.fromList "() \"\n;',"
 
 {-# INLINE updateStreamL #-}
 updateStreamL :: T.Text -> Tokenizer ()

@@ -17,13 +17,12 @@ discernMetaTerm e = do
 discernMetaTerm' :: NameEnv -> MetaTermPlus -> WithEnv MetaTermPlus
 discernMetaTerm' nenv term =
   case term of
-    (m, MetaTermVar x) -> do
-      let mx = Map.lookup (asText x) nenv
-      case mx of
+    (m, MetaTermVar x) ->
+      case Map.lookup (asText x) nenv of
         Just x' ->
           return (m, MetaTermVar x')
         Nothing ->
-          return (m, MetaTermLeaf (asText x))
+          raiseError m $ "undefined variable: " <> asText x
     (m, MetaTermImpIntro xs e) -> do
       (xs', e') <- discernBinder' nenv xs e
       return (m, MetaTermImpIntro xs' e')
@@ -41,12 +40,7 @@ discernMetaTerm' nenv term =
       return term
     (m, MetaTermNode es) -> do
       es' <- mapM (discernMetaTerm' nenv) es
-      case es' of
-        e@(_, MetaTermVar _) : rest
-          | True ->
-            return (m, MetaTermImpElim e rest)
-        _ ->
-          return (m, MetaTermNode es')
+      return (m, MetaTermNode es')
 
 discernBinder' ::
   NameEnv ->
@@ -60,9 +54,5 @@ discernBinder' nenv binder e =
       return ([], e')
     x : xts -> do
       x' <- newNameWith x
-      (xts', e') <- discernBinder' (insertName x x' nenv) xts e
+      (xts', e') <- discernBinder' (Map.insert (asText x) x' nenv) xts e
       return (x' : xts', e')
-
-insertName :: Ident -> Ident -> NameEnv -> NameEnv
-insertName (I (s, _)) =
-  Map.insert s

@@ -15,7 +15,7 @@ import GHC.IO.Handle
 import Path
 import Path.IO
 import Preprocess.Discern
-import Preprocess.Interpret
+import Preprocess.Reflect
 import Preprocess.Tokenize
 import Reduce.MetaTerm
 import System.Exit
@@ -25,7 +25,11 @@ import Text.Read (readMaybe)
 preprocess :: Path Abs File -> WithEnv [TreePlus]
 preprocess mainFilePath = do
   pushTrace mainFilePath
-  visit mainFilePath
+  out <- visit mainFilePath
+  forM_ out $ \k ->
+    p $ T.unpack $ showAsSExp k
+  p "quitting."
+  liftIO $ exitWith ExitSuccess
 
 visit :: Path Abs File -> WithEnv [TreePlus]
 visit path = do
@@ -61,14 +65,14 @@ preprocess'' sub stmtList =
   case stmtList of
     [] ->
       leave
-    headStmt : restStmtList ->
+    headStmt : restStmtList -> do
       case headStmt of
         (m, TreeNode ((_, TreeLeaf headAtom) : rest)) ->
           case headAtom of
             "denote"
               | [(_, TreeLeaf name), body] <- rest -> do
-                body' <- interpretMetaTerm body >>= discernMetaTerm
-                body'' <- reduceMetaTerm' $ substMetaTerm sub body'
+                body' <- reflect 1 body >>= discernMetaTerm
+                body'' <- reduceMetaTerm $ substMetaTerm sub body'
                 name' <- newNameWith $ asIdent name
                 modify (\env -> env {topMetaNameEnv = Map.insert name name' (topMetaNameEnv env)})
                 preprocess'' (IntMap.insert (asInt name') body'' sub) restStmtList
@@ -114,13 +118,18 @@ preprocess'' sub stmtList =
 
 preprocessAux :: SubstMetaTerm -> TreePlus -> [TreePlus] -> WithEnv [TreePlus]
 preprocessAux sub headStmt restStmtList = do
-  headStmt' <- interpretMetaTerm headStmt >>= discernMetaTerm
+  headStmt' <- reflect 1 headStmt >>= discernMetaTerm
   headStmt'' <- reduceMetaTerm $ substMetaTerm sub headStmt'
-  if isSpecialMetaForm headStmt''
-    then preprocess'' sub $ headStmt'' : restStmtList
-    else do
-      treeList <- preprocess'' sub restStmtList
-      return $ headStmt'' : treeList
+  case headStmt'' of
+    (_, MetaTermNecIntro e) -> do
+      ast <- reifyMetaTerm' <$> reduceMetaTerm e
+      if isSpecialMetaForm ast
+        then preprocess'' sub $ ast : restStmtList
+        else do
+          treeList <- preprocess'' sub restStmtList
+          return $ ast : treeList
+    _ ->
+      raiseError (fst headStmt') "meta-computation resulted in a non-quoted term"
 
 isSpecialMetaForm :: TreePlus -> Bool
 isSpecialMetaForm tree =
