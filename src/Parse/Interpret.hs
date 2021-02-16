@@ -4,8 +4,6 @@ module Parse.Interpret
     interpretIdentPlus,
     interpretFix,
     interpretEnumItem,
-    -- raiseSyntaxError,
-    -- interpretMetaCalc,
   )
 where
 
@@ -17,13 +15,11 @@ import Data.Hint
 import Data.Ident
 import Data.LowType
 import Data.Maybe (catMaybes, fromMaybe)
--- import Data.MetaCalc
 import Data.Namespace
 import Data.Size
 import qualified Data.Text as T
 import Data.Tree
 import Data.WeakTerm
--- import Parse.MacroExpand
 import Text.Read (readMaybe)
 
 interpret :: TreePlus -> WithEnv WeakTermPlus
@@ -511,113 +507,3 @@ interpretBorrow'' tree =
         (Just (m, TreeLeaf $ T.tail s), (m, TreeLeaf $ T.tail s))
     t ->
       (Nothing, t)
-
--- interpretCode :: TreePlus -> WithEnv CodePlus
--- interpretCode inputTree =
---   case inputTree of
---     (m, TreeLeaf atom) ->
---       return (m, CodeVar atom)
---     (m, TreeNode (leaf@(_, TreeLeaf headAtom) : rest)) ->
---       case headAtom of
---         "lambda!"
---           | [(_, TreeNode xs), e] <- rest -> do
---             xs' <- mapM interpretText xs
---             e' <- interpretCode e
---             return (m, CodeAbs xs' e')
---           | otherwise ->
---             raiseSyntaxError m "(lambda! (TREE*) TREE)"
---         "quote!"
---           | [t] <- rest -> do
---             t' <- interpretData t
---             return (m, CodeQuote t')
---           | otherwise ->
---             raiseSyntaxError m "(quote! TREE)"
---         _ ->
---           interpretCodeApp m $ leaf : rest
---     (m, TreeNode es) ->
---       interpretCodeApp m es
-
--- interpretCodeApp :: Hint -> [TreePlus] -> WithEnv CodePlus
--- interpretCodeApp m es =
---   case es of
---     [] ->
---       raiseSyntaxError m "(TREE TREE*)"
---     f : args ->
---       interpretCodeApp' m f args
-
--- interpretCodeApp' :: Hint -> TreePlus -> [TreePlus] -> WithEnv CodePlus
--- interpretCodeApp' m f es = do
---   f' <- interpretCode f
---   es' <- mapM interpretCode es
---   return (m, CodeApp f' es')
-
--- interpretData :: TreePlus -> WithEnv DataPlus
--- interpretData inputTree =
---   case inputTree of
---     (m, TreeLeaf atom) ->
---       return (m, DataLeaf atom)
---     (m, TreeNode ts@((_, TreeLeaf headAtom) : rest)) ->
---       case headAtom of
---         "unquote!"
---           | [e] <- rest -> do
---             e' <- interpretCode e
---             return (m, DataUnquote e')
---           | otherwise ->
---             raiseSyntaxError m "(unquote! TREE)"
---         _ -> do
---           ts' <- mapM interpretData ts
---           return (m, DataNode ts')
---     (m, TreeNode ts) -> do
---       ts' <- mapM interpretData ts
---       return (m, DataNode ts')
-
--- interpretIdent :: TreePlus -> WithEnv Ident
--- interpretIdent tree =
---   case tree of
---     (_, TreeLeaf x) ->
---       return $ asIdent x
---     t ->
---       raiseSyntaxError (fst t) "LEAF"
-
--- interpretMetaCalc :: TreePlus -> WithEnv MetaCalcPlus
--- interpretMetaCalc tree =
---   case tree of
---     (m, TreeLeaf atom) ->
---       return (m, MetaCalcVar $ asIdent atom)
---     (m, TreeNode (leaf@(_, TreeLeaf headAtom) : rest)) ->
---       case headAtom of
---         "implication-introduction"
---           | [(_, TreeNode xs), e] <- rest -> do
---             xs' <- mapM interpretIdent xs
---             e' <- interpretMetaCalc e
---             return (m, MetaCalcImpIntro xs' e')
---           | otherwise ->
---             raiseSyntaxError m "(implication-introduction (TREE*) TREE)"
---         "implication-elimination"
---           | e : es <- rest -> do
---             e' <- interpretMetaCalc e
---             es' <- mapM interpretMetaCalc es
---             return (m, MetaCalcImpElim e' es')
---           | otherwise ->
---             raiseSyntaxError m "(implication-elimination TREE TREE*)"
---         "necessity-introduction"
---           | [e] <- rest -> do
---             e' <- interpretMetaCalc e
---             return (m, MetaCalcNecIntro e')
---           | otherwise ->
---             raiseSyntaxError m "(necessity-introduction TREE)"
---         "necessity-elimination"
---           | [e] <- rest -> do
---             e' <- interpretMetaCalc e
---             return (m, MetaCalcNecElim e')
---           | otherwise ->
---             raiseSyntaxError m "(necessity-elimination TREE)"
---         _ ->
---           interpretMetaCalcAux m $ leaf : rest
---     (m, TreeNode es) ->
---       interpretMetaCalcAux m es
-
--- interpretMetaCalcAux :: Hint -> [TreePlus] -> WithEnv MetaCalcPlus
--- interpretMetaCalcAux m es = do
---   es' <- mapM interpretMetaCalc es
---   return (m, MetaCalcNode es')
