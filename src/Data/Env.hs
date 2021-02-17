@@ -45,6 +45,11 @@ data Env = Env
     shouldCancelAlloc :: Bool,
     endOfEntry :: String,
     --
+    -- Preprocess
+    --
+    topMetaNameEnv :: Map.HashMap T.Text Ident,
+    autoQuoteEnv :: S.Set T.Text,
+    --
     -- parse
     --
     phase :: Int,
@@ -59,7 +64,6 @@ data Env = Env
     prefixEnv :: [T.Text],
     sectionEnv :: [T.Text],
     topNameEnv :: Map.HashMap T.Text Ident,
-    topMetaNameEnv :: Map.HashMap T.Text Ident,
     --
     -- elaborate
     --
@@ -89,6 +93,8 @@ initialEnv =
       shouldColorize = True,
       shouldCancelAlloc = True,
       endOfEntry = "",
+      topMetaNameEnv = Map.empty,
+      autoQuoteEnv = S.empty,
       phase = 0,
       -- notationEnv = Map.empty,
       constantSet = S.empty,
@@ -97,7 +103,6 @@ initialEnv =
       traceEnv = [],
       revEnumEnv = Map.empty,
       topNameEnv = Map.empty,
-      topMetaNameEnv = Map.empty,
       prefixEnv = [],
       sectionEnv = [],
       weakTypeEnv = IntMap.empty,

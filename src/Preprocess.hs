@@ -69,6 +69,12 @@ preprocess'' sub stmtList =
       case headStmt of
         (m, TreeNode ((_, TreeLeaf headAtom) : rest)) ->
           case headAtom of
+            "auto-quote"
+              | [(_, TreeLeaf name)] <- rest -> do
+                modify (\env -> env {autoQuoteEnv = S.insert name (autoQuoteEnv env)})
+                preprocess'' sub restStmtList
+              | otherwise ->
+                raiseSyntaxError m "(auto-quote LEAF)"
             "denote"
               | [(_, TreeLeaf name), body] <- rest -> do
                 body' <- reflect body >>= discernMetaTerm
@@ -145,6 +151,7 @@ metaKeywordSet =
     [ "denote",
       "statement",
       "include",
+      "auto-quote",
       "ensure"
     ]
 
