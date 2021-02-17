@@ -2,6 +2,7 @@ module Data.MetaTerm where
 
 import Data.Hint
 import Data.Ident
+import Data.Int
 import qualified Data.IntMap as IntMap
 import qualified Data.Text as T
 
@@ -13,6 +14,8 @@ data MetaTerm
   | MetaTermNecElim MetaTermPlus
   | MetaTermLeaf T.Text
   | MetaTermNode [MetaTermPlus]
+  | MetaTermConst T.Text
+  | MetaTermInt64 Int64
   deriving (Show)
 
 type MetaTermPlus =
@@ -49,3 +52,11 @@ substMetaTerm sub term =
     (m, MetaTermNode es) -> do
       let es' = map (substMetaTerm sub) es
       (m, MetaTermNode es')
+    (_, MetaTermConst _) ->
+      term
+    (_, MetaTermInt64 _) ->
+      term
+
+quote :: MetaTermPlus -> MetaTermPlus
+quote (m, t) =
+  (m, MetaTermNecIntro (m, t))

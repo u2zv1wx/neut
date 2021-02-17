@@ -10,6 +10,7 @@ import Data.Hint
 import Data.Ident
 import Data.Namespace
 import Data.Platform
+import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Tree
 import Data.WeakTerm
@@ -197,3 +198,10 @@ retrieveCompileTimeVarValue m var =
       showArch <$> getArch
     _ ->
       raiseError m $ "no such compile-time variable defined: " <> var
+
+insertConstant :: Hint -> T.Text -> WithEnv ()
+insertConstant m x = do
+  cset <- gets constantSet
+  if S.member x cset
+    then raiseError m $ "the constant `" <> x <> "` is already defined"
+    else modify (\env -> env {constantSet = S.insert x (constantSet env)})

@@ -9,7 +9,9 @@ import Data.Hint
 import Data.Ident
 import Data.MetaTerm
 import qualified Data.Set as S
+import qualified Data.Text as T
 import Data.Tree
+import Text.Read (readMaybe)
 
 reflect :: TreePlus -> WithEnv MetaTermPlus
 reflect tree =
@@ -21,6 +23,8 @@ reflect' level tree =
     (m, TreeLeaf atom)
       | level > 1 ->
         return (m, MetaTermLeaf atom)
+      | Just i <- readMaybe $ T.unpack atom ->
+        return (m, MetaTermInt64 i)
       | otherwise ->
         return (m, MetaTermVar $ asIdent atom)
     (m, TreeNode treeList)

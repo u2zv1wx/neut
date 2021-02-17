@@ -37,7 +37,7 @@ visit path = do
   modify (\env -> env {fileEnv = Map.insert path VisitInfoActive (fileEnv env)})
   modify (\env -> env {phase = 1 + phase env})
   content <- liftIO $ TIO.readFile $ toFilePath path
-  tokenize content >>= preprocess'
+  tokenize content >>= preprocess' IntMap.empty
 
 leave :: WithEnv [TreePlus]
 leave = do
@@ -56,12 +56,8 @@ popTrace :: WithEnv ()
 popTrace =
   modify (\env -> env {traceEnv = tail (traceEnv env)})
 
-preprocess' :: [TreePlus] -> WithEnv [TreePlus]
-preprocess' ts =
-  preprocess'' IntMap.empty ts
-
-preprocess'' :: SubstMetaTerm -> [TreePlus] -> WithEnv [TreePlus]
-preprocess'' sub stmtList =
+preprocess' :: SubstMetaTerm -> [TreePlus] -> WithEnv [TreePlus]
+preprocess' sub stmtList =
   case stmtList of
     [] ->
       leave
@@ -72,7 +68,7 @@ preprocess'' sub stmtList =
             "auto-quote"
               | [(_, TreeLeaf name)] <- rest -> do
                 modify (\env -> env {autoQuoteEnv = S.insert name (autoQuoteEnv env)})
-                preprocess'' sub restStmtList
+                preprocess' sub restStmtList
               | otherwise ->
                 raiseSyntaxError m "(auto-quote LEAF)"
             "denote"
@@ -81,9 +77,15 @@ preprocess'' sub stmtList =
                 body'' <- reduceMetaTerm $ substMetaTerm sub body'
                 name' <- newNameWith $ asIdent name
                 modify (\env -> env {topMetaNameEnv = Map.insert name name' (topMetaNameEnv env)})
-                preprocess'' (IntMap.insert (asInt name') body'' sub) restStmtList
+                preprocess' (IntMap.insert (asInt name') body'' sub) restStmtList
               | otherwise ->
                 raiseSyntaxError m "(denote LEAF TREE)"
+            "meta-constant"
+              | [(_, TreeLeaf name)] <- rest -> do
+                modify (\env -> env {metaConstantSet = S.insert name (metaConstantSet env)})
+                preprocess' sub restStmtList
+              | otherwise ->
+                raiseSyntaxError m "(meta-constant LEAF)"
             "include"
               | [(mPath, TreeLeaf pathString)] <- rest,
                 not (T.null pathString) ->
@@ -112,11 +114,11 @@ preprocess'' sub stmtList =
                   tarExitCode <- liftIO $ waitForProcess tarHandler
                   raiseIfFailure mUrl "tar" tarExitCode tarErrorHandler pkgDirPath
                   return ()
-                preprocess'' sub restStmtList
+                preprocess' sub restStmtList
               | otherwise ->
                 raiseSyntaxError m "(ensure LEAF LEAF)"
             "statement" ->
-              preprocess'' sub $ rest ++ restStmtList
+              preprocess' sub $ rest ++ restStmtList
             _ ->
               preprocessAux sub headStmt restStmtList
         _ ->
@@ -130,12 +132,12 @@ preprocessAux sub headStmt restStmtList = do
     (_, MetaTermNecIntro e) -> do
       ast <- reify <$> reduceMetaTerm e
       if isSpecialMetaForm ast
-        then preprocess'' sub $ ast : restStmtList
+        then preprocess' sub $ ast : restStmtList
         else do
-          treeList <- preprocess'' sub restStmtList
+          treeList <- preprocess' sub restStmtList
           return $ ast : treeList
-    _ ->
-      raiseError (fst headStmt') "meta-computation resulted in a non-quoted term"
+    _ -> do
+      raiseError (fst headStmt') $ "meta-computation resulted in a non-quoted term: " <> showAsSExp (reify headStmt'')
 
 isSpecialMetaForm :: TreePlus -> Bool
 isSpecialMetaForm tree =
@@ -152,6 +154,7 @@ metaKeywordSet =
       "statement",
       "include",
       "auto-quote",
+      "meta-constant",
       "ensure"
     ]
 
@@ -179,10 +182,10 @@ includeFile sub m mPath pathString as = do
       let cyclicPath = dropWhile (/= newPath) (reverse tenv) ++ [newPath]
       raiseError m $ "found cyclic inclusion:\n" <> showCyclicPath cyclicPath
     Just VisitInfoFinish ->
-      preprocess'' sub as
+      preprocess' sub as
     Nothing -> do
       treeList1 <- visit newPath
-      treeList2 <- preprocess'' sub as
+      treeList2 <- preprocess' sub as
       return $ treeList1 ++ treeList2
 
 readStrOrThrow :: (Read a) => Hint -> T.Text -> WithEnv a

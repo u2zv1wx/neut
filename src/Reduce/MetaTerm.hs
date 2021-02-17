@@ -1,9 +1,12 @@
 module Reduce.MetaTerm where
 
+import Control.Monad.IO.Class
 import Data.Env
 import Data.Ident
+import Data.Int
 import qualified Data.IntMap as IntMap
 import Data.MetaTerm
+import qualified Data.Text as T
 import Data.Tree
 
 -- reduceMetaTerm :: MetaTermPlus -> WithEnv TreePlus
@@ -22,6 +25,20 @@ reduceMetaTerm term =
           | length xs == length es' -> do
             let sub = IntMap.fromList $ zip (map asInt xs) es'
             reduceMetaTerm $ substMetaTerm sub body
+        (_, MetaTermConst c)
+          | "meta-print" == c,
+            [arg] <- es' -> do
+            liftIO $ putStrLn $ T.unpack $ showAsSExp $ reify arg
+            return $ quote (m, MetaTermLeaf "unit")
+          | Just op <- toArithmeticOperator c,
+            [arg1, arg2] <- es' -> do
+            case (arg1, arg2) of
+              ((_, MetaTermInt64 i1), (_, MetaTermInt64 i2)) ->
+                return (m, MetaTermInt64 (op i1 i2))
+              _ ->
+                raiseError m "found an ill-typed application"
+          | otherwise ->
+            raiseError m $ "undefined meta-constant: " <> c
         _ ->
           raiseError m "arity mismatch"
     (_, MetaTermNecElim e) -> do
@@ -37,16 +54,19 @@ reduceMetaTerm term =
     _ ->
       return term
 
--- reifyMetaTerm :: MetaTermPlus -> WithEnv TreePlus
--- reifyMetaTerm term =
---   case term of
---     (m, MetaTermLeaf x) ->
---       return (m, TreeLeaf x)
---     (m, MetaTermNode es) -> do
---       es' <- mapM reifyMetaTerm es
---       return (m, TreeNode es')
---     (m, _) ->
---       raiseError m $ "the result of meta computation must be an AST, but is: \n" <> showAsSExp (reify term)
+toArithmeticOperator :: T.Text -> Maybe (Int64 -> Int64 -> Int64)
+toArithmeticOperator opStr =
+  case opStr of
+    "meta-add" ->
+      Just (+)
+    "meta-sub" ->
+      Just (-)
+    "meta-mul" ->
+      Just (*)
+    "meta-div" ->
+      Just div
+    _ ->
+      Nothing
 
 reify :: MetaTermPlus -> TreePlus
 reify term =
@@ -72,3 +92,7 @@ reify term =
     (m, MetaTermNode es) -> do
       let es' = map reify es
       (m, TreeNode es')
+    (m, MetaTermConst c) ->
+      (m, TreeLeaf c)
+    (m, MetaTermInt64 i) ->
+      (m, TreeLeaf $ T.pack $ show i)

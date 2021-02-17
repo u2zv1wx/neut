@@ -5,6 +5,7 @@ import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import Data.Ident
 import Data.MetaTerm
+import qualified Data.Set as S
 import qualified Data.Text as T
 
 type NameEnv = Map.HashMap T.Text Ident
@@ -21,8 +22,11 @@ discernMetaTerm' nenv term =
       case Map.lookup (asText x) nenv of
         Just x' ->
           return (m, MetaTermVar x')
-        Nothing ->
-          raiseError m $ "undefined variable: " <> asText x
+        Nothing -> do
+          cenv <- gets metaConstantSet
+          if S.member (asText x) cenv
+            then return (m, MetaTermConst (asText x))
+            else raiseError m $ "undefined variable: " <> asText x
     (m, MetaTermImpIntro xs e) -> do
       (xs', e') <- discernBinder' nenv xs e
       return (m, MetaTermImpIntro xs' e')
@@ -41,6 +45,10 @@ discernMetaTerm' nenv term =
     (m, MetaTermNode es) -> do
       es' <- mapM (discernMetaTerm' nenv) es
       return (m, MetaTermNode es')
+    (_, MetaTermConst _) ->
+      return term
+    (_, MetaTermInt64 _) ->
+      return term
 
 discernBinder' ::
   NameEnv ->

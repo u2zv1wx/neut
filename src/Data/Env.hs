@@ -49,6 +49,7 @@ data Env = Env
     --
     topMetaNameEnv :: Map.HashMap T.Text Ident,
     autoQuoteEnv :: S.Set T.Text,
+    metaConstantSet :: S.Set T.Text,
     --
     -- parse
     --
@@ -95,6 +96,7 @@ initialEnv =
       endOfEntry = "",
       topMetaNameEnv = Map.empty,
       autoQuoteEnv = S.empty,
+      metaConstantSet = S.empty,
       phase = 0,
       -- notationEnv = Map.empty,
       constantSet = S.empty,
@@ -433,10 +435,3 @@ warn pos str = do
   b <- gets shouldColorize
   eoe <- gets endOfEntry
   liftIO $ outputLog b eoe $ logWarning pos str
-
-insertConstant :: Hint -> T.Text -> WithEnv ()
-insertConstant m x = do
-  cset <- gets constantSet
-  if S.member x cset
-    then raiseError m $ "the constant `" <> x <> "` is already defined"
-    else modify (\env -> env {constantSet = S.insert x (constantSet env)})
