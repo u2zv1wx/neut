@@ -65,9 +65,17 @@ reflect' level tree =
                 | [(_, TreeNode xs), e] <- rest -> do
                   xs' <- mapM reflectIdent xs
                   e' <- reflect' level e
-                  return (m, MetaTermImpIntro xs' e')
+                  return (m, MetaTermImpIntro xs' Nothing e')
                 | otherwise ->
-                  raiseSyntaxError m "(lambda (TREE*) TREE)"
+                  raiseSyntaxError m "(lambda (LEAF*) TREE)"
+              "lambda+"
+                | [(_, TreeNode args@(_ : _)), e] <- rest -> do
+                  xs' <- mapM reflectIdent (init args)
+                  rest' <- reflectIdent $ last args
+                  e' <- reflect' level e
+                  return (m, MetaTermImpIntro xs' (Just rest') e')
+                | otherwise ->
+                  raiseSyntaxError m "(lambda+ (LEAF LEAF*) TREE)"
               "apply"
                 | e : es <- rest -> do
                   e' <- reflect' level e
@@ -79,9 +87,17 @@ reflect' level tree =
                 | [(_, TreeLeaf f), (_, TreeNode xs), e] <- rest -> do
                   xs' <- mapM reflectIdent xs
                   e' <- reflect e
-                  return (m, MetaTermFix (asIdent f) xs' e')
+                  return (m, MetaTermFix (asIdent f) xs' Nothing e')
                 | otherwise ->
                   raiseSyntaxError m "(fix LEAF (LEAF*) TREE)"
+              "fix+"
+                | [(_, TreeLeaf f), (_, TreeNode args@(_ : _)), e] <- rest -> do
+                  xs' <- mapM reflectIdent (init args)
+                  rest' <- reflectIdent $ last args
+                  e' <- reflect e
+                  return (m, MetaTermFix (asIdent f) xs' (Just rest') e')
+                | otherwise ->
+                  raiseSyntaxError m "(fix+ LEAF (LEAF LEAF*) TREE)"
               "quote"
                 | [e] <- rest -> do
                   e' <- reflect' (level + 1) e

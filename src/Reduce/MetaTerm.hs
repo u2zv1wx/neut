@@ -20,14 +20,38 @@ reduceMetaTerm term =
       e' <- reduceMetaTerm e
       es' <- mapM reduceMetaTerm es
       case e' of
-        (_, MetaTermImpIntro xs body)
-          | length xs == length es' -> do
-            let sub = IntMap.fromList $ zip (map asInt xs) es'
-            reduceMetaTerm $ substMetaTerm sub body
-        (_, MetaTermFix f xs body)
-          | length xs == length es' -> do
-            let sub = IntMap.fromList $ (asInt f, e') : zip (map asInt xs) es'
-            reduceMetaTerm $ substMetaTerm sub body
+        (_, MetaTermImpIntro xs mRest body)
+          | Just rest <- mRest -> do
+            if length xs > length es'
+              then raiseError m "arity mismatch"
+              else do
+                let es1 = take (length xs) es'
+                let es2 = map (\x -> (m, MetaTermNecElim x)) $ drop (length xs) es'
+                let restArg = (m, MetaTermNecIntro (m, MetaTermNode es2))
+                let sub = IntMap.fromList $ zip (map asInt xs) es1 ++ [(asInt rest, restArg)]
+                reduceMetaTerm $ substMetaTerm sub body
+          | otherwise ->
+            if length xs /= length es'
+              then raiseError m "arity mismatch"
+              else do
+                let sub = IntMap.fromList $ zip (map asInt xs) es'
+                reduceMetaTerm $ substMetaTerm sub body
+        (_, MetaTermFix f xs mRest body)
+          | Just rest <- mRest -> do
+            if length xs > length es'
+              then raiseError m "arity mismatch"
+              else do
+                let es1 = take (length xs) es'
+                let es2 = map (\x -> (m, MetaTermNecElim x)) $ drop (length xs) es'
+                let restArg = (m, MetaTermNecIntro (m, MetaTermNode es2))
+                let sub = IntMap.fromList $ (asInt f, e') : zip (map asInt xs) es1 ++ [(asInt rest, restArg)]
+                reduceMetaTerm $ substMetaTerm sub body
+          | otherwise -> do
+            if length xs /= length es'
+              then raiseError m "arity mismatch"
+              else do
+                let sub = IntMap.fromList $ (asInt f, e') : zip (map asInt xs) es'
+                reduceMetaTerm $ substMetaTerm sub body
         (_, MetaTermConst c)
           | "meta-print" == c,
             [arg] <- es' -> do
@@ -172,18 +196,27 @@ reify term =
   case term of
     (m, MetaTermVar x) ->
       (m, TreeLeaf $ asText' x) -- ホントはmeta専用の名前にするべき
-    (m, MetaTermImpIntro xs e) -> do
+    (m, MetaTermImpIntro xs Nothing e) -> do
       let e' = reify e
       let xs' = map (\i -> (m, TreeLeaf $ asText' i)) xs
       (m, TreeNode [(m, TreeLeaf "lambda"), (m, TreeNode xs'), e'])
+    (m, MetaTermImpIntro xs (Just rest) e) -> do
+      let e' = reify e
+      let args = map (\i -> (m, TreeLeaf $ asText' i)) $ xs ++ [rest]
+      (m, TreeNode [(m, TreeLeaf "lambda+"), (m, TreeNode args), e'])
     (m, MetaTermImpElim e es) -> do
       let e' = reify e
       let es' = map reify es
       (m, TreeNode ((m, TreeLeaf "apply") : e' : es'))
-    (m, MetaTermFix f xs e) -> do
+    (m, MetaTermFix f xs Nothing e) -> do
       let e' = reify e
       let xs' = map (\i -> (m, TreeLeaf $ asText' i)) xs
       (m, TreeNode [(m, TreeLeaf (asText' f)), (m, TreeNode xs'), e'])
+    (m, MetaTermFix f xs (Just rest) e) -> do
+      let e' = reify e
+      -- let xs' = map (\i -> (m, TreeLeaf $ asText' i)) xs
+      let args = map (\i -> (m, TreeLeaf $ asText' i)) $ xs ++ [rest]
+      (m, TreeNode [(m, TreeLeaf (asText' f)), (m, TreeNode args), e'])
     (m, MetaTermNecIntro e) -> do
       let e' = reify e
       (m, TreeNode [(m, TreeLeaf "quote"), e'])

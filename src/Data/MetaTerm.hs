@@ -5,13 +5,14 @@ import Data.Hint
 import Data.Ident
 import Data.Int
 import qualified Data.IntMap as IntMap
+import Data.Maybe (catMaybes)
 import qualified Data.Text as T
 
 data MetaTerm
   = MetaTermVar Ident
-  | MetaTermImpIntro [Ident] MetaTermPlus
+  | MetaTermImpIntro [Ident] (Maybe Ident) MetaTermPlus
   | MetaTermImpElim MetaTermPlus [MetaTermPlus]
-  | MetaTermFix Ident [Ident] MetaTermPlus
+  | MetaTermFix Ident [Ident] (Maybe Ident) MetaTermPlus
   | MetaTermNecIntro MetaTermPlus
   | MetaTermNecElim MetaTermPlus
   | MetaTermLeaf T.Text
@@ -37,18 +38,18 @@ substMetaTerm sub term =
           term
         Just e ->
           e
-    (m, MetaTermImpIntro xs e) -> do
-      let sub' = foldr IntMap.delete sub (map asInt xs)
+    (m, MetaTermImpIntro xs mx e) -> do
+      let sub' = foldr IntMap.delete sub (map asInt (xs ++ catMaybes [mx]))
       let e' = substMetaTerm sub' e
-      (m, MetaTermImpIntro xs e')
+      (m, MetaTermImpIntro xs mx e')
     (m, MetaTermImpElim e es) -> do
       let e' = substMetaTerm sub e
       let es' = map (substMetaTerm sub) es
       (m, MetaTermImpElim e' es')
-    (m, MetaTermFix f xs e) -> do
-      let sub' = foldr IntMap.delete sub (map asInt (f : xs))
+    (m, MetaTermFix f xs mx e) -> do
+      let sub' = foldr IntMap.delete sub (map asInt (f : xs ++ catMaybes [mx]))
       let e' = substMetaTerm sub' e
-      (m, MetaTermFix f xs e')
+      (m, MetaTermFix f xs mx e')
     (m, MetaTermNecIntro e) -> do
       let e' = substMetaTerm sub e
       (m, MetaTermNecIntro e')

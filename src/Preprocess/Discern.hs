@@ -35,16 +35,16 @@ discernMetaTerm' nenv term =
                   return (m, MetaTermEnumIntro enumValue)
                 Nothing ->
                   raiseError m $ "undefined variable: " <> asText x
-    (m, MetaTermImpIntro xs e) -> do
-      (xs', e') <- discernBinder' nenv xs e
-      return (m, MetaTermImpIntro xs' e')
+    (m, MetaTermImpIntro xs mf e) -> do
+      (xs', mf', e') <- discernBinder nenv xs mf e
+      return (m, MetaTermImpIntro xs' mf' e')
     (m, MetaTermImpElim e es) -> do
       e' <- discernMetaTerm' nenv e
       es' <- mapM (discernMetaTerm' nenv) es
       return (m, MetaTermImpElim e' es')
-    (m, MetaTermFix f xs e) -> do
-      (f' : xs', e') <- discernBinder' nenv (f : xs) e
-      return (m, MetaTermFix f' xs' e')
+    (m, MetaTermFix f xs mx e) -> do
+      (f' : xs', mx', e') <- discernBinder nenv (f : xs) mx e
+      return (m, MetaTermFix f' xs' mx' e')
     (m, MetaTermNecIntro e) -> do
       e' <- discernMetaTerm' nenv e
       return (m, MetaTermNecIntro e')
@@ -71,20 +71,27 @@ discernMetaTerm' nenv term =
           return ((mCase, l'), body')
       return (m, MetaTermEnumElim e' caseList')
 
-discernBinder' ::
+discernBinder ::
   NameEnv ->
   [Ident] ->
+  Maybe Ident ->
   MetaTermPlus ->
-  WithEnv ([Ident], MetaTermPlus)
-discernBinder' nenv binder e =
+  WithEnv ([Ident], Maybe Ident, MetaTermPlus)
+discernBinder nenv binder mf e =
   case binder of
     [] -> do
-      e' <- discernMetaTerm' nenv e
-      return ([], e')
-    x : xts -> do
+      case mf of
+        Just f -> do
+          f' <- newNameWith f
+          e' <- discernMetaTerm' (Map.insert (asText f) f' nenv) e
+          return ([], Just f', e')
+        Nothing -> do
+          e' <- discernMetaTerm' nenv e
+          return ([], Nothing, e')
+    x : xs -> do
       x' <- newNameWith x
-      (xts', e') <- discernBinder' (Map.insert (asText x) x' nenv) xts e
-      return (x' : xts', e')
+      (xs', mf', e') <- discernBinder (Map.insert (asText x) x' nenv) xs mf e
+      return (x' : xs', mf', e')
 
 discernEnumCase :: Hint -> EnumCase -> WithEnv EnumCase
 discernEnumCase m weakCase =
