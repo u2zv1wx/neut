@@ -1,6 +1,7 @@
 module Reduce.MetaTerm where
 
 import Control.Monad.IO.Class
+import Data.EnumCase
 import Data.Env
 import Data.Ident
 import Data.Int
@@ -41,6 +42,18 @@ reduceMetaTerm term =
             raiseError m $ "undefined meta-constant: " <> c
         _ ->
           raiseError m "arity mismatch"
+    (m, MetaTermEnumElim e caseList) -> do
+      e' <- reduceMetaTerm e
+      let caseList' = map (\(c, body) -> (snd c, body)) caseList
+      case e' of
+        (_, MetaTermEnumIntro l) ->
+          case lookup (EnumCaseLabel l) caseList' of
+            Just body ->
+              reduceMetaTerm body
+            Nothing ->
+              raiseError m "found an ill-typed switch"
+        _ ->
+          raiseError m "found an ill-typed switch"
     (_, MetaTermNecElim e) -> do
       e' <- reduceMetaTerm e
       case e' of
@@ -96,3 +109,20 @@ reify term =
       (m, TreeLeaf c)
     (m, MetaTermInt64 i) ->
       (m, TreeLeaf $ T.pack $ show i)
+    (m, MetaTermEnumIntro a) ->
+      (m, TreeLeaf a)
+    (m, MetaTermEnumElim e caseList) -> do
+      let e' = reify e
+      let (cs, bodyList) = unzip caseList
+      let cs' = map reifyEnumCase cs
+      let bodyList' = map reify bodyList
+      let caseList' = map (\(c, body) -> (m, TreeNode [c, body])) $ zip cs' bodyList'
+      (m, TreeNode [(m, TreeLeaf "switch"), e', (m, TreeNode caseList')])
+
+reifyEnumCase :: EnumCasePlus -> TreePlus
+reifyEnumCase (m, v) =
+  case v of
+    EnumCaseLabel l ->
+      (m, TreeLeaf l)
+    EnumCaseDefault ->
+      (m, TreeLeaf "default")

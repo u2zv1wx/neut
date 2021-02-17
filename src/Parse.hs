@@ -17,6 +17,7 @@ import Data.WeakTerm
 import Parse.Discern
 import Parse.Interpret
 import Parse.Rule
+import Preprocess.Reflect
 
 parse :: [TreePlus] -> WithEnv [WeakStmt]
 parse stmtTreeList =
@@ -54,7 +55,7 @@ parse stmtTreeList =
                 raiseSyntaxError m "(end LEAF)"
             "enum"
               | (_, TreeLeaf name) : ts <- rest -> do
-                xis <- interpretEnumItem m name ts
+                xis <- reflectEnumItem m name ts
                 insEnumEnv m name xis
                 parse restStmtList
               | otherwise ->

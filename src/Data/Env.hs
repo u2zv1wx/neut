@@ -12,6 +12,7 @@ import Data.List (find)
 import Data.Log
 import Data.LowComp
 import Data.LowType
+import Data.Namespace
 import qualified Data.PQueue.Min as Q
 import Data.Platform
 import Data.Primitive
@@ -435,3 +436,55 @@ warn pos str = do
   b <- gets shouldColorize
   eoe <- gets endOfEntry
   liftIO $ outputLog b eoe $ logWarning pos str
+
+resolveSymbol :: (T.Text -> WithEnv Bool) -> T.Text -> WithEnv (Maybe T.Text)
+resolveSymbol predicate name = do
+  penv <- gets prefixEnv
+  takeFirst predicate $ name : (map (\prefix -> prefix <> nsSep <> name) penv)
+
+-- b <- f name
+-- if b
+--   then return $ Just name
+--   else do
+--     penv <- gets prefixEnv
+--     lookupEnum' f penv name
+-- lookupEnum' :: (T.Text -> WithEnv Bool) -> [T.Text] -> T.Text -> WithEnv (Maybe T.Text)
+-- lookupEnum' f penv name =
+--   case penv of
+--     [] ->
+--       return Nothing
+--     prefix : prefixList -> do
+--       let name' = prefix <> nsSep <> name
+--       b <- f name'
+--       if b
+--         then return $ Just name'
+--         else lookupEnum' f prefixList name
+
+takeFirst :: (T.Text -> WithEnv Bool) -> [T.Text] -> WithEnv (Maybe T.Text)
+takeFirst predicate candidateList =
+  case candidateList of
+    [] ->
+      return Nothing
+    x : xs -> do
+      b <- predicate x
+      if b
+        then return $ Just x
+        else takeFirst predicate xs
+
+resolveAsEnumValue :: T.Text -> WithEnv (Maybe T.Text)
+resolveAsEnumValue =
+  resolveSymbol isDefinedEnumValue
+
+resolveAsEnumType :: T.Text -> WithEnv (Maybe T.Text)
+resolveAsEnumType =
+  resolveSymbol isDefinedEnumType
+
+isDefinedEnumValue :: T.Text -> WithEnv Bool
+isDefinedEnumValue name = do
+  renv <- gets revEnumEnv
+  return $ name `Map.member` renv
+
+isDefinedEnumType :: T.Text -> WithEnv Bool
+isDefinedEnumType name = do
+  eenv <- gets enumEnv
+  return $ name `Map.member` eenv

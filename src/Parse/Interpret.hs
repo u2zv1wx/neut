@@ -3,7 +3,6 @@ module Parse.Interpret
     interpretWeakIdentPlus,
     interpretIdentPlus,
     interpretFix,
-    interpretEnumItem,
   )
 where
 
@@ -14,12 +13,12 @@ import Data.Env
 import Data.Hint
 import Data.Ident
 import Data.LowType
-import Data.Maybe (catMaybes, fromMaybe)
-import Data.Namespace
+import Data.Maybe (catMaybes)
 import Data.Size
 import qualified Data.Text as T
 import Data.Tree
 import Data.WeakTerm
+import Preprocess.Reflect
 import Text.Read (readMaybe)
 
 interpret :: TreePlus -> WithEnv WeakTermPlus
@@ -327,23 +326,11 @@ interpretBinder xts t = do
   t' <- interpret t
   return (xts', t')
 
-interpretEnumCase :: TreePlus -> WithEnv EnumCasePlus
-interpretEnumCase tree =
-  case tree of
-    (m, TreeNode [(_, TreeLeaf "enum-introduction"), (_, TreeLeaf l)]) ->
-      return (m, EnumCaseLabel l)
-    (m, TreeLeaf "default") ->
-      return (m, EnumCaseDefault)
-    (m, TreeLeaf l) ->
-      return (m, EnumCaseLabel l)
-    (m, _) ->
-      raiseSyntaxError m "(enum-introduction LEAF) | default | LEAF"
-
 interpretClause :: TreePlus -> WithEnv (EnumCasePlus, WeakTermPlus)
 interpretClause tree =
   case tree of
     (_, TreeNode [c, e]) -> do
-      c' <- interpretEnumCase c
+      c' <- reflectEnumCase c
       e' <- interpret e
       return (c', e')
     e ->
@@ -368,45 +355,6 @@ interpretStructElim tree =
       return (m, x, k')
     e ->
       raiseSyntaxError (fst e) "(LEAF TREE)"
-
-interpretEnumItem :: Hint -> T.Text -> [TreePlus] -> WithEnv [(T.Text, Int)]
-interpretEnumItem m name ts = do
-  xis <- interpretEnumItem' name $ reverse ts
-  if isLinear (map snd xis)
-    then return $ reverse xis
-    else raiseError m "found a collision of discriminant"
-
-interpretEnumItem' :: T.Text -> [TreePlus] -> WithEnv [(T.Text, Int)]
-interpretEnumItem' name treeList =
-  case treeList of
-    [] ->
-      return []
-    [t] -> do
-      (s, mj) <- interpretEnumItem'' t
-      return [(name <> nsSep <> s, fromMaybe 0 mj)]
-    (t : ts) -> do
-      ts' <- interpretEnumItem' name ts
-      (s, mj) <- interpretEnumItem'' t
-      return $ (name <> nsSep <> s, fromMaybe (1 + headDiscriminantOf ts') mj) : ts'
-
-interpretEnumItem'' :: TreePlus -> WithEnv (T.Text, Maybe Int)
-interpretEnumItem'' tree =
-  case tree of
-    (_, TreeLeaf s) ->
-      return (s, Nothing)
-    (_, TreeNode [(_, TreeLeaf s), (_, TreeLeaf i)])
-      | Just i' <- readMaybe $ T.unpack i ->
-        return (s, Just i')
-    t ->
-      raiseSyntaxError (fst t) "LEAF | (LEAF LEAF)"
-
-headDiscriminantOf :: [(T.Text, Int)] -> Int
-headDiscriminantOf labelNumList =
-  case labelNumList of
-    [] ->
-      0
-    ((_, i) : _) ->
-      i
 
 readValueInt :: T.Text -> T.Text -> Maybe (IntSize, Integer)
 readValueInt t x

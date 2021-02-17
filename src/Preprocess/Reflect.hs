@@ -1,13 +1,18 @@
 module Preprocess.Reflect
   ( reflect,
+    reflectEnumItem,
+    reflectEnumCase,
   )
 where
 
 import Control.Monad.State.Lazy
+import Data.EnumCase
 import Data.Env
 import Data.Hint
 import Data.Ident
+import Data.Maybe (fromMaybe)
 import Data.MetaTerm
+import Data.Namespace
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Tree
@@ -82,6 +87,13 @@ reflect' level tree =
                   return (m, MetaTermNecElim e')
                 | otherwise ->
                   raiseSyntaxError m "(unquote TREE)"
+              "switch"
+                | e : cs <- rest -> do
+                  e' <- reflect' level e
+                  cs' <- mapM (reflectEnumClause level) cs
+                  return (m, MetaTermEnumElim e' cs')
+                | otherwise ->
+                  raiseSyntaxError m "(switch TREE TREE*)"
               _ ->
                 reflectAux level m leaf rest
           leaf : rest ->
@@ -112,3 +124,64 @@ reflectIdent tree =
 wrapWithQuote :: TreePlus -> TreePlus
 wrapWithQuote (m, t) =
   (m, TreeNode [(m, TreeLeaf "quote"), (m, t)])
+
+reflectEnumItem :: Hint -> T.Text -> [TreePlus] -> WithEnv [(T.Text, Int)]
+reflectEnumItem m name ts = do
+  xis <- reflectEnumItem' name $ reverse ts
+  if isLinear (map snd xis)
+    then return $ reverse xis
+    else raiseError m "found a collision of discriminant"
+
+reflectEnumItem' :: T.Text -> [TreePlus] -> WithEnv [(T.Text, Int)]
+reflectEnumItem' name treeList =
+  case treeList of
+    [] ->
+      return []
+    [t] -> do
+      (s, mj) <- reflectEnumItem'' t
+      return [(name <> nsSep <> s, fromMaybe 0 mj)]
+    (t : ts) -> do
+      ts' <- reflectEnumItem' name ts
+      (s, mj) <- reflectEnumItem'' t
+      return $ (name <> nsSep <> s, fromMaybe (1 + headDiscriminantOf ts') mj) : ts'
+
+reflectEnumItem'' :: TreePlus -> WithEnv (T.Text, Maybe Int)
+reflectEnumItem'' tree =
+  case tree of
+    (_, TreeLeaf s) ->
+      return (s, Nothing)
+    (_, TreeNode [(_, TreeLeaf s), (_, TreeLeaf i)])
+      | Just i' <- readMaybe $ T.unpack i ->
+        return (s, Just i')
+    t ->
+      raiseSyntaxError (fst t) "LEAF | (LEAF LEAF)"
+
+headDiscriminantOf :: [(T.Text, Int)] -> Int
+headDiscriminantOf labelNumList =
+  case labelNumList of
+    [] ->
+      0
+    ((_, i) : _) ->
+      i
+
+reflectEnumClause :: Int -> TreePlus -> WithEnv (EnumCasePlus, MetaTermPlus)
+reflectEnumClause level tree =
+  case tree of
+    (_, TreeNode [c, e]) -> do
+      c' <- reflectEnumCase c
+      e' <- reflect' level e
+      return (c', e')
+    e ->
+      raiseSyntaxError (fst e) "(TREE TREE)"
+
+reflectEnumCase :: TreePlus -> WithEnv EnumCasePlus
+reflectEnumCase tree =
+  case tree of
+    (m, TreeNode [(_, TreeLeaf "enum-introduction"), (_, TreeLeaf l)]) ->
+      return (m, EnumCaseLabel l)
+    (m, TreeLeaf "default") ->
+      return (m, EnumCaseDefault)
+    (m, TreeLeaf l) ->
+      return (m, EnumCaseLabel l)
+    (m, _) ->
+      raiseSyntaxError m "default | LEAF"

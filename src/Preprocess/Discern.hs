@@ -1,8 +1,10 @@
-module Preprocess.Discern (discernMetaTerm) where
+module Preprocess.Discern (discernMetaTerm, discernEnumCase) where
 
 import Control.Monad.State.Lazy
+import Data.EnumCase
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import Data.Hint
 import Data.Ident
 import Data.MetaTerm
 import qualified Data.Set as S
@@ -26,7 +28,13 @@ discernMetaTerm' nenv term =
           cenv <- gets metaConstantSet
           if S.member (asText x) cenv
             then return (m, MetaTermConst (asText x))
-            else raiseError m $ "undefined variable: " <> asText x
+            else do
+              mEnumValue <- resolveAsEnumValue (asText x)
+              case mEnumValue of
+                Just enumValue ->
+                  return (m, MetaTermEnumIntro enumValue)
+                Nothing ->
+                  raiseError m $ "undefined variable: " <> asText x
     (m, MetaTermImpIntro xs e) -> do
       (xs', e') <- discernBinder' nenv xs e
       return (m, MetaTermImpIntro xs' e')
@@ -49,6 +57,16 @@ discernMetaTerm' nenv term =
       return term
     (_, MetaTermInt64 _) ->
       return term
+    (_, MetaTermEnumIntro _) ->
+      return term
+    (m, MetaTermEnumElim e caseList) -> do
+      e' <- discernMetaTerm' nenv e
+      caseList' <-
+        forM caseList $ \((mCase, l), body) -> do
+          l' <- discernEnumCase mCase l
+          body' <- discernMetaTerm' nenv body
+          return ((mCase, l'), body')
+      return (m, MetaTermEnumElim e' caseList')
 
 discernBinder' ::
   NameEnv ->
@@ -64,3 +82,16 @@ discernBinder' nenv binder e =
       x' <- newNameWith x
       (xts', e') <- discernBinder' (Map.insert (asText x) x' nenv) xts e
       return (x' : xts', e')
+
+discernEnumCase :: Hint -> EnumCase -> WithEnv EnumCase
+discernEnumCase m weakCase =
+  case weakCase of
+    EnumCaseLabel l -> do
+      ml <- resolveAsEnumValue l
+      case ml of
+        Just l' ->
+          return (EnumCaseLabel l')
+        Nothing ->
+          raiseError m $ "no such enum-value is defined: " <> l
+    _ ->
+      return weakCase

@@ -29,6 +29,8 @@ preprocess mainFilePath = do
   forM_ out $ \k ->
     p $ T.unpack $ showAsSExp k
   p "quitting."
+  modify (\env -> env {enumEnv = Map.empty})
+  modify (\env -> env {revEnumEnv = Map.empty})
   liftIO $ exitWith ExitSuccess
 
 visit :: Path Abs File -> WithEnv [TreePlus]
@@ -44,8 +46,8 @@ leave = do
   path <- getCurrentFilePath
   popTrace
   modify (\env -> env {fileEnv = Map.insert path VisitInfoFinish (fileEnv env)})
-  modify (\env -> env {prefixEnv = []})
-  modify (\env -> env {sectionEnv = []})
+  -- modify (\env -> env {prefixEnv = []})
+  -- modify (\env -> env {sectionEnv = []})
   return []
 
 pushTrace :: Path Abs File -> WithEnv ()
@@ -80,6 +82,13 @@ preprocess' sub stmtList =
                 preprocess' (IntMap.insert (asInt name') body'' sub) restStmtList
               | otherwise ->
                 raiseSyntaxError m "(denote LEAF TREE)"
+            "meta-enum"
+              | (_, TreeLeaf name) : ts <- rest -> do
+                xis <- reflectEnumItem m name ts
+                insEnumEnv m name xis
+                preprocess' sub restStmtList
+              | otherwise ->
+                raiseSyntaxError m "(enum LEAF TREE ... TREE)"
             "meta-constant"
               | [(_, TreeLeaf name)] <- rest -> do
                 modify (\env -> env {metaConstantSet = S.insert name (metaConstantSet env)})
@@ -154,6 +163,7 @@ metaKeywordSet =
       "statement",
       "include",
       "auto-quote",
+      "meta-enum",
       "meta-constant",
       "ensure"
     ]
@@ -166,7 +176,7 @@ includeFile ::
   [TreePlus] ->
   WithEnv [TreePlus]
 includeFile sub m mPath pathString as = do
-  ensureEnvSanity m
+  -- ensureEnvSanity m
   path <- readStrOrThrow mPath pathString
   when (null path) $ raiseError m "found an empty path"
   dirPath <-
@@ -180,7 +190,7 @@ includeFile sub m mPath pathString as = do
     Just VisitInfoActive -> do
       tenv <- gets traceEnv
       let cyclicPath = dropWhile (/= newPath) (reverse tenv) ++ [newPath]
-      raiseError m $ "found cyclic inclusion:\n" <> showCyclicPath cyclicPath
+      raiseError m $ "found a cyclic inclusion:\n" <> showCyclicPath cyclicPath
     Just VisitInfoFinish ->
       preprocess' sub as
     Nothing -> do
@@ -206,12 +216,12 @@ raiseIfFailure m procName exitCode h pkgDirPath =
       errStr <- liftIO $ hGetContents h
       raiseError m $ T.pack $ "the child process `" ++ procName ++ "` failed with the following message (exitcode = " ++ show i ++ "):\n" ++ errStr
 
-ensureEnvSanity :: Hint -> WithEnv ()
-ensureEnvSanity m = do
-  penv <- gets prefixEnv
-  if null penv
-    then return ()
-    else raiseError m "`include` can only be used with no prefix assumption"
+-- ensureEnvSanity :: Hint -> WithEnv ()
+-- ensureEnvSanity m = do
+--   penv <- gets prefixEnv
+--   if null penv
+--     then return ()
+--     else raiseError m "`include` can only be used with no prefix assumption"
 
 showCyclicPath :: [Path Abs File] -> T.Text
 showCyclicPath pathList =

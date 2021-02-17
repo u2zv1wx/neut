@@ -7,7 +7,6 @@ module Parse.Discern
 where
 
 import Control.Monad.State.Lazy
-import Data.EnumCase
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import Data.Hint
@@ -15,6 +14,7 @@ import Data.Ident
 import Data.Namespace
 import qualified Data.Text as T
 import Data.WeakTerm
+import Preprocess.Discern
 
 type NameEnv = Map.HashMap T.Text Ident
 
@@ -48,15 +48,15 @@ discern' nenv term =
         Just x' ->
           return (m, WeakTermUpsilon x')
         Nothing -> do
-          b1 <- lookupEnumValueNameWithPrefix s
-          case b1 of
-            Just s' ->
-              return (m, WeakTermEnumIntro s')
+          mEnumValue <- resolveAsEnumValue s
+          case mEnumValue of
+            Just enumValue ->
+              return (m, WeakTermEnumIntro enumValue)
             Nothing -> do
-              b2 <- lookupEnumTypeNameWithPrefix s
-              case b2 of
-                Just s' ->
-                  return (m, WeakTermEnum s')
+              mEnumType <- resolveAsEnumType s
+              case mEnumType of
+                Just enumType ->
+                  return (m, WeakTermEnum enumType)
                 Nothing -> do
                   mc <- lookupConstantMaybe m penv s
                   case mc of
@@ -173,19 +173,6 @@ discernFix nenv self binder e = do
   (binder', e') <- discernBinder nenv (self : binder) e
   return (head binder', tail binder', e')
 
-discernEnumCase :: Hint -> EnumCase -> WithEnv EnumCase
-discernEnumCase m weakCase =
-  case weakCase of
-    EnumCaseLabel l -> do
-      ml <- lookupEnumValueNameWithPrefix l
-      case ml of
-        Just l' ->
-          return (EnumCaseLabel l')
-        Nothing ->
-          raiseError m $ "no such enum-value is defined: " <> l
-    _ ->
-      return weakCase
-
 discernStruct ::
   NameEnv ->
   [(Hint, Ident, a)] ->
@@ -253,42 +240,3 @@ lookupConstantMaybe' m penv x =
       if b
         then return $ Just query
         else lookupConstantMaybe' m prefixList x
-
-lookupEnum :: (T.Text -> WithEnv Bool) -> T.Text -> WithEnv (Maybe T.Text)
-lookupEnum f name = do
-  b <- f name
-  if b
-    then return $ Just name
-    else do
-      penv <- gets prefixEnv
-      lookupEnum' f penv name
-
-lookupEnum' :: (T.Text -> WithEnv Bool) -> [T.Text] -> T.Text -> WithEnv (Maybe T.Text)
-lookupEnum' f penv name =
-  case penv of
-    [] ->
-      return Nothing
-    prefix : prefixList -> do
-      let name' = prefix <> nsSep <> name
-      b <- f name'
-      if b
-        then return $ Just name'
-        else lookupEnum' f prefixList name
-
-lookupEnumValueNameWithPrefix :: T.Text -> WithEnv (Maybe T.Text)
-lookupEnumValueNameWithPrefix =
-  lookupEnum isDefinedEnumValue
-
-lookupEnumTypeNameWithPrefix :: T.Text -> WithEnv (Maybe T.Text)
-lookupEnumTypeNameWithPrefix =
-  lookupEnum isDefinedEnumType
-
-isDefinedEnumValue :: T.Text -> WithEnv Bool
-isDefinedEnumValue name = do
-  renv <- gets revEnumEnv
-  return $ name `Map.member` renv
-
-isDefinedEnumType :: T.Text -> WithEnv Bool
-isDefinedEnumType name = do
-  eenv <- gets enumEnv
-  return $ name `Map.member` eenv

@@ -1,5 +1,6 @@
 module Data.MetaTerm where
 
+import Data.EnumCase
 import Data.Hint
 import Data.Ident
 import Data.Int
@@ -16,6 +17,8 @@ data MetaTerm
   | MetaTermNode [MetaTermPlus]
   | MetaTermConst T.Text
   | MetaTermInt64 Int64
+  | MetaTermEnumIntro T.Text
+  | MetaTermEnumElim MetaTermPlus [(EnumCasePlus, MetaTermPlus)]
   deriving (Show)
 
 type MetaTermPlus =
@@ -56,6 +59,13 @@ substMetaTerm sub term =
       term
     (_, MetaTermInt64 _) ->
       term
+    (_, MetaTermEnumIntro _) ->
+      term
+    (m, MetaTermEnumElim e ces) -> do
+      let e' = substMetaTerm sub e
+      let (cs, es) = unzip ces
+      let es' = map (substMetaTerm sub) es
+      (m, MetaTermEnumElim e' (zip cs es'))
 
 quote :: MetaTermPlus -> MetaTermPlus
 quote (m, t) =
