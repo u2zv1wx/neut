@@ -26,6 +26,36 @@ reduceMetaTerm term =
             [arg] <- es' -> do
             liftIO $ putStrLn $ T.unpack $ showAsSExp $ reify arg
             return (m, MetaTermEnumIntro "top.unit")
+          | "meta-head" == c,
+            [arg] <- es' -> do
+            case arg of
+              (mQuote, MetaTermNecIntro (_, MetaTermNode (h : _))) ->
+                return (mQuote, MetaTermNecIntro h)
+              _ ->
+                raiseError m $ "meta-head cannot be applied to: " <> showAsSExp (reify arg)
+          | "meta-tail" == c,
+            [arg] <- es' -> do
+            case arg of
+              (mQuote, MetaTermNecIntro (mNode, MetaTermNode (_ : rest))) ->
+                return (mQuote, MetaTermNecIntro (mNode, MetaTermNode rest))
+              _ ->
+                raiseError m $ "meta-tail cannot be applied to: " <> showAsSExp (reify arg)
+          | "meta-join-symbol" == c,
+            [arg1, arg2] <- es' -> do
+            case (arg1, arg2) of
+              ((mQuote, MetaTermNecIntro (mLeaf, MetaTermLeaf s1)), (_, MetaTermNecIntro (_, MetaTermLeaf s2))) ->
+                return (mQuote, MetaTermNecIntro (mLeaf, MetaTermLeaf (s1 <> s2)))
+              _ ->
+                raiseError m $ "meta-join cannot be applied to: (this)"
+          | "meta-leaf-eq" == c,
+            [arg1, arg2] <- es' -> do
+            case (arg1, arg2) of
+              ((_, MetaTermNecIntro (_, MetaTermLeaf s1)), (_, MetaTermNecIntro (_, MetaTermLeaf s2))) ->
+                if s1 == s2
+                  then return (m, MetaTermEnumIntro "bool.true")
+                  else return (m, MetaTermEnumIntro "bool.false")
+              _ ->
+                raiseError m $ "meta-leaf-eq cannot be applied to: (this)"
           | Just op <- toArithmeticOperator c,
             [arg1, arg2] <- es' -> do
             case (arg1, arg2) of
