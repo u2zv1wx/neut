@@ -10,11 +10,6 @@ import Data.MetaTerm
 import qualified Data.Text as T
 import Data.Tree
 
--- reduceMetaTerm :: MetaTermPlus -> WithEnv TreePlus
--- reduceMetaTerm e = do
---   e' <- reduceMetaTerm e
---   reifyMetaTerm e'
-
 reduceMetaTerm :: MetaTermPlus -> WithEnv MetaTermPlus
 reduceMetaTerm term =
   case term of
@@ -30,12 +25,21 @@ reduceMetaTerm term =
           | "meta-print" == c,
             [arg] <- es' -> do
             liftIO $ putStrLn $ T.unpack $ showAsSExp $ reify arg
-            return $ quote (m, MetaTermLeaf "unit")
+            return (m, MetaTermEnumIntro "top.unit")
           | Just op <- toArithmeticOperator c,
             [arg1, arg2] <- es' -> do
             case (arg1, arg2) of
               ((_, MetaTermInt64 i1), (_, MetaTermInt64 i2)) ->
                 return (m, MetaTermInt64 (op i1 i2))
+              _ ->
+                raiseError m "found an ill-typed application"
+          | Just op <- toCmpOp c,
+            [arg1, arg2] <- es' -> do
+            case (arg1, arg2) of
+              ((_, MetaTermInt64 i1), (_, MetaTermInt64 i2)) ->
+                if op i1 i2
+                  then return (m, MetaTermEnumIntro "bool.true")
+                  else return (m, MetaTermEnumIntro "bool.false")
               _ ->
                 raiseError m "found an ill-typed application"
           | otherwise ->
@@ -78,6 +82,22 @@ toArithmeticOperator opStr =
       Just (*)
     "meta-div" ->
       Just div
+    _ ->
+      Nothing
+
+toCmpOp :: T.Text -> Maybe (Int64 -> Int64 -> Bool)
+toCmpOp opStr =
+  case opStr of
+    "meta-int-gt" ->
+      Just (<)
+    "meta-int-ge" ->
+      Just (<=)
+    "meta-int-lt" ->
+      Just (>)
+    "meta-int-le" ->
+      Just (>=)
+    "meta-int-eq" ->
+      Just (==)
     _ ->
       Nothing
 
