@@ -10,6 +10,8 @@ import qualified Data.IntMap as IntMap
 import Data.MetaTerm
 import qualified Data.Text as T
 import Data.Tree
+import Preprocess.Discern
+import Preprocess.Reflect
 
 reduceMetaTerm :: MetaTermPlus -> WithEnv MetaTermPlus
 reduceMetaTerm term =
@@ -31,6 +33,12 @@ reduceMetaTerm term =
             [arg] <- es' -> do
             liftIO $ putStrLn $ T.unpack $ showAsSExp $ reify arg
             return (m, MetaTermEnumIntro "top.unit")
+          | "meta-cons" == c -> do
+            case es' of
+              [(_, MetaTermNecIntro t), (_, MetaTermNecIntro (_, MetaTermNode ts))] ->
+                return (m, MetaTermNecIntro (m, MetaTermNode (t : ts)))
+              _ ->
+                raiseError m $ "meta-cons"
           | "meta-head" == c,
             [arg] <- es' -> do
             case arg of
@@ -52,12 +60,16 @@ reduceMetaTerm term =
                 return $ liftBool (null ts) m
               _ ->
                 raiseError m $ "meta-empty? cannot be applied to: " <> showAsSExp (reify arg)
-          | "reify" == c,
-            [_] <- es' -> do undefined
-          | "reflect" == c,
-            [_] <- es' -> do
-            -- argをleaf/nodeからなると見て, それをreflectしてふたたび新しいtermにして, んでそれを実行する, みたいな。
-            undefined
+          | "evaluate" == c -> do
+            case es' of
+              [arg] ->
+                case arg of
+                  (_, MetaTermNecIntro t) -> do
+                    reflect (reify t) >>= discernMetaTerm >>= reduceMetaTerm
+                  _ ->
+                    raiseError m $ "evaluate cannot be applied to: " <> showAsSExp (reify arg)
+              _ ->
+                raiseError m "arity mismatch"
           | "meta-join-symbol" == c,
             [arg1, arg2] <- es' -> do
             case (arg1, arg2) of
@@ -143,6 +155,17 @@ toCmpOp opStr =
       Just (==)
     _ ->
       Nothing
+
+reinterpret :: MetaTermPlus -> WithEnv TreePlus
+reinterpret term =
+  case term of
+    (m, MetaTermLeaf x) ->
+      return (m, TreeLeaf x)
+    (m, MetaTermNode es) -> do
+      es' <- mapM reinterpret es
+      return (m, TreeNode es')
+    (m, _) ->
+      raiseError m "the argument isn't a valid AST"
 
 reify :: MetaTermPlus -> TreePlus
 reify term =
