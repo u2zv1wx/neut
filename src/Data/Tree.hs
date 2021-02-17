@@ -34,9 +34,9 @@ showAsSExp tree =
   case tree of
     (_, TreeLeaf x) ->
       x
-    (_, TreeNode [(_, TreeLeaf "QUOTE"), t]) ->
+    (_, TreeNode [(_, TreeLeaf "quote"), t]) ->
       "'" <> showAsSExp t
-    (_, TreeNode [(_, TreeLeaf "UNQUOTE"), t]) ->
+    (_, TreeNode [(_, TreeLeaf "unquote"), t]) ->
       "," <> showAsSExp t
     (_, TreeNode ts) ->
       "(" <> T.intercalate " " (map showAsSExp ts) <> ")"

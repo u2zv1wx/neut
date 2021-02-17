@@ -37,38 +37,38 @@ reduceMetaTerm term =
     _ ->
       return term
 
-reifyMetaTerm :: MetaTermPlus -> WithEnv TreePlus
-reifyMetaTerm term =
-  case term of
-    (m, MetaTermLeaf x) ->
-      return (m, TreeLeaf x)
-    (m, MetaTermNode es) -> do
-      es' <- mapM reifyMetaTerm es
-      return (m, TreeNode es')
-    (m, _) ->
-      raiseError m $ "the result of meta computation must be an AST, but is: \n" <> showAsSExp (reifyMetaTerm' term)
+-- reifyMetaTerm :: MetaTermPlus -> WithEnv TreePlus
+-- reifyMetaTerm term =
+--   case term of
+--     (m, MetaTermLeaf x) ->
+--       return (m, TreeLeaf x)
+--     (m, MetaTermNode es) -> do
+--       es' <- mapM reifyMetaTerm es
+--       return (m, TreeNode es')
+--     (m, _) ->
+--       raiseError m $ "the result of meta computation must be an AST, but is: \n" <> showAsSExp (reify term)
 
-reifyMetaTerm' :: MetaTermPlus -> TreePlus
-reifyMetaTerm' term =
+reify :: MetaTermPlus -> TreePlus
+reify term =
   case term of
     (m, MetaTermVar x) ->
       (m, TreeLeaf $ asText' x) -- ホントはmeta専用の名前にするべき
     (m, MetaTermImpIntro xs e) -> do
-      let e' = reifyMetaTerm' e
+      let e' = reify e
       let xs' = map (\i -> (m, TreeLeaf $ asText' i)) xs
-      (m, TreeNode [(m, TreeLeaf "LAMBDA"), (m, TreeNode xs'), e'])
+      (m, TreeNode [(m, TreeLeaf "lambda"), (m, TreeNode xs'), e'])
     (m, MetaTermImpElim e es) -> do
-      let e' = reifyMetaTerm' e
-      let es' = map reifyMetaTerm' es
-      (m, TreeNode ((m, TreeLeaf "APPLY") : e' : es'))
+      let e' = reify e
+      let es' = map reify es
+      (m, TreeNode ((m, TreeLeaf "apply") : e' : es'))
     (m, MetaTermNecIntro e) -> do
-      let e' = reifyMetaTerm' e
-      (m, TreeNode [(m, TreeLeaf "QUOTE"), e'])
+      let e' = reify e
+      (m, TreeNode [(m, TreeLeaf "quote"), e'])
     (m, MetaTermNecElim e) -> do
-      let e' = reifyMetaTerm' e
-      (m, TreeNode [(m, TreeLeaf "UNQUOTE"), e'])
+      let e' = reify e
+      (m, TreeNode [(m, TreeLeaf "unquote"), e'])
     (m, MetaTermLeaf x) ->
       (m, TreeLeaf x)
     (m, MetaTermNode es) -> do
-      let es' = map reifyMetaTerm' es
+      let es' = map reify es
       (m, TreeNode es')

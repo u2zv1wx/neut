@@ -96,7 +96,7 @@ quote = do
   char '\'' >> skip
   item <- term
   skip
-  return (m, TreeNode [(m, TreeLeaf "QUOTE"), item])
+  return (m, TreeNode [(m, TreeLeaf "quote"), item])
 
 unquote :: Tokenizer TreePlus
 unquote = do
@@ -104,7 +104,7 @@ unquote = do
   char ',' >> skip
   item <- term
   skip
-  return (m, TreeNode [(m, TreeLeaf "UNQUOTE"), item])
+  return (m, TreeNode [(m, TreeLeaf "unquote"), item])
 
 char :: Char -> Tokenizer ()
 char c = do
