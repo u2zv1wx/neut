@@ -3,6 +3,7 @@ module Reduce.MetaTerm where
 import Control.Monad.IO.Class
 import Data.EnumCase
 import Data.Env
+import Data.Hint
 import Data.Ident
 import Data.Int
 import qualified Data.IntMap as IntMap
@@ -20,6 +21,10 @@ reduceMetaTerm term =
         (_, MetaTermImpIntro xs body)
           | length xs == length es' -> do
             let sub = IntMap.fromList $ zip (map asInt xs) es'
+            reduceMetaTerm $ substMetaTerm sub body
+        (_, MetaTermFix f xs body)
+          | length xs == length es' -> do
+            let sub = IntMap.fromList $ (asInt f, e') : zip (map asInt xs) es'
             reduceMetaTerm $ substMetaTerm sub body
         (_, MetaTermConst c)
           | "meta-print" == c,
@@ -40,6 +45,19 @@ reduceMetaTerm term =
                 return (mQuote, MetaTermNecIntro (mNode, MetaTermNode rest))
               _ ->
                 raiseError m $ "meta-tail cannot be applied to: " <> showAsSExp (reify arg)
+          | "meta-empty?" == c,
+            [arg] <- es' -> do
+            case arg of
+              (_, MetaTermNecIntro (_, MetaTermNode ts)) ->
+                return $ liftBool (null ts) m
+              _ ->
+                raiseError m $ "meta-empty? cannot be applied to: " <> showAsSExp (reify arg)
+          | "reify" == c,
+            [_] <- es' -> do undefined
+          | "reflect" == c,
+            [_] <- es' -> do
+            -- argをleaf/nodeからなると見て, それをreflectしてふたたび新しいtermにして, んでそれを実行する, みたいな。
+            undefined
           | "meta-join-symbol" == c,
             [arg1, arg2] <- es' -> do
             case (arg1, arg2) of
@@ -51,9 +69,7 @@ reduceMetaTerm term =
             [arg1, arg2] <- es' -> do
             case (arg1, arg2) of
               ((_, MetaTermNecIntro (_, MetaTermLeaf s1)), (_, MetaTermNecIntro (_, MetaTermLeaf s2))) ->
-                if s1 == s2
-                  then return (m, MetaTermEnumIntro "bool.true")
-                  else return (m, MetaTermEnumIntro "bool.false")
+                return $ liftBool (s1 == s2) m
               _ ->
                 raiseError m $ "meta-leaf-eq cannot be applied to: (this)"
           | Just op <- toArithmeticOperator c,
@@ -63,15 +79,12 @@ reduceMetaTerm term =
                 return (m, MetaTermInt64 (op i1 i2))
               _ ->
                 raiseError m "found an ill-typed application"
-          | Just op <- toCmpOp c,
-            [arg1, arg2] <- es' -> do
-            case (arg1, arg2) of
-              ((_, MetaTermInt64 i1), (_, MetaTermInt64 i2)) ->
-                if op i1 i2
-                  then return (m, MetaTermEnumIntro "bool.true")
-                  else return (m, MetaTermEnumIntro "bool.false")
+          | Just op <- toCmpOp c -> do
+            case es' of
+              [(_, MetaTermInt64 i1), (_, MetaTermInt64 i2)] ->
+                return $ liftBool (op i1 i2) m
               _ ->
-                raiseError m "found an ill-typed application"
+                raiseError m $ "found an ill-typed application of a metaconstant " <> c
           | otherwise ->
             raiseError m $ "undefined meta-constant: " <> c
         _ ->
@@ -144,6 +157,10 @@ reify term =
       let e' = reify e
       let es' = map reify es
       (m, TreeNode ((m, TreeLeaf "apply") : e' : es'))
+    (m, MetaTermFix f xs e) -> do
+      let e' = reify e
+      let xs' = map (\i -> (m, TreeLeaf $ asText' i)) xs
+      (m, TreeNode [(m, TreeLeaf (asText' f)), (m, TreeNode xs'), e'])
     (m, MetaTermNecIntro e) -> do
       let e' = reify e
       (m, TreeNode [(m, TreeLeaf "quote"), e'])
@@ -176,3 +193,9 @@ reifyEnumCase (m, v) =
       (m, TreeLeaf l)
     EnumCaseDefault ->
       (m, TreeLeaf "default")
+
+liftBool :: Bool -> Hint -> MetaTermPlus
+liftBool b m =
+  if b
+    then (m, MetaTermEnumIntro "bool.true")
+    else (m, MetaTermEnumIntro "bool.false")

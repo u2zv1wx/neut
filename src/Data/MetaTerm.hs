@@ -11,6 +11,7 @@ data MetaTerm
   = MetaTermVar Ident
   | MetaTermImpIntro [Ident] MetaTermPlus
   | MetaTermImpElim MetaTermPlus [MetaTermPlus]
+  | MetaTermFix Ident [Ident] MetaTermPlus
   | MetaTermNecIntro MetaTermPlus
   | MetaTermNecElim MetaTermPlus
   | MetaTermLeaf T.Text
@@ -44,6 +45,10 @@ substMetaTerm sub term =
       let e' = substMetaTerm sub e
       let es' = map (substMetaTerm sub) es
       (m, MetaTermImpElim e' es')
+    (m, MetaTermFix f xs e) -> do
+      let sub' = foldr IntMap.delete sub (map asInt (f : xs))
+      let e' = substMetaTerm sub' e
+      (m, MetaTermFix f xs e')
     (m, MetaTermNecIntro e) -> do
       let e' = substMetaTerm sub e
       (m, MetaTermNecIntro e')

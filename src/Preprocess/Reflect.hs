@@ -75,6 +75,13 @@ reflect' level tree =
                   return (m, MetaTermImpElim e' es')
                 | otherwise ->
                   raiseSyntaxError m "(apply TREE TREE*)"
+              "fix"
+                | [(_, TreeLeaf f), (_, TreeNode xs), e] <- rest -> do
+                  xs' <- mapM reflectIdent xs
+                  e' <- reflect e
+                  return (m, MetaTermFix (asIdent f) xs' e')
+                | otherwise ->
+                  raiseSyntaxError m "(fix LEAF (LEAF*) TREE)"
               "quote"
                 | [e] <- rest -> do
                   e' <- reflect' (level + 1) e

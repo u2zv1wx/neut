@@ -42,6 +42,9 @@ discernMetaTerm' nenv term =
       e' <- discernMetaTerm' nenv e
       es' <- mapM (discernMetaTerm' nenv) es
       return (m, MetaTermImpElim e' es')
+    (m, MetaTermFix f xs e) -> do
+      (f' : xs', e') <- discernBinder' nenv (f : xs) e
+      return (m, MetaTermFix f' xs' e')
     (m, MetaTermNecIntro e) -> do
       e' <- discernMetaTerm' nenv e
       return (m, MetaTermNecIntro e')
