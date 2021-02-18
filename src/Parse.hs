@@ -10,7 +10,6 @@ import Data.Hint
 import Data.Ident
 import Data.MetaTerm
 import Data.Namespace
-import Data.Platform
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Tree
@@ -76,17 +75,6 @@ parse stmtTreeList =
                 stmtList1 <- parseData m rest
                 stmtList2 <- parse restStmtList
                 return $ stmtList1 ++ stmtList2
-            "introspect"
-              | ((mx, TreeLeaf x) : stmtClauseList) <- rest -> do
-                val <- retrieveCompileTimeVarValue mx x
-                stmtClauseList' <- mapM parseStmtClause stmtClauseList
-                case lookup val stmtClauseList' of
-                  Nothing ->
-                    parse restStmtList
-                  Just as1 ->
-                    parse $ as1 ++ restStmtList
-              | otherwise ->
-                raiseSyntaxError m "(introspect LEAF TREE*)"
             "let"
               | [(mx, TreeLeaf x), t, e] <- rest -> do
                 let xt = (mx, TreeNode [(mx, TreeLeaf x), t])
@@ -182,24 +170,6 @@ prefixTextPlus tree =
       return (m, TreeNode [(mx, TreeLeaf x'), t])
     t ->
       raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
-
-parseStmtClause :: TreePlus -> WithEnv (T.Text, [TreePlus])
-parseStmtClause tree =
-  case tree of
-    (_, TreeNode ((_, TreeLeaf x) : stmtList)) ->
-      return (x, stmtList)
-    (m, _) ->
-      raiseSyntaxError m "(LEAF TREE*)"
-
-retrieveCompileTimeVarValue :: Hint -> T.Text -> WithEnv T.Text
-retrieveCompileTimeVarValue m var =
-  case var of
-    "OS" ->
-      showOS <$> getOS
-    "architecture" ->
-      showArch <$> getArch
-    _ ->
-      raiseError m $ "no such compile-time variable defined: " <> var
 
 insertConstant :: Hint -> T.Text -> WithEnv ()
 insertConstant m x = do

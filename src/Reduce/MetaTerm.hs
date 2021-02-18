@@ -88,34 +88,34 @@ reduceFix e es =
 reduceConstApp :: Hint -> T.Text -> [MetaTermPlus] -> WithEnv MetaTermPlus
 reduceConstApp m c es =
   case c of
+    "cons"
+      | [(_, MetaTermNecIntro t), (_, MetaTermNecIntro (_, MetaTermNode ts))] <- es ->
+        return (m, MetaTermNecIntro (m, MetaTermNode (t : ts)))
+    "dump"
+      | [arg] <- es -> do
+        liftIO $ putStrLn $ T.unpack $ showAsSExp $ toTree arg
+        return (m, MetaTermEnumIntro "top.unit")
+    "head"
+      | [(mQuote, MetaTermNecIntro (_, MetaTermNode (h : _)))] <- es ->
+        return (mQuote, MetaTermNecIntro h)
+    "is-nil"
+      | [(_, MetaTermNecIntro (_, MetaTermNode ts))] <- es ->
+        return $ liftBool (null ts) m
+    "leaf-mul"
+      | [(mQuote, MetaTermNecIntro (mLeaf, MetaTermLeaf s1)), (_, MetaTermNecIntro (_, MetaTermLeaf s2))] <- es ->
+        return (mQuote, MetaTermNecIntro (mLeaf, MetaTermLeaf (s1 <> s2)))
+    "leaf-equal"
+      | [(_, MetaTermNecIntro (_, MetaTermLeaf s1)), (_, MetaTermNecIntro (_, MetaTermLeaf s2))] <- es ->
+        return $ liftBool (s1 == s2) m
     "reify"
       | [arg@(_, MetaTermNecIntro _)] <- es ->
         return (m, MetaTermNecIntro arg)
     "reflect"
       | [(_, MetaTermNecIntro t)] <- es ->
         reflect t >>= discernMetaTerm >>= reduceMetaTerm
-    "meta-print"
-      | [arg] <- es -> do
-        liftIO $ putStrLn $ T.unpack $ showAsSExp $ toTree arg
-        return (m, MetaTermEnumIntro "top.unit")
-    "meta-cons"
-      | [(_, MetaTermNecIntro t), (_, MetaTermNecIntro (_, MetaTermNode ts))] <- es ->
-        return (m, MetaTermNecIntro (m, MetaTermNode (t : ts)))
-    "meta-head"
-      | [(mQuote, MetaTermNecIntro (_, MetaTermNode (h : _)))] <- es ->
-        return (mQuote, MetaTermNecIntro h)
-    "meta-tail"
+    "tail"
       | [(mQuote, MetaTermNecIntro (mNode, MetaTermNode (_ : rest)))] <- es ->
         return (mQuote, MetaTermNecIntro (mNode, MetaTermNode rest))
-    "meta-empty?"
-      | [(_, MetaTermNecIntro (_, MetaTermNode ts))] <- es ->
-        return $ liftBool (null ts) m
-    "meta-join-symbol"
-      | [(mQuote, MetaTermNecIntro (mLeaf, MetaTermLeaf s1)), (_, MetaTermNecIntro (_, MetaTermLeaf s2))] <- es ->
-        return (mQuote, MetaTermNecIntro (mLeaf, MetaTermLeaf (s1 <> s2)))
-    "meta-leaf-eq"
-      | [(_, MetaTermNecIntro (_, MetaTermLeaf s1)), (_, MetaTermNecIntro (_, MetaTermLeaf s2))] <- es ->
-        return $ liftBool (s1 == s2) m
     _
       | Just op <- toArithOp c,
         [(_, MetaTermInt64 i1), (_, MetaTermInt64 i2)] <- es ->
@@ -130,13 +130,13 @@ reduceConstApp m c es =
 toArithOp :: T.Text -> Maybe (Int64 -> Int64 -> Int64)
 toArithOp opStr =
   case opStr of
-    "meta-add" ->
+    "int-add" ->
       Just (+)
-    "meta-sub" ->
+    "int-sub" ->
       Just (-)
-    "meta-mul" ->
+    "int-mul" ->
       Just (*)
-    "meta-div" ->
+    "int-div" ->
       Just div
     _ ->
       Nothing
@@ -144,15 +144,15 @@ toArithOp opStr =
 toCmpOp :: T.Text -> Maybe (Int64 -> Int64 -> Bool)
 toCmpOp opStr =
   case opStr of
-    "meta-int-gt" ->
+    "int-gt" ->
       Just (<)
-    "meta-int-ge" ->
+    "int-ge" ->
       Just (<=)
-    "meta-int-lt" ->
+    "int-lt" ->
       Just (>)
-    "meta-int-le" ->
+    "int-le" ->
       Just (>=)
-    "meta-int-eq" ->
+    "int-eq" ->
       Just (==)
     _ ->
       Nothing

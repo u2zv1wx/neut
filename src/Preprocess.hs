@@ -7,6 +7,7 @@ import Data.Hint
 import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.MetaTerm
+import Data.Platform
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
@@ -110,6 +111,17 @@ preprocess' sub stmtList =
                 includeFile sub m mPath pathString restStmtList
               | otherwise ->
                 raiseSyntaxError m "(include LEAF)"
+            "introspect"
+              | ((mx, MetaTermLeaf x) : stmtClauseList) <- rest -> do
+                val <- retrieveCompileTimeVarValue mx x
+                stmtClauseList' <- mapM preprocessStmtClause stmtClauseList
+                case lookup val stmtClauseList' of
+                  Nothing ->
+                    preprocess' sub restStmtList
+                  Just as1 ->
+                    preprocess' sub $ as1 ++ restStmtList
+              | otherwise ->
+                raiseSyntaxError m "(introspect LEAF TREE*)"
             "ensure"
               | [(_, MetaTermLeaf pkg), (mUrl, MetaTermLeaf urlStr)] <- rest -> do
                 libDirPath <- getLibraryDirPath
@@ -173,6 +185,7 @@ metaKeywordSet =
       "auto-thunk",
       "auto-quote",
       "meta-enum",
+      "introspect",
       "meta-constant",
       "ensure"
     ]
@@ -269,3 +282,21 @@ specialize term =
       return (m, TreeNode es')
     (m, _) ->
       raiseError m "the argument isn't a valid AST"
+
+preprocessStmtClause :: MetaTermPlus -> WithEnv (T.Text, [MetaTermPlus])
+preprocessStmtClause tree =
+  case tree of
+    (_, MetaTermNode ((_, MetaTermLeaf x) : stmtList)) ->
+      return (x, stmtList)
+    (m, _) ->
+      raiseSyntaxError m "(LEAF TREE*)"
+
+retrieveCompileTimeVarValue :: Hint -> T.Text -> WithEnv T.Text
+retrieveCompileTimeVarValue m var =
+  case var of
+    "OS" ->
+      showOS <$> getOS
+    "architecture" ->
+      showArch <$> getArch
+    _ ->
+      raiseError m $ "no such compile-time variable defined: " <> var
