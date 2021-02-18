@@ -55,7 +55,8 @@ parse stmtTreeList =
                 raiseSyntaxError m "(end LEAF)"
             "enum"
               | (_, TreeLeaf name) : ts <- rest -> do
-                xis <- reflectEnumItem m name ts
+                -- xis <- reflectEnumItem m name ts
+                xis <- undefined -- fix later
                 insEnumEnv m name xis
                 parse restStmtList
               | otherwise ->

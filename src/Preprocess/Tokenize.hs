@@ -8,9 +8,9 @@ import Control.Monad.State.Lazy
 import Data.Env
 import Data.Hint
 import Data.Log
+import Data.MetaTerm hiding (quote)
 import qualified Data.Set as S
 import qualified Data.Text as T
-import Data.Tree
 import Path
 
 data TEnv = TEnv
@@ -24,7 +24,7 @@ data TEnv = TEnv
 
 type Tokenizer a = StateT TEnv IO a
 
-tokenize :: T.Text -> WithEnv [TreePlus]
+tokenize :: T.Text -> WithEnv [MetaTermPlus]
 tokenize input = do
   modify (\env -> env {count = 1 + count env})
   path <- getCurrentFilePath
@@ -37,7 +37,7 @@ tokenize input = do
     Right (result, _) ->
       return result
 
-program :: [TreePlus] -> Tokenizer [TreePlus]
+program :: [MetaTermPlus] -> Tokenizer [MetaTermPlus]
 program ts = do
   skip
   s <- gets text
@@ -47,7 +47,7 @@ program ts = do
       t <- term
       program $ t : ts
 
-term :: Tokenizer TreePlus
+term :: Tokenizer MetaTermPlus
 term = do
   s <- gets text
   case T.uncons s of
@@ -60,7 +60,7 @@ term = do
     _ ->
       leaf
 
-leaf :: Tokenizer TreePlus
+leaf :: Tokenizer MetaTermPlus
 leaf = do
   m <- currentHint
   s <- gets text
@@ -68,12 +68,12 @@ leaf = do
     Just ('"', _) -> do
       k <- string
       skip
-      return (m, TreeLeaf k)
+      return (m, MetaTermLeaf k)
     Just (c, _)
       | isSymbolChar c -> do
         x <- symbol
         skip
-        return (m, TreeLeaf x)
+        return (m, MetaTermLeaf x)
       | otherwise ->
         raiseTokenizeError $
           "unexpected character: '"
@@ -82,29 +82,29 @@ leaf = do
     Nothing ->
       raiseTokenizeError "unexpected end of input\nexpecting: LEAF"
 
-node :: Tokenizer TreePlus
+node :: Tokenizer MetaTermPlus
 node = do
   m <- currentHint
   char '(' >> skip
   itemList <- many term
   skip >> char ')' >> skip
-  return (m, TreeNode itemList)
+  return (m, MetaTermNode itemList)
 
-quote :: Tokenizer TreePlus
+quote :: Tokenizer MetaTermPlus
 quote = do
   m <- currentHint
   char '\'' >> skip
   item <- term
   skip
-  return (m, TreeNode [(m, TreeLeaf "quote"), item])
+  return (m, MetaTermNode [(m, MetaTermLeaf "quote"), item])
 
-unquote :: Tokenizer TreePlus
+unquote :: Tokenizer MetaTermPlus
 unquote = do
   m <- currentHint
   char ',' >> skip
   item <- term
   skip
-  return (m, TreeNode [(m, TreeLeaf "unquote"), item])
+  return (m, MetaTermNode [(m, MetaTermLeaf "unquote"), item])
 
 char :: Char -> Tokenizer ()
 char c = do

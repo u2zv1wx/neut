@@ -50,6 +50,7 @@ data Env = Env
     --
     topMetaNameEnv :: Map.HashMap T.Text Ident,
     autoQuoteEnv :: S.Set T.Text,
+    autoThunkEnv :: S.Set T.Text,
     metaConstantSet :: S.Set T.Text,
     --
     -- parse
@@ -97,6 +98,7 @@ initialEnv =
       endOfEntry = "",
       topMetaNameEnv = Map.empty,
       autoQuoteEnv = S.empty,
+      autoThunkEnv = S.empty,
       metaConstantSet = S.empty,
       phase = 0,
       -- notationEnv = Map.empty,

@@ -18,7 +18,6 @@ import Data.Size
 import qualified Data.Text as T
 import Data.Tree
 import Data.WeakTerm
-import Preprocess.Reflect
 import Text.Read (readMaybe)
 
 interpret :: TreePlus -> WithEnv WeakTermPlus
@@ -330,11 +329,23 @@ interpretClause :: TreePlus -> WithEnv (EnumCasePlus, WeakTermPlus)
 interpretClause tree =
   case tree of
     (_, TreeNode [c, e]) -> do
-      c' <- reflectEnumCase c
+      c' <- interpretEnumCase c
       e' <- interpret e
       return (c', e')
     e ->
       raiseSyntaxError (fst e) "(TREE TREE)"
+
+interpretEnumCase :: TreePlus -> WithEnv EnumCasePlus
+interpretEnumCase tree =
+  case tree of
+    (m, TreeNode [(_, TreeLeaf "enum-introduction"), (_, TreeLeaf l)]) ->
+      return (m, EnumCaseLabel l)
+    (m, TreeLeaf "default") ->
+      return (m, EnumCaseDefault)
+    (m, TreeLeaf l) ->
+      return (m, EnumCaseLabel l)
+    (m, _) ->
+      raiseSyntaxError m "default | LEAF"
 
 interpretStructIntro :: TreePlus -> WithEnv (WeakTermPlus, ArrayKind)
 interpretStructIntro tree =

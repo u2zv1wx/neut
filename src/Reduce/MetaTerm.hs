@@ -84,14 +84,24 @@ reduceMetaTerm term =
                 return $ liftBool (null ts) m
               _ ->
                 raiseError m $ "meta-empty? cannot be applied to: " <> showAsSExp (reify arg)
-          | "evaluate" == c -> do
+          | "reify" == c -> do
+            case es' of
+              [arg] ->
+                case arg of
+                  (_, MetaTermNecIntro _) -> do
+                    return (m, MetaTermNecIntro arg)
+                  _ ->
+                    raiseError m $ "reify cannot be applied to: " <> showAsSExp (reify arg)
+              _ ->
+                raiseError m "arity mismatch"
+          | "reflect" == c -> do
             case es' of
               [arg] ->
                 case arg of
                   (_, MetaTermNecIntro t) -> do
-                    reflect (reify t) >>= discernMetaTerm >>= reduceMetaTerm
+                    reflect t >>= discernMetaTerm >>= reduceMetaTerm
                   _ ->
-                    raiseError m $ "evaluate cannot be applied to: " <> showAsSExp (reify arg)
+                    raiseError m $ "reflect cannot be applied to: " <> showAsSExp (reify arg)
               _ ->
                 raiseError m "arity mismatch"
           | "meta-join-symbol" == c,
@@ -135,8 +145,11 @@ reduceMetaTerm term =
               reduceMetaTerm body
             Nothing ->
               raiseError m "found an ill-typed switch"
-        _ ->
+        _ -> do
           raiseError m "found an ill-typed switch"
+    (m, MetaTermNecIntro e) -> do
+      e' <- reduceMetaTerm e -- !
+      return (m, MetaTermNecIntro e')
     (_, MetaTermNecElim e) -> do
       e' <- reduceMetaTerm e
       case e' of
@@ -147,7 +160,7 @@ reduceMetaTerm term =
     (m, MetaTermNode es) -> do
       es' <- mapM reduceMetaTerm es
       return (m, MetaTermNode es')
-    _ ->
+    _ -> do
       return term
 
 toArithmeticOperator :: T.Text -> Maybe (Int64 -> Int64 -> Int64)
@@ -180,14 +193,14 @@ toCmpOp opStr =
     _ ->
       Nothing
 
-reinterpret :: MetaTermPlus -> WithEnv TreePlus
-reinterpret term =
+inject :: MetaTermPlus -> WithEnv MetaTermPlus
+inject term =
   case term of
-    (m, MetaTermLeaf x) ->
-      return (m, TreeLeaf x)
+    (m, MetaTermLeaf _) ->
+      return (m, MetaTermNode [(m, MetaTermLeaf "leaf"), term])
     (m, MetaTermNode es) -> do
-      es' <- mapM reinterpret es
-      return (m, TreeNode es')
+      es' <- mapM inject es
+      return (m, MetaTermNode ((m, MetaTermLeaf "node") : es'))
     (m, _) ->
       raiseError m "the argument isn't a valid AST"
 
@@ -211,12 +224,11 @@ reify term =
     (m, MetaTermFix f xs Nothing e) -> do
       let e' = reify e
       let xs' = map (\i -> (m, TreeLeaf $ asText' i)) xs
-      (m, TreeNode [(m, TreeLeaf (asText' f)), (m, TreeNode xs'), e'])
+      (m, TreeNode [(m, TreeLeaf "fix"), (m, TreeLeaf (asText' f)), (m, TreeNode xs'), e'])
     (m, MetaTermFix f xs (Just rest) e) -> do
       let e' = reify e
-      -- let xs' = map (\i -> (m, TreeLeaf $ asText' i)) xs
       let args = map (\i -> (m, TreeLeaf $ asText' i)) $ xs ++ [rest]
-      (m, TreeNode [(m, TreeLeaf (asText' f)), (m, TreeNode args), e'])
+      (m, TreeNode [(m, TreeLeaf "fix+"), (m, TreeLeaf (asText' f)), (m, TreeNode args), e'])
     (m, MetaTermNecIntro e) -> do
       let e' = reify e
       (m, TreeNode [(m, TreeLeaf "quote"), e'])

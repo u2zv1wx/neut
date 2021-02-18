@@ -7,6 +7,7 @@ import Data.Int
 import qualified Data.IntMap as IntMap
 import Data.Maybe (catMaybes)
 import qualified Data.Text as T
+import Data.Tree
 
 data MetaTerm
   = MetaTermVar Ident
@@ -25,6 +26,14 @@ data MetaTerm
 
 type MetaTermPlus =
   (Hint, MetaTerm)
+
+embed :: TreePlus -> MetaTermPlus
+embed term =
+  case term of
+    (m, TreeLeaf x) ->
+      (m, MetaTermLeaf x)
+    (m, TreeNode es) ->
+      (m, MetaTermNode (map embed es))
 
 type SubstMetaTerm =
   IntMap.IntMap MetaTermPlus

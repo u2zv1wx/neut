@@ -26,14 +26,14 @@ preprocess :: Path Abs File -> WithEnv [TreePlus]
 preprocess mainFilePath = do
   pushTrace mainFilePath
   out <- visit mainFilePath
-  forM_ out $ \k ->
-    p $ T.unpack $ showAsSExp k
+  forM_ out $ \k -> do
+    p $ T.unpack $ showAsSExp $ reify k
   p "quitting."
   modify (\env -> env {enumEnv = Map.empty})
   modify (\env -> env {revEnumEnv = Map.empty})
   liftIO $ exitWith ExitSuccess
 
-visit :: Path Abs File -> WithEnv [TreePlus]
+visit :: Path Abs File -> WithEnv [MetaTermPlus]
 visit path = do
   pushTrace path
   modify (\env -> env {fileEnv = Map.insert path VisitInfoActive (fileEnv env)})
@@ -41,7 +41,7 @@ visit path = do
   content <- liftIO $ TIO.readFile $ toFilePath path
   tokenize content >>= preprocess' IntMap.empty
 
-leave :: WithEnv [TreePlus]
+leave :: WithEnv [MetaTermPlus]
 leave = do
   path <- getCurrentFilePath
   popTrace
@@ -58,51 +58,58 @@ popTrace :: WithEnv ()
 popTrace =
   modify (\env -> env {traceEnv = tail (traceEnv env)})
 
-preprocess' :: SubstMetaTerm -> [TreePlus] -> WithEnv [TreePlus]
+preprocess' :: SubstMetaTerm -> [MetaTermPlus] -> WithEnv [MetaTermPlus]
 preprocess' sub stmtList =
   case stmtList of
     [] ->
       leave
     headStmt : restStmtList -> do
       case headStmt of
-        (m, TreeNode ((_, TreeLeaf headAtom) : rest)) ->
+        (m, MetaTermNode ((_, MetaTermLeaf headAtom) : rest)) ->
           case headAtom of
+            "auto-thunk"
+              | [(_, MetaTermLeaf name)] <- rest -> do
+                modify (\env -> env {autoThunkEnv = S.insert name (autoThunkEnv env)})
+                preprocess' sub restStmtList
+              | otherwise ->
+                raiseSyntaxError m "(auto-thunk LEAF)"
             "auto-quote"
-              | [(_, TreeLeaf name)] <- rest -> do
+              | [(_, MetaTermLeaf name)] <- rest -> do
                 modify (\env -> env {autoQuoteEnv = S.insert name (autoQuoteEnv env)})
                 preprocess' sub restStmtList
               | otherwise ->
                 raiseSyntaxError m "(auto-quote LEAF)"
             "denote"
-              | [(_, TreeLeaf name), body] <- rest -> do
+              | [(_, MetaTermLeaf name), body] <- rest -> do
                 body' <- reflect body >>= discernMetaTerm
                 body'' <- reduceMetaTerm $ substMetaTerm sub body'
                 name' <- newNameWith $ asIdent name
                 modify (\env -> env {topMetaNameEnv = Map.insert name name' (topMetaNameEnv env)})
                 preprocess' (IntMap.insert (asInt name') body'' sub) restStmtList
-              | otherwise ->
+              | otherwise -> do
+                p' rest
                 raiseSyntaxError m "(denote LEAF TREE)"
             "meta-enum"
-              | (_, TreeLeaf name) : ts <- rest -> do
+              | (_, MetaTermLeaf name) : ts <- rest -> do
                 xis <- reflectEnumItem m name ts
                 insEnumEnv m name xis
                 preprocess' sub restStmtList
               | otherwise ->
                 raiseSyntaxError m "(enum LEAF TREE ... TREE)"
             "meta-constant"
-              | [(_, TreeLeaf name)] <- rest -> do
+              | [(_, MetaTermLeaf name)] <- rest -> do
                 modify (\env -> env {metaConstantSet = S.insert name (metaConstantSet env)})
                 preprocess' sub restStmtList
               | otherwise ->
                 raiseSyntaxError m "(meta-constant LEAF)"
             "include"
-              | [(mPath, TreeLeaf pathString)] <- rest,
+              | [(mPath, MetaTermLeaf pathString)] <- rest,
                 not (T.null pathString) ->
                 includeFile sub m mPath pathString restStmtList
               | otherwise ->
                 raiseSyntaxError m "(include LEAF)"
             "ensure"
-              | [(_, TreeLeaf pkg), (mUrl, TreeLeaf urlStr)] <- rest -> do
+              | [(_, MetaTermLeaf pkg), (mUrl, MetaTermLeaf urlStr)] <- rest -> do
                 libDirPath <- getLibraryDirPath
                 pkg' <- parseRelDir $ T.unpack pkg
                 let pkgDirPath = libDirPath </> pkg'
@@ -133,25 +140,25 @@ preprocess' sub stmtList =
         _ ->
           preprocessAux sub headStmt restStmtList
 
-preprocessAux :: SubstMetaTerm -> TreePlus -> [TreePlus] -> WithEnv [TreePlus]
+preprocessAux :: SubstMetaTerm -> MetaTermPlus -> [MetaTermPlus] -> WithEnv [MetaTermPlus]
 preprocessAux sub headStmt restStmtList = do
   headStmt' <- reflect headStmt >>= discernMetaTerm
   headStmt'' <- reduceMetaTerm $ substMetaTerm sub headStmt'
   case headStmt'' of
     (_, MetaTermNecIntro e) -> do
-      ast <- reify <$> reduceMetaTerm e
-      if isSpecialMetaForm ast
-        then preprocess' sub $ ast : restStmtList
+      -- let ast = reify e
+      if isSpecialMetaForm e
+        then preprocess' sub $ e : restStmtList
         else do
           treeList <- preprocess' sub restStmtList
-          return $ ast : treeList
+          return $ e : treeList
     _ -> do
       raiseError (fst headStmt') $ "meta-computation resulted in a non-quoted term: " <> showAsSExp (reify headStmt'')
 
-isSpecialMetaForm :: TreePlus -> Bool
+isSpecialMetaForm :: MetaTermPlus -> Bool
 isSpecialMetaForm tree =
   case tree of
-    (_, TreeNode ((_, TreeLeaf x) : _)) ->
+    (_, MetaTermNode ((_, MetaTermLeaf x) : _)) ->
       S.member x metaKeywordSet
     _ ->
       False
@@ -162,6 +169,7 @@ metaKeywordSet =
     [ "denote",
       "statement",
       "include",
+      "auto-thunk",
       "auto-quote",
       "meta-enum",
       "meta-constant",
@@ -173,8 +181,8 @@ includeFile ::
   Hint ->
   Hint ->
   T.Text ->
-  [TreePlus] ->
-  WithEnv [TreePlus]
+  [MetaTermPlus] ->
+  WithEnv [MetaTermPlus]
 includeFile sub m mPath pathString as = do
   -- ensureEnvSanity m
   path <- readStrOrThrow mPath pathString
