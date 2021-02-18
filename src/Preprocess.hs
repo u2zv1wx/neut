@@ -26,7 +26,7 @@ preprocess :: Path Abs File -> WithEnv [TreePlus]
 preprocess mainFilePath = do
   pushTrace mainFilePath
   out <- visit mainFilePath
-  out' <- mapM inject out
+  out' <- mapM specialize out
   forM_ out $ \k -> do
     p $ T.unpack $ showAsSExp $ toTree k
   p "quitting."
@@ -148,7 +148,6 @@ preprocessAux sub headStmt restStmtList = do
   headStmt'' <- reduceMetaTerm $ substMetaTerm sub headStmt'
   case headStmt'' of
     (_, MetaTermNecIntro e) -> do
-      -- let ast = reify e
       if isSpecialMetaForm e
         then preprocess' sub $ e : restStmtList
         else do
@@ -260,13 +259,13 @@ ensureFileExistence m path = do
     then return ()
     else raiseError m $ "no such file: " <> T.pack (toFilePath path)
 
-inject :: MetaTermPlus -> WithEnv TreePlus
-inject term =
+specialize :: MetaTermPlus -> WithEnv TreePlus
+specialize term =
   case term of
     (m, MetaTermLeaf x) ->
       return (m, TreeLeaf x)
     (m, MetaTermNode es) -> do
-      es' <- mapM inject es
+      es' <- mapM specialize es
       return (m, TreeNode es')
     (m, _) ->
       raiseError m "the argument isn't a valid AST"

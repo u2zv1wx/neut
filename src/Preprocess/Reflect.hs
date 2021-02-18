@@ -140,29 +140,28 @@ reflect' level tree =
     (m, MetaTermNecElim e) -> do
       e' <- reflect' (level - 1) e
       return (m, MetaTermNecElim e')
-    _ -> do
-      p' tree
-      undefined
+    (m, _) -> do
+      raiseCritical m "Preprocess.Reflect.reflect called for a non-AST term (compiler bug)"
 
 reflectAux :: Int -> Hint -> MetaTermPlus -> [MetaTermPlus] -> WithEnv MetaTermPlus
 reflectAux level m f args = do
   f' <- reflect' level f
+  args' <- modifyArgs f args
+  args'' <- mapM (reflect' level) args'
+  return (m, MetaTermImpElim f' args'')
+
+modifyArgs :: MetaTermPlus -> [MetaTermPlus] -> WithEnv [MetaTermPlus]
+modifyArgs f args = do
   thunkEnv <- gets autoThunkEnv
   quoteEnv <- gets autoQuoteEnv
-  case f' of
+  case f of
     (_, MetaTermVar name)
-      | S.member (asText name) thunkEnv -> do
-        let args' = map wrapWithThunk args
-        args'' <- mapM (reflect' level) args'
-        return (m, MetaTermImpElim f' args'')
-    (_, MetaTermVar name)
-      | S.member (asText name) quoteEnv -> do
-        let args' = map wrapWithQuote args
-        args'' <- mapM (reflect' level) args'
-        return (m, MetaTermImpElim f' args'')
-    _ -> do
-      args' <- mapM (reflect' level) args
-      return (m, MetaTermImpElim f' args')
+      | S.member (asText name) thunkEnv ->
+        return $ map wrapWithThunk args
+      | S.member (asText name) quoteEnv ->
+        return $ map wrapWithQuote args
+    _ ->
+      return args
 
 reflectIdent :: MetaTermPlus -> WithEnv Ident
 reflectIdent tree =
