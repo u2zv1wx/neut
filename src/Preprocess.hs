@@ -26,12 +26,14 @@ preprocess :: Path Abs File -> WithEnv [TreePlus]
 preprocess mainFilePath = do
   pushTrace mainFilePath
   out <- visit mainFilePath
+  out' <- mapM inject out
   forM_ out $ \k -> do
-    p $ T.unpack $ showAsSExp $ reify k
+    p $ T.unpack $ showAsSExp $ toTree k
   p "quitting."
   modify (\env -> env {enumEnv = Map.empty})
   modify (\env -> env {revEnumEnv = Map.empty})
-  liftIO $ exitWith ExitSuccess
+  _ <- liftIO $ exitWith ExitSuccess
+  return out'
 
 visit :: Path Abs File -> WithEnv [MetaTermPlus]
 visit path = do
@@ -153,7 +155,7 @@ preprocessAux sub headStmt restStmtList = do
           treeList <- preprocess' sub restStmtList
           return $ e : treeList
     _ -> do
-      raiseError (fst headStmt') $ "meta-computation resulted in a non-quoted term: " <> showAsSExp (reify headStmt'')
+      raiseError (fst headStmt') $ "meta-computation resulted in a non-quoted term: " <> showAsSExp (toTree headStmt'')
 
 isSpecialMetaForm :: MetaTermPlus -> Bool
 isSpecialMetaForm tree =
@@ -257,3 +259,14 @@ ensureFileExistence m path = do
   if b
     then return ()
     else raiseError m $ "no such file: " <> T.pack (toFilePath path)
+
+inject :: MetaTermPlus -> WithEnv TreePlus
+inject term =
+  case term of
+    (m, MetaTermLeaf x) ->
+      return (m, TreeLeaf x)
+    (m, MetaTermNode es) -> do
+      es' <- mapM inject es
+      return (m, TreeNode es')
+    (m, _) ->
+      raiseError m "the argument isn't a valid AST"

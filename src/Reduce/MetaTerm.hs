@@ -13,6 +13,12 @@ import Data.Tree
 import Preprocess.Discern
 import Preprocess.Reflect
 
+-- common lisp   | the meta-calculus of Neut (S4 modal logic)
+--               |
+-- quasiquote    | necessity-intro
+-- unquote       | necessity-elim
+-- quote         | reify (Axiom 4, added as a constant)
+-- eval          | reflect (Axiom T, added as a constant)
 reduceMetaTerm :: MetaTermPlus -> WithEnv MetaTermPlus
 reduceMetaTerm term =
   case term of
@@ -55,7 +61,7 @@ reduceMetaTerm term =
         (_, MetaTermConst c)
           | "meta-print" == c,
             [arg] <- es' -> do
-            liftIO $ putStrLn $ T.unpack $ showAsSExp $ reify arg
+            liftIO $ putStrLn $ T.unpack $ showAsSExp $ toTree arg
             return (m, MetaTermEnumIntro "top.unit")
           | "meta-cons" == c -> do
             case es' of
@@ -69,21 +75,21 @@ reduceMetaTerm term =
               (mQuote, MetaTermNecIntro (_, MetaTermNode (h : _))) ->
                 return (mQuote, MetaTermNecIntro h)
               _ ->
-                raiseError m $ "meta-head cannot be applied to: " <> showAsSExp (reify arg)
+                raiseError m $ "meta-head cannot be applied to: " <> showAsSExp (toTree arg)
           | "meta-tail" == c,
             [arg] <- es' -> do
             case arg of
               (mQuote, MetaTermNecIntro (mNode, MetaTermNode (_ : rest))) ->
                 return (mQuote, MetaTermNecIntro (mNode, MetaTermNode rest))
               _ ->
-                raiseError m $ "meta-tail cannot be applied to: " <> showAsSExp (reify arg)
+                raiseError m $ "meta-tail cannot be applied to: " <> showAsSExp (toTree arg)
           | "meta-empty?" == c,
             [arg] <- es' -> do
             case arg of
               (_, MetaTermNecIntro (_, MetaTermNode ts)) ->
                 return $ liftBool (null ts) m
               _ ->
-                raiseError m $ "meta-empty? cannot be applied to: " <> showAsSExp (reify arg)
+                raiseError m $ "meta-empty? cannot be applied to: " <> showAsSExp (toTree arg)
           | "reify" == c -> do
             case es' of
               [arg] ->
@@ -91,7 +97,7 @@ reduceMetaTerm term =
                   (_, MetaTermNecIntro _) -> do
                     return (m, MetaTermNecIntro arg)
                   _ ->
-                    raiseError m $ "reify cannot be applied to: " <> showAsSExp (reify arg)
+                    raiseError m $ "reify cannot be applied to: " <> showAsSExp (toTree arg)
               _ ->
                 raiseError m "arity mismatch"
           | "reflect" == c -> do
@@ -101,7 +107,7 @@ reduceMetaTerm term =
                   (_, MetaTermNecIntro t) -> do
                     reflect t >>= discernMetaTerm >>= reduceMetaTerm
                   _ ->
-                    raiseError m $ "reflect cannot be applied to: " <> showAsSExp (reify arg)
+                    raiseError m $ "reflect cannot be applied to: " <> showAsSExp (toTree arg)
               _ ->
                 raiseError m "arity mismatch"
           | "meta-join-symbol" == c,
@@ -192,75 +198,6 @@ toCmpOp opStr =
       Just (==)
     _ ->
       Nothing
-
-inject :: MetaTermPlus -> WithEnv MetaTermPlus
-inject term =
-  case term of
-    (m, MetaTermLeaf _) ->
-      return (m, MetaTermNode [(m, MetaTermLeaf "leaf"), term])
-    (m, MetaTermNode es) -> do
-      es' <- mapM inject es
-      return (m, MetaTermNode ((m, MetaTermLeaf "node") : es'))
-    (m, _) ->
-      raiseError m "the argument isn't a valid AST"
-
-reify :: MetaTermPlus -> TreePlus
-reify term =
-  case term of
-    (m, MetaTermVar x) ->
-      (m, TreeLeaf $ asText' x) -- ホントはmeta専用の名前にするべき
-    (m, MetaTermImpIntro xs Nothing e) -> do
-      let e' = reify e
-      let xs' = map (\i -> (m, TreeLeaf $ asText' i)) xs
-      (m, TreeNode [(m, TreeLeaf "lambda"), (m, TreeNode xs'), e'])
-    (m, MetaTermImpIntro xs (Just rest) e) -> do
-      let e' = reify e
-      let args = map (\i -> (m, TreeLeaf $ asText' i)) $ xs ++ [rest]
-      (m, TreeNode [(m, TreeLeaf "lambda+"), (m, TreeNode args), e'])
-    (m, MetaTermImpElim e es) -> do
-      let e' = reify e
-      let es' = map reify es
-      (m, TreeNode ((m, TreeLeaf "apply") : e' : es'))
-    (m, MetaTermFix f xs Nothing e) -> do
-      let e' = reify e
-      let xs' = map (\i -> (m, TreeLeaf $ asText' i)) xs
-      (m, TreeNode [(m, TreeLeaf "fix"), (m, TreeLeaf (asText' f)), (m, TreeNode xs'), e'])
-    (m, MetaTermFix f xs (Just rest) e) -> do
-      let e' = reify e
-      let args = map (\i -> (m, TreeLeaf $ asText' i)) $ xs ++ [rest]
-      (m, TreeNode [(m, TreeLeaf "fix+"), (m, TreeLeaf (asText' f)), (m, TreeNode args), e'])
-    (m, MetaTermNecIntro e) -> do
-      let e' = reify e
-      (m, TreeNode [(m, TreeLeaf "quote"), e'])
-    (m, MetaTermNecElim e) -> do
-      let e' = reify e
-      (m, TreeNode [(m, TreeLeaf "unquote"), e'])
-    (m, MetaTermLeaf x) ->
-      (m, TreeLeaf x)
-    (m, MetaTermNode es) -> do
-      let es' = map reify es
-      (m, TreeNode es')
-    (m, MetaTermConst c) ->
-      (m, TreeLeaf c)
-    (m, MetaTermInt64 i) ->
-      (m, TreeLeaf $ T.pack $ show i)
-    (m, MetaTermEnumIntro a) ->
-      (m, TreeLeaf a)
-    (m, MetaTermEnumElim e caseList) -> do
-      let e' = reify e
-      let (cs, bodyList) = unzip caseList
-      let cs' = map reifyEnumCase cs
-      let bodyList' = map reify bodyList
-      let caseList' = map (\(c, body) -> (m, TreeNode [c, body])) $ zip cs' bodyList'
-      (m, TreeNode [(m, TreeLeaf "switch"), e', (m, TreeNode caseList')])
-
-reifyEnumCase :: EnumCasePlus -> TreePlus
-reifyEnumCase (m, v) =
-  case v of
-    EnumCaseLabel l ->
-      (m, TreeLeaf l)
-    EnumCaseDefault ->
-      (m, TreeLeaf "default")
 
 liftBool :: Bool -> Hint -> MetaTermPlus
 liftBool b m =

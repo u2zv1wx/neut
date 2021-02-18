@@ -85,3 +85,61 @@ substMetaTerm sub term =
 quote :: MetaTermPlus -> MetaTermPlus
 quote (m, t) =
   (m, MetaTermNecIntro (m, t))
+
+toTree :: MetaTermPlus -> TreePlus
+toTree term =
+  case term of
+    (m, MetaTermVar x) ->
+      (m, TreeLeaf $ asText' x) -- ホントはmeta専用の名前にするべき
+    (m, MetaTermImpIntro xs Nothing e) -> do
+      let e' = toTree e
+      let xs' = map (\i -> (m, TreeLeaf $ asText' i)) xs
+      (m, TreeNode [(m, TreeLeaf "lambda"), (m, TreeNode xs'), e'])
+    (m, MetaTermImpIntro xs (Just rest) e) -> do
+      let e' = toTree e
+      let args = map (\i -> (m, TreeLeaf $ asText' i)) $ xs ++ [rest]
+      (m, TreeNode [(m, TreeLeaf "lambda+"), (m, TreeNode args), e'])
+    (m, MetaTermImpElim e es) -> do
+      let e' = toTree e
+      let es' = map toTree es
+      (m, TreeNode ((m, TreeLeaf "apply") : e' : es'))
+    (m, MetaTermFix f xs Nothing e) -> do
+      let e' = toTree e
+      let xs' = map (\i -> (m, TreeLeaf $ asText' i)) xs
+      (m, TreeNode [(m, TreeLeaf "fix"), (m, TreeLeaf (asText' f)), (m, TreeNode xs'), e'])
+    (m, MetaTermFix f xs (Just rest) e) -> do
+      let e' = toTree e
+      let args = map (\i -> (m, TreeLeaf $ asText' i)) $ xs ++ [rest]
+      (m, TreeNode [(m, TreeLeaf "fix+"), (m, TreeLeaf (asText' f)), (m, TreeNode args), e'])
+    (m, MetaTermNecIntro e) -> do
+      let e' = toTree e
+      (m, TreeNode [(m, TreeLeaf "quote"), e'])
+    (m, MetaTermNecElim e) -> do
+      let e' = toTree e
+      (m, TreeNode [(m, TreeLeaf "unquote"), e'])
+    (m, MetaTermLeaf x) ->
+      (m, TreeLeaf x)
+    (m, MetaTermNode es) -> do
+      let es' = map toTree es
+      (m, TreeNode es')
+    (m, MetaTermConst c) ->
+      (m, TreeLeaf c)
+    (m, MetaTermInt64 i) ->
+      (m, TreeLeaf $ T.pack $ show i)
+    (m, MetaTermEnumIntro a) ->
+      (m, TreeLeaf a)
+    (m, MetaTermEnumElim e caseList) -> do
+      let e' = toTree e
+      let (cs, bodyList) = unzip caseList
+      let cs' = map toTreeEnumCase cs
+      let bodyList' = map toTree bodyList
+      let caseList' = map (\(c, body) -> (m, TreeNode [c, body])) $ zip cs' bodyList'
+      (m, TreeNode [(m, TreeLeaf "switch"), e', (m, TreeNode caseList')])
+
+toTreeEnumCase :: EnumCasePlus -> TreePlus
+toTreeEnumCase (m, v) =
+  case v of
+    EnumCaseLabel l ->
+      (m, TreeLeaf l)
+    EnumCaseDefault ->
+      (m, TreeLeaf "default")
