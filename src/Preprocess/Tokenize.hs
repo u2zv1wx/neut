@@ -6,11 +6,13 @@ where
 import Control.Exception.Safe
 import Control.Monad.State.Lazy
 import Data.Env
+import qualified Data.HashMap.Lazy as Map
 import Data.Hint
 import Data.Log
 import Data.MetaTerm hiding (quote)
 import qualified Data.Set as S
 import qualified Data.Text as T
+import Data.Tree
 import Path
 
 data TEnv = TEnv
@@ -34,7 +36,7 @@ tokenize input = do
   case resultOrError of
     Left err ->
       throw (err :: Error)
-    Right (result, _) ->
+    Right (result, _) -> do
       return result
 
 program :: [MetaTermPlus] -> Tokenizer [MetaTermPlus]
@@ -51,10 +53,9 @@ term :: Tokenizer MetaTermPlus
 term = do
   s <- gets text
   case T.uncons s of
-    Just ('\'', _) ->
-      quote
-    Just (',', _) ->
-      unquote
+    Just (c, _)
+      | Just l <- Map.lookup c readMacroMap ->
+        resolveReadMacro c l
     Just ('(', _) ->
       node
     _ ->
@@ -90,21 +91,13 @@ node = do
   skip >> char ')' >> skip
   return (m, MetaTermNode itemList)
 
-quote :: Tokenizer MetaTermPlus
-quote = do
+resolveReadMacro :: Char -> T.Text -> Tokenizer MetaTermPlus
+resolveReadMacro from to = do
   m <- currentHint
-  char '\'' >> skip
+  char from >> skip
   item <- term
   skip
-  return (m, MetaTermNode [(m, MetaTermLeaf "quote"), item])
-
-unquote :: Tokenizer MetaTermPlus
-unquote = do
-  m <- currentHint
-  char ',' >> skip
-  item <- term
-  skip
-  return (m, MetaTermNode [(m, MetaTermLeaf "unquote"), item])
+  return (m, MetaTermNode [(m, MetaTermLeaf to), item])
 
 char :: Char -> Tokenizer ()
 char c = do
@@ -241,7 +234,7 @@ newlineSet =
 {-# INLINE nonSymbolSet #-}
 nonSymbolSet :: S.Set Char
 nonSymbolSet =
-  S.fromList "() \"\n;',"
+  S.fromList "() \"\n;',`#"
 
 {-# INLINE updateStreamL #-}
 updateStreamL :: T.Text -> Tokenizer ()
@@ -265,3 +258,12 @@ raiseTokenizeError :: T.Text -> Tokenizer a
 raiseTokenizeError txt = do
   m <- currentHint
   throw $ Error [logError (getPosInfo m) txt]
+
+readMacroMap :: Map.HashMap Char T.Text
+readMacroMap =
+  Map.fromList
+    [ ('\'', "quote"),
+      (',', "unquote"),
+      ('`', "quasiquote"),
+      ('#', "quasiunquote")
+    ]
