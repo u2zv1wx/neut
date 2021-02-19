@@ -1,4 +1,9 @@
-module Preprocess.Discern (discernMetaTerm, discernEnumCase) where
+module Preprocess.Discern
+  ( discernMetaTerm,
+    discernEnumCase,
+    discernMetaType,
+  )
+where
 
 import Control.Monad.State.Lazy
 import Data.EnumCase
@@ -62,14 +67,14 @@ discernMetaTerm' nenv term =
       return term
     (_, MetaTermEnumIntro _) ->
       return term
-    (m, MetaTermEnumElim e caseList) -> do
+    (m, MetaTermEnumElim (e, i) caseList) -> do
       e' <- discernMetaTerm' nenv e
       caseList' <-
         forM caseList $ \((mCase, l), body) -> do
           l' <- discernEnumCase mCase l
           body' <- discernMetaTerm' nenv body
           return ((mCase, l'), body')
-      return (m, MetaTermEnumElim e' caseList')
+      return (m, MetaTermEnumElim (e', i) caseList')
 
 discernBinder ::
   NameEnv ->
@@ -105,3 +110,50 @@ discernEnumCase m weakCase =
           raiseError m $ "no such enum-value is defined: " <> l
     _ ->
       return weakCase
+
+discernMetaType :: [Ident] -> MetaTypePlus -> WithEnv ([Ident], MetaTypePlus)
+discernMetaType is t = do
+  is' <- mapM newNameWith is
+  let nenv = Map.fromList $ zip (map asText is) is'
+  t' <- discernMetaType' nenv t
+  return (is', t')
+
+discernMetaType' :: NameEnv -> MetaTypePlus -> WithEnv MetaTypePlus
+discernMetaType' nenv t =
+  case t of
+    (m, MetaTypeVar x) ->
+      case Map.lookup (asText x) nenv of
+        Just x' ->
+          return (m, MetaTypeVar x')
+        Nothing -> do
+          eenv <- gets enumEnv
+          if Map.member (asText x) eenv
+            then return (m, MetaTypeEnum $ asText x)
+            else case asText x of
+              "i64" ->
+                return (m, MetaTypeInt64)
+              "code" ->
+                return (m, MetaTypeAST)
+              _ ->
+                raiseError m $ "undefined type-variable: " <> asText x
+    (m, MetaTypeArrow domList cod) -> do
+      domList' <- mapM (discernMetaType' nenv) domList
+      cod' <- discernMetaType' nenv cod
+      return (m, MetaTypeArrow domList' cod')
+    (m, MetaTypeNec t') -> do
+      t'' <- discernMetaType' nenv t'
+      return (m, MetaTypeNec t'')
+    _ ->
+      return t
+
+-- eenv <- gets enumEnv
+-- case t of
+--   (m, MetaTypeVar x) ->
+--     undefined
+
+--  Map.member x eenv ->
+--  return (m, MetaTypeEnum x)
+--  "i64" == x ->
+--  return (m, MetaTypeInt64)
+--  "code" == x ->
+--  return (m, MetaTypeAST)

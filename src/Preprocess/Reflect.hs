@@ -2,10 +2,10 @@ module Preprocess.Reflect
   ( reflect,
     reflectEnumItem,
     reflectEnumCase,
+    reflectMetaType,
   )
 where
 
-import Control.Monad.State.Lazy
 import Data.EnumCase
 import Data.Env
 import Data.Hint
@@ -13,7 +13,6 @@ import Data.Ident
 import Data.Maybe (fromMaybe)
 import Data.MetaTerm
 import Data.Namespace
-import qualified Data.Set as S
 import qualified Data.Text as T
 import Text.Read (readMaybe)
 
@@ -113,15 +112,21 @@ reflect' level tree =
                   raiseSyntaxError m "(quote TREE)"
               "unquote"
                 | [e] <- rest -> do
-                  e' <- reflect' (level - 1) e
-                  return (m, MetaTermNecElim e')
+                  if level - 1 < 1
+                    then do
+                      p' e
+                      raiseError m "cannot unquote a term at the base calculus"
+                    else do
+                      e' <- reflect' (level - 1) e
+                      return (m, MetaTermNecElim e')
                 | otherwise ->
                   raiseSyntaxError m "(unquote TREE)"
               "switch"
                 | e : cs <- rest -> do
                   e' <- reflect' level e
                   cs' <- mapM (reflectEnumClause level) cs
-                  return (m, MetaTermEnumElim e' cs')
+                  i <- newNameWith' "switch"
+                  return (m, MetaTermEnumElim (e', i) cs')
                 | otherwise ->
                   raiseSyntaxError m "(switch TREE TREE*)"
               "thunk"
@@ -134,34 +139,60 @@ reflect' level tree =
                 reflectAux level m leaf rest
           leaf : rest ->
             reflectAux level m leaf rest
+    -- reflectされたコードのunquoteの中にはこれらが出てくる
+    (_, MetaTermVar _) ->
+      return tree
+    (m, MetaTermImpIntro xs mRest e) -> do
+      e' <- reflect' level e
+      return (m, MetaTermImpIntro xs mRest e')
+    (m, MetaTermImpElim e es) -> do
+      e' <- reflect' level e
+      es' <- mapM (reflect' level) es
+      return (m, MetaTermImpElim e' es')
+    (m, MetaTermFix f xs mRest e) -> do
+      e' <- reflect' level e
+      return (m, MetaTermFix f xs mRest e')
     (m, MetaTermNecIntro e) -> do
       e' <- reflect' (level + 1) e
       return (m, MetaTermNecIntro e')
     (m, MetaTermNecElim e) -> do
       e' <- reflect' (level - 1) e
       return (m, MetaTermNecElim e')
-    (m, _) -> do
-      raiseCritical m "Preprocess.Reflect.reflect called for a non-AST term (compiler bug)"
+    (_, MetaTermConst _) ->
+      return tree
+    (_, MetaTermInt64 _) ->
+      return tree
+    (_, MetaTermEnumIntro _) ->
+      return tree
+    (m, MetaTermEnumElim (e, i) caseList) -> do
+      let (cs, es) = unzip caseList
+      e' <- reflect' level e
+      es' <- mapM (reflect' level) es
+      return (m, MetaTermEnumElim (e', i) (zip cs es'))
+
+-- (m, _) -> do
+--   p' tree
+--   raiseCritical m "Preprocess.Reflect.reflect called for a non-AST term (compiler bug)"
 
 reflectAux :: Int -> Hint -> MetaTermPlus -> [MetaTermPlus] -> WithEnv MetaTermPlus
 reflectAux level m f args = do
   f' <- reflect' level f
-  args' <- modifyArgs f args
-  args'' <- mapM (reflect' level) args'
-  return (m, MetaTermImpElim f' args'')
+  -- args' <- modifyArgs f args
+  args' <- mapM (reflect' level) args
+  return (m, MetaTermImpElim f' args')
 
-modifyArgs :: MetaTermPlus -> [MetaTermPlus] -> WithEnv [MetaTermPlus]
-modifyArgs f args = do
-  thunkEnv <- gets autoThunkEnv
-  quoteEnv <- gets autoQuoteEnv
-  case f of
-    (_, MetaTermVar name)
-      | S.member (asText name) thunkEnv ->
-        return $ map wrapWithThunk args
-      | S.member (asText name) quoteEnv ->
-        return $ map wrapWithQuote args
-    _ ->
-      return args
+-- modifyArgs :: MetaTermPlus -> [MetaTermPlus] -> WithEnv [MetaTermPlus]
+-- modifyArgs f args = do
+--   thunkEnv <- gets autoThunkEnv
+--   quoteEnv <- gets autoQuoteEnv
+--   case f of
+--     (_, MetaTermVar name)
+--       | S.member (asText name) thunkEnv ->
+--         return $ map wrapWithThunk args
+--       | S.member (asText name) quoteEnv ->
+--         return $ map wrapWithQuote args
+--     _ ->
+--       return args
 
 reflectIdent :: MetaTermPlus -> WithEnv Ident
 reflectIdent tree =
@@ -171,13 +202,13 @@ reflectIdent tree =
     t ->
       raiseSyntaxError (fst t) "LEAF"
 
-wrapWithThunk :: MetaTermPlus -> MetaTermPlus
-wrapWithThunk (m, t) =
-  (m, MetaTermNode [(m, MetaTermLeaf "thunk"), (m, t)])
+-- wrapWithThunk :: MetaTermPlus -> MetaTermPlus
+-- wrapWithThunk (m, t) =
+--   (m, MetaTermNode [(m, MetaTermLeaf "thunk"), (m, t)])
 
-wrapWithQuote :: MetaTermPlus -> MetaTermPlus
-wrapWithQuote (m, t) =
-  (m, MetaTermNode [(m, MetaTermLeaf "quote"), (m, t)])
+-- wrapWithQuote :: MetaTermPlus -> MetaTermPlus
+-- wrapWithQuote (m, t) =
+--   (m, MetaTermNode [(m, MetaTermLeaf "quote"), (m, t)])
 
 reflectEnumItem :: Hint -> T.Text -> [MetaTermPlus] -> WithEnv [(T.Text, Int)]
 reflectEnumItem m name ts = do
@@ -239,3 +270,68 @@ reflectEnumCase tree =
       return (m, EnumCaseLabel l)
     (m, _) ->
       raiseSyntaxError m "default | LEAF"
+
+reflectMetaType :: MetaTermPlus -> WithEnv ([Ident], MetaTypePlus)
+reflectMetaType tree =
+  case tree of
+    (m, MetaTermNode ((_, MetaTermLeaf "forall") : rest))
+      | [(_, MetaTermNode args), cod] <- rest -> do
+        xs <- mapM reflectIdent args
+        cod' <- reflectMetaType' cod
+        return (xs, cod')
+      | otherwise ->
+        raiseSyntaxError m "(forall (LEAF*) TREE)"
+    _ -> do
+      t <- reflectMetaType' tree
+      return ([], t)
+
+reflectMetaType' :: MetaTermPlus -> WithEnv MetaTypePlus
+reflectMetaType' tree = do
+  -- eenv <- gets enumEnv
+  case tree of
+    (m, MetaTermLeaf x) -> do
+      return (m, MetaTypeVar (asIdent x))
+    (m, MetaTermNode []) ->
+      raiseSyntaxError m "(TREE TREE*)"
+    (m, MetaTermNode ((_, MetaTermLeaf headAtom) : ts))
+      | "arrow" == headAtom ->
+        case ts of
+          [(_, MetaTermNode domList), cod] -> do
+            domList' <- mapM reflectMetaType' domList
+            cod' <- reflectMetaType' cod
+            return (m, MetaTypeArrow domList' cod')
+          _ ->
+            raiseSyntaxError m "(arrow (TREE*) TREE)"
+      | "box" == headAtom ->
+        case ts of
+          [t] -> do
+            t' <- reflectMetaType' t
+            return (m, MetaTypeNec t')
+          _ ->
+            raiseSyntaxError m "(box TREE)"
+      | otherwise ->
+        raiseSyntaxError m "(arrow (TREE*) TREE) | (meta TREE)"
+    _ ->
+      raiseCritical (fst tree) "reflectMetaType' called for a non-AST term (compiler-bug)"
+
+--  Map.member x eenv ->
+--  return (m, MetaTypeEnum x)
+--  "i64" == x ->
+--  return (m, MetaTypeInt64)
+--  "code" == x ->
+--  return (m, MetaTypeAST)
+
+-- (arrow ((box AST) (box AST)) (box AST))
+-- Q := box code みたいにしてもいいかも？
+-- syntax, expressionなどいろいろある。sexpとか？S式だし「S」でいいかも？
+-- Q := Quote S
+-- (arrow ((quote S) (quote S)) (quote S))
+-- (arrow ('S 'S) 'S) とかでもいいかな？型とtermのほうで同じ構文をつかうやつ。
+-- (arrow ('code 'code) 'code)みたいな？
+-- (hom 'code 'code)とかって書けると, まあ, けっこう嬉しい気がする。
+-- でも,やっぱちょっとわかりづらいか。ひとつの記号はひとつの意味で。
+-- (meta code)とかだろうか。quote foo : (meta code)みたいになる。
+-- eval : forall a. meta code -> aとか。
+-- K : meta (a -> b) -> meta a -> meta bとか。まあ, "meta" かな。
+-- しかし, メタ言語からみれば, box Aはむしろ対象言語のコードなんだよな。metaとは逆だ。未来の世界。
+-- boxかなあ。quoteであり。(next code)とか？

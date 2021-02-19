@@ -6,6 +6,8 @@ import Data.Ident
 import Data.Int
 import qualified Data.IntMap as IntMap
 import Data.Maybe (catMaybes)
+import qualified Data.PQueue.Min as Q
+import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Tree
 
@@ -21,11 +23,99 @@ data MetaTerm
   | MetaTermConst T.Text
   | MetaTermInt64 Int64
   | MetaTermEnumIntro T.Text
-  | MetaTermEnumElim MetaTermPlus [(EnumCasePlus, MetaTermPlus)]
+  | MetaTermEnumElim (MetaTermPlus, Ident) [(EnumCasePlus, MetaTermPlus)]
   deriving (Show)
 
 type MetaTermPlus =
   (Hint, MetaTerm)
+
+-- HM
+data MetaType
+  = MetaTypeVar Ident
+  | MetaTypeArrow [MetaTypePlus] MetaTypePlus
+  | MetaTypeNec MetaTypePlus
+  | MetaTypeInt64
+  | MetaTypeAST
+  | MetaTypeEnum T.Text
+  deriving (Show)
+
+type MetaTypePlus =
+  (Hint, MetaType)
+
+-- type MetaConstraint =
+--   (MetaTypePlus, MetaTypePlus)
+
+data MetaConstraint
+  = MetaConstraintUnprocessed MetaTypePlus MetaTypePlus
+  | MetaConstraintProcessed MetaTypePlus MetaTypePlus
+  deriving (Show)
+
+metaConstraintToInt :: MetaConstraint -> Int
+metaConstraintToInt c =
+  case c of
+    MetaConstraintUnprocessed {} ->
+      0
+    MetaConstraintProcessed {} ->
+      1
+
+instance Eq MetaConstraint where
+  c1 == c2 =
+    metaConstraintToInt c1 == metaConstraintToInt c2
+
+instance Ord MetaConstraint where
+  compare c1 c2 =
+    compare (metaConstraintToInt c1) (metaConstraintToInt c2)
+
+type MetaConstraintQueue =
+  Q.MinQueue MetaConstraint
+
+metaTypeToText :: MetaTypePlus -> T.Text
+metaTypeToText t =
+  showAsSExp $ metaTypeToTree t
+
+metaTypeToTree :: MetaTypePlus -> TreePlus
+metaTypeToTree t =
+  case t of
+    (m, MetaTypeVar x) ->
+      (m, TreeLeaf $ "?M" <> T.pack (show $ asInt x))
+    -- (m, TreeLeaf $ asText' x)
+    (m, MetaTypeArrow domList cod) -> do
+      let domList' = map metaTypeToTree domList
+      let cod' = metaTypeToTree cod
+      (m, TreeNode [(m, TreeLeaf "arrow"), (m, TreeNode domList'), cod'])
+    (m, MetaTypeNec t') -> do
+      let t'' = metaTypeToTree t'
+      (m, TreeNode [(m, TreeLeaf "box"), t''])
+    (m, MetaTypeInt64) -> do
+      (m, TreeLeaf "i64")
+    (m, MetaTypeAST) -> do
+      (m, TreeLeaf "code")
+    (m, MetaTypeEnum c) -> do
+      (m, TreeLeaf c)
+
+type SubstMetaType =
+  IntMap.IntMap MetaTypePlus
+
+type MetaTypeEnv =
+  IntMap.IntMap ([Int], MetaTypePlus)
+
+substMetaType :: SubstMetaType -> MetaTypePlus -> MetaTypePlus
+substMetaType sub t =
+  case t of
+    (_, MetaTypeVar x) ->
+      case IntMap.lookup (asInt x) sub of
+        Just t' ->
+          t'
+        Nothing ->
+          t
+    (m, MetaTypeArrow domList cod) -> do
+      let domList' = map (substMetaType sub) domList
+      let cod' = substMetaType sub cod
+      (m, MetaTypeArrow domList' cod')
+    (m, MetaTypeNec t') ->
+      (m, MetaTypeNec (substMetaType sub t'))
+    _ ->
+      t
 
 embed :: TreePlus -> MetaTermPlus
 embed term =
@@ -37,6 +127,18 @@ embed term =
 
 type SubstMetaTerm =
   IntMap.IntMap MetaTermPlus
+
+varMetaType :: MetaTypePlus -> S.Set Ident
+varMetaType t =
+  case t of
+    (_, MetaTypeVar x) ->
+      S.singleton x
+    (_, MetaTypeArrow ts cod) -> do
+      S.unions $ map varMetaType $ cod : ts
+    (_, MetaTypeNec t') ->
+      varMetaType t'
+    _ ->
+      S.empty
 
 substMetaTerm :: SubstMetaTerm -> MetaTermPlus -> MetaTermPlus
 substMetaTerm sub term =
@@ -76,11 +178,11 @@ substMetaTerm sub term =
       term
     (_, MetaTermEnumIntro _) ->
       term
-    (m, MetaTermEnumElim e ces) -> do
+    (m, MetaTermEnumElim (e, i) ces) -> do
       let e' = substMetaTerm sub e
       let (cs, es) = unzip ces
       let es' = map (substMetaTerm sub) es
-      (m, MetaTermEnumElim e' (zip cs es'))
+      (m, MetaTermEnumElim (e', i) (zip cs es'))
 
 quote :: MetaTermPlus -> MetaTermPlus
 quote (m, t) =
@@ -102,7 +204,8 @@ toTree term =
     (m, MetaTermImpElim e es) -> do
       let e' = toTree e
       let es' = map toTree es
-      (m, TreeNode ((m, TreeLeaf "apply") : e' : es'))
+      (m, TreeNode (e' : es'))
+    -- (m, TreeNode ((m, TreeLeaf "apply") : e' : es'))
     (m, MetaTermFix f xs Nothing e) -> do
       let e' = toTree e
       let xs' = map (\i -> (m, TreeLeaf $ asText' i)) xs
@@ -128,7 +231,7 @@ toTree term =
       (m, TreeLeaf $ T.pack $ show i)
     (m, MetaTermEnumIntro a) ->
       (m, TreeLeaf a)
-    (m, MetaTermEnumElim e caseList) -> do
+    (m, MetaTermEnumElim (e, _) caseList) -> do
       let e' = toTree e
       let (cs, bodyList) = unzip caseList
       let cs' = map toTreeEnumCase cs

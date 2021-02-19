@@ -35,7 +35,7 @@ reduceMetaTerm term =
           reduceConstApp m c es'
         _ ->
           raiseError m "encountered an ill-typed application"
-    (m, MetaTermEnumElim e caseList) -> do
+    (m, MetaTermEnumElim (e, _) caseList) -> do
       e' <- reduceMetaTerm e
       let caseList' = map (\(c, body) -> (snd c, body)) caseList
       case e' of
@@ -47,15 +47,12 @@ reduceMetaTerm term =
               raiseError m "found an ill-typed switch"
         _ -> do
           raiseError m "found an ill-typed switch"
-    (m, MetaTermNecIntro e) -> do
-      e' <- reduceMetaTerm e -- !
-      return (m, MetaTermNecIntro e')
     (_, MetaTermNecElim e) -> do
       e' <- reduceMetaTerm e
       case e' of
         (_, MetaTermNecIntro e'') ->
           reduceMetaTerm e''
-        (m, _) ->
+        (m, _) -> do
           raiseError m "the inner term of an unquote must be a quoted term"
     (m, MetaTermNode es) -> do
       es' <- mapM reduceMetaTerm es
@@ -108,11 +105,41 @@ reduceConstApp m c es =
       | [(_, MetaTermNecIntro (_, MetaTermLeaf s1)), (_, MetaTermNecIntro (_, MetaTermLeaf s2))] <- es ->
         return $ liftBool (s1 == s2) m
     "reify"
-      | [arg@(_, MetaTermNecIntro _)] <- es ->
+      | [arg@(_, MetaTermNecIntro _)] <- es -> do
         return (m, MetaTermNecIntro arg)
     "reflect"
-      | [(_, MetaTermNecIntro t)] <- es ->
-        reflect t >>= discernMetaTerm >>= reduceMetaTerm
+      | [(_, MetaTermNecIntro e)] <- es -> do
+        reduceMetaTerm e
+    "evaluate"
+      | [(_, MetaTermNecIntro e)] <- es -> do
+        -- p' e
+        -- e' <- reflect e -- lower the level
+        -- p' e'
+        reflect e >>= discernMetaTerm >>= reduceMetaTerm
+    -- reflect' 2 e' >>= discernMetaTerm >>= reduceMetaTerm
+    -- refl <- reflect' 2 foo
+    -- -- refl <- reflect' 2 $ embed $ toTree foo
+    -- p "refl:"
+    -- liftIO $ putStrLn $ T.unpack $ showAsSExp $ toTree refl
+    -- reflect' 2 refl >>= discernMetaTerm >>= reduceMetaTerm
+    -- p' t
+    -- liftIO $ putStrLn $ T.unpack $ showAsSExp $ toTree arg
+    -- p "here"
+    -- -- e' <- reduceMetaTerm e
+    -- -- p "here"
+    -- -- liftIO $ putStrLn $ T.unpack $ showAsSExp $ toTree e'
+    -- case embed (toTree arg) of
+    --   (_, MetaTermNode [(_, MetaTermLeaf "quote"), e]) -> do
+    --     refl <- reflect' 2 e
+    --     p "refl:"
+    --     liftIO $ putStrLn $ T.unpack $ showAsSExp $ toTree refl
+    --     reflect' 2 e >>= discernMetaTerm >>= reduceMetaTerm
+    --   -- reflect e >>= discernMetaTerm >>= reduceMetaTerm
+    --   _ -> do
+    --     p' arg
+    --     undefined
+    -- reflect (embed (toTree t)) >>= discernMetaTerm >>= reduceMetaTerm
+    -- reflect t >>= discernMetaTerm >>= reduceMetaTerm
     "tail"
       | [(mQuote, MetaTermNecIntro (mNode, MetaTermNode (_ : rest)))] <- es ->
         return (mQuote, MetaTermNecIntro (mNode, MetaTermNode rest))
@@ -125,7 +152,7 @@ reduceConstApp m c es =
         return $ liftBool (op i1 i2) m
       | otherwise -> do
         let textList = map (showAsSExp . toTree) es
-        raiseError m $ "the constant `" <> c <> "` cannot be used with the following arguments: " <> T.intercalate "\n" textList
+        raiseError m $ "the constant `" <> c <> "` cannot be used with the following arguments:\n" <> T.intercalate "\n" textList
 
 toArithOp :: T.Text -> Maybe (Int64 -> Int64 -> Int64)
 toArithOp opStr =

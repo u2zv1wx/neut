@@ -11,7 +11,7 @@ where
 import Control.Monad.State.Lazy
 import Data.EnumCase
 import Data.Env
-import qualified Data.HashMap.Lazy as Map
+-- import qualified Data.HashMap.Lazy as Map
 import Data.Hint
 import Data.Ident
 import qualified Data.IntMap as IntMap
@@ -326,11 +326,11 @@ lookupWeakTypeEnvMaybe (I (_, s)) = do
     Just t ->
       return $ Just t
 
-lookupKind :: Hint -> T.Text -> WithEnv T.Text
-lookupKind m name = do
-  renv <- gets revEnumEnv
-  case Map.lookup name renv of
-    Nothing ->
-      raiseError m $ "no such enum-intro is defined: " <> name
-    Just (j, _) ->
-      return j
+-- lookupKind :: Hint -> T.Text -> WithEnv T.Text
+-- lookupKind m name = do
+--   renv <- gets revEnumEnv
+--   case Map.lookup name renv of
+--     Nothing ->
+--       raiseError m $ "no such enum-intro is defined: " <> name
+--     Just (j, _) ->
+--       return j
