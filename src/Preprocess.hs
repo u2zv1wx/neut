@@ -64,14 +64,14 @@ popTrace :: WithEnv ()
 popTrace =
   modify (\env -> env {traceEnv = tail (traceEnv env)})
 
-preprocess' :: SubstMetaTerm -> [MetaTermPlus] -> WithEnv [MetaTermPlus]
+preprocess' :: SubstMetaTerm -> [TreePlus] -> WithEnv [MetaTermPlus]
 preprocess' sub stmtList = do
   case stmtList of
     [] ->
       leave
     headStmt : restStmtList -> do
       case headStmt of
-        (m, MetaTermNode ((_, MetaTermLeaf headAtom) : rest)) ->
+        (m, TreeNode ((_, TreeLeaf headAtom) : rest)) ->
           case headAtom of
             -- "auto-thunk"
             --   | [(_, MetaTermLeaf name)] <- rest -> do
@@ -86,7 +86,7 @@ preprocess' sub stmtList = do
             --   | otherwise ->
             --     raiseSyntaxError m "(auto-quote LEAF)"
             "denote"
-              | [(_, MetaTermLeaf name), body] <- rest -> do
+              | [(_, TreeLeaf name), body] <- rest -> do
                 body' <- reflectCode body >>= discernMetaTerm
                 name' <- newNameWith $ asIdent name
                 check (Just name') body'
@@ -96,14 +96,14 @@ preprocess' sub stmtList = do
               | otherwise -> do
                 raiseSyntaxError m "(denote LEAF TREE)"
             "meta-enum"
-              | (_, MetaTermLeaf name) : ts <- rest -> do
+              | (_, TreeLeaf name) : ts <- rest -> do
                 xis <- reflectEnumItem m name ts
                 insEnumEnv m name xis
                 preprocess' sub restStmtList
               | otherwise ->
                 raiseSyntaxError m "(enum LEAF TREE ... TREE)"
             "meta-constant"
-              | [(_, MetaTermLeaf name), t] <- rest -> do
+              | [(_, TreeLeaf name), t] <- rest -> do
                 (xs, t') <- reflectMetaType t
                 (xs', t'') <- discernMetaType xs t'
                 modify (\env -> env {metaConstTypeEnv = Map.insert name (map asInt xs', t'') (metaConstTypeEnv env)})
@@ -112,13 +112,13 @@ preprocess' sub stmtList = do
               | otherwise ->
                 raiseSyntaxError m "(meta-constant LEAF)"
             "include"
-              | [(mPath, MetaTermLeaf pathString)] <- rest,
+              | [(mPath, TreeLeaf pathString)] <- rest,
                 not (T.null pathString) ->
                 includeFile sub m mPath pathString restStmtList
               | otherwise ->
                 raiseSyntaxError m "(include LEAF)"
             "introspect"
-              | ((mx, MetaTermLeaf x) : stmtClauseList) <- rest -> do
+              | ((mx, TreeLeaf x) : stmtClauseList) <- rest -> do
                 val <- retrieveCompileTimeVarValue mx x
                 stmtClauseList' <- mapM preprocessStmtClause stmtClauseList
                 case lookup val stmtClauseList' of
@@ -129,7 +129,7 @@ preprocess' sub stmtList = do
               | otherwise ->
                 raiseSyntaxError m "(introspect LEAF TREE*)"
             "ensure"
-              | [(_, MetaTermLeaf pkg), (mUrl, MetaTermLeaf urlStr)] <- rest -> do
+              | [(_, TreeLeaf pkg), (mUrl, TreeLeaf urlStr)] <- rest -> do
                 libDirPath <- getLibraryDirPath
                 pkg' <- parseRelDir $ T.unpack pkg
                 let pkgDirPath = libDirPath </> pkg'
@@ -160,7 +160,7 @@ preprocess' sub stmtList = do
         _ ->
           preprocessAux sub headStmt restStmtList
 
-preprocessAux :: SubstMetaTerm -> MetaTermPlus -> [MetaTermPlus] -> WithEnv [MetaTermPlus]
+preprocessAux :: SubstMetaTerm -> TreePlus -> [TreePlus] -> WithEnv [MetaTermPlus]
 preprocessAux sub headStmt restStmtList = do
   headStmt' <- reflectCode headStmt >>= discernMetaTerm
   -- h <- newNameWith' "_"
@@ -172,8 +172,9 @@ preprocessAux sub headStmt restStmtList = do
       return $ headStmt'' : treeList
     e@(_, MetaTermNode _) -> do
       -- (_, MetaTermNecIntro e) -> do
+      -- denote xとかを生成するやつ
       if isSpecialMetaForm e
-        then preprocess' sub $ e : restStmtList
+        then preprocess' sub $ toTree e : restStmtList
         else do
           treeList <- preprocess' sub restStmtList
           return $ headStmt'' : treeList
@@ -209,7 +210,7 @@ includeFile ::
   Hint ->
   Hint ->
   T.Text ->
-  [MetaTermPlus] ->
+  [TreePlus] ->
   WithEnv [MetaTermPlus]
 includeFile sub m mPath pathString as = do
   -- ensureEnvSanity m
@@ -298,10 +299,10 @@ ensureFileExistence m path = do
 --       p' term
 --       raiseError m "the argument isn't a valid AST"
 
-preprocessStmtClause :: MetaTermPlus -> WithEnv (T.Text, [MetaTermPlus])
+preprocessStmtClause :: TreePlus -> WithEnv (T.Text, [TreePlus])
 preprocessStmtClause tree =
   case tree of
-    (_, MetaTermNode ((_, MetaTermLeaf x) : stmtList)) ->
+    (_, TreeNode ((_, TreeLeaf x) : stmtList)) ->
       return (x, stmtList)
     (m, _) ->
       raiseSyntaxError m "(LEAF TREE*)"

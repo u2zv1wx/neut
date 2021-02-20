@@ -8,7 +8,6 @@ import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import Data.Hint
 import Data.Ident
-import Data.MetaTerm
 import Data.Namespace
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -55,7 +54,7 @@ parse stmtTreeList =
                 raiseSyntaxError m "(end LEAF)"
             "enum"
               | (_, TreeLeaf name) : ts <- rest -> do
-                xis <- reflectEnumItem m name $ map embed ts
+                xis <- reflectEnumItem m name ts
                 insEnumEnv m name xis
                 parse restStmtList
               | otherwise ->

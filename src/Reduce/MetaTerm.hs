@@ -10,8 +10,9 @@ import qualified Data.IntMap as IntMap
 import Data.MetaTerm
 import qualified Data.Text as T
 import Data.Tree
-import Preprocess.Discern
-import Preprocess.Reflect
+
+-- import Preprocess.Discern
+-- import Preprocess.Reflect
 
 -- common lisp   | the meta-calculus of Neut (S4 modal logic)
 --               |
@@ -85,9 +86,6 @@ reduceFix e es =
 reduceConstApp :: Hint -> T.Text -> [MetaTermPlus] -> WithEnv MetaTermPlus
 reduceConstApp m c es =
   case c of
-    -- "cons"
-    --   | [(_, MetaTermNecIntro t), (_, MetaTermNecIntro (_, MetaTermNode ts))] <- es ->
-    --     return (m, MetaTermNecIntro (m, MetaTermNode (t : ts)))
     "cons"
       | [t, (_, MetaTermNode ts)] <- es ->
         return (m, MetaTermNode (t : ts))
@@ -96,8 +94,8 @@ reduceConstApp m c es =
         liftIO $ putStrLn $ T.unpack $ showAsSExp $ toTree arg
         return (m, MetaTermEnumIntro "top.unit")
     "head"
-      | [(mQuote, MetaTermNecIntro (_, MetaTermNode (h : _)))] <- es ->
-        return (mQuote, MetaTermNecIntro h)
+      | [(_, MetaTermNode (h : _))] <- es ->
+        return (m, MetaTermNecIntro h)
     "is-nil"
       | [(_, MetaTermNecIntro (_, MetaTermNode ts))] <- es ->
         return $ liftBool (null ts) m
@@ -113,40 +111,9 @@ reduceConstApp m c es =
     "reflect"
       | [(_, MetaTermNecIntro e)] <- es -> do
         reduceMetaTerm e
-    "evaluate"
-      | [(_, MetaTermNecIntro e)] <- es -> do
-        -- p' e
-        -- e' <- reflect e -- lower the level
-        -- p' e'
-        -- interpret given data as code
-        reflectCode e >>= discernMetaTerm >>= reduceMetaTerm
-    -- reflect' 2 e' >>= discernMetaTerm >>= reduceMetaTerm
-    -- refl <- reflect' 2 foo
-    -- -- refl <- reflect' 2 $ embed $ toTree foo
-    -- p "refl:"
-    -- liftIO $ putStrLn $ T.unpack $ showAsSExp $ toTree refl
-    -- reflect' 2 refl >>= discernMetaTerm >>= reduceMetaTerm
-    -- p' t
-    -- liftIO $ putStrLn $ T.unpack $ showAsSExp $ toTree arg
-    -- p "here"
-    -- -- e' <- reduceMetaTerm e
-    -- -- p "here"
-    -- -- liftIO $ putStrLn $ T.unpack $ showAsSExp $ toTree e'
-    -- case embed (toTree arg) of
-    --   (_, MetaTermNode [(_, MetaTermLeaf "quote"), e]) -> do
-    --     refl <- reflect' 2 e
-    --     p "refl:"
-    --     liftIO $ putStrLn $ T.unpack $ showAsSExp $ toTree refl
-    --     reflect' 2 e >>= discernMetaTerm >>= reduceMetaTerm
-    --   -- reflect e >>= discernMetaTerm >>= reduceMetaTerm
-    --   _ -> do
-    --     p' arg
-    --     undefined
-    -- reflect (embed (toTree t)) >>= discernMetaTerm >>= reduceMetaTerm
-    -- reflect t >>= discernMetaTerm >>= reduceMetaTerm
     "tail"
-      | [(mQuote, MetaTermNecIntro (mNode, MetaTermNode (_ : rest)))] <- es ->
-        return (mQuote, MetaTermNecIntro (mNode, MetaTermNode rest))
+      | [(mNode, MetaTermNode (_ : rest))] <- es ->
+        return (mNode, MetaTermNode rest)
     _
       | Just op <- toArithOp c,
         [(_, MetaTermInt64 i1), (_, MetaTermInt64 i2)] <- es ->

@@ -9,9 +9,9 @@ import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import Data.Hint
 import Data.Log
-import Data.MetaTerm hiding (quote)
 import qualified Data.Set as S
 import qualified Data.Text as T
+import Data.Tree
 import Path
 
 data TEnv = TEnv
@@ -25,7 +25,7 @@ data TEnv = TEnv
 
 type Tokenizer a = StateT TEnv IO a
 
-tokenize :: T.Text -> WithEnv [MetaTermPlus]
+tokenize :: T.Text -> WithEnv [TreePlus]
 tokenize input = do
   modify (\env -> env {count = 1 + count env})
   path <- getCurrentFilePath
@@ -38,7 +38,7 @@ tokenize input = do
     Right (result, _) -> do
       return result
 
-program :: [MetaTermPlus] -> Tokenizer [MetaTermPlus]
+program :: [TreePlus] -> Tokenizer [TreePlus]
 program ts = do
   skip
   s <- gets text
@@ -48,7 +48,7 @@ program ts = do
       t <- term
       program $ t : ts
 
-term :: Tokenizer MetaTermPlus
+term :: Tokenizer TreePlus
 term = do
   s <- gets text
   case T.uncons s of
@@ -60,7 +60,7 @@ term = do
     _ ->
       leaf
 
-leaf :: Tokenizer MetaTermPlus
+leaf :: Tokenizer TreePlus
 leaf = do
   m <- currentHint
   s <- gets text
@@ -68,12 +68,12 @@ leaf = do
     Just ('"', _) -> do
       k <- string
       skip
-      return (m, MetaTermLeaf k)
+      return (m, TreeLeaf k)
     Just (c, _)
       | isSymbolChar c -> do
         x <- symbol
         skip
-        return (m, MetaTermLeaf x)
+        return (m, TreeLeaf x)
       | otherwise ->
         raiseTokenizeError $
           "unexpected character: '"
@@ -82,21 +82,21 @@ leaf = do
     Nothing ->
       raiseTokenizeError "unexpected end of input\nexpecting: LEAF"
 
-node :: Tokenizer MetaTermPlus
+node :: Tokenizer TreePlus
 node = do
   m <- currentHint
   char '(' >> skip
   itemList <- many term
   skip >> char ')' >> skip
-  return (m, MetaTermNode itemList)
+  return (m, TreeNode itemList)
 
-resolveReadMacro :: Char -> T.Text -> Tokenizer MetaTermPlus
+resolveReadMacro :: Char -> T.Text -> Tokenizer TreePlus
 resolveReadMacro from to = do
   m <- currentHint
   char from >> skip
   item <- term
   skip
-  return (m, MetaTermNode [(m, MetaTermLeaf to), item])
+  return (m, TreeNode [(m, TreeLeaf to), item])
 
 char :: Char -> Tokenizer ()
 char c = do

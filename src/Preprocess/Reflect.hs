@@ -14,6 +14,7 @@ import Data.Maybe (fromMaybe)
 import Data.MetaTerm
 import Data.Namespace
 import qualified Data.Text as T
+import Data.Tree
 import Text.Read (readMaybe)
 
 -- reflect :: MetaTermPlus -> WithEnv MetaTermPlus
@@ -174,29 +175,29 @@ import Text.Read (readMaybe)
 --   p' tree
 --   raiseCritical m "Preprocess.Reflect.reflect called for a non-AST term (compiler bug)"
 
-reflectCode :: MetaTermPlus -> WithEnv MetaTermPlus
+reflectCode :: TreePlus -> WithEnv MetaTermPlus
 reflectCode tree =
   case tree of
-    (m, MetaTermLeaf atom)
+    (m, TreeLeaf atom)
       | Just i <- readMaybe $ T.unpack atom ->
         return (m, MetaTermInt64 i)
       | otherwise ->
         return (m, MetaTermVar $ asIdent atom)
-    (m, MetaTermNode treeList) ->
+    (m, TreeNode treeList) ->
       case treeList of
         [] ->
           raiseSyntaxError m "(TREE TREE*)"
-        leaf@(_, MetaTermLeaf headAtom) : rest -> do
+        leaf@(_, TreeLeaf headAtom) : rest -> do
           case headAtom of
             "lambda"
-              | [(_, MetaTermNode xs), e] <- rest -> do
+              | [(_, TreeNode xs), e] <- rest -> do
                 xs' <- mapM reflectIdent xs
                 e' <- reflectCode e
                 return (m, MetaTermImpIntro xs' Nothing e')
               | otherwise ->
                 raiseSyntaxError m "(lambda (LEAF*) TREE)"
             "lambda+"
-              | [(_, MetaTermNode args@(_ : _)), e] <- rest -> do
+              | [(_, TreeNode args@(_ : _)), e] <- rest -> do
                 xs' <- mapM reflectIdent (init args)
                 rest' <- reflectIdent $ last args
                 e' <- reflectCode e
@@ -211,14 +212,14 @@ reflectCode tree =
               | otherwise ->
                 raiseSyntaxError m "(apply TREE TREE*)"
             "fix"
-              | [(_, MetaTermLeaf f), (_, MetaTermNode xs), e] <- rest -> do
+              | [(_, TreeLeaf f), (_, TreeNode xs), e] <- rest -> do
                 xs' <- mapM reflectIdent xs
                 e' <- reflectCode e
                 return (m, MetaTermFix (asIdent f) xs' Nothing e')
               | otherwise ->
                 raiseSyntaxError m "(fix LEAF (LEAF*) TREE)"
             "fix+"
-              | [(_, MetaTermLeaf f), (_, MetaTermNode args@(_ : _)), e] <- rest -> do
+              | [(_, TreeLeaf f), (_, TreeNode args@(_ : _)), e] <- rest -> do
                 xs' <- mapM reflectIdent (init args)
                 rest' <- reflectIdent $ last args
                 e' <- reflectCode e
@@ -254,8 +255,6 @@ reflectCode tree =
               reflectAux m leaf rest
         leaf : rest ->
           reflectAux m leaf rest
-    (m, _) ->
-      raiseError m "reflectCode"
 
 -- reflectされたコードのunquoteの中にはこれらが出てくる
 -- (_, MetaTermVar _) ->
@@ -288,14 +287,14 @@ reflectCode tree =
 --   es' <- mapM (reflectCode) es
 --   return (m, MetaTermEnumElim (e', i) (zip cs es'))
 
-reflectData :: MetaTermPlus -> WithEnv MetaTermPlus
+reflectData :: TreePlus -> WithEnv MetaTermPlus
 reflectData tree = do
   case tree of
-    (m, MetaTermLeaf atom) ->
+    (m, TreeLeaf atom) ->
       return (m, MetaTermLeaf atom)
-    (m, MetaTermNode treeList) ->
+    (m, TreeNode treeList) ->
       case treeList of
-        (_, MetaTermLeaf "quasiunquote") : rest
+        (_, TreeLeaf "quasiunquote") : rest
           | [e] <- rest -> do
             reflectCode e
           | otherwise ->
@@ -303,10 +302,8 @@ reflectData tree = do
         _ -> do
           treeList' <- mapM reflectData treeList
           return (m, MetaTermNode treeList')
-    (m, _) ->
-      raiseError m "reflectData"
 
-reflectAux :: Hint -> MetaTermPlus -> [MetaTermPlus] -> WithEnv MetaTermPlus
+reflectAux :: Hint -> TreePlus -> [TreePlus] -> WithEnv MetaTermPlus
 reflectAux m f args = do
   f' <- reflectCode f
   args' <- mapM reflectCode args
@@ -325,10 +322,10 @@ reflectAux m f args = do
 --     _ ->
 --       return args
 
-reflectIdent :: MetaTermPlus -> WithEnv Ident
+reflectIdent :: TreePlus -> WithEnv Ident
 reflectIdent tree =
   case tree of
-    (_, MetaTermLeaf x) ->
+    (_, TreeLeaf x) ->
       return $ asIdent x
     t ->
       raiseSyntaxError (fst t) "LEAF"
@@ -341,14 +338,14 @@ reflectIdent tree =
 -- wrapWithQuote (m, t) =
 --   (m, MetaTermNode [(m, MetaTermLeaf "quote"), (m, t)])
 
-reflectEnumItem :: Hint -> T.Text -> [MetaTermPlus] -> WithEnv [(T.Text, Int)]
+reflectEnumItem :: Hint -> T.Text -> [TreePlus] -> WithEnv [(T.Text, Int)]
 reflectEnumItem m name ts = do
   xis <- reflectEnumItem' name $ reverse ts
   if isLinear (map snd xis)
     then return $ reverse xis
     else raiseError m "found a collision of discriminant"
 
-reflectEnumItem' :: T.Text -> [MetaTermPlus] -> WithEnv [(T.Text, Int)]
+reflectEnumItem' :: T.Text -> [TreePlus] -> WithEnv [(T.Text, Int)]
 reflectEnumItem' name treeList =
   case treeList of
     [] ->
@@ -361,12 +358,12 @@ reflectEnumItem' name treeList =
       (s, mj) <- reflectEnumItem'' t
       return $ (name <> nsSep <> s, fromMaybe (1 + headDiscriminantOf ts') mj) : ts'
 
-reflectEnumItem'' :: MetaTermPlus -> WithEnv (T.Text, Maybe Int)
+reflectEnumItem'' :: TreePlus -> WithEnv (T.Text, Maybe Int)
 reflectEnumItem'' tree =
   case tree of
-    (_, MetaTermLeaf s) ->
+    (_, TreeLeaf s) ->
       return (s, Nothing)
-    (_, MetaTermNode [(_, MetaTermLeaf s), (_, MetaTermLeaf i)])
+    (_, TreeNode [(_, TreeLeaf s), (_, TreeLeaf i)])
       | Just i' <- readMaybe $ T.unpack i ->
         return (s, Just i')
     t ->
@@ -380,33 +377,33 @@ headDiscriminantOf labelNumList =
     ((_, i) : _) ->
       i
 
-reflectEnumClause :: MetaTermPlus -> WithEnv (EnumCasePlus, MetaTermPlus)
+reflectEnumClause :: TreePlus -> WithEnv (EnumCasePlus, MetaTermPlus)
 reflectEnumClause tree =
   case tree of
-    (_, MetaTermNode [c, e]) -> do
+    (_, TreeNode [c, e]) -> do
       c' <- reflectEnumCase c
       e' <- reflectCode e
       return (c', e')
     e ->
       raiseSyntaxError (fst e) "(TREE TREE)"
 
-reflectEnumCase :: MetaTermPlus -> WithEnv EnumCasePlus
+reflectEnumCase :: TreePlus -> WithEnv EnumCasePlus
 reflectEnumCase tree =
   case tree of
-    (m, MetaTermNode [(_, MetaTermLeaf "enum-introduction"), (_, MetaTermLeaf l)]) ->
+    (m, TreeNode [(_, TreeLeaf "enum-introduction"), (_, TreeLeaf l)]) ->
       return (m, EnumCaseLabel l)
-    (m, MetaTermLeaf "default") ->
+    (m, TreeLeaf "default") ->
       return (m, EnumCaseDefault)
-    (m, MetaTermLeaf l) ->
+    (m, TreeLeaf l) ->
       return (m, EnumCaseLabel l)
     (m, _) ->
       raiseSyntaxError m "default | LEAF"
 
-reflectMetaType :: MetaTermPlus -> WithEnv ([Ident], MetaTypePlus)
+reflectMetaType :: TreePlus -> WithEnv ([Ident], MetaTypePlus)
 reflectMetaType tree =
   case tree of
-    (m, MetaTermNode ((_, MetaTermLeaf "forall") : rest))
-      | [(_, MetaTermNode args), cod] <- rest -> do
+    (m, TreeNode ((_, TreeLeaf "forall") : rest))
+      | [(_, TreeNode args), cod] <- rest -> do
         xs <- mapM reflectIdent args
         cod' <- reflectMetaType' cod
         return (xs, cod')
@@ -416,18 +413,18 @@ reflectMetaType tree =
       t <- reflectMetaType' tree
       return ([], t)
 
-reflectMetaType' :: MetaTermPlus -> WithEnv MetaTypePlus
+reflectMetaType' :: TreePlus -> WithEnv MetaTypePlus
 reflectMetaType' tree = do
   -- eenv <- gets enumEnv
   case tree of
-    (m, MetaTermLeaf x) -> do
+    (m, TreeLeaf x) -> do
       return (m, MetaTypeVar (asIdent x))
-    (m, MetaTermNode []) ->
-      raiseSyntaxError m "(TREE TREE*)"
-    (m, MetaTermNode ((_, MetaTermLeaf headAtom) : ts))
+    -- (m, TreeNode []) ->
+    --   raiseSyntaxError m "(TREE TREE*)"
+    (m, TreeNode ((_, TreeLeaf headAtom) : ts))
       | "arrow" == headAtom ->
         case ts of
-          [(_, MetaTermNode domList), cod] -> do
+          [(_, TreeNode domList), cod] -> do
             domList' <- mapM reflectMetaType' domList
             cod' <- reflectMetaType' cod
             return (m, MetaTypeArrow domList' cod')
@@ -442,8 +439,10 @@ reflectMetaType' tree = do
             raiseSyntaxError m "(box TREE)"
       | otherwise ->
         raiseSyntaxError m "(arrow (TREE*) TREE) | (meta TREE)"
-    _ ->
-      raiseCritical (fst tree) "reflectMetaType' called for a non-AST term (compiler-bug)"
+    (m, _) ->
+      raiseSyntaxError m "(LEAF TREE*)"
+
+-- raiseCritical (fst tree) "reflectMetaType' called for a non-AST term (compiler-bug)"
 
 --  Map.member x eenv ->
 --  return (m, MetaTypeEnum x)
