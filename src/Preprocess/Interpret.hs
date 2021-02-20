@@ -75,6 +75,18 @@ interpretCode tree =
                 return (m, MetaTermEnumElim (e', i) cs')
               | otherwise ->
                 raiseSyntaxError m "(SWITCH TREE TREE*)"
+            "quote"
+              | [e] <- rest -> do
+                e' <- interpretCode e
+                return (m, MetaTermImpIntro [] Nothing e')
+              | otherwise ->
+                raiseSyntaxError m "(quote TREE)"
+            "unquote"
+              | [e] <- rest -> do
+                e' <- interpretCode e
+                return (m, MetaTermImpElim e' [])
+              | otherwise ->
+                raiseSyntaxError m "(unquote TREE)"
             "quasiquote"
               | [e] <- rest ->
                 interpretData e

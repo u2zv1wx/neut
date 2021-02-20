@@ -50,7 +50,6 @@ reduceFix e es =
   case e of
     (m, MetaTermFix f xs mRest body)
       | Just rest <- mRest -> do
-        p "reduce-fix-with-rest"
         if length xs > length es
           then raiseError m "arity mismatch"
           else do

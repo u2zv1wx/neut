@@ -196,6 +196,7 @@ includeFile ::
   [TreePlus] ->
   WithEnv [MetaTermPlus]
 includeFile sub m mPath pathString as = do
+  -- includeにはその痕跡を残しておいてもよいかも。Parse.hsのほうでこれを参照してなんかチェックする感じ。
   -- ensureEnvSanity m
   path <- readStrOrThrow mPath pathString
   when (null path) $ raiseError m "found an empty path"
