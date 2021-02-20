@@ -18,6 +18,7 @@ dependencies:
 - containers
 - directory
 - half
+- hashable
 - mtl
 - optparse-applicative
 - path

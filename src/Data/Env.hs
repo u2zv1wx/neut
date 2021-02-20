@@ -49,7 +49,7 @@ data Env = Env
     --
     -- Preprocess
     --
-    topMetaNameEnv :: Map.HashMap T.Text Ident,
+    topMetaNameEnv :: Map.HashMap (T.Text, Level) Ident,
     -- autoQuoteEnv :: S.Set T.Text,
     -- autoThunkEnv :: S.Set T.Text,
     metaConstantSet :: S.Set T.Text,

@@ -12,7 +12,6 @@ import Data.Log
 import Data.MetaTerm hiding (quote)
 import qualified Data.Set as S
 import qualified Data.Text as T
-import Data.Tree
 import Path
 
 data TEnv = TEnv

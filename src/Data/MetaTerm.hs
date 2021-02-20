@@ -1,6 +1,9 @@
+{-# LANGUAGE DeriveGeneric #-}
+
 module Data.MetaTerm where
 
 import Data.EnumCase
+import Data.Hashable
 import Data.Hint
 import Data.Ident
 import Data.Int
@@ -10,6 +13,7 @@ import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Tree
+import GHC.Generics (Generic)
 
 data MetaTerm
   = MetaTermVar Ident
@@ -57,6 +61,17 @@ metaConstraintToInt c =
       0
     MetaConstraintProcessed {} ->
       1
+
+data Level
+  = LevelMono Int
+  | LevelPoly
+  deriving (Show, Eq, Generic)
+
+baseLevel :: Int
+baseLevel =
+  1
+
+instance Hashable Level
 
 instance Eq MetaConstraint where
   c1 == c2 =

@@ -65,7 +65,7 @@ popTrace =
   modify (\env -> env {traceEnv = tail (traceEnv env)})
 
 preprocess' :: SubstMetaTerm -> [MetaTermPlus] -> WithEnv [MetaTermPlus]
-preprocess' sub stmtList =
+preprocess' sub stmtList = do
   case stmtList of
     [] ->
       leave
@@ -87,11 +87,11 @@ preprocess' sub stmtList =
             --     raiseSyntaxError m "(auto-quote LEAF)"
             "denote"
               | [(_, MetaTermLeaf name), body] <- rest -> do
-                body' <- reflect body >>= discernMetaTerm
+                body' <- reflectCode body >>= discernMetaTerm
                 name' <- newNameWith $ asIdent name
                 check (Just name') body'
                 body'' <- reduceMetaTerm $ substMetaTerm sub body'
-                modify (\env -> env {topMetaNameEnv = Map.insert name name' (topMetaNameEnv env)})
+                modify (\env -> env {topMetaNameEnv = Map.insert (name, LevelPoly) name' (topMetaNameEnv env)})
                 preprocess' (IntMap.insert (asInt name') body'' sub) restStmtList
               | otherwise -> do
                 raiseSyntaxError m "(denote LEAF TREE)"
@@ -162,12 +162,16 @@ preprocess' sub stmtList =
 
 preprocessAux :: SubstMetaTerm -> MetaTermPlus -> [MetaTermPlus] -> WithEnv [MetaTermPlus]
 preprocessAux sub headStmt restStmtList = do
-  headStmt' <- reflect headStmt >>= discernMetaTerm
+  headStmt' <- reflectCode headStmt >>= discernMetaTerm
   -- h <- newNameWith' "_"
   check Nothing headStmt'
   headStmt'' <- reduceMetaTerm $ substMetaTerm sub headStmt'
   case headStmt'' of
-    (_, MetaTermNecIntro e) -> do
+    (_, MetaTermLeaf _) -> do
+      treeList <- preprocess' sub restStmtList
+      return $ headStmt'' : treeList
+    e@(_, MetaTermNode _) -> do
+      -- (_, MetaTermNecIntro e) -> do
       if isSpecialMetaForm e
         then preprocess' sub $ e : restStmtList
         else do

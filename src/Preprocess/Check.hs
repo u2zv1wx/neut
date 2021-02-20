@@ -23,7 +23,8 @@ check mx e = do
     Just _ ->
       return ()
     Nothing ->
-      insMetaConstraint t (fst e, MetaTypeNec (fst e, MetaTypeAST))
+      insMetaConstraint t (fst e, MetaTypeAST)
+  -- insMetaConstraint t (fst e, MetaTypeNec (fst e, MetaTypeAST))
   cs <- gets metaConstraintEnv
   -- p "↓↓↓============================================"
   -- forM_ (Q.toList cs) $ \c -> do

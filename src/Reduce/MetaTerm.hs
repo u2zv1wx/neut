@@ -85,9 +85,12 @@ reduceFix e es =
 reduceConstApp :: Hint -> T.Text -> [MetaTermPlus] -> WithEnv MetaTermPlus
 reduceConstApp m c es =
   case c of
+    -- "cons"
+    --   | [(_, MetaTermNecIntro t), (_, MetaTermNecIntro (_, MetaTermNode ts))] <- es ->
+    --     return (m, MetaTermNecIntro (m, MetaTermNode (t : ts)))
     "cons"
-      | [(_, MetaTermNecIntro t), (_, MetaTermNecIntro (_, MetaTermNode ts))] <- es ->
-        return (m, MetaTermNecIntro (m, MetaTermNode (t : ts)))
+      | [t, (_, MetaTermNode ts)] <- es ->
+        return (m, MetaTermNode (t : ts))
     "dump"
       | [arg] <- es -> do
         liftIO $ putStrLn $ T.unpack $ showAsSExp $ toTree arg
@@ -115,7 +118,8 @@ reduceConstApp m c es =
         -- p' e
         -- e' <- reflect e -- lower the level
         -- p' e'
-        reflect e >>= discernMetaTerm >>= reduceMetaTerm
+        -- interpret given data as code
+        reflectCode e >>= discernMetaTerm >>= reduceMetaTerm
     -- reflect' 2 e' >>= discernMetaTerm >>= reduceMetaTerm
     -- refl <- reflect' 2 foo
     -- -- refl <- reflect' 2 $ embed $ toTree foo

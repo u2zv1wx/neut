@@ -15,51 +15,55 @@ import Data.MetaTerm
 import qualified Data.Set as S
 import qualified Data.Text as T
 
-type NameEnv = Map.HashMap T.Text Ident
+type NameEnv = Map.HashMap (T.Text, Level) Ident
 
 discernMetaTerm :: MetaTermPlus -> WithEnv MetaTermPlus
 discernMetaTerm e = do
   nenv <- gets topMetaNameEnv
-  discernMetaTerm' nenv e
+  discernMetaTerm' 1 nenv e
 
-discernMetaTerm' :: NameEnv -> MetaTermPlus -> WithEnv MetaTermPlus
-discernMetaTerm' nenv term =
+discernMetaTerm' :: Int -> NameEnv -> MetaTermPlus -> WithEnv MetaTermPlus
+discernMetaTerm' levelOfJudgement nenv term =
   case term of
     (m, MetaTermVar x) ->
-      case Map.lookup (asText x) nenv of
+      case Map.lookup (asText x, LevelMono levelOfJudgement) nenv of
         Just x' ->
           return (m, MetaTermVar x')
-        Nothing -> do
-          cenv <- gets metaConstantSet
-          if S.member (asText x) cenv
-            then return (m, MetaTermConst (asText x))
-            else do
-              mEnumValue <- resolveAsEnumValue (asText x)
-              case mEnumValue of
-                Just enumValue ->
-                  return (m, MetaTermEnumIntro enumValue)
-                Nothing ->
-                  raiseError m $ "undefined variable: " <> asText x
+        _ ->
+          case Map.lookup (asText x, LevelPoly) nenv of
+            Just x' ->
+              return (m, MetaTermVar x')
+            _ -> do
+              cenv <- gets metaConstantSet
+              if S.member (asText x) cenv
+                then return (m, MetaTermConst (asText x))
+                else do
+                  mEnumValue <- resolveAsEnumValue (asText x)
+                  case mEnumValue of
+                    Just enumValue ->
+                      return (m, MetaTermEnumIntro enumValue)
+                    Nothing ->
+                      raiseError m $ "undefined variable: " <> asText x
     (m, MetaTermImpIntro xs mf e) -> do
-      (xs', mf', e') <- discernBinder nenv xs mf e
+      (xs', mf', e') <- discernBinder levelOfJudgement nenv xs mf e
       return (m, MetaTermImpIntro xs' mf' e')
     (m, MetaTermImpElim e es) -> do
-      e' <- discernMetaTerm' nenv e
-      es' <- mapM (discernMetaTerm' nenv) es
+      e' <- discernMetaTerm' levelOfJudgement nenv e
+      es' <- mapM (discernMetaTerm' levelOfJudgement nenv) es
       return (m, MetaTermImpElim e' es')
     (m, MetaTermFix f xs mx e) -> do
-      (f' : xs', mx', e') <- discernBinder nenv (f : xs) mx e
+      (f' : xs', mx', e') <- discernBinder levelOfJudgement nenv (f : xs) mx e
       return (m, MetaTermFix f' xs' mx' e')
     (m, MetaTermNecIntro e) -> do
-      e' <- discernMetaTerm' nenv e
+      e' <- discernMetaTerm' (levelOfJudgement + 1) nenv e
       return (m, MetaTermNecIntro e')
     (m, MetaTermNecElim e) -> do
-      e' <- discernMetaTerm' nenv e
+      e' <- discernMetaTerm' (levelOfJudgement - 1) nenv e
       return (m, MetaTermNecElim e')
     (_, MetaTermLeaf _) ->
       return term
     (m, MetaTermNode es) -> do
-      es' <- mapM (discernMetaTerm' nenv) es
+      es' <- mapM (discernMetaTerm' levelOfJudgement nenv) es
       return (m, MetaTermNode es')
     (_, MetaTermConst _) ->
       return term
@@ -68,34 +72,35 @@ discernMetaTerm' nenv term =
     (_, MetaTermEnumIntro _) ->
       return term
     (m, MetaTermEnumElim (e, i) caseList) -> do
-      e' <- discernMetaTerm' nenv e
+      e' <- discernMetaTerm' levelOfJudgement nenv e
       caseList' <-
         forM caseList $ \((mCase, l), body) -> do
           l' <- discernEnumCase mCase l
-          body' <- discernMetaTerm' nenv body
+          body' <- discernMetaTerm' levelOfJudgement nenv body
           return ((mCase, l'), body')
       return (m, MetaTermEnumElim (e', i) caseList')
 
 discernBinder ::
+  Int ->
   NameEnv ->
   [Ident] ->
   Maybe Ident ->
   MetaTermPlus ->
   WithEnv ([Ident], Maybe Ident, MetaTermPlus)
-discernBinder nenv binder mf e =
+discernBinder levelOfJudgement nenv binder mf e =
   case binder of
     [] -> do
       case mf of
         Just f -> do
           f' <- newNameWith f
-          e' <- discernMetaTerm' (Map.insert (asText f) f' nenv) e
+          e' <- discernMetaTerm' levelOfJudgement (Map.insert (asText f, LevelMono levelOfJudgement) f' nenv) e
           return ([], Just f', e')
         Nothing -> do
-          e' <- discernMetaTerm' nenv e
+          e' <- discernMetaTerm' levelOfJudgement nenv e
           return ([], Nothing, e')
     x : xs -> do
       x' <- newNameWith x
-      (xs', mf', e') <- discernBinder (Map.insert (asText x) x' nenv) xs mf e
+      (xs', mf', e') <- discernBinder levelOfJudgement (Map.insert (asText x, LevelMono levelOfJudgement) x' nenv) xs mf e
       return (x' : xs', mf', e')
 
 discernEnumCase :: Hint -> EnumCase -> WithEnv EnumCase
@@ -118,7 +123,7 @@ discernMetaType is t = do
   t' <- discernMetaType' nenv t
   return (is', t')
 
-discernMetaType' :: NameEnv -> MetaTypePlus -> WithEnv MetaTypePlus
+discernMetaType' :: Map.HashMap T.Text Ident -> MetaTypePlus -> WithEnv MetaTypePlus
 discernMetaType' nenv t =
   case t of
     (m, MetaTypeVar x) ->
@@ -145,15 +150,3 @@ discernMetaType' nenv t =
       return (m, MetaTypeNec t'')
     _ ->
       return t
-
--- eenv <- gets enumEnv
--- case t of
---   (m, MetaTypeVar x) ->
---     undefined
-
---  Map.member x eenv ->
---  return (m, MetaTypeEnum x)
---  "i64" == x ->
---  return (m, MetaTypeInt64)
---  "code" == x ->
---  return (m, MetaTypeAST)
