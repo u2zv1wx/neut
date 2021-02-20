@@ -11,12 +11,6 @@ import Data.MetaTerm
 import qualified Data.Text as T
 import Data.Tree
 
--- common lisp   | the meta-calculus of Neut (S4 modal logic)
---               |
--- quasiquote    | necessity-intro
--- unquote       | necessity-elim
--- quote         | reify   (the axiom 4, added as a constant)
--- eval          | reflect (the axiom T, added as a constant)
 reduceMetaTerm :: MetaTermPlus -> WithEnv MetaTermPlus
 reduceMetaTerm term =
   case term of
@@ -45,13 +39,6 @@ reduceMetaTerm term =
               raiseError m "found an ill-typed switch"
         _ -> do
           raiseError m "found an ill-typed switch"
-    (_, MetaTermNecElim e) -> do
-      e' <- reduceMetaTerm e
-      case e' of
-        (_, MetaTermNecIntro e'') ->
-          reduceMetaTerm e''
-        (m, _) -> do
-          raiseError m "the inner term of an unquote must be a quoted term"
     (m, MetaTermNode es) -> do
       es' <- mapM reduceMetaTerm es
       return (m, MetaTermNode es')
@@ -63,12 +50,15 @@ reduceFix e es =
   case e of
     (m, MetaTermFix f xs mRest body)
       | Just rest <- mRest -> do
+        p "reduce-fix-with-rest"
         if length xs > length es
           then raiseError m "arity mismatch"
           else do
             let es1 = take (length xs) es
-            let es2 = map (\x -> (m, MetaTermNecElim x)) $ drop (length xs) es
-            let restArg = (m, MetaTermNecIntro (m, MetaTermNode es2))
+            -- let es2 = drop (length xs) es
+            -- let es2 = map (\x -> (m, MetaTermNecElim x)) $ drop (length xs) es
+            let restArg = (m, MetaTermNode (drop (length xs) es))
+            -- let restArg = (m, MetaTermNecIntro (m, MetaTermNode es2))
             let sub = IntMap.fromList $ (asInt f, e) : zip (map asInt xs) es1 ++ [(asInt rest, restArg)]
             reduceMetaTerm $ substMetaTerm sub body
       | otherwise -> do
@@ -92,22 +82,16 @@ reduceConstApp m c es =
         return (m, MetaTermEnumIntro "top.unit")
     "head"
       | [(_, MetaTermNode (h : _))] <- es ->
-        return (m, MetaTermNecIntro h)
+        return h
     "is-nil"
-      | [(_, MetaTermNecIntro (_, MetaTermNode ts))] <- es ->
+      | [(_, MetaTermNode ts)] <- es ->
         return $ liftBool (null ts) m
     "leaf-mul"
-      | [(mQuote, MetaTermNecIntro (mLeaf, MetaTermLeaf s1)), (_, MetaTermNecIntro (_, MetaTermLeaf s2))] <- es ->
-        return (mQuote, MetaTermNecIntro (mLeaf, MetaTermLeaf (s1 <> s2)))
+      | [(mLeaf, MetaTermLeaf s1), (_, MetaTermLeaf s2)] <- es ->
+        return (mLeaf, MetaTermLeaf (s1 <> s2))
     "leaf-equal"
-      | [(_, MetaTermNecIntro (_, MetaTermLeaf s1)), (_, MetaTermNecIntro (_, MetaTermLeaf s2))] <- es ->
+      | [(_, MetaTermLeaf s1), (_, MetaTermLeaf s2)] <- es ->
         return $ liftBool (s1 == s2) m
-    "reify"
-      | [arg@(_, MetaTermNecIntro _)] <- es -> do
-        return (m, MetaTermNecIntro arg)
-    "reflect"
-      | [(_, MetaTermNecIntro e)] <- es -> do
-        reduceMetaTerm e
     "tail"
       | [(mNode, MetaTermNode (_ : rest))] <- es ->
         return (mNode, MetaTermNode rest)

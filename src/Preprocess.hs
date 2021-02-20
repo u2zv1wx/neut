@@ -15,7 +15,6 @@ import Data.Tree
 import GHC.IO.Handle
 import Path
 import Path.IO
-import Preprocess.Check
 import Preprocess.Discern
 import Preprocess.Interpret
 import Preprocess.Tokenize
@@ -77,13 +76,12 @@ preprocess' sub stmtList = do
             --     preprocess' sub restStmtList
             --   | otherwise ->
             --     raiseSyntaxError m "(auto-quote LEAF)"
-            "denote"
+            "LET"
               | [(_, TreeLeaf name), body] <- rest -> do
                 body' <- interpretCode body >>= discernMetaTerm
                 name' <- newNameWith $ asIdent name
-                check (Just name') body'
                 body'' <- reduceMetaTerm $ substMetaTerm sub body'
-                modify (\env -> env {topMetaNameEnv = Map.insert (name, LevelPoly) name' (topMetaNameEnv env)})
+                modify (\env -> env {topMetaNameEnv = Map.insert name name' (topMetaNameEnv env)})
                 preprocess' (IntMap.insert (asInt name') body'' sub) restStmtList
               | otherwise -> do
                 raiseSyntaxError m "(denote LEAF TREE)"
@@ -95,10 +93,7 @@ preprocess' sub stmtList = do
               | otherwise ->
                 raiseSyntaxError m "(enum LEAF TREE ... TREE)"
             "meta-constant"
-              | [(_, TreeLeaf name), t] <- rest -> do
-                (xs, t') <- interpretMetaType t
-                (xs', t'') <- discernMetaType xs t'
-                modify (\env -> env {metaConstTypeEnv = Map.insert name (map asInt xs', t'') (metaConstTypeEnv env)})
+              | [(_, TreeLeaf name)] <- rest -> do
                 modify (\env -> env {metaConstantSet = S.insert name (metaConstantSet env)})
                 preprocess' sub restStmtList
               | otherwise ->
@@ -155,7 +150,6 @@ preprocess' sub stmtList = do
 preprocessAux :: SubstMetaTerm -> TreePlus -> [TreePlus] -> WithEnv [MetaTermPlus]
 preprocessAux sub headStmt restStmtList = do
   headStmt' <- interpretCode headStmt >>= discernMetaTerm
-  check Nothing headStmt'
   headStmt'' <- reduceMetaTerm $ substMetaTerm sub headStmt'
   case headStmt'' of
     (_, MetaTermLeaf _) -> do
@@ -183,7 +177,7 @@ isSpecialMetaForm tree =
 metaKeywordSet :: S.Set T.Text
 metaKeywordSet =
   S.fromList
-    [ "denote",
+    [ "LET",
       "statement",
       "include",
       -- "auto-thunk",

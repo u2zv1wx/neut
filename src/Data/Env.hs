@@ -12,7 +12,6 @@ import Data.List (find)
 import Data.Log
 import Data.LowComp
 import Data.LowType
-import Data.MetaTerm
 import Data.Namespace
 import qualified Data.PQueue.Min as Q
 import Data.Platform
@@ -49,13 +48,13 @@ data Env = Env
     --
     -- Preprocess
     --
-    topMetaNameEnv :: Map.HashMap (T.Text, Level) Ident,
+    topMetaNameEnv :: Map.HashMap T.Text Ident,
     -- autoQuoteEnv :: S.Set T.Text,
     -- autoThunkEnv :: S.Set T.Text,
     metaConstantSet :: S.Set T.Text,
-    metaTypeEnv :: MetaTypeEnv,
-    metaConstraintEnv :: MetaConstraintQueue,
-    metaConstTypeEnv :: Map.HashMap T.Text ([Int], MetaTypePlus),
+    -- metaTypeEnv :: MetaTypeEnv,
+    -- metaConstraintEnv :: MetaConstraintQueue,
+    -- metaConstTypeEnv :: Map.HashMap T.Text ([Int], MetaTypePlus),
     --
     -- parse
     --
@@ -104,9 +103,9 @@ initialEnv =
       -- autoQuoteEnv = S.empty,
       -- autoThunkEnv = S.empty,
       metaConstantSet = S.empty,
-      metaTypeEnv = IntMap.empty,
-      metaConstraintEnv = Q.empty,
-      metaConstTypeEnv = Map.empty,
+      -- metaTypeEnv = IntMap.empty,
+      -- metaConstraintEnv = Q.empty,
+      -- metaConstTypeEnv = Map.empty,
       phase = 0,
       -- notationEnv = Map.empty,
       constantSet = S.empty,
@@ -266,15 +265,15 @@ lookupConstTypeEnv m x
         raiseCritical m $
           "the constant `" <> x <> "` is not found in the type environment."
 
-lookupMetaConstTypeEnv :: Hint -> T.Text -> WithEnv ([Int], MetaTypePlus)
-lookupMetaConstTypeEnv m x = do
-  ctenv <- gets metaConstTypeEnv
-  case Map.lookup x ctenv of
-    Just t -> do
-      return t
-    Nothing ->
-      raiseCritical m $
-        "the constant `" <> x <> "` is not found in the type environment."
+-- lookupMetaConstTypeEnv :: Hint -> T.Text -> WithEnv ([Int], MetaTypePlus)
+-- lookupMetaConstTypeEnv m x = do
+--   ctenv <- gets metaConstTypeEnv
+--   case Map.lookup x ctenv of
+--     Just t -> do
+--       return t
+--     Nothing ->
+--       raiseCritical m $
+--         "the constant `" <> x <> "` is not found in the type environment."
 
 lowTypeToType :: Hint -> LowType -> WithEnv TermPlus
 lowTypeToType m lowType =

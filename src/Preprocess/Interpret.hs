@@ -2,7 +2,6 @@ module Preprocess.Interpret
   ( interpretCode,
     interpretEnumItem,
     interpretEnumCase,
-    interpretMetaType,
   )
 where
 
@@ -31,63 +30,51 @@ interpretCode tree =
           raiseSyntaxError m "(TREE TREE*)"
         leaf@(_, TreeLeaf headAtom) : rest -> do
           case headAtom of
-            "lambda"
+            "LAMBDA"
               | [(_, TreeNode xs), e] <- rest -> do
                 xs' <- mapM interpretIdent xs
                 e' <- interpretCode e
                 return (m, MetaTermImpIntro xs' Nothing e')
               | otherwise ->
-                raiseSyntaxError m "(lambda (LEAF*) TREE)"
-            "lambda+"
+                raiseSyntaxError m "(LAMBDA (LEAF*) TREE)"
+            "LAMBDA+"
               | [(_, TreeNode args@(_ : _)), e] <- rest -> do
                 xs' <- mapM interpretIdent (init args)
                 rest' <- interpretIdent $ last args
                 e' <- interpretCode e
                 return (m, MetaTermImpIntro xs' (Just rest') e')
               | otherwise ->
-                raiseSyntaxError m "(lambda+ (LEAF LEAF*) TREE)"
-            "apply"
+                raiseSyntaxError m "(LAMBDA+ (LEAF LEAF*) TREE)"
+            "APPLY"
               | e : es <- rest -> do
                 e' <- interpretCode e
                 es' <- mapM (interpretCode) es
                 return (m, MetaTermImpElim e' es')
               | otherwise ->
-                raiseSyntaxError m "(apply TREE TREE*)"
-            "fix"
+                raiseSyntaxError m "(APPLY TREE TREE*)"
+            "FIX"
               | [(_, TreeLeaf f), (_, TreeNode xs), e] <- rest -> do
                 xs' <- mapM interpretIdent xs
                 e' <- interpretCode e
                 return (m, MetaTermFix (asIdent f) xs' Nothing e')
               | otherwise ->
-                raiseSyntaxError m "(fix LEAF (LEAF*) TREE)"
-            "fix+"
+                raiseSyntaxError m "(FIX LEAF (LEAF*) TREE)"
+            "FIX+"
               | [(_, TreeLeaf f), (_, TreeNode args@(_ : _)), e] <- rest -> do
                 xs' <- mapM interpretIdent (init args)
                 rest' <- interpretIdent $ last args
                 e' <- interpretCode e
                 return (m, MetaTermFix (asIdent f) xs' (Just rest') e')
               | otherwise ->
-                raiseSyntaxError m "(fix+ LEAF (LEAF LEAF*) TREE)"
-            "quote"
-              | [e] <- rest -> do
-                e' <- interpretCode e
-                return (m, MetaTermNecIntro e')
-              | otherwise ->
-                raiseSyntaxError m "(quote TREE)"
-            "unquote"
-              | [e] <- rest -> do
-                e' <- interpretCode e
-                return (m, MetaTermNecElim e')
-              | otherwise ->
-                raiseSyntaxError m "(unquote TREE)"
-            "switch"
+                raiseSyntaxError m "(FIX+ LEAF (LEAF LEAF*) TREE)"
+            "SWITCH"
               | e : cs <- rest -> do
                 e' <- interpretCode e
                 cs' <- mapM interpretEnumClause cs
                 i <- newNameWith' "switch"
                 return (m, MetaTermEnumElim (e', i) cs')
               | otherwise ->
-                raiseSyntaxError m "(switch TREE TREE*)"
+                raiseSyntaxError m "(SWITCH TREE TREE*)"
             "quasiquote"
               | [e] <- rest ->
                 interpretData e
@@ -205,43 +192,3 @@ interpretEnumCase tree =
       return (m, EnumCaseLabel l)
     (m, _) ->
       raiseSyntaxError m "default | LEAF"
-
-interpretMetaType :: TreePlus -> WithEnv ([Ident], MetaTypePlus)
-interpretMetaType tree =
-  case tree of
-    (m, TreeNode ((_, TreeLeaf "forall") : rest))
-      | [(_, TreeNode args), cod] <- rest -> do
-        xs <- mapM interpretIdent args
-        cod' <- interpretMetaType' cod
-        return (xs, cod')
-      | otherwise ->
-        raiseSyntaxError m "(forall (LEAF*) TREE)"
-    _ -> do
-      t <- interpretMetaType' tree
-      return ([], t)
-
-interpretMetaType' :: TreePlus -> WithEnv MetaTypePlus
-interpretMetaType' tree = do
-  case tree of
-    (m, TreeLeaf x) -> do
-      return (m, MetaTypeVar (asIdent x))
-    (m, TreeNode ((_, TreeLeaf headAtom) : ts))
-      | "arrow" == headAtom ->
-        case ts of
-          [(_, TreeNode domList), cod] -> do
-            domList' <- mapM interpretMetaType' domList
-            cod' <- interpretMetaType' cod
-            return (m, MetaTypeArrow domList' cod')
-          _ ->
-            raiseSyntaxError m "(arrow (TREE*) TREE)"
-      | "box" == headAtom ->
-        case ts of
-          [t] -> do
-            t' <- interpretMetaType' t
-            return (m, MetaTypeNec t')
-          _ ->
-            raiseSyntaxError m "(box TREE)"
-      | otherwise ->
-        raiseSyntaxError m "(arrow (TREE*) TREE) | (meta TREE)"
-    (m, _) ->
-      raiseSyntaxError m "(LEAF TREE*)"
