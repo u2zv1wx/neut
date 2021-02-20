@@ -17,7 +17,7 @@ import Path
 import Path.IO
 import Preprocess.Check
 import Preprocess.Discern
-import Preprocess.Reflect
+import Preprocess.Interpret
 import Preprocess.Tokenize
 import Reduce.MetaTerm
 import System.Exit
@@ -28,16 +28,14 @@ preprocess :: Path Abs File -> WithEnv [TreePlus]
 preprocess mainFilePath = do
   pushTrace mainFilePath
   out <- visit mainFilePath
-  -- out' <- mapM specialize out
-  forM_ out $ \k -> do
-    p $ T.unpack $ showAsSExp $ toTree k
+  out' <- mapM specialize out
+  forM_ out' $ \k -> do
+    p $ T.unpack $ showAsSExp k
   p "quitting."
   modify (\env -> env {enumEnv = Map.empty})
   modify (\env -> env {revEnumEnv = Map.empty})
   _ <- liftIO $ exitWith ExitSuccess
   undefined
-
--- return out'
 
 visit :: Path Abs File -> WithEnv [MetaTermPlus]
 visit path = do
@@ -73,12 +71,6 @@ preprocess' sub stmtList = do
       case headStmt of
         (m, TreeNode ((_, TreeLeaf headAtom) : rest)) ->
           case headAtom of
-            -- "auto-thunk"
-            --   | [(_, MetaTermLeaf name)] <- rest -> do
-            --     modify (\env -> env {autoThunkEnv = S.insert name (autoThunkEnv env)})
-            --     preprocess' sub restStmtList
-            --   | otherwise ->
-            --     raiseSyntaxError m "(auto-thunk LEAF)"
             -- "auto-quote"
             --   | [(_, MetaTermLeaf name)] <- rest -> do
             --     modify (\env -> env {autoQuoteEnv = S.insert name (autoQuoteEnv env)})
@@ -87,7 +79,7 @@ preprocess' sub stmtList = do
             --     raiseSyntaxError m "(auto-quote LEAF)"
             "denote"
               | [(_, TreeLeaf name), body] <- rest -> do
-                body' <- reflectCode body >>= discernMetaTerm
+                body' <- interpretCode body >>= discernMetaTerm
                 name' <- newNameWith $ asIdent name
                 check (Just name') body'
                 body'' <- reduceMetaTerm $ substMetaTerm sub body'
@@ -97,14 +89,14 @@ preprocess' sub stmtList = do
                 raiseSyntaxError m "(denote LEAF TREE)"
             "meta-enum"
               | (_, TreeLeaf name) : ts <- rest -> do
-                xis <- reflectEnumItem m name ts
+                xis <- interpretEnumItem m name ts
                 insEnumEnv m name xis
                 preprocess' sub restStmtList
               | otherwise ->
                 raiseSyntaxError m "(enum LEAF TREE ... TREE)"
             "meta-constant"
               | [(_, TreeLeaf name), t] <- rest -> do
-                (xs, t') <- reflectMetaType t
+                (xs, t') <- interpretMetaType t
                 (xs', t'') <- discernMetaType xs t'
                 modify (\env -> env {metaConstTypeEnv = Map.insert name (map asInt xs', t'') (metaConstTypeEnv env)})
                 modify (\env -> env {metaConstantSet = S.insert name (metaConstantSet env)})
@@ -162,8 +154,7 @@ preprocess' sub stmtList = do
 
 preprocessAux :: SubstMetaTerm -> TreePlus -> [TreePlus] -> WithEnv [MetaTermPlus]
 preprocessAux sub headStmt restStmtList = do
-  headStmt' <- reflectCode headStmt >>= discernMetaTerm
-  -- h <- newNameWith' "_"
+  headStmt' <- interpretCode headStmt >>= discernMetaTerm
   check Nothing headStmt'
   headStmt'' <- reduceMetaTerm $ substMetaTerm sub headStmt'
   case headStmt'' of
@@ -171,14 +162,12 @@ preprocessAux sub headStmt restStmtList = do
       treeList <- preprocess' sub restStmtList
       return $ headStmt'' : treeList
     e@(_, MetaTermNode _) -> do
-      -- (_, MetaTermNecIntro e) -> do
       -- denote xとかを生成するやつ
       if isSpecialMetaForm e
         then preprocess' sub $ toTree e : restStmtList
         else do
           treeList <- preprocess' sub restStmtList
           return $ headStmt'' : treeList
-    -- return $ e : treeList
     _ -> do
       p' headStmt''
       raiseError (fst headStmt') $ "meta-computation resulted in a non-quoted term: " <> showAsSExp (toTree headStmt'')
@@ -287,17 +276,17 @@ ensureFileExistence m path = do
     then return ()
     else raiseError m $ "no such file: " <> T.pack (toFilePath path)
 
--- specialize :: MetaTermPlus -> WithEnv TreePlus
--- specialize term =
---   case term of
---     (m, MetaTermLeaf x) ->
---       return (m, TreeLeaf x)
---     (m, MetaTermNode es) -> do
---       es' <- mapM specialize es
---       return (m, TreeNode es')
---     (m, _) -> do
---       p' term
---       raiseError m "the argument isn't a valid AST"
+specialize :: MetaTermPlus -> WithEnv TreePlus
+specialize term =
+  case term of
+    (m, MetaTermLeaf x) ->
+      return (m, TreeLeaf x)
+    (m, MetaTermNode es) -> do
+      es' <- mapM specialize es
+      return (m, TreeNode es')
+    (m, _) -> do
+      p' term
+      raiseError m "the argument isn't a valid AST"
 
 preprocessStmtClause :: TreePlus -> WithEnv (T.Text, [TreePlus])
 preprocessStmtClause tree =

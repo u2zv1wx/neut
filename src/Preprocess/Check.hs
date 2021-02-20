@@ -16,7 +16,6 @@ import qualified Data.Text as T
 
 check :: Maybe Ident -> MetaTermPlus -> WithEnv ()
 check mx e = do
-  p "-----------------------------"
   modify (\env -> env {metaConstraintEnv = Q.empty})
   t <- infer e
   case mx of
@@ -24,20 +23,7 @@ check mx e = do
       return ()
     Nothing ->
       insMetaConstraint t (fst e, MetaTypeAST)
-  -- insMetaConstraint t (fst e, MetaTypeNec (fst e, MetaTypeAST))
-  cs <- gets metaConstraintEnv
-  -- p "↓↓↓============================================"
-  -- forM_ (Q.toList cs) $ \c -> do
-  --   let (x, y) = toTuple c
-  --   p $ T.unpack $ metaTypeToText x
-  --   p $ T.unpack $ metaTypeToText y
-  --   p "--------------------"
-  -- p "↑↑↑↑============================================"
-  sub <- unify cs
-  -- p "sub:"
-  -- p' sub
-  -- p "---"
-  -- p "result:"
+  sub <- gets metaConstraintEnv >>= unify
   forM_ (catMaybes [mx]) $ \x -> do
     p' x
     p $ T.unpack $ metaTypeToText $ substMetaType sub t
@@ -55,20 +41,9 @@ unify q =
         unify $ Q.deleteMin q
       | (_, MetaTypeVar i1) <- t1,
         ensureOccurSanity (asInt i1) t2 -> do
-        -- p "updating queue with:"
-        -- p' (i1, t2)
-        let q' = updateQueue (IntMap.singleton (asInt i1) t2) $ Q.deleteMin q
-        -- p' q'
-        sub <- unify q'
-        -- p "resolve:"
-        -- p' (i1, t2) -- このt2も更新しないとダメ？
-        -- p "before:"
-        -- p' sub
-        -- p "after:"
-        -- p' $ compose (IntMap.singleton (asInt i1) t2) sub
+        sub <- unify $ updateQueue (IntMap.singleton (asInt i1) t2) $ Q.deleteMin q
         let t2' = substMetaType sub t2
         return $ compose (IntMap.singleton (asInt i1) t2') sub
-      -- return $ compose (IntMap.singleton (asInt i1) t2) sub
       | (_, MetaTypeVar _) <- t2 ->
         unify $ Q.insert (MetaConstraintUnprocessed t2 t1) $ Q.deleteMin q
       | (_, MetaTypeArrow domList1 cod1) <- t1,
@@ -93,14 +68,12 @@ unify q =
         p' (t1, t2)
         unify $ Q.insert (MetaConstraintProcessed t1 t2) $ Q.deleteMin q
     Just (MetaConstraintProcessed {}) -> do
-      -- p' q
       throw $ Error $ map toErrorLog (Q.toList q)
 
 toErrorLog :: MetaConstraint -> Log
 toErrorLog c = do
   let (x, y) = toTuple c
   let msg = constructErrorMsg x y
-  -- let pos = supHint (fst x) (fst y) -- fixme
   logError (getPosInfo $ supHint (fst x) (fst y)) msg
 
 ensureOccurSanity :: Int -> MetaTypePlus -> Bool
@@ -124,10 +97,7 @@ infer term =
       return h
     (m, MetaTermFix f xs mRest e) -> do
       hs <- mapM (const (newMetaTypeVar m)) xs
-      forM_ (zip xs hs) $ \(x, h) -> do
-        -- p "ins:"
-        -- p' x
-        -- p' h
+      forM_ (zip xs hs) $ \(x, h) ->
         insMetaType x h
       h <- newMetaTypeVar m
       case mRest of

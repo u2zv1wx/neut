@@ -11,9 +11,6 @@ import Data.MetaTerm
 import qualified Data.Text as T
 import Data.Tree
 
--- import Preprocess.Discern
--- import Preprocess.Reflect
-
 -- common lisp   | the meta-calculus of Neut (S4 modal logic)
 --               |
 -- quasiquote    | necessity-intro
