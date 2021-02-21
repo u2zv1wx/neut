@@ -147,7 +147,6 @@ preprocess' ctx stmtList = do
 
 preprocessAux :: SubstMetaTerm -> TreePlus -> [TreePlus] -> WithEnv [MetaTermPlus]
 preprocessAux ctx headStmt restStmtList = do
-  -- headStmt' <- preprocess'' ctx (fst headStmt, TreeNode [(fst headStmt, TreeLeaf "apply"), headStmt])
   headStmt' <- evaluate ctx (unwrap headStmt)
   if isSpecialMetaForm headStmt'
     then preprocess' ctx $ toTree headStmt' : restStmtList
