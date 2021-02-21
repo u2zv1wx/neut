@@ -16,7 +16,8 @@ import Data.WeakTerm
 import Parse.Discern
 import Parse.Interpret
 import Parse.Rule
-import Preprocess.Interpret
+
+-- import Preprocess.Interpret
 
 parse :: [TreePlus] -> WithEnv [WeakStmt]
 parse stmtTreeList =
@@ -52,13 +53,6 @@ parse stmtTreeList =
                         "the innermost section is not `" <> s <> "`, but is `" <> s' <> "`"
               | otherwise ->
                 raiseSyntaxError m "(end LEAF)"
-            "enum"
-              | (_, TreeLeaf name) : ts <- rest -> do
-                xis <- interpretEnumItem m name ts
-                insEnumEnv m name xis
-                parse restStmtList
-              | otherwise ->
-                raiseSyntaxError m "(enum LEAF TREE ... TREE)"
             "erase"
               | [(ms, TreeLeaf s)] <- rest -> do
                 nenv <- gets topNameEnv

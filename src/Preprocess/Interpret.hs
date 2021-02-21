@@ -5,6 +5,7 @@ module Preprocess.Interpret
   )
 where
 
+import Control.Monad.State.Lazy
 import Data.EnumCase
 import Data.Env
 import Data.Hint
@@ -12,6 +13,7 @@ import Data.Ident
 import Data.Maybe (fromMaybe)
 import Data.MetaTerm
 import Data.Namespace
+import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Tree
 import Text.Read (readMaybe)
@@ -30,107 +32,120 @@ interpretCode tree =
           raiseSyntaxError m "(TREE TREE*)"
         leaf@(_, TreeLeaf headAtom) : rest -> do
           case headAtom of
-            "LAMBDA"
+            "lambda"
               | [(_, TreeNode xs), e] <- rest -> do
                 xs' <- mapM interpretIdent xs
                 e' <- interpretCode e
                 return (m, MetaTermImpIntro xs' Nothing e')
               | otherwise ->
-                raiseSyntaxError m "(LAMBDA (LEAF*) TREE)"
-            "LAMBDA+"
+                raiseSyntaxError m "(lambda (LEAF*) TREE)"
+            "lambda+"
               | [(_, TreeNode args@(_ : _)), e] <- rest -> do
                 xs' <- mapM interpretIdent (init args)
                 rest' <- interpretIdent $ last args
                 e' <- interpretCode e
                 return (m, MetaTermImpIntro xs' (Just rest') e')
               | otherwise ->
-                raiseSyntaxError m "(LAMBDA+ (LEAF LEAF*) TREE)"
-            "APPLY"
+                raiseSyntaxError m "(lambda+ (LEAF LEAF*) TREE)"
+            "apply"
               | e : es <- rest -> do
                 e' <- interpretCode e
                 es' <- mapM (interpretCode) es
                 return (m, MetaTermImpElim e' es')
               | otherwise ->
-                raiseSyntaxError m "(APPLY TREE TREE*)"
-            "FIX"
+                raiseSyntaxError m "(apply TREE TREE*)"
+            "fix"
               | [(_, TreeLeaf f), (_, TreeNode xs), e] <- rest -> do
                 xs' <- mapM interpretIdent xs
                 e' <- interpretCode e
                 return (m, MetaTermFix (asIdent f) xs' Nothing e')
               | otherwise ->
-                raiseSyntaxError m "(FIX LEAF (LEAF*) TREE)"
-            "FIX+"
+                raiseSyntaxError m "(fix LEAF (LEAF*) TREE)"
+            "fix+"
               | [(_, TreeLeaf f), (_, TreeNode args@(_ : _)), e] <- rest -> do
                 xs' <- mapM interpretIdent (init args)
                 rest' <- interpretIdent $ last args
                 e' <- interpretCode e
                 return (m, MetaTermFix (asIdent f) xs' (Just rest') e')
               | otherwise ->
-                raiseSyntaxError m "(FIX+ LEAF (LEAF LEAF*) TREE)"
-            "SWITCH"
+                raiseSyntaxError m "(fix+ LEAF (LEAF LEAF*) TREE)"
+            "switch"
               | e : cs <- rest -> do
                 e' <- interpretCode e
                 cs' <- mapM interpretEnumClause cs
                 i <- newNameWith' "switch"
                 return (m, MetaTermEnumElim (e', i) cs')
               | otherwise ->
-                raiseSyntaxError m "(SWITCH TREE TREE*)"
+                raiseSyntaxError m "(switch TREE TREE*)"
+            "leaf"
+              | [(_, TreeLeaf x)] <- rest -> do
+                return (m, MetaTermLeaf x)
+              | otherwise ->
+                raiseSyntaxError m "(leaf TREE)"
+            "node" -> do
+              rest' <- mapM interpretCode rest
+              return (m, MetaTermNode rest')
             "quote"
               | [e] <- rest -> do
-                e' <- interpretCode e
+                e' <- interpretData 1 e
                 return (m, MetaTermImpIntro [] Nothing e')
               | otherwise ->
                 raiseSyntaxError m "(quote TREE)"
             "unquote"
-              | [e] <- rest -> do
-                e' <- interpretCode e
-                return (m, MetaTermImpElim e' [])
+              | [_] <- rest -> do
+                raiseSyntaxError m "found an unquote not inside a quote"
               | otherwise ->
                 raiseSyntaxError m "(unquote TREE)"
-            "quasiquote"
-              | [e] <- rest ->
-                interpretData e
-              | otherwise ->
-                raiseSyntaxError m "(quasiquote TREE)"
             _ ->
               interpretAux m leaf rest
         leaf : rest ->
           interpretAux m leaf rest
 
-interpretData :: TreePlus -> WithEnv MetaTermPlus
-interpretData tree = do
+interpretData :: Int -> TreePlus -> WithEnv MetaTermPlus
+interpretData level tree = do
   case tree of
     (m, TreeLeaf atom) ->
       return (m, MetaTermLeaf atom)
     (m, TreeNode treeList) ->
       case treeList of
-        (_, TreeLeaf "quasiunquote") : rest
+        (_, TreeLeaf "quote") : rest
           | [e] <- rest -> do
-            interpretCode e
+            e' <- interpretData (level + 1) e
+            return (m, MetaTermNode [(m, MetaTermLeaf "quote"), e'])
           | otherwise ->
-            raiseSyntaxError m "(quasiunquote TREE)"
+            raiseSyntaxError m "(quote TREE)"
+        (_, TreeLeaf "unquote") : rest
+          | [e] <- rest -> do
+            if level == 1
+              then do
+                e' <- interpretCode e
+                return (m, MetaTermImpElim e' [])
+              else do
+                e' <- interpretData (level - 1) e
+                return (m, MetaTermNode [(m, MetaTermLeaf "unquote"), e'])
+          | otherwise ->
+            raiseSyntaxError m "(unquote TREE)"
         _ -> do
-          treeList' <- mapM interpretData treeList
+          treeList' <- mapM (interpretData level) treeList
           return (m, MetaTermNode treeList')
 
 interpretAux :: Hint -> TreePlus -> [TreePlus] -> WithEnv MetaTermPlus
 interpretAux m f args = do
   f' <- interpretCode f
-  args' <- mapM interpretCode args
-  return (m, MetaTermImpElim f' args')
+  args' <- modifyArgs f' args
+  -- args' <- mapM interpretCode args
+  args'' <- mapM interpretCode args'
+  return (m, MetaTermImpElim f' args'')
 
--- modifyArgs :: MetaTermPlus -> [MetaTermPlus] -> WithEnv [MetaTermPlus]
--- modifyArgs f args = do
---   thunkEnv <- gets autoThunkEnv
---   quoteEnv <- gets autoQuoteEnv
---   case f of
---     (_, MetaTermVar name)
---       | S.member (asText name) thunkEnv ->
---         return $ map wrapWithThunk args
---       | S.member (asText name) quoteEnv ->
---         return $ map wrapWithQuote args
---     _ ->
---       return args
+modifyArgs :: MetaTermPlus -> [TreePlus] -> WithEnv [TreePlus]
+modifyArgs f args = do
+  quoteEnv <- gets autoQuoteEnv
+  case f of
+    (_, MetaTermVar name)
+      | S.member (asText name) quoteEnv ->
+        return $ map wrapWithQuote args
+    _ ->
+      return args
 
 interpretIdent :: TreePlus -> WithEnv Ident
 interpretIdent tree =
@@ -140,9 +155,9 @@ interpretIdent tree =
     t ->
       raiseSyntaxError (fst t) "LEAF"
 
--- wrapWithQuote :: MetaTermPlus -> MetaTermPlus
--- wrapWithQuote (m, t) =
---   (m, MetaTermNode [(m, MetaTermLeaf "quote"), (m, t)])
+wrapWithQuote :: TreePlus -> TreePlus
+wrapWithQuote (m, t) =
+  (m, TreeNode [(m, TreeLeaf "quote"), (m, t)])
 
 interpretEnumItem :: Hint -> T.Text -> [TreePlus] -> WithEnv [(T.Text, Int)]
 interpretEnumItem m name ts = do

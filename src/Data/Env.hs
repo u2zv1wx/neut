@@ -49,12 +49,8 @@ data Env = Env
     -- Preprocess
     --
     topMetaNameEnv :: Map.HashMap T.Text Ident,
-    -- autoQuoteEnv :: S.Set T.Text,
+    autoQuoteEnv :: S.Set T.Text,
     -- autoThunkEnv :: S.Set T.Text,
-    metaConstantSet :: S.Set T.Text,
-    -- metaTypeEnv :: MetaTypeEnv,
-    -- metaConstraintEnv :: MetaConstraintQueue,
-    -- metaConstTypeEnv :: Map.HashMap T.Text ([Int], MetaTypePlus),
     --
     -- parse
     --
@@ -100,14 +96,9 @@ initialEnv =
       shouldCancelAlloc = True,
       endOfEntry = "",
       topMetaNameEnv = Map.empty,
-      -- autoQuoteEnv = S.empty,
+      autoQuoteEnv = S.empty,
       -- autoThunkEnv = S.empty,
-      metaConstantSet = S.empty,
-      -- metaTypeEnv = IntMap.empty,
-      -- metaConstraintEnv = Q.empty,
-      -- metaConstTypeEnv = Map.empty,
       phase = 0,
-      -- notationEnv = Map.empty,
       constantSet = S.empty,
       enumEnv = Map.empty,
       fileEnv = Map.empty,
@@ -264,16 +255,6 @@ lookupConstTypeEnv m x
       Nothing ->
         raiseCritical m $
           "the constant `" <> x <> "` is not found in the type environment."
-
--- lookupMetaConstTypeEnv :: Hint -> T.Text -> WithEnv ([Int], MetaTypePlus)
--- lookupMetaConstTypeEnv m x = do
---   ctenv <- gets metaConstTypeEnv
---   case Map.lookup x ctenv of
---     Just t -> do
---       return t
---     Nothing ->
---       raiseCritical m $
---         "the constant `" <> x <> "` is not found in the type environment."
 
 lowTypeToType :: Hint -> LowType -> WithEnv TermPlus
 lowTypeToType m lowType =

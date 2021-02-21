@@ -29,8 +29,7 @@ discernMetaTerm' nenv term =
         Just x' ->
           return (m, MetaTermVar x')
         _ -> do
-          cenv <- gets metaConstantSet
-          if S.member (asText x) cenv
+          if S.member (asText x) metaConstants
             then return (m, MetaTermConst (asText x))
             else do
               mEnumValue <- resolveAsEnumValue (asText x)

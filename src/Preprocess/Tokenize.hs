@@ -262,7 +262,14 @@ readMacroMap :: Map.HashMap Char T.Text
 readMacroMap =
   Map.fromList
     [ ('\'', "quote"),
-      (',', "unquote"),
-      ('`', "quasiquote"),
-      ('#', "quasiunquote")
+      (',', "unquote")
     ]
+
+-- readMacroMap :: Map.HashMap Char T.Text
+-- readMacroMap =
+--   Map.fromList
+--     [ ('\'', "quote"),
+--       (',', "unquote"),
+--       ('`', "quasiquote"),
+--       ('#', "quasiunquote")
+--     ]

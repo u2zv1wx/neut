@@ -6,6 +6,7 @@ import Data.Ident
 import Data.Int
 import qualified Data.IntMap as IntMap
 import Data.Maybe (catMaybes)
+import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Tree
 
@@ -13,7 +14,9 @@ data MetaTerm
   = MetaTermVar Ident
   | MetaTermImpIntro [Ident] (Maybe Ident) MetaTermPlus
   | MetaTermImpElim MetaTermPlus [MetaTermPlus]
-  | MetaTermFix Ident [Ident] (Maybe Ident) MetaTermPlus
+  | -- | MetaTermNecIntro MetaTermPlus
+    -- | MetaTermNecElim MetaTermPlus
+    MetaTermFix Ident [Ident] (Maybe Ident) MetaTermPlus
   | MetaTermLeaf T.Text
   | MetaTermNode [MetaTermPlus]
   | MetaTermConst T.Text
@@ -126,3 +129,23 @@ toTreeEnumCase (m, v) =
       (m, TreeLeaf l)
     EnumCaseDefault ->
       (m, TreeLeaf "default")
+
+metaConstants :: S.Set T.Text
+metaConstants =
+  S.fromList
+    [ "cons",
+      "dump",
+      "evaluate",
+      "is-nil",
+      "leaf-equal",
+      "leaf-mul",
+      "int-add",
+      "int-sub",
+      "int-mul",
+      "int-div",
+      "int-eq",
+      "int-gt",
+      "int-ge",
+      "int-le",
+      "int-lt"
+    ]
