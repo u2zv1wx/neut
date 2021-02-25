@@ -24,7 +24,6 @@ parse stmtTreeList =
     [] ->
       return []
     headStmt : restStmtList -> do
-      -- p $ T.unpack $ showAsSExp headStmt
       case headStmt of
         (m, TreeNode (leaf@(_, TreeLeaf headAtom) : rest)) ->
           case headAtom of

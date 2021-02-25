@@ -27,16 +27,15 @@ preprocess :: Path Abs File -> WithEnv [TreePlus]
 preprocess mainFilePath = do
   pushTrace mainFilePath
   out <- visit mainFilePath
-  out' <- mapM specialize out
-  -- forM_ out' $ \k -> do
+  -- forM_ out $ \k -> do
   --   p $ T.unpack $ showAsSExp k
   -- p "quitting."
   -- _ <- liftIO $ exitWith ExitSuccess
   modify (\env -> env {enumEnv = Map.empty})
   modify (\env -> env {revEnumEnv = Map.empty})
-  return out'
+  return out
 
-visit :: Path Abs File -> WithEnv [MetaTermPlus]
+visit :: Path Abs File -> WithEnv [TreePlus]
 visit path = do
   pushTrace path
   modify (\env -> env {fileEnv = Map.insert path VisitInfoActive (fileEnv env)})
@@ -44,7 +43,7 @@ visit path = do
   content <- liftIO $ TIO.readFile $ toFilePath path
   tokenize content >>= preprocess'
 
-leave :: WithEnv [MetaTermPlus]
+leave :: WithEnv [a]
 leave = do
   path <- getCurrentFilePath
   popTrace
@@ -61,7 +60,7 @@ popTrace :: WithEnv ()
 popTrace =
   modify (\env -> env {traceEnv = tail (traceEnv env)})
 
-preprocess' :: [TreePlus] -> WithEnv [MetaTermPlus]
+preprocess' :: [TreePlus] -> WithEnv [TreePlus]
 preprocess' stmtList = do
   case stmtList of
     [] ->
@@ -73,7 +72,7 @@ preprocess' stmtList = do
       stmt'' <- autoThunkStmt quotedStmt
       preprocess'' [stmt''] restStmtList
 
-preprocess'' :: [TreePlus] -> [TreePlus] -> WithEnv [MetaTermPlus]
+preprocess'' :: [TreePlus] -> [TreePlus] -> WithEnv [TreePlus]
 preprocess'' quotedStmtList restStmtList =
   case quotedStmtList of
     [] ->
@@ -159,11 +158,11 @@ preprocess'' quotedStmtList restStmtList =
         _ ->
           preprocessAux headStmt quotedRestStmtList restStmtList
 
-preprocessAux :: TreePlus -> [TreePlus] -> [TreePlus] -> WithEnv [MetaTermPlus]
+preprocessAux :: TreePlus -> [TreePlus] -> [TreePlus] -> WithEnv [TreePlus]
 preprocessAux headStmt expandedRestStmtList restStmtList = do
-  headStmt' <- evaluate headStmt
+  headStmt' <- evaluate headStmt >>= specialize
   if isSpecialMetaForm headStmt'
-    then preprocess'' (toTree headStmt' : expandedRestStmtList) restStmtList
+    then preprocess'' (headStmt' : expandedRestStmtList) restStmtList
     else do
       treeList <- preprocess'' expandedRestStmtList restStmtList
       return $ headStmt' : treeList
@@ -173,10 +172,10 @@ evaluate e = do
   ctx <- gets metaTermCtx
   interpretCode e >>= discernMetaTerm >>= return . substMetaTerm ctx >>= reduceMetaTerm
 
-isSpecialMetaForm :: MetaTermPlus -> Bool
+isSpecialMetaForm :: TreePlus -> Bool
 isSpecialMetaForm tree =
   case tree of
-    (_, MetaTermNode ((_, MetaTermLeaf x) : _)) ->
+    (_, TreeNode ((_, TreeLeaf x) : _)) ->
       S.member x metaKeywordSet
     _ ->
       False
@@ -200,7 +199,7 @@ includeFile ::
   T.Text ->
   [TreePlus] ->
   [TreePlus] ->
-  WithEnv [MetaTermPlus]
+  WithEnv [TreePlus]
 includeFile m mPath pathString expandedRestStmtList as = do
   -- includeにはその痕跡を残しておいてもよいかも。Parse.hsのほうでこれを参照してなんかチェックする感じ。
   -- ensureEnvSanity m
@@ -286,7 +285,6 @@ specialize term =
       es' <- mapM specialize es
       return (m, TreeNode es')
     (m, _) -> do
-      -- p' term
       raiseError m $ "meta-computation resulted in a non-quoted term: " <> showAsSExp (toTree term)
 
 preprocessStmtClause :: TreePlus -> WithEnv (T.Text, [TreePlus])
@@ -317,7 +315,7 @@ mapStmt f tree =
       rest' <- mapM (mapStmt f) rest
       return (m, TreeNode (stmt : rest'))
     _ ->
-      if isSpecialMetaForm $ embed tree
+      if isSpecialMetaForm tree
         then return tree
         else f tree
 

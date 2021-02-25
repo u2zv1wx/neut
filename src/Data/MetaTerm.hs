@@ -84,29 +84,30 @@ toTree term =
     (m, MetaTermImpIntro xs Nothing e) -> do
       let e' = toTree e
       let xs' = map (\i -> (m, TreeLeaf $ asText' i)) xs
-      (m, TreeNode [(m, TreeLeaf "lambda"), (m, TreeNode xs'), e'])
+      (m, TreeNode [(m, TreeLeaf "lambda-meta"), (m, TreeNode xs'), e'])
     (m, MetaTermImpIntro xs (Just rest) e) -> do
       let e' = toTree e
       let args = map (\i -> (m, TreeLeaf $ asText' i)) $ xs ++ [rest]
-      (m, TreeNode [(m, TreeLeaf "lambda+"), (m, TreeNode args), e'])
+      (m, TreeNode [(m, TreeLeaf "lambda-meta-variadic"), (m, TreeNode args), e'])
     (m, MetaTermImpElim e es) -> do
       let e' = toTree e
       let es' = map toTree es
-      -- (m, TreeNode (e' : es'))
-      (m, TreeNode ((m, TreeLeaf "expand") : e' : es'))
+      (m, TreeNode ((m, TreeLeaf "apply-meta") : e' : es'))
     (m, MetaTermFix f xs Nothing e) -> do
       let e' = toTree e
       let xs' = map (\i -> (m, TreeLeaf $ asText' i)) xs
-      (m, TreeNode [(m, TreeLeaf "fix"), (m, TreeLeaf (asText' f)), (m, TreeNode xs'), e'])
+      (m, TreeNode [(m, TreeLeaf "fix-meta"), (m, TreeLeaf (asText' f)), (m, TreeNode xs'), e'])
     (m, MetaTermFix f xs (Just rest) e) -> do
       let e' = toTree e
       let args = map (\i -> (m, TreeLeaf $ asText' i)) $ xs ++ [rest]
-      (m, TreeNode [(m, TreeLeaf "fix+"), (m, TreeLeaf (asText' f)), (m, TreeNode args), e'])
+      (m, TreeNode [(m, TreeLeaf "fix-meta-variadic"), (m, TreeLeaf (asText' f)), (m, TreeNode args), e'])
     (m, MetaTermLeaf x) ->
-      (m, TreeLeaf x)
+      (m, TreeNode [(m, TreeLeaf "leaf"), (m, TreeLeaf x)])
+    -- (m, TreeLeaf x)
     (m, MetaTermNode es) -> do
       let es' = map toTree es
-      (m, TreeNode es')
+      (m, TreeNode ((m, TreeLeaf "node") : es'))
+    -- (m, TreeNode es')
     (m, MetaTermConst c) ->
       (m, TreeLeaf c)
     (m, MetaTermInt64 i) ->
@@ -119,7 +120,7 @@ toTree term =
       let cs' = map toTreeEnumCase cs
       let bodyList' = map toTree bodyList
       let caseList' = map (\(c, body) -> (m, TreeNode [c, body])) $ zip cs' bodyList'
-      (m, TreeNode [(m, TreeLeaf "switch"), e', (m, TreeNode caseList')])
+      (m, TreeNode [(m, TreeLeaf "switch-meta"), e', (m, TreeNode caseList')])
 
 toTreeEnumCase :: EnumCasePlus -> TreePlus
 toTreeEnumCase (m, v) =
