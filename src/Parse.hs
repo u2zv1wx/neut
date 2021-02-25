@@ -28,6 +28,13 @@ parse stmtTreeList =
       case headStmt of
         (m, TreeNode (leaf@(_, TreeLeaf headAtom) : rest)) ->
           case headAtom of
+            "data"
+              | name@(mFun, TreeLeaf _) : xts@(_, TreeNode _) : es' <- rest ->
+                parse $ (m, TreeNode [leaf, (mFun, TreeNode (name : xts : es'))]) : restStmtList
+              | otherwise -> do
+                stmtList1 <- parseData m rest
+                stmtList2 <- parse restStmtList
+                return $ stmtList1 ++ stmtList2
             "declare-constant"
               | [(_, TreeLeaf name), t] <- rest -> do
                 t' <- interpret t >>= discern
@@ -68,13 +75,6 @@ parse stmtTreeList =
                 parse restStmtList
               | otherwise ->
                 raiseSyntaxError m "(erase LEAF)"
-            "data"
-              | name@(mFun, TreeLeaf _) : xts@(_, TreeNode _) : es' <- rest ->
-                parse $ (m, TreeNode [leaf, (mFun, TreeNode (name : xts : es'))]) : restStmtList
-              | otherwise -> do
-                stmtList1 <- parseData m rest
-                stmtList2 <- parse restStmtList
-                return $ stmtList1 ++ stmtList2
             "let"
               | [xt, e] <- rest -> do
                 e' <- interpret e >>= discern

@@ -1,12 +1,10 @@
 module Preprocess (preprocess) where
 
 import Control.Monad.State.Lazy hiding (get)
-import Data.EnumCase
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import Data.Hint
 import Data.Ident
-import Data.Int
 import qualified Data.IntMap as IntMap
 import Data.MetaTerm
 import Data.Platform
@@ -20,6 +18,7 @@ import Path.IO
 import Preprocess.Discern
 import Preprocess.Interpret
 import Preprocess.Tokenize
+import Reduce.MetaTerm
 import System.Exit
 import System.Process hiding (env)
 import Text.Read (readMaybe)
@@ -144,7 +143,6 @@ preprocess'' quotedStmtList restStmtList =
                     preprocess'' (as1 ++ quotedRestStmtList) restStmtList
               | otherwise ->
                 raiseSyntaxError m "(introspect LEAF TREE*)"
-            -- fixme: 定義済みのものがみつかったらエラーにしたほうがいい。
             "let-meta"
               | [(_, TreeLeaf name), body] <- rest -> do
                 body' <- evaluate body
@@ -152,7 +150,7 @@ preprocess'' quotedStmtList restStmtList =
                 modify (\env -> env {topMetaNameEnv = Map.insert name name' (topMetaNameEnv env)})
                 modify (\env -> env {metaTermCtx = IntMap.insert (asInt name') body' (metaTermCtx env)})
                 preprocess'' quotedRestStmtList restStmtList
-              | otherwise -> do
+              | otherwise ->
                 raiseSyntaxError m "(let-meta LEAF TREE)"
             "statement-meta" ->
               preprocess'' (rest ++ quotedRestStmtList) restStmtList
@@ -291,18 +289,6 @@ specialize term =
       -- p' term
       raiseError m $ "meta-computation resulted in a non-quoted term: " <> showAsSExp (toTree term)
 
-metaToTree :: MetaTermPlus -> WithEnv TreePlus
-metaToTree term =
-  case term of
-    (m, MetaTermLeaf x) ->
-      return (m, TreeLeaf x)
-    (m, MetaTermNode es) -> do
-      es' <- mapM metaToTree es
-      return (m, TreeNode es')
-    (m, _) -> do
-      p' term
-      raiseError m $ "the argument of eval isn't a valid AST " <> showAsSExp (toTree term)
-
 preprocessStmtClause :: TreePlus -> WithEnv (T.Text, [TreePlus])
 preprocessStmtClause tree =
   case tree of
@@ -320,165 +306,6 @@ retrieveCompileTimeVarValue m var =
       showArch <$> getArch
     _ ->
       raiseError m $ "no such compile-time variable defined: " <> var
-
-reduceMetaTerm :: MetaTermPlus -> WithEnv MetaTermPlus
-reduceMetaTerm term =
-  case term of
-    (m, MetaTermImpElim e es) -> do
-      e' <- reduceMetaTerm e
-      es' <- mapM (reduceMetaTerm) es
-      case e' of
-        (mLam, MetaTermImpIntro xs mRest body) -> do
-          h <- newNameWith' "SELF"
-          reduceFix (mLam, MetaTermFix h xs mRest body) es'
-        (_, MetaTermFix {}) ->
-          reduceFix e' es'
-        (_, MetaTermConst c) ->
-          reduceConstApp m c es'
-        _ -> do
-          raiseError m $ "the term \n  " <> showAsSExp (toTree e') <> "\ncannot be applied to:\n  " <> T.intercalate "\n" (map (showAsSExp . toTree) es')
-    (m, MetaTermEnumElim (e, _) caseList) -> do
-      e' <- reduceMetaTerm e
-      let caseList' = map (\(c, body) -> (snd c, body)) caseList
-      case e' of
-        (_, MetaTermEnumIntro l) ->
-          case lookup (EnumCaseLabel l) caseList' of
-            Just body ->
-              reduceMetaTerm body
-            Nothing ->
-              raiseError m "found an ill-typed switch"
-        _ -> do
-          raiseError m "found an ill-typed switch"
-    (m, MetaTermNode es) -> do
-      es' <- mapM (reduceMetaTerm) es
-      return (m, MetaTermNode es')
-    _ -> do
-      return term
-
-reduceFix :: MetaTermPlus -> [MetaTermPlus] -> WithEnv MetaTermPlus
-reduceFix e es =
-  case e of
-    (m, MetaTermFix f xs mRest body)
-      | Just rest <- mRest -> do
-        if length xs > length es
-          then raiseError m "arity mismatch"
-          else do
-            let es1 = take (length xs) es
-            -- let es2 = map (\x -> (m, MetaTermNecElim x)) $ drop (length xs) es
-            let restArg = (m, MetaTermNode (drop (length xs) es))
-            -- let restArg = (m, MetaTermNecIntro (m, MetaTermNode es2))
-            let sub = IntMap.fromList $ (asInt f, e) : zip (map asInt xs) es1 ++ [(asInt rest, restArg)]
-            reduceMetaTerm $ substMetaTerm sub body
-      | otherwise -> do
-        if length xs /= length es
-          then raiseError m "arity mismatch"
-          else do
-            let sub = IntMap.fromList $ (asInt f, e) : zip (map asInt xs) es
-            reduceMetaTerm $ substMetaTerm sub body
-    _ ->
-      raiseCritical (fst e) "unreachable"
-
-reduceConstApp :: Hint -> T.Text -> [MetaTermPlus] -> WithEnv MetaTermPlus
-reduceConstApp m c es =
-  case c of
-    "cons"
-      | [t, (_, MetaTermNode ts)] <- es ->
-        return (m, MetaTermNode (t : ts))
-    "dump"
-      | [arg] <- es -> do
-        liftIO $ putStrLn $ T.unpack $ showAsSExp $ toTree arg
-        return (m, MetaTermEnumIntro "top.unit")
-    "evaluate"
-      | [arg] <- es -> do
-        arg' <- metaToTree arg
-        evaluate arg'
-    "head"
-      | [(_, MetaTermNode (h : _))] <- es ->
-        return h
-    "is-nil"
-      | [(_, MetaTermNode ts)] <- es ->
-        return $ liftBool (null ts) m
-    "is-leaf"
-      | [(_, MetaTermLeaf _)] <- es ->
-        return $ liftBool True m
-      | [(_, MetaTermNode _)] <- es ->
-        return $ liftBool False m
-    "is-node"
-      | [(_, MetaTermLeaf _)] <- es ->
-        return $ liftBool False m
-      | [(_, MetaTermNode _)] <- es ->
-        return $ liftBool True m
-    "leaf-mul"
-      | [(mLeaf, MetaTermLeaf s1), (_, MetaTermLeaf s2)] <- es ->
-        return (mLeaf, MetaTermLeaf (s1 <> s2))
-    "leaf-equal"
-      | [(_, MetaTermLeaf s1), (_, MetaTermLeaf s2)] <- es ->
-        return $ liftBool (s1 == s2) m
-    "leaf-uncons"
-      | [(_, MetaTermLeaf s)] <- es -> do
-        case T.uncons s of
-          Just (ch, rest) ->
-            return (m, MetaTermNode [(m, MetaTermLeaf (T.singleton ch)), (m, MetaTermLeaf rest)])
-          Nothing ->
-            undefined
-    "tail"
-      | [(mNode, MetaTermNode (_ : rest))] <- es ->
-        return (mNode, MetaTermNode rest)
-    "new-symbol"
-      | [] <- es -> do
-        i <- newCount
-        return (m, MetaTermLeaf ("#" <> T.pack (show i)))
-    "nth"
-      | [(_, MetaTermInt64 i), (_, MetaTermNode ts)] <- es -> do
-        if 0 <= i && i < fromIntegral (length ts)
-          then return $ ts !! (fromIntegral i)
-          else raiseError m "index out of range"
-    _
-      | Just op <- toArithOp c,
-        [(_, MetaTermInt64 i1), (_, MetaTermInt64 i2)] <- es ->
-        return (m, MetaTermInt64 (op i1 i2))
-      | Just op <- toCmpOp c,
-        [(_, MetaTermInt64 i1), (_, MetaTermInt64 i2)] <- es ->
-        return $ liftBool (op i1 i2) m
-      | otherwise -> do
-        let textList = map (showAsSExp . toTree) es
-        raiseError m $ "the constant `" <> c <> "` cannot be used with the following arguments:\n" <> T.intercalate "\n" textList
-
-toArithOp :: T.Text -> Maybe (Int64 -> Int64 -> Int64)
-toArithOp opStr =
-  case opStr of
-    "int-add" ->
-      Just (+)
-    "int-sub" ->
-      Just (-)
-    "int-mul" ->
-      Just (*)
-    "int-div" ->
-      Just div
-    _ ->
-      Nothing
-
-toCmpOp :: T.Text -> Maybe (Int64 -> Int64 -> Bool)
-toCmpOp opStr =
-  case opStr of
-    "int-gt" ->
-      Just (>)
-    "int-ge" ->
-      Just (>=)
-    "int-lt" ->
-      Just (<)
-    "int-le" ->
-      Just (<=)
-    "int-eq" ->
-      Just (==)
-    _ ->
-      Nothing
-
-liftBool :: Bool -> Hint -> MetaTermPlus
-liftBool b m =
-  if b
-    then (m, MetaTermEnumIntro "bool.true")
-    else (m, MetaTermEnumIntro "bool.false")
 
 mapStmt :: (TreePlus -> WithEnv TreePlus) -> TreePlus -> WithEnv TreePlus
 mapStmt f tree =

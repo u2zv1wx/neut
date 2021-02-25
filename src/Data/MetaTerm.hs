@@ -134,7 +134,6 @@ metaConstants =
   S.fromList
     [ "cons",
       "dump",
-      "evaluate",
       "is-nil",
       "head",
       "tail",
