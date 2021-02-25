@@ -76,9 +76,6 @@ parse stmtTreeList =
                 stmtList2 <- parse restStmtList
                 return $ stmtList1 ++ stmtList2
             "let"
-              | [(mx, TreeLeaf x), t, e] <- rest -> do
-                let xt = (mx, TreeNode [(mx, TreeLeaf x), t])
-                parse ((m, TreeNode [(m, TreeLeaf "let"), xt, e]) : restStmtList)
               | [xt, e] <- rest -> do
                 e' <- interpret e >>= discern
                 xt' <- prefixTextPlus xt >>= interpretIdentPlus >>= discernIdentPlus
