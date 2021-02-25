@@ -51,14 +51,11 @@ data Env = Env
     -- Preprocess
     --
     topMetaNameEnv :: Map.HashMap T.Text Ident,
-    autoQuoteEnv :: S.Set T.Text,
-    autoThunkEnv :: S.Set T.Text,
     metaTermCtx :: SubstMetaTerm,
     --
     -- parse
     --
     phase :: Int,
-    -- notationEnv :: Map.HashMap T.Text [(TreePlus, TreePlus)],
     constantSet :: S.Set T.Text,
     fileEnv :: Map.HashMap (Path Abs File) VisitInfo,
     traceEnv :: [Path Abs File],
@@ -100,8 +97,6 @@ initialEnv =
       endOfEntry = "",
       topMetaNameEnv = Map.empty,
       metaTermCtx = IntMap.empty,
-      autoQuoteEnv = S.empty,
-      autoThunkEnv = S.empty,
       phase = 0,
       constantSet = S.empty,
       enumEnv = Map.empty,
@@ -500,3 +495,11 @@ lookupKind m name = do
       raiseError m $ "no such enum-intro is defined: " <> name
     Just (j, _) ->
       return j
+
+use :: T.Text -> WithEnv ()
+use s =
+  modify (\e -> e {prefixEnv = s : prefixEnv e})
+
+unuse :: T.Text -> WithEnv ()
+unuse s =
+  modify (\e -> e {prefixEnv = filter (/= s) (prefixEnv e)})

@@ -8,7 +8,7 @@ import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.MetaTerm
 import Data.Platform
-import qualified Data.Set as S
+-- import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import Data.Tree
@@ -48,7 +48,7 @@ leave = do
   path <- getCurrentFilePath
   popTrace
   modify (\env -> env {fileEnv = Map.insert path VisitInfoFinish (fileEnv env)})
-  -- modify (\env -> env {prefixEnv = []})
+  modify (\env -> env {prefixEnv = []})
   -- modify (\env -> env {sectionEnv = []})
   return []
 
@@ -63,18 +63,12 @@ popTrace =
 preprocess' :: [TreePlus] -> WithEnv [TreePlus]
 preprocess' stmtList = do
   case stmtList of
-    [] ->
+    [] -> do
       leave
     headStmt : restStmtList ->
       case headStmt of
         (m, TreeNode (leaf@(_, TreeLeaf headAtom) : rest)) ->
           case headAtom of
-            "auto-thunk"
-              | [(_, TreeLeaf name)] <- rest -> do
-                modify (\env -> env {autoThunkEnv = S.insert name (autoThunkEnv env)})
-                preprocess' restStmtList
-              | otherwise ->
-                raiseSyntaxError m "(auto-thunk LEAF)"
             "declare-enum-meta"
               | (_, TreeLeaf name) : ts <- rest -> do
                 xis <- interpretEnumItem m name ts
@@ -126,11 +120,13 @@ preprocess' stmtList = do
                 raiseSyntaxError m "(introspect LEAF TREE*)"
             "define-macro"
               | [(_, TreeLeaf name), body] <- rest -> do
+                nenv <- gets topMetaNameEnv
+                when (Map.member name nenv) $
+                  raiseError m $ "the meta-variable `" <> name <> "` is already defined at top level"
                 body' <- evaluate body
                 name' <- newNameWith $ asIdent name
                 modify (\env -> env {topMetaNameEnv = Map.insert name name' (topMetaNameEnv env)})
                 modify (\env -> env {metaTermCtx = IntMap.insert (asInt name') body' (metaTermCtx env)})
-                modify (\env -> env {autoQuoteEnv = S.insert name (autoQuoteEnv env)}) -- new!
                 preprocess' restStmtList
               | [name@(_, TreeLeaf _), xts, body] <- rest -> do
                 let defFix = (m, TreeNode [leaf, name, (m, TreeNode [(m, TreeLeaf "fix-meta"), name, xts, body])])
@@ -143,6 +139,20 @@ preprocess' stmtList = do
                 preprocess' $ defFix : restStmtList
               | otherwise ->
                 raiseSyntaxError m "(define-macro-variadic LEAF TREE TREE)"
+            "use"
+              | [(_, TreeLeaf s)] <- rest -> do
+                use s
+                treeList <- preprocess' restStmtList
+                return $ headStmt : treeList -- the `(use NAME)` is also used in the object language
+              | otherwise ->
+                raiseSyntaxError m "(use LEAF)"
+            "unuse"
+              | [(_, TreeLeaf s)] <- rest -> do
+                unuse s
+                treeList <- preprocess' restStmtList
+                return $ headStmt : treeList -- the `(unuse NAME)` is also used in the object language
+              | otherwise ->
+                raiseSyntaxError m "(unuse LEAF)"
             _ ->
               preprocessAux headStmt restStmtList
         _ ->
@@ -157,7 +167,7 @@ preprocessAux headStmt restStmtList = do
 evaluate :: TreePlus -> WithEnv MetaTermPlus
 evaluate e = do
   ctx <- gets metaTermCtx
-  autoThunk e >>= interpretCode >>= discernMetaTerm >>= return . substMetaTerm ctx >>= reduceMetaTerm
+  interpretCode e >>= discernMetaTerm >>= return . substMetaTerm ctx >>= reduceMetaTerm
 
 includeFile ::
   Hint ->
@@ -166,8 +176,7 @@ includeFile ::
   [TreePlus] ->
   WithEnv [TreePlus]
 includeFile m mPath pathString as = do
-  -- includeにはその痕跡を残しておいてもよいかも。Parse.hsのほうでこれを参照してなんかチェックする感じ。
-  -- ensureEnvSanity m
+  ensureEnvSanity m
   path <- readStrOrThrow mPath pathString
   when (null path) $ raiseError m "found an empty path"
   dirPath <-
@@ -207,12 +216,12 @@ raiseIfFailure m procName exitCode h pkgDirPath =
       errStr <- liftIO $ hGetContents h
       raiseError m $ T.pack $ "the child process `" ++ procName ++ "` failed with the following message (exitcode = " ++ show i ++ "):\n" ++ errStr
 
--- ensureEnvSanity :: Hint -> WithEnv ()
--- ensureEnvSanity m = do
---   penv <- gets prefixEnv
---   if null penv
---     then return ()
---     else raiseError m "`include` can only be used with no prefix assumption"
+ensureEnvSanity :: Hint -> WithEnv ()
+ensureEnvSanity m = do
+  penv <- gets prefixEnv
+  if null penv
+    then return ()
+    else raiseError m "`include` can only be used with no `use`"
 
 showCyclicPath :: [Path Abs File] -> T.Text
 showCyclicPath pathList =
@@ -270,58 +279,39 @@ retrieveCompileTimeVarValue m var =
     _ ->
       raiseError m $ "no such compile-time variable defined: " <> var
 
-autoThunk :: TreePlus -> WithEnv TreePlus
-autoThunk tree = do
-  tenv <- gets autoThunkEnv
-  case tree of
-    (_, TreeLeaf _) ->
-      return tree
-    (m, TreeNode ts) -> do
-      ts' <- mapM autoThunk ts
-      case ts' of
-        t@(_, TreeLeaf x) : rest
-          | S.member x tenv ->
-            return (m, TreeNode $ t : map autoThunk' rest)
-        _ ->
-          return (m, TreeNode ts')
-
-autoThunk' :: TreePlus -> TreePlus
-autoThunk' (m, t) =
-  (m, TreeNode [(m, TreeLeaf "lambda-meta"), (m, TreeNode []), (m, t)])
-
 autoQuote :: TreePlus -> WithEnv TreePlus
 autoQuote tree = do
-  qenv <- gets autoQuoteEnv
-  return $ autoQuote' qenv tree
+  nenv <- gets topMetaNameEnv
+  return $ autoQuote' nenv tree
 
-autoQuote' :: S.Set T.Text -> TreePlus -> TreePlus
-autoQuote' qenv tree =
+autoQuote' :: Map.HashMap T.Text Ident -> TreePlus -> TreePlus
+autoQuote' nenv tree =
   case tree of
     (_, TreeLeaf _) ->
       tree
     (m, TreeNode ts) -> do
-      let modifier = if isSpecialForm qenv tree then quoteData else unquoteCode
-      let ts' = map (modifier qenv . autoQuote' qenv) ts
+      let modifier = if isSpecialForm nenv tree then quoteData else unquoteCode
+      let ts' = map (modifier nenv . autoQuote' nenv) ts
       (m, TreeNode ts')
 
-quoteData :: S.Set T.Text -> TreePlus -> TreePlus
-quoteData qenv tree@(m, _) =
-  if isSpecialForm qenv tree
+quoteData :: Map.HashMap T.Text Ident -> TreePlus -> TreePlus
+quoteData nenv tree@(m, _) =
+  if isSpecialForm nenv tree
     then tree
     else (m, TreeNode [(m, TreeLeaf "quasiquote"), tree])
 
-unquoteCode :: S.Set T.Text -> TreePlus -> TreePlus
-unquoteCode qenv tree@(m, _) =
-  if isSpecialForm qenv tree
+unquoteCode :: Map.HashMap T.Text Ident -> TreePlus -> TreePlus
+unquoteCode nenv tree@(m, _) =
+  if isSpecialForm nenv tree
     then (m, TreeNode [(m, TreeLeaf "quasiunquote"), tree])
     else tree
 
-isSpecialForm :: S.Set T.Text -> TreePlus -> Bool
-isSpecialForm qenv tree =
+isSpecialForm :: Map.HashMap T.Text Ident -> TreePlus -> Bool
+isSpecialForm nenv tree =
   case tree of
     (_, TreeLeaf x) ->
-      S.member x qenv
+      Map.member x nenv
     (_, TreeNode ((_, TreeLeaf x) : _)) ->
-      S.member x qenv
+      Map.member x nenv
     _ ->
       False

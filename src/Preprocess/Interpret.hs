@@ -73,6 +73,19 @@ interpretCode tree =
                 return (m, MetaTermEnumElim (e', i) cs')
               | otherwise ->
                 raiseSyntaxError m "(switch-meta TREE TREE*)"
+            "if-meta"
+              | [cond, onTrue, onFalse] <- rest -> do
+                interpretCode
+                  ( m,
+                    TreeNode
+                      [ (m, TreeLeaf "switch-meta"),
+                        cond,
+                        (m, TreeNode [(m, TreeLeaf "bool.true"), onTrue]),
+                        (m, TreeNode [(m, TreeLeaf "bool.false"), onFalse])
+                      ]
+                  )
+              | otherwise ->
+                raiseSyntaxError m "(if-meta TREE TREE TREE)"
             "leaf"
               | [(_, TreeLeaf x)] <- rest -> do
                 return (m, MetaTermLeaf x)

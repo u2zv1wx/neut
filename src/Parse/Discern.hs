@@ -145,7 +145,7 @@ sanityCheck m x = do
   nenv <- gets topNameEnv
   when (Map.member (asText x) nenv) $
     raiseError m $
-      "the variable " <> asText x <> " is already defined at top level"
+      "the variable `" <> asText x <> "` is already defined at top level"
 
 discernBinder ::
   NameEnv ->

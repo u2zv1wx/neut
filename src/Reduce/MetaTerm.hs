@@ -101,15 +101,15 @@ reduceConstApp m c es =
       | [(_, MetaTermNode ts)] <- es ->
         return $ liftBool (null ts) m
     "is-leaf"
-      | [(_, MetaTermLeaf _)] <- es ->
-        return $ liftBool True m
-      | [(_, MetaTermNode _)] <- es ->
-        return $ liftBool False m
+      | [(mLeaf, MetaTermLeaf _)] <- es ->
+        return $ liftBool True mLeaf
+      | [(mNode, MetaTermNode _)] <- es ->
+        return $ liftBool False mNode
     "is-node"
-      | [(_, MetaTermLeaf _)] <- es ->
-        return $ liftBool False m
-      | [(_, MetaTermNode _)] <- es ->
-        return $ liftBool True m
+      | [(mLeaf, MetaTermLeaf _)] <- es ->
+        return $ liftBool False mLeaf
+      | [(mNode, MetaTermNode _)] <- es ->
+        return $ liftBool True mNode
     "leaf-mul"
       | [(mLeaf, MetaTermLeaf s1), (_, MetaTermLeaf s2)] <- es ->
         return (mLeaf, MetaTermLeaf (s1 <> s2))
@@ -117,9 +117,9 @@ reduceConstApp m c es =
       | [(_, MetaTermLeaf s1), (_, MetaTermLeaf s2)] <- es ->
         return $ liftBool (s1 == s2) m
     "leaf-uncons"
-      | [(_, MetaTermLeaf s)] <- es,
+      | [(mLeaf, MetaTermLeaf s)] <- es,
         Just (ch, rest) <- T.uncons s -> do
-        return (m, MetaTermNode [(m, MetaTermLeaf (T.singleton ch)), (m, MetaTermLeaf rest)])
+        return (mLeaf, MetaTermNode [(mLeaf, MetaTermLeaf (T.singleton ch)), (mLeaf, MetaTermLeaf rest)])
     "tail"
       | [(mNode, MetaTermNode ts)] <- es ->
         case ts of

@@ -124,14 +124,6 @@ interpretAux headStmt restStmtList = do
   defList <- parse restStmtList
   return $ WeakStmtLet m (m, h, t) e : defList
 
-use :: T.Text -> WithEnv ()
-use s =
-  modify (\e -> e {prefixEnv = s : prefixEnv e})
-
-unuse :: T.Text -> WithEnv ()
-unuse s =
-  modify (\e -> e {prefixEnv = filter (/= s) (prefixEnv e)})
-
 withSectionPrefix :: T.Text -> WithEnv T.Text
 withSectionPrefix x = do
   ns <- gets sectionEnv
