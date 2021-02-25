@@ -91,8 +91,12 @@ reduceConstApp m c es =
         liftIO $ putStrLn $ T.unpack $ showAsSExp $ toTree arg
         return (m, MetaTermEnumIntro "top.unit")
     "head"
-      | [(_, MetaTermNode ((_, h) : _))] <- es ->
-        return (m, h)
+      | [(mNode, MetaTermNode ts)] <- es ->
+        case ts of
+          h : _ ->
+            return h
+          _ ->
+            raiseError mNode "the constant `head` cannot be applied to nil"
     "is-nil"
       | [(_, MetaTermNode ts)] <- es ->
         return $ liftBool (null ts) m
@@ -117,8 +121,12 @@ reduceConstApp m c es =
         Just (ch, rest) <- T.uncons s -> do
         return (m, MetaTermNode [(m, MetaTermLeaf (T.singleton ch)), (m, MetaTermLeaf rest)])
     "tail"
-      | [(mNode, MetaTermNode (_ : rest))] <- es ->
-        return (mNode, MetaTermNode rest)
+      | [(mNode, MetaTermNode ts)] <- es ->
+        case ts of
+          (_ : rest) ->
+            return (mNode, MetaTermNode rest)
+          _ ->
+            raiseError mNode "the constant `tail` cannot be applied to nil"
     "new-symbol"
       | [] <- es -> do
         i <- newCount

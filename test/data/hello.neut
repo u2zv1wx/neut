@@ -1,6 +1,3 @@
-(ensure core/0.1.0.2
-  "https://gitlab.com/veka41/neut-core/-/raw/master/release/0.1.0.2.tar.xz")
-
-(include "core/0.1.0.2/core.neut")
+(include "../header.neut")
 
 (reduce (string.print "hello, world!"))

@@ -1,13 +1,4 @@
-(ensure core/0.1.0.2
-  "https://gitlab.com/veka41/neut-core/-/raw/master/release/0.1.0.2.tar.xz")
-
-(include "core/0.1.0.2/notation.neut")
-
-(include "core/0.1.0.2/top.neut")
-
-(declare-enum bool
-  (true 1)
-  (false 0))
+(include "../header.neut")
 
 (define app
   (lambda ((_ (Π () top)))

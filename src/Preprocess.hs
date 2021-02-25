@@ -65,39 +65,21 @@ preprocess' stmtList = do
   case stmtList of
     [] ->
       leave
-    stmt : restStmtList -> do
-      -- p $ "before AQ: " <> T.unpack (showAsSExp stmt)
-      quotedStmt <- autoQuoteStmt stmt
-      -- p $ "after AQ:  " <> T.unpack (showAsSExp quotedStmt)
-      stmt'' <- autoThunkStmt quotedStmt
-      preprocess'' [stmt''] restStmtList
-
-preprocess'' :: [TreePlus] -> [TreePlus] -> WithEnv [TreePlus]
-preprocess'' quotedStmtList restStmtList =
-  case quotedStmtList of
-    [] ->
-      preprocess' restStmtList
-    headStmt : quotedRestStmtList -> do
+    headStmt : restStmtList ->
       case headStmt of
-        (m, TreeNode ((_, TreeLeaf headAtom) : rest)) ->
+        (m, TreeNode (leaf@(_, TreeLeaf headAtom) : rest)) ->
           case headAtom of
-            "auto-quote"
-              | [(_, TreeLeaf name)] <- rest -> do
-                modify (\env -> env {autoQuoteEnv = S.insert name (autoQuoteEnv env)})
-                preprocess'' quotedRestStmtList restStmtList
-              | otherwise ->
-                raiseSyntaxError m "(auto-quote LEAF)"
             "auto-thunk"
               | [(_, TreeLeaf name)] <- rest -> do
                 modify (\env -> env {autoThunkEnv = S.insert name (autoThunkEnv env)})
-                preprocess'' quotedRestStmtList restStmtList
+                preprocess' restStmtList
               | otherwise ->
                 raiseSyntaxError m "(auto-thunk LEAF)"
             "declare-enum-meta"
               | (_, TreeLeaf name) : ts <- rest -> do
                 xis <- interpretEnumItem m name ts
                 insEnumEnv m name xis
-                preprocess'' quotedRestStmtList restStmtList
+                preprocess' restStmtList
               | otherwise ->
                 raiseSyntaxError m "(enum LEAF TREE ... TREE)"
             "ensure"
@@ -122,13 +104,13 @@ preprocess'' quotedStmtList restStmtList =
                   tarExitCode <- liftIO $ waitForProcess tarHandler
                   raiseIfFailure mUrl "tar" tarExitCode tarErrorHandler pkgDirPath
                   return ()
-                preprocess'' quotedRestStmtList restStmtList
+                preprocess' restStmtList
               | otherwise ->
                 raiseSyntaxError m "(ensure LEAF LEAF)"
             "include"
               | [(mPath, TreeLeaf pathString)] <- rest,
                 not (T.null pathString) ->
-                includeFile m mPath pathString quotedRestStmtList restStmtList
+                includeFile m mPath pathString restStmtList
               | otherwise ->
                 raiseSyntaxError m "(include LEAF)"
             "introspect"
@@ -137,70 +119,53 @@ preprocess'' quotedStmtList restStmtList =
                 stmtClauseList' <- mapM preprocessStmtClause stmtClauseList
                 case lookup val stmtClauseList' of
                   Nothing ->
-                    preprocess'' quotedRestStmtList restStmtList
+                    preprocess' restStmtList
                   Just as1 ->
-                    preprocess'' (as1 ++ quotedRestStmtList) restStmtList
+                    preprocess' $ as1 ++ restStmtList
               | otherwise ->
                 raiseSyntaxError m "(introspect LEAF TREE*)"
-            "let-meta"
+            "define-macro"
               | [(_, TreeLeaf name), body] <- rest -> do
                 body' <- evaluate body
                 name' <- newNameWith $ asIdent name
                 modify (\env -> env {topMetaNameEnv = Map.insert name name' (topMetaNameEnv env)})
                 modify (\env -> env {metaTermCtx = IntMap.insert (asInt name') body' (metaTermCtx env)})
-                preprocess'' quotedRestStmtList restStmtList
+                modify (\env -> env {autoQuoteEnv = S.insert name (autoQuoteEnv env)}) -- new!
+                preprocess' restStmtList
+              | [name@(_, TreeLeaf _), xts, body] <- rest -> do
+                let defFix = (m, TreeNode [leaf, name, (m, TreeNode [(m, TreeLeaf "fix-meta"), name, xts, body])])
+                preprocess' $ defFix : restStmtList
               | otherwise ->
-                raiseSyntaxError m "(let-meta LEAF TREE)"
-            "statement-meta" ->
-              preprocess'' (rest ++ quotedRestStmtList) restStmtList
+                raiseSyntaxError m "(define-macro LEAF TREE) | (define-macro LEAF TREE TREE)"
+            "define-macro-variadic"
+              | [name@(_, TreeLeaf _), xts, body] <- rest -> do
+                let defFix = (m, TreeNode [(m, TreeLeaf "define-macro"), name, (m, TreeNode [(m, TreeLeaf "fix-meta-variadic"), name, xts, body])])
+                preprocess' $ defFix : restStmtList
+              | otherwise ->
+                raiseSyntaxError m "(define-macro-variadic LEAF TREE TREE)"
             _ ->
-              preprocessAux headStmt quotedRestStmtList restStmtList
+              preprocessAux headStmt restStmtList
         _ ->
-          preprocessAux headStmt quotedRestStmtList restStmtList
+          preprocessAux headStmt restStmtList
 
-preprocessAux :: TreePlus -> [TreePlus] -> [TreePlus] -> WithEnv [TreePlus]
-preprocessAux headStmt expandedRestStmtList restStmtList = do
-  headStmt' <- evaluate headStmt >>= specialize
-  if isSpecialMetaForm headStmt'
-    then preprocess'' (headStmt' : expandedRestStmtList) restStmtList
-    else do
-      treeList <- preprocess'' expandedRestStmtList restStmtList
-      return $ headStmt' : treeList
+preprocessAux :: TreePlus -> [TreePlus] -> WithEnv [TreePlus]
+preprocessAux headStmt restStmtList = do
+  headStmt' <- autoQuote headStmt >>= evaluate >>= specialize
+  treeList <- preprocess' restStmtList
+  return $ headStmt' : treeList
 
 evaluate :: TreePlus -> WithEnv MetaTermPlus
 evaluate e = do
   ctx <- gets metaTermCtx
-  interpretCode e >>= discernMetaTerm >>= return . substMetaTerm ctx >>= reduceMetaTerm
-
-isSpecialMetaForm :: TreePlus -> Bool
-isSpecialMetaForm tree =
-  case tree of
-    (_, TreeNode ((_, TreeLeaf x) : _)) ->
-      S.member x metaKeywordSet
-    _ ->
-      False
-
-metaKeywordSet :: S.Set T.Text
-metaKeywordSet =
-  S.fromList
-    [ "auto-quote",
-      "auto-thunk",
-      "declare-enum-meta",
-      "ensure",
-      "include",
-      "introspect",
-      "let-meta",
-      "statement-meta"
-    ]
+  autoThunk e >>= interpretCode >>= discernMetaTerm >>= return . substMetaTerm ctx >>= reduceMetaTerm
 
 includeFile ::
   Hint ->
   Hint ->
   T.Text ->
   [TreePlus] ->
-  [TreePlus] ->
   WithEnv [TreePlus]
-includeFile m mPath pathString expandedRestStmtList as = do
+includeFile m mPath pathString as = do
   -- includeにはその痕跡を残しておいてもよいかも。Parse.hsのほうでこれを参照してなんかチェックする感じ。
   -- ensureEnvSanity m
   path <- readStrOrThrow mPath pathString
@@ -218,10 +183,10 @@ includeFile m mPath pathString expandedRestStmtList as = do
       let cyclicPath = dropWhile (/= newPath) (reverse tenv) ++ [newPath]
       raiseError m $ "found a cyclic inclusion:\n" <> showCyclicPath cyclicPath
     Just VisitInfoFinish ->
-      preprocess'' expandedRestStmtList as
+      preprocess' as
     Nothing -> do
       treeList1 <- visit newPath
-      treeList2 <- preprocess'' expandedRestStmtList as
+      treeList2 <- preprocess' as
       return $ treeList1 ++ treeList2
 
 readStrOrThrow :: (Read a) => Hint -> T.Text -> WithEnv a
@@ -287,8 +252,6 @@ specialize term =
     (m, _) -> do
       raiseError m $ "meta-reduction of this term resulted in a non-quoted term"
 
--- raiseError m $ "meta-reduction of this term resulted in a non-quoted term: " <> showAsSExp (toTree term)
-
 preprocessStmtClause :: TreePlus -> WithEnv (T.Text, [TreePlus])
 preprocessStmtClause tree =
   case tree of
@@ -306,24 +269,6 @@ retrieveCompileTimeVarValue m var =
       showArch <$> getArch
     _ ->
       raiseError m $ "no such compile-time variable defined: " <> var
-
-mapStmt :: (TreePlus -> WithEnv TreePlus) -> TreePlus -> WithEnv TreePlus
-mapStmt f tree =
-  case tree of
-    (m, TreeNode [l@(_, TreeLeaf "let-meta"), name, e]) -> do
-      e' <- f e
-      return (m, TreeNode [l, name, e'])
-    (m, TreeNode (stmt@(_, TreeLeaf "statement-meta") : rest)) -> do
-      rest' <- mapM (mapStmt f) rest
-      return (m, TreeNode (stmt : rest'))
-    _ ->
-      if isSpecialMetaForm tree
-        then return tree
-        else f tree
-
-autoThunkStmt :: TreePlus -> WithEnv TreePlus
-autoThunkStmt =
-  mapStmt autoThunk
 
 autoThunk :: TreePlus -> WithEnv TreePlus
 autoThunk tree = do
@@ -343,10 +288,6 @@ autoThunk tree = do
 autoThunk' :: TreePlus -> TreePlus
 autoThunk' (m, t) =
   (m, TreeNode [(m, TreeLeaf "lambda-meta"), (m, TreeNode []), (m, t)])
-
-autoQuoteStmt :: TreePlus -> WithEnv TreePlus
-autoQuoteStmt =
-  mapStmt autoQuote
 
 autoQuote :: TreePlus -> WithEnv TreePlus
 autoQuote tree = do

@@ -98,6 +98,8 @@ parse stmtTreeList =
                 parse restStmtList
               | otherwise ->
                 raiseSyntaxError m "(section LEAF)"
+            "statement" ->
+              parse $ rest ++ restStmtList
             "use"
               | [(_, TreeLeaf s)] <- rest ->
                 use s >> parse restStmtList

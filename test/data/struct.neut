@@ -1,7 +1,4 @@
-(ensure core/0.1.0.2
-  "https://gitlab.com/veka41/neut-core/-/raw/master/release/0.1.0.2.tar.xz")
-
-(include "core/0.1.0.2/integer.neut")
+(include "../header.neut")
 
 (define a
   (struct f16 i8 i16 f32 i64 i64 f64 i8))
