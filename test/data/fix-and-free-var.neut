@@ -1,18 +1,20 @@
-(ensure core/0.1.0.0
-  "https://gitlab.com/veka41/neut-core/-/raw/master/release/0.1.0.0.tar.xz")
+(ensure core/0.1.0.2
+  "https://gitlab.com/veka41/neut-core/-/raw/master/release/0.1.0.2.tar.xz")
 
-(include "core/0.1.0.0/notation.neut")
+(include "core/0.1.0.2/notation.neut")
 
-(include "core/0.1.0.0/top.neut")
+(include "core/0.1.0.2/top.neut")
 
-(enum bool (true 1) (false 0))
+(declare-enum bool
+  (true 1)
+  (false 0))
 
-(let app
+(define app
   (lambda ((_ (Π () top)))
     top.unit))
 
-(let f
+(define f
   (fix self ()
     (app (lambda () (self)))))
 
-(f)
+(reduce (f))

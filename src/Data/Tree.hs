@@ -11,6 +11,9 @@ data Tree
 type TreePlus =
   (Hint, Tree)
 
+toLeaf :: Hint -> T.Text -> TreePlus
+toLeaf m x = (m, TreeLeaf x)
+
 asLeaf :: TreePlus -> Maybe (Hint, T.Text)
 asLeaf tree =
   case tree of

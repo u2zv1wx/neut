@@ -1,11 +1,11 @@
-(ensure core/0.1.0.0
-  "https://gitlab.com/veka41/neut-core/-/raw/master/release/0.1.0.0.tar.xz")
+(ensure core/0.1.0.2
+  "https://gitlab.com/veka41/neut-core/-/raw/master/release/0.1.0.1.tar.xz")
 
-(include "core/0.1.0.0/core.neut")
+(include "core/0.1.0.2/core.neut")
 
-(let (x *) (i64 1))
+(define (x *) (i64 1))
 
-(let (y *)
+(define (y *)
   (with identity.bind
     (let (z *) x)
     z))

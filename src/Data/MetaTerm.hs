@@ -10,13 +10,12 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Tree
 
+-- untyped lambda calculus with AST values (node / leaf)
 data MetaTerm
   = MetaTermVar Ident
   | MetaTermImpIntro [Ident] (Maybe Ident) MetaTermPlus
   | MetaTermImpElim MetaTermPlus [MetaTermPlus]
-  | -- | MetaTermNecIntro MetaTermPlus
-    -- | MetaTermNecElim MetaTermPlus
-    MetaTermFix Ident [Ident] (Maybe Ident) MetaTermPlus
+  | MetaTermFix Ident [Ident] (Maybe Ident) MetaTermPlus
   | MetaTermLeaf T.Text
   | MetaTermNode [MetaTermPlus]
   | MetaTermConst T.Text
@@ -42,12 +41,12 @@ type SubstMetaTerm =
 substMetaTerm :: SubstMetaTerm -> MetaTermPlus -> MetaTermPlus
 substMetaTerm sub term =
   case term of
-    (_, MetaTermVar x) ->
+    (m, MetaTermVar x) ->
       case IntMap.lookup (asInt x) sub of
         Nothing ->
           term
-        Just e ->
-          e
+        Just (_, e) ->
+          (m, e)
     (m, MetaTermImpIntro xs mx e) -> do
       let sub' = foldr IntMap.delete sub (map asInt (xs ++ catMaybes [mx]))
       let e' = substMetaTerm sub' e
@@ -93,8 +92,8 @@ toTree term =
     (m, MetaTermImpElim e es) -> do
       let e' = toTree e
       let es' = map toTree es
-      (m, TreeNode (e' : es'))
-    -- (m, TreeNode ((m, TreeLeaf "apply") : e' : es'))
+      -- (m, TreeNode (e' : es'))
+      (m, TreeNode ((m, TreeLeaf "expand") : e' : es'))
     (m, MetaTermFix f xs Nothing e) -> do
       let e' = toTree e
       let xs' = map (\i -> (m, TreeLeaf $ asText' i)) xs
@@ -137,8 +136,15 @@ metaConstants =
       "dump",
       "evaluate",
       "is-nil",
+      "head",
+      "tail",
       "leaf-equal",
+      "is-leaf",
+      "is-node",
       "leaf-mul",
+      "leaf-uncons",
+      "new-symbol",
+      "nth",
       "int-add",
       "int-sub",
       "int-mul",

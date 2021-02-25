@@ -5,7 +5,6 @@ module Preprocess.Interpret
   )
 where
 
-import Control.Monad.State.Lazy
 import Data.EnumCase
 import Data.Env
 import Data.Hint
@@ -13,7 +12,6 @@ import Data.Ident
 import Data.Maybe (fromMaybe)
 import Data.MetaTerm
 import Data.Namespace
-import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Tree
 import Text.Read (readMaybe)
@@ -32,51 +30,49 @@ interpretCode tree =
           raiseSyntaxError m "(TREE TREE*)"
         leaf@(_, TreeLeaf headAtom) : rest -> do
           case headAtom of
-            "lambda"
+            "lambda-meta"
               | [(_, TreeNode xs), e] <- rest -> do
                 xs' <- mapM interpretIdent xs
                 e' <- interpretCode e
                 return (m, MetaTermImpIntro xs' Nothing e')
               | otherwise ->
-                raiseSyntaxError m "(lambda (LEAF*) TREE)"
-            "lambda+"
+                raiseSyntaxError m "(lambda-meta (LEAF*) TREE)"
+            "lambda-meta-variadic"
               | [(_, TreeNode args@(_ : _)), e] <- rest -> do
                 xs' <- mapM interpretIdent (init args)
                 rest' <- interpretIdent $ last args
                 e' <- interpretCode e
                 return (m, MetaTermImpIntro xs' (Just rest') e')
               | otherwise ->
-                raiseSyntaxError m "(lambda+ (LEAF LEAF*) TREE)"
-            "apply"
+                raiseSyntaxError m "(lambda-meta-variadic (LEAF LEAF*) TREE)"
+            "apply-meta"
               | e : es <- rest -> do
-                e' <- interpretCode e
-                es' <- mapM (interpretCode) es
-                return (m, MetaTermImpElim e' es')
+                interpretAux m e es
               | otherwise ->
-                raiseSyntaxError m "(apply TREE TREE*)"
-            "fix"
+                raiseSyntaxError m "(apply-meta TREE TREE*)"
+            "fix-meta"
               | [(_, TreeLeaf f), (_, TreeNode xs), e] <- rest -> do
                 xs' <- mapM interpretIdent xs
                 e' <- interpretCode e
                 return (m, MetaTermFix (asIdent f) xs' Nothing e')
               | otherwise ->
-                raiseSyntaxError m "(fix LEAF (LEAF*) TREE)"
-            "fix+"
+                raiseSyntaxError m "(fix-meta LEAF (LEAF*) TREE)"
+            "fix-meta-variadic"
               | [(_, TreeLeaf f), (_, TreeNode args@(_ : _)), e] <- rest -> do
                 xs' <- mapM interpretIdent (init args)
                 rest' <- interpretIdent $ last args
                 e' <- interpretCode e
                 return (m, MetaTermFix (asIdent f) xs' (Just rest') e')
               | otherwise ->
-                raiseSyntaxError m "(fix+ LEAF (LEAF LEAF*) TREE)"
-            "switch"
+                raiseSyntaxError m "(fix-meta-variadic LEAF (LEAF LEAF*) TREE)"
+            "switch-meta"
               | e : cs <- rest -> do
                 e' <- interpretCode e
                 cs' <- mapM interpretEnumClause cs
                 i <- newNameWith' "switch"
                 return (m, MetaTermEnumElim (e', i) cs')
               | otherwise ->
-                raiseSyntaxError m "(switch TREE TREE*)"
+                raiseSyntaxError m "(switch-meta TREE TREE*)"
             "leaf"
               | [(_, TreeLeaf x)] <- rest -> do
                 return (m, MetaTermLeaf x)
@@ -85,17 +81,29 @@ interpretCode tree =
             "node" -> do
               rest' <- mapM interpretCode rest
               return (m, MetaTermNode rest')
-            "quote"
+            "quasiquote"
               | [e] <- rest -> do
-                e' <- interpretData 1 e
-                return (m, MetaTermImpIntro [] Nothing e')
+                interpretData 1 e
               | otherwise ->
-                raiseSyntaxError m "(quote TREE)"
-            "unquote"
+                raiseSyntaxError m "(quasiquote TREE)"
+            "quasiunquote"
               | [_] <- rest -> do
-                raiseSyntaxError m "found an unquote not inside a quote"
+                raiseSyntaxError m "found a quasiunquote not inside a quote"
               | otherwise ->
-                raiseSyntaxError m "(unquote TREE)"
+                raiseSyntaxError m "(quasiunquote TREE)"
+            "begin-meta" -> do
+              let x = (m, TreeLeaf "x")
+              let k = (m, TreeLeaf "k")
+              let lam = (m, TreeLeaf "lambda-meta")
+              let bind = (m, TreeNode [lam, (m, TreeNode [x, k]), (m, TreeNode [k, x])])
+              interpretWith (m, TreeNode ((m, TreeLeaf "with-meta") : bind : rest))
+            "with-meta" -> do
+              -- tmp <- interpretWith inputTree
+              -- p "with. before:"
+              -- p $ T.unpack $ showAsSExp inputTree
+              -- p "after:"
+              -- p $ T.unpack $ toText tmp
+              interpretWith tree
             _ ->
               interpretAux m leaf rest
         leaf : rest ->
@@ -108,23 +116,21 @@ interpretData level tree = do
       return (m, MetaTermLeaf atom)
     (m, TreeNode treeList) ->
       case treeList of
-        (_, TreeLeaf "quote") : rest
+        (_, TreeLeaf "quasiquote") : rest
           | [e] <- rest -> do
             e' <- interpretData (level + 1) e
-            return (m, MetaTermNode [(m, MetaTermLeaf "quote"), e'])
+            return (m, MetaTermNode [(m, MetaTermLeaf "quasiquote"), e'])
           | otherwise ->
             raiseSyntaxError m "(quote TREE)"
-        (_, TreeLeaf "unquote") : rest
+        (_, TreeLeaf "quasiunquote") : rest
           | [e] <- rest -> do
             if level == 1
-              then do
-                e' <- interpretCode e
-                return (m, MetaTermImpElim e' [])
+              then interpretCode e
               else do
                 e' <- interpretData (level - 1) e
-                return (m, MetaTermNode [(m, MetaTermLeaf "unquote"), e'])
+                return (m, MetaTermNode [(m, MetaTermLeaf "quasiunquote"), e'])
           | otherwise ->
-            raiseSyntaxError m "(unquote TREE)"
+            raiseSyntaxError m "(quasiunquote TREE)"
         _ -> do
           treeList' <- mapM (interpretData level) treeList
           return (m, MetaTermNode treeList')
@@ -132,20 +138,20 @@ interpretData level tree = do
 interpretAux :: Hint -> TreePlus -> [TreePlus] -> WithEnv MetaTermPlus
 interpretAux m f args = do
   f' <- interpretCode f
-  args' <- modifyArgs f' args
-  -- args' <- mapM interpretCode args
-  args'' <- mapM interpretCode args'
-  return (m, MetaTermImpElim f' args'')
+  args' <- mapM interpretCode args
+  return (m, MetaTermImpElim f' args')
 
-modifyArgs :: MetaTermPlus -> [TreePlus] -> WithEnv [TreePlus]
-modifyArgs f args = do
-  quoteEnv <- gets autoQuoteEnv
-  case f of
-    (_, MetaTermVar name)
-      | S.member (asText name) quoteEnv ->
-        return $ map wrapWithQuote args
-    _ ->
-      return args
+-- modifyArgs :: MetaTermPlus -> [TreePlus] -> WithEnv [TreePlus]
+-- modifyArgs f args = do
+--   quoteEnv <- gets autoQuoteEnv
+--   case f of
+--     (_, MetaTermVar name)
+--       | S.member (asText name) quoteEnv -> do
+--         -- p "found:"
+--         -- p' name
+--         return $ map (wrapWithQuote quoteEnv) args
+--     _ ->
+--       return args
 
 interpretIdent :: TreePlus -> WithEnv Ident
 interpretIdent tree =
@@ -154,10 +160,6 @@ interpretIdent tree =
       return $ asIdent x
     t ->
       raiseSyntaxError (fst t) "LEAF"
-
-wrapWithQuote :: TreePlus -> TreePlus
-wrapWithQuote (m, t) =
-  (m, TreeNode [(m, TreeLeaf "quote"), (m, t)])
 
 interpretEnumItem :: Hint -> T.Text -> [TreePlus] -> WithEnv [(T.Text, Int)]
 interpretEnumItem m name ts = do
@@ -219,3 +221,20 @@ interpretEnumCase tree =
       return (m, EnumCaseLabel l)
     (m, _) ->
       raiseSyntaxError m "default | LEAF"
+
+interpretWith :: TreePlus -> WithEnv MetaTermPlus
+interpretWith tree =
+  case tree of
+    (m, TreeNode (with@(_, TreeLeaf "with-meta") : bind : (_, TreeNode ((_, TreeLeaf "let") : xt : es)) : rest)) -> do
+      bind' <- interpretCode bind
+      e' <- interpretWith (m, TreeNode (with : bind : es))
+      xt' <- interpretIdent xt
+      rest' <- interpretWith (m, TreeNode (with : bind : rest))
+      return (m, MetaTermImpElim bind' [e', (m, MetaTermImpIntro [xt'] Nothing rest')])
+    (_, TreeNode [(_, TreeLeaf "with-meta"), _, e]) ->
+      interpretCode e
+    (m, TreeNode (with@(_, TreeLeaf "with-meta") : bind : e : rest)) -> do
+      let e' = (m, TreeNode [(m, TreeLeaf "let"), (m, TreeLeaf "_"), e]) -- fixme: "_"
+      interpretWith (m, TreeNode (with : bind : e' : rest))
+    t ->
+      raiseSyntaxError (fst t) "(with-meta TREE TREE+)"

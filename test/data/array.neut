@@ -1,35 +1,36 @@
-(ensure core/0.1.0.0
-  "https://gitlab.com/veka41/neut-core/-/raw/master/release/0.1.0.0.tar.xz")
+(ensure core/0.1.0.2
+  "https://gitlab.com/veka41/neut-core/-/raw/master/release/0.1.0.1.tar.xz")
 
-(include "core/0.1.0.0/core.neut")
+(include "core/0.1.0.2/core.neut")
 
 ; empty array
-(let _
+(define _
   (array-introduction i64))
 
-(let _
+(define _
   (array-introduction i8 1 2 3 2 1 2 4))
 
-(let xs
+(define xs
   (array-introduction i64 1 2 -30 20))
 
 ; float array
-(let _
+(define _
   (array-introduction f16 3.28 2.14 2.0 9.82))
 
-(let _
+(define _
   (array-introduction f32 3.28 2.14))
 
-(let _
+(define _
   (array-introduction f64 3.28 2.14 3.14159))
 
-(let k
+(define k
   (array-elimination i64 (a b c d) xs
     (i64.add a (i64.add b (i64.add c d)))))
 
-(i64.print k) ; -7
+(reduce
+  (i64.print k))
 
-(let l
+(define l
   (with identity.bind
     (let a (i64.array-access 0 * &xs))
     (let b (i64.array-access 1 4 &xs))
@@ -38,4 +39,5 @@
     (erase xs)
     (i64.add a (i64.add b (i64.add c d)))))
 
-(i64.print l) ; -7
+(reduce
+  (i64.print l))

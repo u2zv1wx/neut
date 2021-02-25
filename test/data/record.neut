@@ -1,7 +1,7 @@
-(ensure core/0.1.0.0
-  "https://gitlab.com/veka41/neut-core/-/raw/master/release/0.1.0.0.tar.xz")
+(ensure core/0.1.0.2
+  "https://gitlab.com/veka41/neut-core/-/raw/master/release/0.1.0.2.tar.xz")
 
-(include "core/0.1.0.0/core.neut")
+(include "core/0.1.0.2/core.neut")
 
 (record my-record ((a tau))
   (item-1
@@ -11,15 +11,15 @@
   (item-3
     top))
 
-(let item
+(define item
   (my-record.new
     i64
     10
     20
     top.unit))
 
-(i64.print (my-record.item-1 i64 item))
+(reduce (i64.print (my-record.item-1 i64 item)))
 
-(i64.print (my-record.item-2 i64 item))
+(reduce (i64.print (my-record.item-2 i64 item)))
 
 (record empty-record ())

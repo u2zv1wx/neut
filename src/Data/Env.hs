@@ -12,6 +12,9 @@ import Data.List (find)
 import Data.Log
 import Data.LowComp
 import Data.LowType
+-- import Data.Tree
+
+import Data.MetaTerm
 import Data.Namespace
 import qualified Data.PQueue.Min as Q
 import Data.Platform
@@ -20,7 +23,6 @@ import qualified Data.Set as S
 import Data.Size
 import Data.Term
 import qualified Data.Text as T
--- import Data.Tree
 import Data.Version (showVersion)
 import Data.WeakTerm
 import Path
@@ -50,7 +52,8 @@ data Env = Env
     --
     topMetaNameEnv :: Map.HashMap T.Text Ident,
     autoQuoteEnv :: S.Set T.Text,
-    -- autoThunkEnv :: S.Set T.Text,
+    autoThunkEnv :: S.Set T.Text,
+    metaTermCtx :: SubstMetaTerm,
     --
     -- parse
     --
@@ -96,8 +99,9 @@ initialEnv =
       shouldCancelAlloc = True,
       endOfEntry = "",
       topMetaNameEnv = Map.empty,
+      metaTermCtx = IntMap.empty,
       autoQuoteEnv = S.empty,
-      -- autoThunkEnv = S.empty,
+      autoThunkEnv = S.empty,
       phase = 0,
       constantSet = S.empty,
       enumEnv = Map.empty,

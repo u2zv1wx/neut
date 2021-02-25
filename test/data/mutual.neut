@@ -1,12 +1,12 @@
-(ensure core/0.1.0.0
-  "https://gitlab.com/veka41/neut-core/-/raw/master/release/0.1.0.0.tar.xz")
+(ensure core/0.1.0.2
+  "https://gitlab.com/veka41/neut-core/-/raw/master/release/0.1.0.2.tar.xz")
 
-(include "core/0.1.0.0/core.neut")
+(include "core/0.1.0.2/core.neut")
 
 (define f ((n i64))
   (i64.add n 1))
 
-(i64.print (f 0))
+(reduce (i64.print (f 0)))
 
 (use bool)
 
@@ -25,12 +25,14 @@
 (define even ((n i64))
   (even-f odd n))
 
-(print
-  (if (even 10)
-    100
-    1000))
+(reduce
+  (print
+    (if (even 10)
+      100
+      1000)))
 
-(print
-  (if (odd 10)
-    100
-    1000))
+(reduce
+  (print
+    (if (odd 10)
+      100
+      1000)))

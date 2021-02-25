@@ -29,6 +29,7 @@ discernMetaTerm' nenv term =
         Just x' ->
           return (m, MetaTermVar x')
         _ -> do
+          -- cenv <- gets metaConstantSet
           if S.member (asText x) metaConstants
             then return (m, MetaTermConst (asText x))
             else do
@@ -37,7 +38,7 @@ discernMetaTerm' nenv term =
                 Just enumValue ->
                   return (m, MetaTermEnumIntro enumValue)
                 Nothing ->
-                  raiseError m $ "undefined variable: " <> asText x
+                  raiseError m $ "undefined meta-variable: " <> asText x
     (m, MetaTermImpIntro xs mf e) -> do
       (xs', mf', e') <- discernBinder nenv xs mf e
       return (m, MetaTermImpIntro xs' mf' e')

@@ -1,31 +1,31 @@
-(ensure core/0.1.0.0
-  "https://gitlab.com/veka41/neut-core/-/raw/master/release/0.1.0.0.tar.xz")
+(ensure core/0.1.0.2
+  "https://gitlab.com/veka41/neut-core/-/raw/master/release/0.1.0.2.tar.xz")
 
-(include "core/0.1.0.0/core.neut")
+(include "core/0.1.0.2/core.neut")
 
 ; nullary lambda (Π-introduction)
-(let f1
+(define f1
   (Π-introduction () (i64 1)))
 
-(i64.print (f1))
+(reduce (i64.print (f1)))
 
 ; unary lambda
-(let f2
+(define f2
   (lambda ((x i64)) x))
 
-(i64.print (f2 2))
+(reduce (i64.print (f2 2)))
 
 ; binary lambda
-(let f3
+(define f3
   (lambda ((x i64) (y i64)) (i64.add x y)))
 
-(i64.print (f3 1 2))
+(reduce (i64.print (f3 1 2)))
 
 ; a function that takes another function as an argument
-(let f4
+(define f4
   (lambda ((a tau) (f (hom a a)) (x a)) (f x)))
 
-(i64.print (f4 i64 (lambda (x) (i64.add x 1)) 3))
+(reduce (i64.print (f4 i64 (lambda (x) (i64.add x 1)) 3)))
 
 ; a function with a free variable
 (define f5 ((x i64))
@@ -33,9 +33,9 @@
     (let adder (lambda (y) (i64.add x y)))
     adder))
 
-(let add-3 (f5 3))
+(define add-3 (f5 3))
 
-(i64.print (add-3 2))
+(reduce (i64.print (add-3 2)))
 
 ; a function with a free variable of type pi
 (define f6 ((g (hom i64 i64)))
@@ -43,4 +43,4 @@
     (let app (lambda (y) (g y)))
     app))
 
-(i64.print ((f6 f2) 6))
+(reduce (i64.print ((f6 f2) 6)))

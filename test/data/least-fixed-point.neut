@@ -1,9 +1,9 @@
-(ensure core/0.1.0.0
-  "https://gitlab.com/veka41/neut-core/-/raw/master/release/0.1.0.0.tar.xz")
+(ensure core/0.1.0.2
+  "https://gitlab.com/veka41/neut-core/-/raw/master/release/0.1.0.2.tar.xz")
 
-(include "core/0.1.0.0/notation.neut")
+(include "core/0.1.0.2/notation.neut")
 
-(include "core/0.1.0.0/integer.neut")
+(include "core/0.1.0.2/integer.neut")
 
 (data µ ((f (hom tau tau)))
   (lan
@@ -87,6 +87,7 @@
       (λ (y ys)
         (add-i64 1 (my-length a ys))))))
 
-(let xs (list.cons i64 0 (list.cons * 1 (list.cons * 2 (list.nil *)))))
+(define xs
+  (list.cons i64 0 (list.cons * 1 (list.cons * 2 (list.nil *)))))
 
-(i64.print (my-length i64 xs))
+(reduce (i64.print (my-length i64 xs)))

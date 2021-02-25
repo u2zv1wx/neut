@@ -1,12 +1,12 @@
-(ensure core/0.1.0.0
-  "https://gitlab.com/veka41/neut-core/-/raw/master/release/0.1.0.0.tar.xz")
+(ensure core/0.1.0.2
+  "https://gitlab.com/veka41/neut-core/-/raw/master/release/0.1.0.2.tar.xz")
 
-(include "core/0.1.0.0/integer.neut")
+(include "core/0.1.0.2/integer.neut")
 
-(let a
+(define a
   (struct f16 i8 i16 f32 i64 i64 f64 i8))
 
-(let (st a)
+(define (st a)
   (struct-introduction
     (f16 3.8)
     (i8 8)
@@ -18,7 +18,7 @@
     (i8 9)))
 
 ; affine
-(let (_ a)
+(define (_ a)
   (struct-introduction
     (f16 3.8)
     (i8 8)
@@ -29,14 +29,16 @@
     (f64 -329444.4444444)
     (i8 9)))
 
-(i64.print
-  (struct-elimination
-    ((_ f16) (_ i8) (_ i16) (_ f32) (z i64) (w i64) (_ f64) (_ i8))
-    st
-    (i64.add z w)))
+(reduce
+  (i64.print
+    (struct-elimination
+      ((_ f16) (_ i8) (_ i16) (_ f32) (z i64) (w i64) (_ f64) (_ i8))
+      st
+      (i64.add z w))))
 
-(i64.print
-  (struct-elimination
-    ((_ f16) (_ i8) (_ i16) (_ f32) (z i64) (_ i64) (_ f64) (_ i8))
-    st
-    z))
+(reduce
+  (i64.print
+    (struct-elimination
+      ((_ f16) (_ i8) (_ i16) (_ f32) (z i64) (_ i64) (_ f64) (_ i8))
+      st
+      z)))

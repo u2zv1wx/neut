@@ -35,24 +35,35 @@ tokenize input = do
   case resultOrError of
     Left err ->
       throw (err :: Error)
-    Right (result, _) -> do
+    Right (result, _) ->
       return result
 
 program :: [TreePlus] -> Tokenizer [TreePlus]
-program ts = do
+program acc = do
   skip
   s <- gets text
   if T.null s
-    then return $ reverse ts
+    then return $ reverse acc
     else do
       t <- term
-      program $ t : ts
+      program $ t : acc
 
 term :: Tokenizer TreePlus
 term = do
   s <- gets text
   case T.uncons s of
     Just (c, _)
+      -- fixme: このへんはauto-thunkでやればよろしい
+      -- | '\'' == c -> do
+      --   char '\''
+      --   e <- term
+      --   let m = fst e
+      --   return (m, TreeNode [(m, TreeLeaf "lambda"), (m, TreeNode []), e])
+      -- | ',' == c -> do
+      --   char ','
+      --   e <- term
+      --   let m = fst e
+      --   return (m, TreeNode [(m, TreeLeaf "expand"), e])
       | Just l <- Map.lookup c readMacroMap ->
         resolveReadMacro c l
     Just ('(', _) ->
@@ -233,7 +244,7 @@ newlineSet =
 {-# INLINE nonSymbolSet #-}
 nonSymbolSet :: S.Set Char
 nonSymbolSet =
-  S.fromList "() \"\n;',`#"
+  S.fromList "() \"\n;`#"
 
 {-# INLINE updateStreamL #-}
 updateStreamL :: T.Text -> Tokenizer ()
@@ -258,18 +269,18 @@ raiseTokenizeError txt = do
   m <- currentHint
   throw $ Error [logError (getPosInfo m) txt]
 
-readMacroMap :: Map.HashMap Char T.Text
-readMacroMap =
-  Map.fromList
-    [ ('\'', "quote"),
-      (',', "unquote")
-    ]
-
 -- readMacroMap :: Map.HashMap Char T.Text
 -- readMacroMap =
 --   Map.fromList
 --     [ ('\'', "quote"),
---       (',', "unquote"),
---       ('`', "quasiquote"),
---       ('#', "quasiunquote")
+--       (',', "unquote")
 --     ]
+
+readMacroMap :: Map.HashMap Char T.Text
+readMacroMap =
+  Map.fromList
+    [ -- ('\'', "quote"),
+      -- (',', "unquote"),
+      ('`', "quasiquote"),
+      ('#', "quasiunquote")
+    ]

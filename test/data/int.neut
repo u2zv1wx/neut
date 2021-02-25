@@ -1,28 +1,33 @@
-(let (_ i1) -1)
-(let (_ i1) 0)
-(let (_ i1) 3) ; 3 = 1 = -1 = -3 = ... (mod 2^1)
+(ensure core/0.1.0.2
+  "https://gitlab.com/veka41/neut-core/-/raw/master/release/0.1.0.2.tar.xz")
 
-(let (_ i2) -2)
-(let (_ i2) -1)
-(let (_ i2) 0)
-(let (_ i2) 1)
-(let (_ i2) 2)
-(let (_ i2) 3) ; 3 = -1 = -5 = ... (mod 2^2)
+(include "core/0.1.0.2/core.neut")
 
-; (let (_ i2) -1)
-(let (_ i2) 0)
-(let (_ i2) 1)
-(let (_ i2) 2)
-(let (_ i2) 3)
+(define (_ i1) -1)
+(define (_ i1) 0)
+(define (_ i1) 3) ; 3 = 1 = -1 = -3 = ... (mod 2^1)
 
-(let (_ i33) 10)
+(define (_ i2) -2)
+(define (_ i2) -1)
+(define (_ i2) 0)
+(define (_ i2) 1)
+(define (_ i2) 2)
+(define (_ i2) 3) ; 3 = -1 = -5 = ... (mod 2^2)
 
-(let (_ i63) 10)
+; (define (_ i2) -1)
+(define (_ i2) 0)
+(define (_ i2) 1)
+(define (_ i2) 2)
+(define (_ i2) 3)
 
-(let (x i0000000064) 10)
+(define (_ i33) 10)
 
-(let _ f32)
+(define (_ i63) 10)
+
+(define (x i0000000064) 10)
+
+(define _ f32)
 
 ; (i64:print (unsafe:cast i3 i64 (i3 -1)))
 
-; (let (_ i65) 10) ; should raise an error
+; (define (_ i65) 10) ; should raise an error

@@ -1,34 +1,34 @@
-(ensure core/0.1.0.0
-  "https://gitlab.com/veka41/neut-core/-/raw/master/release/0.1.0.0.tar.xz")
+(ensure core/0.1.0.2
+  "https://gitlab.com/veka41/neut-core/-/raw/master/release/0.1.0.2.tar.xz")
 
-(include "core/0.1.0.0/core.neut")
+(include "core/0.1.0.2/core.neut")
 
 ; degenerates to (λ () (i64 0))
-(let f0
+(define f0
   (fix _ ()
     (i64 0)))
 
-(i64.print (f0))
+(reduce (i64.print (f0)))
 
-(let fact
+(define fact
   (fix self ((x i64))
     (if (icmp-sle-i64 x 0)
       1
       (mul-i64 x (self (sub-i64 x 1))))))
 
-(i64.print (fact 10)) ; 3628800
+(reduce (i64.print (fact 10))) ; 3628800
 
 ; fix with type annotation
-(let fact'
+(define fact'
   (fix (self (hom i64 i64)) ((x i64))
     (if (icmp-sle-i64 x 0)
       1
       (mul-i64 x (self (sub-i64 x 1))))))
 
-(i64.print (fact' 5)) ; 120
+(reduce (i64.print (fact' 5))) ; 120
 
 ; https://mathworld.wolfram.com/TAKFunction.html
-(let tak
+(define tak
   (fix self (x y z)
     (if (icmp-sle-i64 x y)
       y
@@ -38,4 +38,4 @@
         (let z' (self (sub-i64 z 1) x y))
         (self x' y' z')))))
 
-(i64.print (tak 12 6 0)) ; 12
+(reduce (i64.print (tak 12 6 0))) ; 12
