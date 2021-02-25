@@ -31,8 +31,6 @@ preprocess mainFilePath = do
   --   p $ T.unpack $ showAsSExp k
   -- p "quitting."
   -- _ <- liftIO $ exitWith ExitSuccess
-  modify (\env -> env {enumEnv = Map.empty})
-  modify (\env -> env {revEnumEnv = Map.empty})
   return out
 
 visit :: Path Abs File -> WithEnv [TreePlus]
@@ -69,13 +67,13 @@ preprocess' stmtList = do
       case headStmt of
         (m, TreeNode (leaf@(_, TreeLeaf headAtom) : rest)) ->
           case headAtom of
-            "declare-enum-meta"
+            "declare-enum"
               | (_, TreeLeaf name) : ts <- rest -> do
                 xis <- interpretEnumItem m name ts
                 insEnumEnv m name xis
                 preprocess' restStmtList
               | otherwise ->
-                raiseSyntaxError m "(enum LEAF TREE ... TREE)"
+                raiseSyntaxError m "(declare-enum LEAF TREE ... TREE)"
             "ensure"
               | [(_, TreeLeaf pkg), (mUrl, TreeLeaf urlStr)] <- rest -> do
                 libDirPath <- getLibraryDirPath
@@ -139,20 +137,20 @@ preprocess' stmtList = do
                 preprocess' $ defFix : restStmtList
               | otherwise ->
                 raiseSyntaxError m "(define-macro-variadic LEAF TREE TREE)"
-            "use"
-              | [(_, TreeLeaf s)] <- rest -> do
-                use s
-                treeList <- preprocess' restStmtList
-                return $ headStmt : treeList -- the `(use NAME)` is also used in the object language
-              | otherwise ->
-                raiseSyntaxError m "(use LEAF)"
-            "unuse"
-              | [(_, TreeLeaf s)] <- rest -> do
-                unuse s
-                treeList <- preprocess' restStmtList
-                return $ headStmt : treeList -- the `(unuse NAME)` is also used in the object language
-              | otherwise ->
-                raiseSyntaxError m "(unuse LEAF)"
+            -- "use"
+            --   | [(_, TreeLeaf s)] <- rest -> do
+            --     use s
+            --     treeList <- preprocess' restStmtList
+            --     return $ headStmt : treeList -- the `(use NAME)` is also used in the object language
+            --   | otherwise ->
+            --     raiseSyntaxError m "(use LEAF)"
+            -- "unuse"
+            --   | [(_, TreeLeaf s)] <- rest -> do
+            --     unuse s
+            --     treeList <- preprocess' restStmtList
+            --     return $ headStmt : treeList -- the `(unuse NAME)` is also used in the object language
+            --   | otherwise ->
+            --     raiseSyntaxError m "(unuse LEAF)"
             _ ->
               preprocessAux headStmt restStmtList
         _ ->

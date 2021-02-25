@@ -16,7 +16,6 @@ import Data.WeakTerm
 import Parse.Discern
 import Parse.Interpret
 import Parse.Rule
-import Preprocess.Interpret
 
 parse :: [TreePlus] -> WithEnv [WeakStmt]
 parse stmtTreeList =
@@ -43,13 +42,6 @@ parse stmtTreeList =
                 return $ WeakStmtConstDecl (m, name', t') : defList
               | otherwise ->
                 raiseSyntaxError m "(declare-constant LEAF TREE)"
-            "declare-enum"
-              | (_, TreeLeaf name) : ts <- rest -> do
-                xis <- interpretEnumItem m name ts
-                insEnumEnv m name xis
-                parse restStmtList
-              | otherwise ->
-                raiseSyntaxError m "(declare-enum LEAF TREE ... TREE)"
             "end"
               | [(_, TreeLeaf s)] <- rest -> do
                 ns <- gets sectionEnv

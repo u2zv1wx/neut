@@ -440,24 +440,6 @@ resolveSymbol predicate name = do
   penv <- gets prefixEnv
   takeFirst predicate $ name : (map (\prefix -> prefix <> nsSep <> name) penv)
 
--- b <- f name
--- if b
---   then return $ Just name
---   else do
---     penv <- gets prefixEnv
---     lookupEnum' f penv name
--- lookupEnum' :: (T.Text -> WithEnv Bool) -> [T.Text] -> T.Text -> WithEnv (Maybe T.Text)
--- lookupEnum' f penv name =
---   case penv of
---     [] ->
---       return Nothing
---     prefix : prefixList -> do
---       let name' = prefix <> nsSep <> name
---       b <- f name'
---       if b
---         then return $ Just name'
---         else lookupEnum' f prefixList name
-
 takeFirst :: (T.Text -> WithEnv Bool) -> [T.Text] -> WithEnv (Maybe T.Text)
 takeFirst predicate candidateList =
   case candidateList of
