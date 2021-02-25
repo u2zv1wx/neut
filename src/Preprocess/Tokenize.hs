@@ -53,17 +53,6 @@ term = do
   s <- gets text
   case T.uncons s of
     Just (c, _)
-      -- fixme: このへんはauto-thunkでやればよろしい
-      -- | '\'' == c -> do
-      --   char '\''
-      --   e <- term
-      --   let m = fst e
-      --   return (m, TreeNode [(m, TreeLeaf "lambda"), (m, TreeNode []), e])
-      -- | ',' == c -> do
-      --   char ','
-      --   e <- term
-      --   let m = fst e
-      --   return (m, TreeNode [(m, TreeLeaf "expand"), e])
       | Just l <- Map.lookup c readMacroMap ->
         resolveReadMacro c l
     Just ('(', _) ->
@@ -268,13 +257,6 @@ raiseTokenizeError :: T.Text -> Tokenizer a
 raiseTokenizeError txt = do
   m <- currentHint
   throw $ Error [logError (getPosInfo m) txt]
-
--- readMacroMap :: Map.HashMap Char T.Text
--- readMacroMap =
---   Map.fromList
---     [ ('\'', "quote"),
---       (',', "unquote")
---     ]
 
 readMacroMap :: Map.HashMap Char T.Text
 readMacroMap =

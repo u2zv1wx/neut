@@ -97,12 +97,7 @@ interpretCode tree =
               let lam = (m, TreeLeaf "lambda-meta")
               let bind = (m, TreeNode [lam, (m, TreeNode [x, k]), (m, TreeNode [k, x])])
               interpretWith (m, TreeNode ((m, TreeLeaf "with-meta") : bind : rest))
-            "with-meta" -> do
-              -- tmp <- interpretWith inputTree
-              -- p "with. before:"
-              -- p $ T.unpack $ showAsSExp inputTree
-              -- p "after:"
-              -- p $ T.unpack $ toText tmp
+            "with-meta" ->
               interpretWith tree
             _ ->
               interpretAux m leaf rest
@@ -140,18 +135,6 @@ interpretAux m f args = do
   f' <- interpretCode f
   args' <- mapM interpretCode args
   return (m, MetaTermImpElim f' args')
-
--- modifyArgs :: MetaTermPlus -> [TreePlus] -> WithEnv [TreePlus]
--- modifyArgs f args = do
---   quoteEnv <- gets autoQuoteEnv
---   case f of
---     (_, MetaTermVar name)
---       | S.member (asText name) quoteEnv -> do
---         -- p "found:"
---         -- p' name
---         return $ map (wrapWithQuote quoteEnv) args
---     _ ->
---       return args
 
 interpretIdent :: TreePlus -> WithEnv Ident
 interpretIdent tree =
