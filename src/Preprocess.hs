@@ -285,7 +285,9 @@ specialize term =
       es' <- mapM specialize es
       return (m, TreeNode es')
     (m, _) -> do
-      raiseError m $ "meta-computation resulted in a non-quoted term: " <> showAsSExp (toTree term)
+      raiseError m $ "meta-reduction of this term resulted in a non-quoted term"
+
+-- raiseError m $ "meta-reduction of this term resulted in a non-quoted term: " <> showAsSExp (toTree term)
 
 preprocessStmtClause :: TreePlus -> WithEnv (T.Text, [TreePlus])
 preprocessStmtClause tree =

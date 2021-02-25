@@ -1,12 +1,12 @@
 module Data.MetaTerm where
 
 import Data.EnumCase
+import qualified Data.HashMap.Lazy as Map
 import Data.Hint
 import Data.Ident
 import Data.Int
 import qualified Data.IntMap as IntMap
 import Data.Maybe (catMaybes)
-import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Tree
 
@@ -41,12 +41,12 @@ type SubstMetaTerm =
 substMetaTerm :: SubstMetaTerm -> MetaTermPlus -> MetaTermPlus
 substMetaTerm sub term =
   case term of
-    (m, MetaTermVar x) ->
+    (_, MetaTermVar x) ->
       case IntMap.lookup (asInt x) sub of
         Nothing ->
           term
-        Just (_, e) ->
-          (m, e)
+        Just e ->
+          e
     (m, MetaTermImpIntro xs mx e) -> do
       let sub' = foldr IntMap.delete sub (map asInt (xs ++ catMaybes [mx]))
       let e' = substMetaTerm sub' e
@@ -75,6 +75,10 @@ substMetaTerm sub term =
       let (cs, es) = unzip ces
       let es' = map (substMetaTerm sub) es
       (m, MetaTermEnumElim (e', i) (zip cs es'))
+
+showMetaTerm :: MetaTermPlus -> T.Text
+showMetaTerm e =
+  showAsSExp (toTree e)
 
 toTree :: MetaTermPlus -> TreePlus
 toTree term =
@@ -130,28 +134,68 @@ toTreeEnumCase (m, v) =
     EnumCaseDefault ->
       (m, TreeLeaf "default")
 
-metaConstants :: S.Set T.Text
+-- これをmetaconstantsの中で使って引数の形を指定する
+data Arg
+  = ArgLeaf
+  | ArgNode
+  | ArgInt
+  | ArgEnum
+  | ArgLam
+  | ArgAny
+  deriving (Ord, Eq, Show)
+
+showArgForm :: Arg -> T.Text
+showArgForm arg =
+  case arg of
+    ArgLeaf ->
+      "leaf"
+    ArgNode ->
+      "node"
+    ArgInt ->
+      "int"
+    ArgEnum ->
+      "enum"
+    ArgLam ->
+      "lambda-term"
+    ArgAny ->
+      "(any)"
+
+metaConstants :: Map.HashMap T.Text [Arg]
 metaConstants =
-  S.fromList
-    [ "cons",
-      "dump",
-      "is-nil",
-      "head",
-      "tail",
-      "leaf-equal",
-      "is-leaf",
-      "is-node",
-      "leaf-mul",
-      "leaf-uncons",
-      "new-symbol",
-      "nth",
-      "int-add",
-      "int-sub",
-      "int-mul",
-      "int-div",
-      "int-eq",
-      "int-gt",
-      "int-ge",
-      "int-le",
-      "int-lt"
+  Map.unions [metaTreeConstants, metaArithConstants, metaCmpConstants]
+
+metaTreeConstants :: Map.HashMap T.Text [Arg]
+metaTreeConstants =
+  Map.fromList
+    [ ("cons", [ArgAny, ArgNode]),
+      ("dump", [ArgAny]),
+      ("head", [ArgNode]),
+      ("is-leaf", [ArgAny]),
+      ("is-nil", [ArgNode]),
+      ("is-node", [ArgAny]),
+      ("leaf-equal", [ArgLeaf, ArgLeaf]),
+      ("leaf-mul", [ArgLeaf, ArgLeaf]),
+      ("leaf-uncons", [ArgLeaf]),
+      ("new-symbol", []),
+      ("nth", [ArgInt, ArgNode]),
+      ("tail", [ArgNode])
+    ]
+
+metaArithConstants :: Map.HashMap T.Text [Arg]
+metaArithConstants =
+  Map.fromList
+    [ ("int-add", [ArgInt, ArgInt]),
+      ("int-sub", [ArgInt, ArgInt]),
+      ("int-mul", [ArgInt, ArgInt]),
+      ("int-div", [ArgInt, ArgInt])
+    ]
+
+metaCmpConstants :: Map.HashMap T.Text [Arg]
+metaCmpConstants =
+  Map.fromList
+    [ ("int-gt", [ArgInt, ArgInt]),
+      ("int-ge", [ArgInt, ArgInt]),
+      ("int-lt", [ArgInt, ArgInt]),
+      ("int-le", [ArgInt, ArgInt]),
+      ("int-eq", [ArgInt, ArgInt])
     ]

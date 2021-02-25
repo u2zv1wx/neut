@@ -11,7 +11,6 @@ import qualified Data.HashMap.Lazy as Map
 import Data.Hint
 import Data.Ident
 import Data.MetaTerm
-import qualified Data.Set as S
 import qualified Data.Text as T
 
 type NameEnv = Map.HashMap T.Text Ident
@@ -29,7 +28,7 @@ discernMetaTerm' nenv term =
         Just x' ->
           return (m, MetaTermVar x')
         _ -> do
-          if S.member (asText x) metaConstants
+          if Map.member (asText x) metaConstants
             then return (m, MetaTermConst (asText x))
             else do
               mEnumValue <- resolveAsEnumValue (asText x)

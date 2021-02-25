@@ -1,12 +1,16 @@
 module Reduce.MetaTerm (reduceMetaTerm) where
 
+import Control.Exception.Safe
 import Control.Monad.State.Lazy hiding (get)
 import Data.EnumCase
 import Data.Env
+import qualified Data.HashMap.Lazy as Map
 import Data.Hint
 import Data.Ident
 import Data.Int
 import qualified Data.IntMap as IntMap
+import Data.Log
+import Data.Maybe (catMaybes)
 import Data.MetaTerm
 import qualified Data.Text as T
 import Data.Tree
@@ -16,13 +20,13 @@ reduceMetaTerm term =
   case term of
     (m, MetaTermImpElim e es) -> do
       e' <- reduceMetaTerm e
-      es' <- mapM (reduceMetaTerm) es
+      es' <- mapM reduceMetaTerm es
       case e' of
         (mLam, MetaTermImpIntro xs mRest body) -> do
           h <- newNameWith' "SELF"
-          reduceFix (mLam, MetaTermFix h xs mRest body) es'
+          reduceFix m (mLam, MetaTermFix h xs mRest body) es'
         (_, MetaTermFix {}) ->
-          reduceFix e' es'
+          reduceFix m e' es'
         (_, MetaTermConst c) ->
           reduceConstApp m c es'
         _ -> do
@@ -40,33 +44,41 @@ reduceMetaTerm term =
         _ -> do
           raiseError m "found an ill-typed switch"
     (m, MetaTermNode es) -> do
-      es' <- mapM (reduceMetaTerm) es
+      es' <- mapM reduceMetaTerm es
       return (m, MetaTermNode es')
     _ -> do
       return term
 
-reduceFix :: MetaTermPlus -> [MetaTermPlus] -> WithEnv MetaTermPlus
-reduceFix e es =
+reduceFix :: Hint -> MetaTermPlus -> [MetaTermPlus] -> WithEnv MetaTermPlus
+reduceFix m e es =
   case e of
-    (m, MetaTermFix f xs mRest body)
+    (_, MetaTermFix f xs mRest (_, body))
       | Just rest <- mRest -> do
         if length xs > length es
-          then raiseError m "arity mismatch"
+          then raiseError m $ "the function here must be called with x (>= " <> T.pack (show (length xs)) <> ") arguments, but found " <> T.pack (show (length es))
           else do
             let es1 = take (length xs) es
-            -- let es2 = map (\x -> (m, MetaTermNecElim x)) $ drop (length xs) es
             let restArg = (m, MetaTermNode (drop (length xs) es))
-            -- let restArg = (m, MetaTermNecIntro (m, MetaTermNode es2))
             let sub = IntMap.fromList $ (asInt f, e) : zip (map asInt xs) es1 ++ [(asInt rest, restArg)]
-            reduceMetaTerm $ substMetaTerm sub body
+            reduceMetaTerm $ substMetaTerm sub (m, body)
       | otherwise -> do
         if length xs /= length es
-          then raiseError m "arity mismatch"
+          then raiseArityMismatch m (length xs) (length es)
           else do
             let sub = IntMap.fromList $ (asInt f, e) : zip (map asInt xs) es
-            reduceMetaTerm $ substMetaTerm sub body
+            reduceMetaTerm $ substMetaTerm sub (m, body)
     _ ->
       raiseCritical (fst e) "unreachable"
+
+raiseArityMismatch :: Hint -> Int -> Int -> WithEnv a
+raiseArityMismatch m expected found = do
+  case expected of
+    0 ->
+      raiseError m $ "the function here must be called with 0 argument, but found " <> T.pack (show found)
+    1 ->
+      raiseError m $ "the function here must be called with 1 argument, but found " <> T.pack (show found)
+    _ ->
+      raiseError m $ "the function here must be called with " <> T.pack (show expected) <> " arguments, but found " <> T.pack (show found)
 
 reduceConstApp :: Hint -> T.Text -> [MetaTermPlus] -> WithEnv MetaTermPlus
 reduceConstApp m c es =
@@ -79,8 +91,8 @@ reduceConstApp m c es =
         liftIO $ putStrLn $ T.unpack $ showAsSExp $ toTree arg
         return (m, MetaTermEnumIntro "top.unit")
     "head"
-      | [(_, MetaTermNode (h : _))] <- es ->
-        return h
+      | [(_, MetaTermNode ((_, h) : _))] <- es ->
+        return (m, h)
     "is-nil"
       | [(_, MetaTermNode ts)] <- es ->
         return $ liftBool (null ts) m
@@ -101,12 +113,9 @@ reduceConstApp m c es =
       | [(_, MetaTermLeaf s1), (_, MetaTermLeaf s2)] <- es ->
         return $ liftBool (s1 == s2) m
     "leaf-uncons"
-      | [(_, MetaTermLeaf s)] <- es -> do
-        case T.uncons s of
-          Just (ch, rest) ->
-            return (m, MetaTermNode [(m, MetaTermLeaf (T.singleton ch)), (m, MetaTermLeaf rest)])
-          Nothing ->
-            undefined
+      | [(_, MetaTermLeaf s)] <- es,
+        Just (ch, rest) <- T.uncons s -> do
+        return (m, MetaTermNode [(m, MetaTermLeaf (T.singleton ch)), (m, MetaTermLeaf rest)])
     "tail"
       | [(mNode, MetaTermNode (_ : rest))] <- es ->
         return (mNode, MetaTermNode rest)
@@ -127,8 +136,52 @@ reduceConstApp m c es =
         [(_, MetaTermInt64 i1), (_, MetaTermInt64 i2)] <- es ->
         return $ liftBool (op i1 i2) m
       | otherwise -> do
-        let textList = map (showAsSExp . toTree) es
-        raiseError m $ "the constant `" <> c <> "` cannot be used with the following arguments:\n" <> T.intercalate "\n" textList
+        raiseConstAppError m c es
+
+raiseConstAppError :: Hint -> T.Text -> [MetaTermPlus] -> WithEnv a
+raiseConstAppError m c es = do
+  case Map.lookup c metaConstants of
+    Nothing ->
+      raiseCritical m $ "the constant " <> c <> " isn't in the meta-constant map (compiler bug)"
+    Just argInfo ->
+      if length argInfo /= length es
+        then raiseArityMismatch m (length argInfo) (length es)
+        else do
+          let hs = catMaybes $ zipWith matchTree argInfo es
+          let logList = map (\(expectedForm, e) -> toConstError expectedForm e) hs
+          throw $ Error logList
+
+toConstError :: Arg -> MetaTermPlus -> Log
+toConstError argForm e =
+  logError (getPosInfo (fst e)) $ "the term here is expected to be a `" <> showArgForm argForm <> "`, but it is actually a `" <> showArgForm (toArgForm e) <> "`."
+
+toArgForm :: MetaTermPlus -> Arg
+toArgForm e =
+  case e of
+    (_, MetaTermLeaf _) ->
+      ArgLeaf
+    (_, MetaTermNode _) ->
+      ArgNode
+    (_, MetaTermInt64 _) ->
+      ArgInt
+    (_, MetaTermEnumIntro _) ->
+      ArgEnum
+    (_, _) ->
+      ArgLam
+
+matchTree :: Arg -> MetaTermPlus -> Maybe (Arg, MetaTermPlus)
+matchTree argForm t =
+  case (argForm, t) of
+    (ArgLeaf, (_, MetaTermLeaf _)) ->
+      Nothing
+    (ArgNode, (_, MetaTermNode _)) ->
+      Nothing
+    (ArgInt, (_, MetaTermInt64 _)) ->
+      Nothing
+    (ArgAny, _) ->
+      Nothing
+    (a, e) ->
+      Just (a, e)
 
 toArithOp :: T.Text -> Maybe (Int64 -> Int64 -> Int64)
 toArithOp opStr =
