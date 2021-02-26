@@ -10,7 +10,9 @@ import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import Data.Hint
 import Data.Ident
+import Data.Log
 import Data.MetaTerm
+import Data.Namespace
 import qualified Data.Text as T
 
 type NameEnv = Map.HashMap T.Text Ident
@@ -23,20 +25,11 @@ discernMetaTerm e = do
 discernMetaTerm' :: NameEnv -> MetaTermPlus -> WithEnv MetaTermPlus
 discernMetaTerm' nenv term =
   case term of
-    (m, MetaTermVar x) ->
-      case Map.lookup (asText x) nenv of
-        Just x' ->
-          return (m, MetaTermVar x')
-        _ -> do
-          if Map.member (asText x) metaConstants
-            then return (m, MetaTermConst (asText x))
-            else do
-              mEnumValue <- resolveAsEnumValue (asText x)
-              case mEnumValue of
-                Just enumValue ->
-                  return (m, MetaTermEnumIntro enumValue)
-                Nothing ->
-                  raiseError m $ "undefined meta-variable: " <> asText x
+    (m, MetaTermVar (I (s, _))) ->
+      tryCand (resolveSymbol (asMetaVar m nenv) s) $
+        tryCand (resolveSymbol (asMetaEnumValue m) s) $
+          tryCand (resolveSymbol (asMetaConstant m) s) $
+            raiseError m $ "undefined meta-variable: " <> s
     (m, MetaTermImpIntro xs mf e) -> do
       (xs', mf', e') <- discernBinder nenv xs mf e
       return (m, MetaTermImpIntro xs' mf' e')
@@ -93,11 +86,13 @@ discernEnumCase :: Hint -> EnumCase -> WithEnv EnumCase
 discernEnumCase m weakCase =
   case weakCase of
     EnumCaseLabel l -> do
-      ml <- resolveAsEnumValue l
+      ml <- resolveSymbol asEnumCase l
       case ml of
         Just l' ->
-          return (EnumCaseLabel l')
-        Nothing ->
+          return l'
+        Nothing -> do
+          e <- gets enumEnv
+          p' e
           raiseError m $ "no such enum-value is defined: " <> l
     _ ->
       return weakCase

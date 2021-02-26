@@ -9,12 +9,14 @@ module Elaborate.Infer
 where
 
 import Control.Monad.State.Lazy
+import Data.ConstType
 import Data.EnumCase
 import Data.Env
--- import qualified Data.HashMap.Lazy as Map
+import qualified Data.HashMap.Lazy as Map
 import Data.Hint
 import Data.Ident
 import qualified Data.IntMap as IntMap
+import Data.Log
 import Data.LowType
 import Data.Primitive
 import Data.Term
@@ -145,8 +147,9 @@ infer' ctx term =
     (m, WeakTermQuestion e _) -> do
       (e', te) <- infer' ctx e
       return ((m, WeakTermQuestion e' te), te)
-    (_, WeakTermErase _ e) ->
-      infer' ctx e
+
+-- (_, WeakTermErase _ e) ->
+--   infer' ctx e
 
 inferArgs ::
   Hint ->
@@ -334,3 +337,12 @@ lookupWeakTypeEnvMaybe (I (_, s)) = do
 --       raiseError m $ "no such enum-intro is defined: " <> name
 --     Just (j, _) ->
 --       return j
+
+lookupKind :: Hint -> T.Text -> WithEnv T.Text
+lookupKind m name = do
+  renv <- gets revEnumEnv
+  case Map.lookup name renv of
+    Nothing ->
+      raiseError m $ "no such enum-intro is defined: " <> name
+    Just (j, _) ->
+      return j

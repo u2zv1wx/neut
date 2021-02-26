@@ -11,14 +11,17 @@ import Clarify.Sigma
 import Clarify.Utility
 import Control.Monad.State.Lazy
 import Data.Comp
+import Data.ConstType
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import Data.Hint
 import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.List (nubBy)
+import Data.Log
 import Data.LowType
 import Data.Namespace
+import Data.Platform
 import Data.Primitive
 import Data.Syscall
 import Data.Term
@@ -47,7 +50,7 @@ clarify' tenv term =
       e' <- clarify' tenv e
       callClosure m e' es'
     (m, TermFix (_, x, t) mxts e) -> do
-      let tenv' = insTypeEnv' (asInt x) t tenv
+      let tenv' = IntMap.insert (asInt x) t tenv
       e' <- clarify' (insTypeEnv1 mxts tenv') e
       fvs <- nubFVS <$> chainOf tenv term
       retClosure tenv (Just x) fvs m mxts e'
@@ -259,7 +262,7 @@ clarifyBinder tenv binder =
       return []
     ((m, x, t) : xts) -> do
       t' <- clarify' tenv t
-      xts' <- clarifyBinder (insTypeEnv' (asInt x) t tenv) xts
+      xts' <- clarifyBinder (IntMap.insert (asInt x) t tenv) xts
       return $ (m, x, t') : xts'
 
 toHeaderInfo ::
@@ -484,7 +487,7 @@ chainOf tenv term =
     (_, TermTau) ->
       return []
     (m, TermUpsilon x) -> do
-      t <- lookupTypeEnv' m x tenv
+      t <- lookupTypeEnv m x tenv
       xts <- chainOf tenv t
       return $ xts ++ [(m, x, t)]
     (_, TermPi {}) ->
@@ -497,7 +500,7 @@ chainOf tenv term =
       return $ xs1 ++ xs2
     (_, TermFix (_, x, t) xts e) -> do
       xs1 <- chainOf tenv t
-      xs2 <- chainOf' (insTypeEnv' (asInt x) t tenv) xts [e]
+      xs2 <- chainOf' (IntMap.insert (asInt x) t tenv) xts [e]
       return $ xs1 ++ filter (\(_, y, _) -> y /= x) xs2
     (_, TermConst _) ->
       return []
@@ -541,7 +544,7 @@ chainOf' tenv binder es =
       concat <$> mapM (chainOf tenv) es
     (_, x, t) : xts -> do
       xs1 <- chainOf tenv t
-      xs2 <- chainOf' (insTypeEnv' (asInt x) t tenv) xts es
+      xs2 <- chainOf' (IntMap.insert (asInt x) t tenv) xts es
       return $ xs1 ++ filter (\(_, y, _) -> y /= x) xs2
 
 dropFst :: [(a, b, c)] -> [(b, c)]
@@ -555,4 +558,13 @@ insTypeEnv1 xts tenv =
     [] ->
       tenv
     (_, x, t) : rest ->
-      insTypeEnv1 rest $ insTypeEnv' (asInt x) t tenv
+      insTypeEnv1 rest $ IntMap.insert (asInt x) t tenv
+
+lookupTypeEnv :: Hint -> Ident -> TypeEnv -> WithEnv TermPlus
+lookupTypeEnv m (I (name, x)) tenv =
+  case IntMap.lookup x tenv of
+    Just t ->
+      return t
+    Nothing ->
+      raiseCritical m $
+        "the variable `" <> name <> "` is not found in the type environment."

@@ -1,5 +1,6 @@
 module Data.Log
   ( Log,
+    Error (Error),
     outputLog,
     outputLog',
     outputPass,
@@ -11,9 +12,15 @@ module Data.Log
     logError',
     logCritical,
     logCritical',
+    raiseError,
+    raiseError',
+    raiseCritical,
+    raiseCritical',
+    raiseSyntaxError,
   )
 where
 
+import Control.Exception.Safe
 import Data.Hint
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
@@ -27,6 +34,12 @@ data LogLevel
   | LogLevelFail -- for test
   | LogLevelCritical -- "impossible" happened
   deriving (Show, Eq)
+
+newtype Error
+  = Error [Log]
+  deriving (Show)
+
+instance Exception Error
 
 logLevelToText :: LogLevel -> T.Text
 logLevelToText level =
@@ -152,3 +165,23 @@ logCritical pos text =
 logCritical' :: T.Text -> Log
 logCritical' text =
   (Nothing, LogLevelCritical, text)
+
+raiseError :: (MonadThrow m) => Hint -> T.Text -> m a
+raiseError m text =
+  throw $ Error [logError (getPosInfo m) text]
+
+raiseError' :: (MonadThrow m) => T.Text -> m a
+raiseError' text =
+  throw $ Error [logError' text]
+
+raiseCritical :: (MonadThrow m) => Hint -> T.Text -> m a
+raiseCritical m text =
+  throw $ Error [logCritical (getPosInfo m) text]
+
+raiseCritical' :: (MonadThrow m) => T.Text -> m a
+raiseCritical' text =
+  throw $ Error [logCritical' text]
+
+raiseSyntaxError :: (MonadThrow m) => Hint -> T.Text -> m a
+raiseSyntaxError m form =
+  raiseError m $ "couldn't match the input with the expected form: " <> form

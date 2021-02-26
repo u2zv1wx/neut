@@ -9,6 +9,7 @@ import Data.Env
 import qualified Data.HashMap.Lazy as HashMap
 import Data.Ident
 import qualified Data.IntMap as IntMap
+import Data.Log
 import Data.LowComp
 import Data.LowType
 import qualified Data.Map as Map

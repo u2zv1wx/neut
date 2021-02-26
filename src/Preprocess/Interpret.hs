@@ -9,6 +9,7 @@ import Data.EnumCase
 import Data.Env
 import Data.Hint
 import Data.Ident
+import Data.Log
 import Data.Maybe (fromMaybe)
 import Data.MetaTerm
 import Data.Namespace

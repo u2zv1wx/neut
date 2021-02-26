@@ -2,7 +2,6 @@ module Parse.Discern
   ( discern,
     discernIdentPlus,
     discernDef,
-    discernText,
   )
 where
 
@@ -11,6 +10,7 @@ import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import Data.Hint
 import Data.Ident
+import Data.Log
 import Data.Namespace
 import qualified Data.Text as T
 import Data.WeakTerm
@@ -23,17 +23,21 @@ discern e = do
   nenv <- gets topNameEnv
   discern' nenv e
 
+discernIdentPlus :: WeakIdentPlus -> WithEnv WeakIdentPlus
+discernIdentPlus (m, x, t) = do
+  nenv <- gets topNameEnv
+  when (Map.member (asText x) nenv) $
+    raiseError m $ "the variable `" <> asText x <> "` is already defined at the top level"
+  t' <- discern' nenv t
+  x' <- newNameWith x
+  modify (\env -> env {topNameEnv = Map.insert (asText x) x' (topNameEnv env)})
+  return (m, x', t')
+
 discernDef :: Def -> WithEnv Def
 discernDef (m, xt, xts, e) = do
   nenv <- gets topNameEnv
   (xt', xts', e') <- discernFix nenv xt xts e
   return (m, xt', xts', e')
-
-discernText :: Hint -> T.Text -> WithEnv Ident
-discernText m x = do
-  nenv <- gets topNameEnv
-  penv <- gets prefixEnv
-  lookupName'' m penv nenv $ asIdent x
 
 -- Alpha-convert all the variables so that different variables have different names.
 discern' :: NameEnv -> WeakTermPlus -> WithEnv WeakTermPlus
@@ -41,29 +45,12 @@ discern' nenv term =
   case term of
     (m, WeakTermTau) ->
       return (m, WeakTermTau)
-    (m, WeakTermUpsilon x@(I (s, _))) -> do
-      penv <- gets prefixEnv
-      mx <- lookupName m penv nenv x
-      case mx of
-        Just x' ->
-          return (m, WeakTermUpsilon x')
-        Nothing -> do
-          mEnumValue <- resolveAsEnumValue s
-          case mEnumValue of
-            Just enumValue ->
-              return (m, WeakTermEnumIntro enumValue)
-            Nothing -> do
-              mEnumType <- resolveAsEnumType s
-              case mEnumType of
-                Just enumType ->
-                  return (m, WeakTermEnum enumType)
-                Nothing -> do
-                  mc <- lookupConstantMaybe m penv s
-                  case mc of
-                    Just c ->
-                      return (m, WeakTermConst c)
-                    Nothing ->
-                      raiseError m $ "undefined variable: " <> asText x
+    (m, WeakTermUpsilon (I (s, _))) ->
+      tryCand (resolveSymbol (asWeakVar m nenv) s) $
+        tryCand (resolveSymbol (asWeakEnumValue m) s) $
+          tryCand (resolveSymbol (asWeakEnumType m) s) $
+            tryCand (resolveSymbol (asWeakConstant m) s) $
+              raiseError m $ "undefined variable: " <> s
     (m, WeakTermPi xts t) -> do
       (xts', t') <- discernBinder nenv xts t
       return (m, WeakTermPi xts' t')
@@ -124,28 +111,6 @@ discern' nenv term =
       e' <- discern' nenv e
       t' <- discern' nenv t
       return (m, WeakTermQuestion e' t')
-    (_, WeakTermErase mxs e) -> do
-      penv <- gets prefixEnv
-      forM_ mxs $ \(mx, x) -> lookupName'' mx penv nenv (asIdent x)
-      let xs = map snd mxs
-      let nenv' = Map.filterWithKey (\k _ -> k `notElem` xs) nenv
-      discern' nenv' e
-
-discernIdentPlus :: WeakIdentPlus -> WithEnv WeakIdentPlus
-discernIdentPlus (m, x, t) = do
-  sanityCheck m x
-  nenv <- gets topNameEnv
-  t' <- discern' nenv t
-  x' <- newNameWith x
-  modify (\env -> env {topNameEnv = Map.insert (asText x) x' (topNameEnv env)})
-  return (m, x', t')
-
-sanityCheck :: Hint -> Ident -> WithEnv ()
-sanityCheck m x = do
-  nenv <- gets topNameEnv
-  when (Map.member (asText x) nenv) $
-    raiseError m $
-      "the variable `" <> asText x <> "` is already defined at top level"
 
 discernBinder ::
   NameEnv ->
@@ -160,7 +125,7 @@ discernBinder nenv binder e =
     (mx, x, t) : xts -> do
       t' <- discern' nenv t
       x' <- newNameWith x
-      (xts', e') <- discernBinder (insertName x x' nenv) xts e
+      (xts', e') <- discernBinder (Map.insert (asText x) x' nenv) xts e
       return ((mx, x', t') : xts', e')
 
 discernFix ::
@@ -185,58 +150,5 @@ discernStruct nenv binder e =
       return ([], e')
     ((mx, x, t) : xts) -> do
       x' <- newNameWith x
-      (xts', e') <- discernStruct (insertName x x' nenv) xts e
+      (xts', e') <- discernStruct (Map.insert (asText x) x' nenv) xts e
       return ((mx, x', t) : xts', e')
-
-insertName :: Ident -> Ident -> NameEnv -> NameEnv
-insertName (I (s, _)) =
-  Map.insert s
-
-lookupName :: Hint -> [T.Text] -> NameEnv -> Ident -> WithEnv (Maybe Ident)
-lookupName m penv nenv x =
-  case Map.lookup (asText x) nenv of
-    Just x' ->
-      return $ Just x'
-    Nothing ->
-      lookupName' m penv nenv x
-
-lookupName' :: Hint -> [T.Text] -> NameEnv -> Ident -> WithEnv (Maybe Ident)
-lookupName' m penv nenv x =
-  case penv of
-    [] ->
-      return Nothing
-    prefix : prefixList -> do
-      let query = prefix <> nsSep <> asText x
-      case Map.lookup query nenv of
-        Nothing ->
-          lookupName' m prefixList nenv x
-        Just x' ->
-          return $ Just x'
-
-lookupName'' :: Hint -> [T.Text] -> NameEnv -> Ident -> WithEnv Ident
-lookupName'' m penv nenv x = do
-  mx <- lookupName m penv nenv x
-  case mx of
-    Just x' ->
-      return x'
-    Nothing ->
-      raiseError m $ "(double-prime) undefined variable: " <> asText x
-
-lookupConstantMaybe :: Hint -> [T.Text] -> T.Text -> WithEnv (Maybe T.Text)
-lookupConstantMaybe m penv x = do
-  b <- isConstant x
-  if b
-    then return $ Just x
-    else lookupConstantMaybe' m penv x
-
-lookupConstantMaybe' :: Hint -> [T.Text] -> T.Text -> WithEnv (Maybe T.Text)
-lookupConstantMaybe' m penv x =
-  case penv of
-    [] ->
-      return Nothing
-    prefix : prefixList -> do
-      let query = prefix <> nsSep <> x
-      b <- isConstant query
-      if b
-        then return $ Just query
-        else lookupConstantMaybe' m prefixList x

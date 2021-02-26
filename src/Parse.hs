@@ -5,9 +5,8 @@ where
 
 import Control.Monad.State.Lazy hiding (get)
 import Data.Env
-import qualified Data.HashMap.Lazy as Map
 import Data.Hint
-import Data.Ident
+import Data.Log
 import Data.Namespace
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -26,13 +25,17 @@ parse stmtTreeList =
       case headStmt of
         (m, TreeNode (leaf@(_, TreeLeaf headAtom) : rest)) ->
           case headAtom of
-            "data"
-              | name@(mFun, TreeLeaf _) : xts@(_, TreeNode _) : es' <- rest ->
-                parse $ (m, TreeNode [leaf, (mFun, TreeNode (name : xts : es'))]) : restStmtList
-              | otherwise -> do
-                stmtList1 <- parseData m rest
-                stmtList2 <- parse restStmtList
-                return $ stmtList1 ++ stmtList2
+            --
+            -- basic statements
+            --
+            "let"
+              | [xt, e] <- rest -> do
+                e' <- interpret e >>= discern
+                xt' <- prefixTextPlus xt >>= interpretIdentPlus >>= discernIdentPlus
+                defList <- parse restStmtList
+                return $ WeakStmtLet m xt' e' : defList
+              | otherwise ->
+                raiseSyntaxError m "(let LEAF TREE TREE) | (let TREE TREE)"
             "declare-constant"
               | [(_, TreeLeaf name), t] <- rest -> do
                 t' <- interpret t >>= discern
@@ -42,38 +45,13 @@ parse stmtTreeList =
                 return $ WeakStmtConstDecl (m, name', t') : defList
               | otherwise ->
                 raiseSyntaxError m "(declare-constant LEAF TREE)"
-            "end"
-              | [(_, TreeLeaf s)] <- rest -> do
-                ns <- gets sectionEnv
-                case ns of
-                  [] ->
-                    raiseError m "there is no section to end"
-                  s' : ns'
-                    | s == s' -> do
-                      getCurrentSection >>= unuse
-                      modify (\e -> e {sectionEnv = ns'})
-                      parse restStmtList
-                    | otherwise ->
-                      raiseError m $
-                        "the innermost section is not `" <> s <> "`, but is `" <> s' <> "`"
-              | otherwise ->
-                raiseSyntaxError m "(end LEAF)"
-            "erase"
-              | [(ms, TreeLeaf s)] <- rest -> do
-                nenv <- gets topNameEnv
-                s' <- asText <$> discernText ms s
-                modify (\env -> env {topNameEnv = Map.filterWithKey (\k _ -> k /= s') nenv})
-                parse restStmtList
-              | otherwise ->
-                raiseSyntaxError m "(erase LEAF)"
-            "let"
-              | [xt, e] <- rest -> do
-                e' <- interpret e >>= discern
-                xt' <- prefixTextPlus xt >>= interpretIdentPlus >>= discernIdentPlus
-                defList <- parse restStmtList
-                return $ WeakStmtLet m xt' e' : defList
-              | otherwise ->
-                raiseSyntaxError m "(let LEAF TREE TREE) | (let TREE TREE)"
+            "data"
+              | name@(mFun, TreeLeaf _) : xts@(_, TreeNode _) : es' <- rest ->
+                parse $ (m, TreeNode [leaf, (mFun, TreeNode (name : xts : es'))]) : restStmtList
+              | otherwise -> do
+                stmtList1 <- parseData m rest
+                stmtList2 <- parse restStmtList
+                return $ stmtList1 ++ stmtList2
             "record"
               | (_, TreeLeaf _) : (_, TreeNode _) : _ <- rest -> do
                 rest' <- asData m rest
@@ -83,15 +61,19 @@ parse stmtTreeList =
                 return $ stmtList1 ++ stmtList2 ++ stmtList3
               | otherwise ->
                 raiseSyntaxError m "(record name (TREE ... TREE) TREE ... TREE)"
+            --
+            -- namespace-related statements
+            --
             "section"
-              | [(_, TreeLeaf s)] <- rest -> do
-                modify (\e -> e {sectionEnv = s : sectionEnv e})
-                getCurrentSection >>= use
-                parse restStmtList
+              | [(_, TreeLeaf s)] <- rest ->
+                handleSection s (parse restStmtList)
               | otherwise ->
                 raiseSyntaxError m "(section LEAF)"
-            "statement" ->
-              parse $ rest ++ restStmtList
+            "end"
+              | [(_, TreeLeaf s)] <- rest -> do
+                handleEnd m s (parse restStmtList)
+              | otherwise ->
+                raiseSyntaxError m "(end LEAF)"
             "use"
               | [(_, TreeLeaf s)] <- rest ->
                 use s >> parse restStmtList
@@ -102,6 +84,19 @@ parse stmtTreeList =
                 unuse s >> parse restStmtList
               | otherwise ->
                 raiseSyntaxError m "(unuse LEAF)"
+            --
+            -- other statements
+            --
+            "statement" ->
+              parse $ rest ++ restStmtList
+            -- "erase"
+            --   | [(ms, TreeLeaf s)] <- rest -> do
+            --     nenv <- gets topNameEnv
+            --     s' <- asText <$> discernText ms s
+            --     modify (\env -> env {topNameEnv = Map.filterWithKey (\k _ -> k /= s') nenv})
+            --     parse restStmtList
+            --   | otherwise ->
+            --     raiseSyntaxError m "(erase LEAF)"
             _ ->
               interpretAux headStmt restStmtList
         _ ->
@@ -115,43 +110,6 @@ interpretAux headStmt restStmtList = do
   t <- newAster m
   defList <- parse restStmtList
   return $ WeakStmtLet m (m, h, t) e : defList
-
-withSectionPrefix :: T.Text -> WithEnv T.Text
-withSectionPrefix x = do
-  ns <- gets sectionEnv
-  return $ foldl (\acc n -> n <> nsSep <> acc) x ns
-
-getCurrentSection :: WithEnv T.Text
-getCurrentSection = do
-  ns <- gets sectionEnv
-  return $ getCurrentSection' ns
-
-getCurrentSection' :: [T.Text] -> T.Text
-getCurrentSection' nameStack =
-  case nameStack of
-    [] ->
-      ""
-    [n] ->
-      n
-    (n : ns) ->
-      getCurrentSection' ns <> nsSep <> n
-
-prefixTextPlus :: TreePlus -> WithEnv TreePlus
-prefixTextPlus tree =
-  case tree of
-    (m, TreeLeaf "_") -> do
-      h <- newTextWith "_"
-      return (m, TreeLeaf h)
-    (m, TreeLeaf x) -> do
-      x' <- withSectionPrefix x
-      return (m, TreeLeaf x')
-    (m, TreeNode [(mx, TreeLeaf "_"), t]) ->
-      return (m, TreeNode [(mx, TreeLeaf "_"), t])
-    (m, TreeNode [(mx, TreeLeaf x), t]) -> do
-      x' <- withSectionPrefix x
-      return (m, TreeNode [(mx, TreeLeaf x'), t])
-    t ->
-      raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
 
 insertConstant :: Hint -> T.Text -> WithEnv ()
 insertConstant m x = do

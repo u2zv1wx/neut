@@ -1,5 +1,8 @@
 module Data.LowType where
 
+import Control.Exception.Safe
+import Data.Hint
+import Data.Log
 import Data.Size
 import qualified Data.Text as T
 import Text.Read hiding (get)
@@ -43,6 +46,14 @@ lowTypeToArrayKindMaybe lowType =
       Just $ ArrayKindFloat size
     _ ->
       Nothing
+
+lowTypeToArrayKind :: (MonadThrow m) => Hint -> LowType -> m ArrayKind
+lowTypeToArrayKind m lowType =
+  case lowTypeToArrayKindMaybe lowType of
+    Just k ->
+      return k
+    Nothing ->
+      raiseCritical m "Infer.lowTypeToArrayKind"
 
 arrayKindToLowType :: ArrayKind -> LowType
 arrayKindToLowType arrayKind =

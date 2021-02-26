@@ -12,6 +12,7 @@ import Data.EnumCase
 import Data.Env
 import Data.Hint
 import Data.Ident
+import Data.Log
 import Data.LowType
 import Data.Size
 import qualified Data.Text as T
@@ -169,13 +170,13 @@ interpret inputTree =
             return (m, WeakTermQuestion e' h)
           | otherwise ->
             raiseSyntaxError m "(question TREE)"
-        "erase"
-          | [(_, TreeNode mxs), body] <- rest,
-            Just mxs' <- mapM asLeaf mxs -> do
-            body' <- interpret body
-            return (m, WeakTermErase mxs' body')
-          | otherwise ->
-            raiseSyntaxError m "(erase (LEAF ... LEAF) TREE)"
+        -- "erase"
+        --   | [(_, TreeNode mxs), body] <- rest,
+        --     Just mxs' <- mapM asLeaf mxs -> do
+        --     body' <- interpret body
+        --     return (m, WeakTermErase mxs' body')
+        --   | otherwise ->
+        --     raiseSyntaxError m "(erase (LEAF ... LEAF) TREE)"
         "irreducible"
           | [e] <- rest -> do
             e' <- interpret e

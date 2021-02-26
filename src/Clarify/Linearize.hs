@@ -8,6 +8,7 @@ import Data.Comp
 import Data.Env
 import Data.Ident
 import qualified Data.IntMap as IntMap
+import Data.Log
 
 -- insert an appropriate header for a closed chain
 linearize ::

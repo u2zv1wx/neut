@@ -5,6 +5,7 @@ module Parse.Rule
   )
 where
 
+import Data.Log
 import Control.Monad.State.Lazy
 import Data.Env
 import Data.Ident

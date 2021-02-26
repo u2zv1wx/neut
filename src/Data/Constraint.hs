@@ -2,8 +2,12 @@ module Data.Constraint where
 
 import Data.Hint
 import Data.Ident
+import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
 import Data.WeakTerm
+
+type ConstraintQueue =
+  Q.MinQueue EnrichedConstraint
 
 type PreConstraint =
   (WeakTermPlus, WeakTermPlus)

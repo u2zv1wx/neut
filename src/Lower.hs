@@ -6,11 +6,13 @@ where
 import Control.Exception.Safe
 import Control.Monad.State.Lazy
 import Data.Comp
+import Data.ConstType
 import Data.EnumCase
 import Data.Env hiding (newNameWith'')
 import qualified Data.HashMap.Lazy as Map
 import Data.Hint
 import Data.Ident
+import Data.Log
 import Data.LowComp
 import Data.LowType
 import Data.Primitive

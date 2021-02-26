@@ -6,9 +6,11 @@ import qualified Data.HashMap.Lazy as Map
 import Data.Hint
 import Data.Ident
 import qualified Data.IntMap as IntMap
+import Data.List (find)
+import Data.Log
 import Data.MetaTerm
+import Data.Namespace
 import Data.Platform
--- import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import Data.Tree
@@ -41,14 +43,20 @@ visit path = do
   content <- liftIO $ TIO.readFile $ toFilePath path
   tokenize content >>= preprocess'
 
-leave :: WithEnv [a]
+leave :: WithEnv [TreePlus]
 leave = do
   path <- getCurrentFilePath
   popTrace
   modify (\env -> env {fileEnv = Map.insert path VisitInfoFinish (fileEnv env)})
+  penv <- gets prefixEnv
+  senv <- gets sectionEnv
+  let m = newHint 0 0 0 path
+  let ts1 = map (\x -> (m, TreeNode [(m, TreeLeaf "unuse"), (m, TreeLeaf x)])) penv
+  let ts2 = map (\x -> (m, TreeNode [(m, TreeLeaf "end"), (m, TreeLeaf x)])) senv
   modify (\env -> env {prefixEnv = []})
-  -- modify (\env -> env {sectionEnv = []})
-  return []
+  modify (\env -> env {sectionEnv = []})
+  -- fixme: ここでend/unuseを適切に入れる
+  return $ ts1 ++ ts2
 
 pushTrace :: Path Abs File -> WithEnv ()
 pushTrace path =
@@ -67,6 +75,30 @@ preprocess' stmtList = do
       case headStmt of
         (m, TreeNode (leaf@(_, TreeLeaf headAtom) : rest)) ->
           case headAtom of
+            --
+            -- basic statements
+            --
+            "define-macro"
+              | [(_, TreeLeaf name), body] <- rest -> do
+                nenv <- gets topMetaNameEnv
+                when (Map.member name nenv) $
+                  raiseError m $ "the meta-variable `" <> name <> "` is already defined at the top level"
+                body' <- evaluate body
+                name' <- newNameWith $ asIdent name
+                modify (\env -> env {topMetaNameEnv = Map.insert name name' (topMetaNameEnv env)})
+                modify (\env -> env {metaTermCtx = IntMap.insert (asInt name') body' (metaTermCtx env)})
+                preprocess' restStmtList
+              | [name@(_, TreeLeaf _), xts, body] <- rest -> do
+                let defFix = (m, TreeNode [leaf, name, (m, TreeNode [(m, TreeLeaf "fix-meta"), name, xts, body])])
+                preprocess' $ defFix : restStmtList
+              | otherwise ->
+                raiseSyntaxError m "(define-macro LEAF TREE) | (define-macro LEAF TREE TREE)"
+            "define-macro-variadic"
+              | [name@(_, TreeLeaf _), xts, body] <- rest -> do
+                let defFix = (m, TreeNode [(m, TreeLeaf "define-macro"), name, (m, TreeNode [(m, TreeLeaf "fix-meta-variadic"), name, xts, body])])
+                preprocess' $ defFix : restStmtList
+              | otherwise ->
+                raiseSyntaxError m "(define-macro-variadic LEAF TREE TREE)"
             "declare-enum"
               | (_, TreeLeaf name) : ts <- rest -> do
                 xis <- interpretEnumItem m name ts
@@ -74,6 +106,15 @@ preprocess' stmtList = do
                 preprocess' restStmtList
               | otherwise ->
                 raiseSyntaxError m "(declare-enum LEAF TREE ... TREE)"
+            --
+            -- file-related statements
+            --
+            "include"
+              | [(mPath, TreeLeaf pathString)] <- rest,
+                not (T.null pathString) ->
+                includeFile m mPath pathString restStmtList
+              | otherwise ->
+                raiseSyntaxError m "(include LEAF)"
             "ensure"
               | [(_, TreeLeaf pkg), (mUrl, TreeLeaf urlStr)] <- rest -> do
                 libDirPath <- getLibraryDirPath
@@ -99,12 +140,36 @@ preprocess' stmtList = do
                 preprocess' restStmtList
               | otherwise ->
                 raiseSyntaxError m "(ensure LEAF LEAF)"
-            "include"
-              | [(mPath, TreeLeaf pathString)] <- rest,
-                not (T.null pathString) ->
-                includeFile m mPath pathString restStmtList
+            --
+            -- namespace-related statements
+            --
+            "section"
+              | [(_, TreeLeaf s)] <- rest -> do
+                treeList <- handleSection s (preprocess' restStmtList)
+                return $ headStmt : treeList -- `(section NAME)` is also used in the object language
               | otherwise ->
-                raiseSyntaxError m "(include LEAF)"
+                raiseSyntaxError m "(section LEAF)"
+            "end"
+              | [(_, TreeLeaf s)] <- rest -> do
+                treeList <- handleEnd m s (preprocess' restStmtList)
+                return $ headStmt : treeList -- `(end NAME)` is also used in the object language
+              | otherwise ->
+                raiseSyntaxError m "(end LEAF)"
+            "use"
+              | [(_, TreeLeaf s)] <- rest -> do
+                treeList <- use s >> preprocess' restStmtList
+                return $ headStmt : treeList -- the `(use NAME)` is also used in the object language
+              | otherwise ->
+                raiseSyntaxError m "(use LEAF)"
+            "unuse"
+              | [(_, TreeLeaf s)] <- rest -> do
+                treeList <- unuse s >> preprocess' restStmtList
+                return $ headStmt : treeList -- the `(unuse NAME)` is also used in the object language
+              | otherwise ->
+                raiseSyntaxError m "(unuse LEAF)"
+            --
+            -- other statements
+            --
             "introspect"
               | ((mx, TreeLeaf x) : stmtClauseList) <- rest -> do
                 val <- retrieveCompileTimeVarValue mx x
@@ -116,41 +181,6 @@ preprocess' stmtList = do
                     preprocess' $ as1 ++ restStmtList
               | otherwise ->
                 raiseSyntaxError m "(introspect LEAF TREE*)"
-            "define-macro"
-              | [(_, TreeLeaf name), body] <- rest -> do
-                nenv <- gets topMetaNameEnv
-                when (Map.member name nenv) $
-                  raiseError m $ "the meta-variable `" <> name <> "` is already defined at top level"
-                body' <- evaluate body
-                name' <- newNameWith $ asIdent name
-                modify (\env -> env {topMetaNameEnv = Map.insert name name' (topMetaNameEnv env)})
-                modify (\env -> env {metaTermCtx = IntMap.insert (asInt name') body' (metaTermCtx env)})
-                preprocess' restStmtList
-              | [name@(_, TreeLeaf _), xts, body] <- rest -> do
-                let defFix = (m, TreeNode [leaf, name, (m, TreeNode [(m, TreeLeaf "fix-meta"), name, xts, body])])
-                preprocess' $ defFix : restStmtList
-              | otherwise ->
-                raiseSyntaxError m "(define-macro LEAF TREE) | (define-macro LEAF TREE TREE)"
-            "define-macro-variadic"
-              | [name@(_, TreeLeaf _), xts, body] <- rest -> do
-                let defFix = (m, TreeNode [(m, TreeLeaf "define-macro"), name, (m, TreeNode [(m, TreeLeaf "fix-meta-variadic"), name, xts, body])])
-                preprocess' $ defFix : restStmtList
-              | otherwise ->
-                raiseSyntaxError m "(define-macro-variadic LEAF TREE TREE)"
-            -- "use"
-            --   | [(_, TreeLeaf s)] <- rest -> do
-            --     use s
-            --     treeList <- preprocess' restStmtList
-            --     return $ headStmt : treeList -- the `(use NAME)` is also used in the object language
-            --   | otherwise ->
-            --     raiseSyntaxError m "(use LEAF)"
-            -- "unuse"
-            --   | [(_, TreeLeaf s)] <- rest -> do
-            --     unuse s
-            --     treeList <- preprocess' restStmtList
-            --     return $ headStmt : treeList -- the `(unuse NAME)` is also used in the object language
-            --   | otherwise ->
-            --     raiseSyntaxError m "(unuse LEAF)"
             _ ->
               preprocessAux headStmt restStmtList
         _ ->
@@ -313,3 +343,21 @@ isSpecialForm nenv tree =
       Map.member x nenv
     _ ->
       False
+
+insEnumEnv :: Hint -> T.Text -> [(T.Text, Int)] -> WithEnv ()
+insEnumEnv m name xis = do
+  eenv <- gets enumEnv
+  let definedEnums = Map.keys eenv ++ map fst (concat (Map.elems eenv))
+  case find (`elem` definedEnums) $ name : map fst xis of
+    Just x ->
+      raiseError m $ "the constant `" <> x <> "` is already defined [ENUM]"
+    _ -> do
+      let (xs, is) = unzip xis
+      let rev = Map.fromList $ zip xs (zip (repeat name) is)
+      modify
+        ( \e ->
+            e
+              { enumEnv = Map.insert name xis (enumEnv e),
+                revEnumEnv = rev `Map.union` revEnumEnv e
+              }
+        )

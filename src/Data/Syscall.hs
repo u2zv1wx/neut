@@ -1,6 +1,5 @@
 module Data.Syscall where
 
-import Data.Namespace
 import Data.Platform
 import qualified Data.Text as T
 
@@ -16,6 +15,16 @@ data Arg
   | ArgStruct
   | ArgUnused
   deriving (Show)
+
+{-# INLINE nsOS #-}
+nsOS :: T.Text
+nsOS =
+  "os."
+
+-- {-# INLINE nsOS #-}
+-- nsOS :: T.Text
+-- nsOS =
+--   "os" <> nsSep
 
 asSyscallMaybe :: OS -> Arch -> T.Text -> Maybe (Syscall, [Arg])
 asSyscallMaybe os arch name =

@@ -1,7 +1,6 @@
 module Data.Primitive where
 
 import Data.LowType
-import Data.Namespace
 import Data.Size
 import qualified Data.Text as T
 
@@ -394,10 +393,17 @@ binaryOpToDomCod binaryOp =
 
 asArrayAccessMaybe :: T.Text -> Maybe LowType
 asArrayAccessMaybe name
-  | Just (typeStr, "array-access") <- breakOnMaybe nsSep name =
+  | Just (typeStr, "array-access") <- breakOnMaybe (T.singleton '.') name =
     asLowTypeMaybe typeStr
   | otherwise =
     Nothing
+
+-- asArrayAccessMaybe :: T.Text -> Maybe LowType
+-- asArrayAccessMaybe name
+--   | Just (typeStr, "array-access") <- breakOnMaybe nsSep name =
+--     asLowTypeMaybe typeStr
+--   | otherwise =
+--     Nothing
 
 {-# INLINE breakOnMaybe #-}
 breakOnMaybe :: T.Text -> T.Text -> Maybe (T.Text, T.Text)

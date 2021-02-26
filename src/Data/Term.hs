@@ -1,9 +1,11 @@
 module Data.Term where
 
+import Control.Exception.Safe
 import Data.EnumCase
 import Data.Hint
 import Data.Ident
 import qualified Data.IntMap as IntMap
+import Data.Log
 import Data.LowType
 import Data.Maybe (fromMaybe)
 import qualified Data.Set as S
@@ -40,6 +42,9 @@ type SubstTerm =
 
 type IdentPlus =
   (Hint, Ident, TermPlus)
+
+type TypeEnv =
+  IntMap.IntMap TermPlus
 
 asUpsilon :: TermPlus -> Maybe Ident
 asUpsilon term =
@@ -254,3 +259,15 @@ weakenArgs :: [(Hint, Ident, TermPlus)] -> [(Hint, Ident, WeakTermPlus)]
 weakenArgs xts = do
   let (ms, xs, ts) = unzip3 xts
   zip3 ms xs (map weaken ts)
+
+lowTypeToType :: (MonadThrow m) => Hint -> LowType -> m TermPlus
+lowTypeToType m lowType =
+  case lowType of
+    LowTypeInt s ->
+      return (m, TermConst (showIntSize s))
+    LowTypeFloat s ->
+      return (m, TermConst (showFloatSize s))
+    LowTypeBool ->
+      return (m, TermEnum "bool")
+    _ ->
+      raiseCritical m "invalid argument passed to lowTypeToType"

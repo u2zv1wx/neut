@@ -30,7 +30,7 @@ data WeakTerm
   | WeakTermStructIntro [(WeakTermPlus, ArrayKind)]
   | WeakTermStructElim [(Hint, Ident, ArrayKind)] WeakTermPlus WeakTermPlus
   | WeakTermQuestion WeakTermPlus WeakTermPlus -- e : t (output the type `t` as note)
-  | WeakTermErase [(Hint, T.Text)] WeakTermPlus
+  -- | WeakTermErase [(Hint, T.Text)] WeakTermPlus
   deriving (Show, Eq)
 
 type WeakTermPlus =
@@ -124,8 +124,8 @@ varWeakTermPlus term =
       let set1 = varWeakTermPlus e
       let set2 = varWeakTermPlus t
       S.union set1 set2
-    (_, WeakTermErase _ e) ->
-      varWeakTermPlus e
+    -- (_, WeakTermErase _ e) ->
+    --   varWeakTermPlus e
 
 varWeakTermPlus' :: [WeakIdentPlus] -> [WeakTermPlus] -> S.Set Ident
 varWeakTermPlus' binder es =
@@ -193,8 +193,8 @@ asterWeakTermPlus term =
       let set1 = asterWeakTermPlus e
       let set2 = asterWeakTermPlus t
       S.union set1 set2
-    (_, WeakTermErase _ e) ->
-      asterWeakTermPlus e
+    -- (_, WeakTermErase _ e) ->
+    --   asterWeakTermPlus e
 
 asterWeakTermPlus' :: [WeakIdentPlus] -> [WeakTermPlus] -> S.Set Int
 asterWeakTermPlus' binder es =
@@ -282,9 +282,9 @@ substWeakTermPlus sub term =
       let e' = substWeakTermPlus sub e
       let t' = substWeakTermPlus sub t
       (m, WeakTermQuestion e' t')
-    (m, WeakTermErase xs e) -> do
-      let e' = substWeakTermPlus sub e
-      (m, WeakTermErase xs e')
+    -- (m, WeakTermErase xs e) -> do
+    --   let e' = substWeakTermPlus sub e
+    --   (m, WeakTermErase xs e')
 
 substWeakTermPlus' :: SubstWeakTerm -> [WeakIdentPlus] -> [WeakIdentPlus]
 substWeakTermPlus' sub binder =
@@ -384,8 +384,8 @@ toText term =
       showCons ["struct-elimination", argStr, toText e1, toText e2]
     (_, WeakTermQuestion e _) ->
       toText e
-    (_, WeakTermErase _ e) ->
-      toText e
+    -- (_, WeakTermErase _ e) ->
+    --   toText e
 
 inParen :: T.Text -> T.Text
 inParen s =

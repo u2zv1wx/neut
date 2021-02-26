@@ -11,6 +11,7 @@ import Data.Hint
 import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.List (nub)
+import Data.Log
 import Data.LowType
 import qualified Data.Set as S
 import Data.Term
@@ -188,8 +189,9 @@ elaborate' term =
       t' <- elaborate' t
       note m $ toText (weaken t')
       return e'
-    (_, WeakTermErase _ e) ->
-      elaborate' e
+
+-- (_, WeakTermErase _ e) ->
+--   elaborate' e
 
 elaboratePlus :: (Hint, a, WeakTermPlus) -> WithEnv (Hint, a, TermPlus)
 elaboratePlus (m, x, t) = do
@@ -212,3 +214,7 @@ lookupEnumSet m name = do
       raiseError m $ "no such enum defined: " <> name
     Just xis ->
       return $ map fst xis
+
+insConstTypeEnv :: T.Text -> TermPlus -> WithEnv ()
+insConstTypeEnv x t =
+  modify (\e -> e {constTypeEnv = Map.insert x t (constTypeEnv e)})
