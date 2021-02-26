@@ -10,7 +10,6 @@
         (string.print &str))
       (let _ (string.print &str))
       (let len (string.print &str))
-      (erase str)
       len)))
 
 (reduce (p "あ"))

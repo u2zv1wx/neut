@@ -46,17 +46,9 @@ visit path = do
 leave :: WithEnv [TreePlus]
 leave = do
   path <- getCurrentFilePath
-  popTrace
   modify (\env -> env {fileEnv = Map.insert path VisitInfoFinish (fileEnv env)})
-  penv <- gets prefixEnv
-  senv <- gets sectionEnv
-  let m = newHint 0 0 0 path
-  let ts1 = map (\x -> (m, TreeNode [(m, TreeLeaf "unuse"), (m, TreeLeaf x)])) penv
-  let ts2 = map (\x -> (m, TreeNode [(m, TreeLeaf "end"), (m, TreeLeaf x)])) senv
-  modify (\env -> env {prefixEnv = []})
-  modify (\env -> env {sectionEnv = []})
-  -- fixme: ここでend/unuseを適切に入れる
-  return $ ts1 ++ ts2
+  popTrace
+  return []
 
 pushTrace :: Path Abs File -> WithEnv ()
 pushTrace path =
@@ -70,7 +62,15 @@ preprocess' :: [TreePlus] -> WithEnv [TreePlus]
 preprocess' stmtList = do
   case stmtList of
     [] -> do
-      leave
+      endStmtList <- generateEndStmtList
+      unuseStmtList <- generateUnuseStmtList
+      case (endStmtList, unuseStmtList) of
+        (_ : _, _) ->
+          preprocess' endStmtList
+        (_, _ : _) ->
+          preprocess' unuseStmtList
+        ([], []) ->
+          leave
     headStmt : restStmtList ->
       case headStmt of
         (m, TreeNode (leaf@(_, TreeLeaf headAtom) : rest)) ->
@@ -84,9 +84,11 @@ preprocess' stmtList = do
                 when (Map.member name nenv) $
                   raiseError m $ "the meta-variable `" <> name <> "` is already defined at the top level"
                 body' <- evaluate body
-                name' <- newNameWith $ asIdent name
-                modify (\env -> env {topMetaNameEnv = Map.insert name name' (topMetaNameEnv env)})
-                modify (\env -> env {metaTermCtx = IntMap.insert (asInt name') body' (metaTermCtx env)})
+                name' <- withSectionPrefix name
+                name'' <- newNameWith $ asIdent name'
+                modify (\env -> env {topMetaNameEnv = Map.insert name' name'' (topMetaNameEnv env)})
+                -- modify (\env -> env {topMetaNameEnv = Map.insert name name'' (topMetaNameEnv env)})
+                modify (\env -> env {metaTermCtx = IntMap.insert (asInt name'') body' (metaTermCtx env)})
                 preprocess' restStmtList
               | [name@(_, TreeLeaf _), xts, body] <- rest -> do
                 let defFix = (m, TreeNode [leaf, name, (m, TreeNode [(m, TreeLeaf "fix-meta"), name, xts, body])])
@@ -361,3 +363,18 @@ insEnumEnv m name xis = do
                 revEnumEnv = rev `Map.union` revEnumEnv e
               }
         )
+
+generateLastStmtList :: T.Text -> (Env -> [T.Text]) -> WithEnv [TreePlus]
+generateLastStmtList atom accessor = do
+  path <- getCurrentFilePath
+  env <- gets accessor
+  let m = newHint 0 0 0 path
+  return $ map (\x -> (m, TreeNode [(m, TreeLeaf atom), (m, TreeLeaf x)])) env
+
+generateUnuseStmtList :: WithEnv [TreePlus]
+generateUnuseStmtList =
+  generateLastStmtList "unuse" prefixEnv
+
+generateEndStmtList :: WithEnv [TreePlus]
+generateEndStmtList =
+  generateLastStmtList "end" sectionEnv

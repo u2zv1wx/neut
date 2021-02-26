@@ -33,7 +33,6 @@
     (let b (i64.array-access 1 4 &xs))
     (let c (i64.array-access 2 4 &xs))
     (let d (i64.array-access 3 * &xs))
-    (erase xs)
     (i64.add a (i64.add b (i64.add c d)))))
 
 (reduce
