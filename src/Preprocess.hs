@@ -87,7 +87,6 @@ preprocess' stmtList = do
                 name' <- withSectionPrefix name
                 name'' <- newNameWith $ asIdent name'
                 modify (\env -> env {topMetaNameEnv = Map.insert name' name'' (topMetaNameEnv env)})
-                -- modify (\env -> env {topMetaNameEnv = Map.insert name name'' (topMetaNameEnv env)})
                 modify (\env -> env {metaTermCtx = IntMap.insert (asInt name'') body' (metaTermCtx env)})
                 preprocess' restStmtList
               | [name@(_, TreeLeaf _), xts, body] <- rest -> do

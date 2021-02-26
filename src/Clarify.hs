@@ -43,7 +43,7 @@ clarify' tenv term =
       returnClosureType m
     (m, TermPiIntro mxts e) -> do
       fvs <- nubFVS <$> chainOf tenv term
-      e' <- clarify' (insTypeEnv1 mxts tenv) e
+      e' <- clarify' (insTypeEnv mxts tenv) e
       retClosure tenv Nothing fvs m mxts e'
     (m, TermPiElim e es) -> do
       es' <- mapM (clarifyPlus tenv) es
@@ -51,7 +51,7 @@ clarify' tenv term =
       callClosure m e' es'
     (m, TermFix (_, x, t) mxts e) -> do
       let tenv' = IntMap.insert (asInt x) t tenv
-      e' <- clarify' (insTypeEnv1 mxts tenv') e
+      e' <- clarify' (insTypeEnv mxts tenv') e
       fvs <- nubFVS <$> chainOf tenv term
       retClosure tenv (Just x) fvs m mxts e'
     (m, TermConst x) ->
@@ -87,7 +87,7 @@ clarify' tenv term =
       (arr, arrVar) <- newValueUpsilonWith m "arr"
       arrType <- newNameWith' "arr-type"
       (content, contentVar) <- newValueUpsilonWith m "arr-content"
-      e2' <- clarify' (insTypeEnv1 mxts tenv) e2
+      e2' <- clarify' (insTypeEnv mxts tenv) e2
       let (_, xs, _) = unzip3 mxts
       return $
         bindLet
@@ -109,7 +109,7 @@ clarify' tenv term =
       e1' <- clarify' tenv e1
       let (ms, xs, ks) = unzip3 xks
       ts <- mapM (inferKind m) ks
-      e2' <- clarify' (insTypeEnv1 (zip3 ms xs ts) tenv) e2
+      e2' <- clarify' (insTypeEnv (zip3 ms xs ts) tenv) e2
       (struct, structVar) <- newValueUpsilonWith m "struct"
       return $ bindLet [(struct, e1')] (m, CompStructElim (zip xs ks) structVar e2')
 
@@ -217,7 +217,7 @@ clarifyArrayAccess tenv m name lowType = do
         (xs, ds, headerList) <- computeHeader m xts [ArgImm, ArgUnused, ArgArray]
         case ds of
           [index, arr] -> do
-            let tenv' = insTypeEnv1 xts tenv
+            let tenv' = insTypeEnv xts tenv
             callThenReturn <- toArrayAccessTail tenv' m lowType cod arr index xs
             let body = iterativeApp headerList callThenReturn
             retClosure tenv Nothing [] m xts body
@@ -240,7 +240,7 @@ clarifySyscall tenv name syscall args m = do
     (_, TermPi xts cod)
       | length xts == length args -> do
         (xs, ds, headerList) <- computeHeader m xts args
-        let tenv' = insTypeEnv1 xts tenv
+        let tenv' = insTypeEnv xts tenv
         callThenReturn <- toSyscallTail tenv' m cod syscall ds xs
         let body = iterativeApp headerList callThenReturn
         retClosure tenv Nothing [] m xts body
@@ -374,7 +374,7 @@ retWithBorrowedVars tenv m cod xts resultVarName =
       (_, resultType) <- rightmostOf sigArgs
       let xs = map (\(_, x, _) -> x) xts
       let vs = map (\x -> (m, TermUpsilon x)) $ xs ++ [resultVarName]
-      let tenv' = insTypeEnv1 (xts ++ [(m, resultVarName, resultType)]) tenv
+      let tenv' = insTypeEnv (xts ++ [(m, resultVarName, resultType)]) tenv
       clarify'
         tenv'
         (m, TermPiIntro [zu, kp] (m, TermPiElim (mk, TermUpsilon k) vs))
@@ -534,7 +534,7 @@ chainOf tenv term =
       xs1 <- chainOf tenv e1
       let (ms, xs, ks) = unzip3 xks
       ts <- mapM (inferKind m) ks
-      xs2 <- chainOf (insTypeEnv1 (zip3 ms xs ts) tenv) e2
+      xs2 <- chainOf (insTypeEnv (zip3 ms xs ts) tenv) e2
       return $ xs1 ++ filter (\(_, y, _) -> y `notElem` xs) xs2
 
 chainOf' :: TypeEnv -> [IdentPlus] -> [TermPlus] -> WithEnv [IdentPlus]
@@ -552,13 +552,13 @@ dropFst xyzs = do
   let (_, ys, zs) = unzip3 xyzs
   zip ys zs
 
-insTypeEnv1 :: [IdentPlus] -> TypeEnv -> TypeEnv
-insTypeEnv1 xts tenv =
+insTypeEnv :: [IdentPlus] -> TypeEnv -> TypeEnv
+insTypeEnv xts tenv =
   case xts of
     [] ->
       tenv
     (_, x, t) : rest ->
-      insTypeEnv1 rest $ IntMap.insert (asInt x) t tenv
+      insTypeEnv rest $ IntMap.insert (asInt x) t tenv
 
 lookupTypeEnv :: Hint -> Ident -> TypeEnv -> WithEnv TermPlus
 lookupTypeEnv m (I (name, x)) tenv =

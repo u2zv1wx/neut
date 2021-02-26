@@ -89,14 +89,6 @@ parse stmtTreeList =
             --
             "statement" ->
               parse $ rest ++ restStmtList
-            -- "erase"
-            --   | [(ms, TreeLeaf s)] <- rest -> do
-            --     nenv <- gets topNameEnv
-            --     s' <- asText <$> discernText ms s
-            --     modify (\env -> env {topNameEnv = Map.filterWithKey (\k _ -> k /= s') nenv})
-            --     parse restStmtList
-            --   | otherwise ->
-            --     raiseSyntaxError m "(erase LEAF)"
             _ ->
               interpretAux headStmt restStmtList
         _ ->

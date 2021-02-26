@@ -190,9 +190,6 @@ elaborate' term =
       note m $ toText (weaken t')
       return e'
 
--- (_, WeakTermErase _ e) ->
---   elaborate' e
-
 elaboratePlus :: (Hint, a, WeakTermPlus) -> WithEnv (Hint, a, TermPlus)
 elaboratePlus (m, x, t) = do
   t' <- elaborate' t

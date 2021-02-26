@@ -170,13 +170,6 @@ interpret inputTree =
             return (m, WeakTermQuestion e' h)
           | otherwise ->
             raiseSyntaxError m "(question TREE)"
-        -- "erase"
-        --   | [(_, TreeNode mxs), body] <- rest,
-        --     Just mxs' <- mapM asLeaf mxs -> do
-        --     body' <- interpret body
-        --     return (m, WeakTermErase mxs' body')
-        --   | otherwise ->
-        --     raiseSyntaxError m "(erase (LEAF ... LEAF) TREE)"
         "irreducible"
           | [e] <- rest -> do
             e' <- interpret e
@@ -384,7 +377,3 @@ asArrayKind tree =
           return t
     _ ->
       raiseSyntaxError (fst tree) "LEAF"
-
--- raiseSyntaxError :: Hint -> T.Text -> WithEnv a
--- raiseSyntaxError m form =
---   raiseError m $ "couldn't match the input with the expected form: " <> form

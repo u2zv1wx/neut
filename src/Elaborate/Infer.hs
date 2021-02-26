@@ -148,9 +148,6 @@ infer' ctx term =
       (e', te) <- infer' ctx e
       return ((m, WeakTermQuestion e' te), te)
 
--- (_, WeakTermErase _ e) ->
---   infer' ctx e
-
 inferArgs ::
   Hint ->
   [(WeakTermPlus, WeakTermPlus)] ->
@@ -328,15 +325,6 @@ lookupWeakTypeEnvMaybe (I (_, s)) = do
       return Nothing
     Just t ->
       return $ Just t
-
--- lookupKind :: Hint -> T.Text -> WithEnv T.Text
--- lookupKind m name = do
---   renv <- gets revEnumEnv
---   case Map.lookup name renv of
---     Nothing ->
---       raiseError m $ "no such enum-intro is defined: " <> name
---     Just (j, _) ->
---       return j
 
 lookupKind :: Hint -> T.Text -> WithEnv T.Text
 lookupKind m name = do

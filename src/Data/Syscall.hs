@@ -9,6 +9,12 @@ import qualified Data.Text as T
 type Syscall =
   Either T.Text (T.Text, Integer)
 
+data SyscallArgKind
+  = SyscallArgImm
+  | SyscallArgArray
+  | SyscallArgStruct
+  deriving (Show, Eq)
+
 data Arg
   = ArgImm
   | ArgArray
@@ -25,6 +31,8 @@ nsOS =
 -- nsOS :: T.Text
 -- nsOS =
 --   "os" <> nsSep
+
+-- (system-call 0 e1 e2 e3) みたいな感じで。 (external-call 0 e1 e2 e3) とかでも。
 
 asSyscallMaybe :: OS -> Arch -> T.Text -> Maybe (Syscall, [Arg])
 asSyscallMaybe os arch name =
