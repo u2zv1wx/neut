@@ -1,6 +1,7 @@
 module Data.Comp where
 
 import Data.EnumCase
+import Data.Exploit
 import Data.Hint
 import Data.Ident
 import qualified Data.IntMap as IntMap
@@ -8,7 +9,6 @@ import Data.LowType
 import Data.Maybe (fromMaybe)
 import Data.Primitive
 import Data.Size
-import Data.Exploit
 import qualified Data.Text as T
 
 data Value
@@ -34,9 +34,7 @@ data Comp
 data Primitive
   = PrimitiveUnaryOp UnaryOp ValuePlus
   | PrimitiveBinaryOp BinaryOp ValuePlus ValuePlus
-  | PrimitiveArrayAccess LowType ValuePlus ValuePlus
   | PrimitiveExploit ExploitKind [ValuePlus]
-  -- | PrimitiveSyscall Syscall [ValuePlus]
   deriving (Show)
 
 newtype IsFixed
@@ -137,10 +135,6 @@ substPrimitive sub c =
       let v1' = substValuePlus sub v1
       let v2' = substValuePlus sub v2
       PrimitiveBinaryOp a v1' v2'
-    PrimitiveArrayAccess t d1 d2 -> do
-      let d1' = substValuePlus sub d1
-      let d2' = substValuePlus sub d2
-      PrimitiveArrayAccess t d1' d2'
     PrimitiveExploit expKind ds -> do
       let ds' = map (substValuePlus sub) ds
       PrimitiveExploit expKind ds'

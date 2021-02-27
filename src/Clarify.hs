@@ -13,6 +13,7 @@ import Control.Monad.State.Lazy
 import Data.Comp
 import Data.ConstType
 import Data.Env
+import Data.Exploit
 import qualified Data.HashMap.Lazy as Map
 import Data.Hint
 import Data.Ident
@@ -22,7 +23,6 @@ import Data.Log
 import Data.LowType
 import Data.Namespace
 import Data.Primitive
-import Data.Syscall
 import Data.Term
 import qualified Data.Text as T
 import Reduce.Term
@@ -161,8 +161,6 @@ clarifyConst tenv m x
     clarifyBinaryOp tenv x op m
   | Just _ <- asLowTypeMaybe x =
     returnCartesianImmediate m
-  --  Just lowType <- asArrayAccessMaybe x =
-  --   clarifyArrayAccess tenv m x lowType
   | x == nsOS <> "file-descriptor" =
     returnCartesianImmediate m
   | x == nsOS <> "stdin" =
@@ -208,61 +206,17 @@ clarifyBinaryOp tenv name op m = do
     _ ->
       raiseCritical m $ "the arity of " <> name <> " is wrong"
 
--- clarifyArrayAccess :: TypeEnv -> Hint -> T.Text -> LowType -> WithEnv CompPlus
--- clarifyArrayAccess tenv m name lowType = do
---   arrayAccessType <- lookupConstTypeEnv m name
---   let arrayAccessType' = reduceTermPlus arrayAccessType
---   case arrayAccessType' of
---     (_, TermPi xts _)
---       | length xts == 3 -> do
---         (xs, ds, headerList) <- computeHeader m (map (\(_, y, _) -> y) xts) [ArgImm, ArgUnused, ArgArray]
---         case ds of
---           [index, arr] -> do
---             let tenv' = insTypeEnv xts tenv
---             -- fixme: codじゃなくてresult typeを与えるべき
---             -- callThenReturn <- toArrayAccessTail tenv' m lowType cod arr index xs
---             -- どうせ中身はimmediateなんだからtauとしてオッケー
---             callThenReturn <- toArrayAccessTail tenv' m lowType arr index xs
---             let body = iterativeApp headerList callThenReturn
---             retClosure tenv Nothing [] m xts body
---           _ ->
---             raiseCritical m "the type of array-access is wrong"
---     _ ->
---       raiseCritical m "the type of array-access is wrong"
-
--- clarifyArrayAccess :: TypeEnv -> Hint -> T.Text -> LowType -> WithEnv CompPlus
--- clarifyArrayAccess tenv m name lowType = do
---   arrayAccessType <- lookupConstTypeEnv m name
---   let arrayAccessType' = reduceTermPlus arrayAccessType
---   case arrayAccessType' of
---     (_, TermPi xts _)
---       | length xts == 3 -> do
---         (xs, ds, headerList) <- computeHeader m xts [ArgImm, ArgUnused, ArgArray]
---         case ds of
---           [index, arr] -> do
---             let tenv' = insTypeEnv xts tenv
---             -- fixme: codじゃなくてresult typeを与えるべき
---             -- callThenReturn <- toArrayAccessTail tenv' m lowType cod arr index xs
---             -- どうせ中身はimmediateなんだからtauとしてオッケー
---             callThenReturn <- toArrayAccessTail tenv' m lowType (m, TermTau) arr index xs
---             let body = iterativeApp headerList callThenReturn
---             retClosure tenv Nothing [] m xts body
---           _ ->
---             raiseCritical m "the type of array-access is wrong"
---     _ ->
---       raiseCritical m "the type of array-access is wrong"
-
-computeHeader :: [(IdentPlus, SyscallArgKind)] -> WithEnv ([IdentPlus], [ValuePlus], [CompPlus -> CompPlus])
+computeHeader :: [(IdentPlus, ExploitArgKind)] -> WithEnv ([IdentPlus], [ValuePlus], [CompPlus -> CompPlus])
 computeHeader xtks = do
   (xss, dss, headerList) <- unzip3 <$> mapM (\(xt, k) -> computeHeader' xt k) xtks
   return (concat xss, concat dss, headerList)
 
-computeHeader' :: IdentPlus -> SyscallArgKind -> WithEnv ([IdentPlus], [ValuePlus], CompPlus -> CompPlus) -- ([borrow], arg-to-syscall, ADD_HEADER_TO_CONTINUATION)
+computeHeader' :: IdentPlus -> ExploitArgKind -> WithEnv ([IdentPlus], [ValuePlus], CompPlus -> CompPlus) -- ([borrow], arg-to-exploit, ADD_HEADER_TO_CONTINUATION)
 computeHeader' (m, x, t) k =
   case k of
-    SyscallArgImm ->
+    ExploitArgKindImm ->
       return ([], [(m, ValueUpsilon x)], id)
-    SyscallArgStruct -> do
+    ExploitArgKindStruct -> do
       (structVarName, structVar) <- newValueUpsilonWith m "struct"
       return
         ( [(m, structVarName, t)],
@@ -270,7 +224,7 @@ computeHeader' (m, x, t) k =
           \cont ->
             (m, CompUpElim structVarName (m, CompUpIntro (m, ValueUpsilon x)) cont)
         )
-    SyscallArgArray -> do
+    ExploitArgKindArray -> do
       arrayVarName <- newNameWith' "array"
       (arrayTypeName, arrayType) <- newValueUpsilonWith m "array-type"
       (arrayInnerName, arrayInner) <- newValueUpsilonWith m "array-inner"
@@ -312,44 +266,6 @@ constructResultTuple tenv m borrowedVarTypeList result@(_, resultVarName, _) =
       tuple <- termSigmaIntro m tupleTypeInfo
       let tenv' = insTypeEnv tupleTypeInfo tenv
       clarify' tenv' tuple
-
--- toArrayAccessTail ::
---   TypeEnv ->
---   Hint ->
---   LowType ->
---   TermPlus -> -- cod type
---   ValuePlus -> -- array (inner)
---   ValuePlus -> -- index
---   [IdentPlus] -> -- borrowed variables
---   WithEnv CompPlus
--- toArrayAccessTail tenv m lowType resultType arr index xts = do
---   resultVarName <- newNameWith' "result"
---   result <- constructResultTuple tenv m resultType xts resultVarName
---   return
---     ( m,
---       CompUpElim
---         resultVarName
---         (m, CompPrimitive (PrimitiveArrayAccess lowType arr index))
---         result
---     )
--- toArrayAccessTail ::
---   TypeEnv ->
---   Hint ->
---   LowType ->
---   ValuePlus -> -- array (inner)
---   ValuePlus -> -- index
---   [Ident] -> -- borrowed variables
---   WithEnv CompPlus
--- toArrayAccessTail tenv m lowType arr index xts = do
---   resultVarName <- newNameWith' "result"
---   result <- constructResultTuple tenv m xts resultVarName
---   return
---     ( m,
---       CompUpElim
---         resultVarName
---         (m, CompPrimitive (PrimitiveArrayAccess lowType arr index))
---         result
---     )
 
 makeClosure ::
   Maybe Ident ->

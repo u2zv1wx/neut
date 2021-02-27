@@ -11,7 +11,6 @@ import Data.LowType
 import Data.Maybe (fromMaybe)
 import qualified Data.Set as S
 import Data.Size
-import Data.Syscall
 import qualified Data.Text as T
 import Data.WeakTerm
 
@@ -34,7 +33,7 @@ data Term
   | TermStruct [ArrayKind]
   | TermStructIntro [(TermPlus, ArrayKind)]
   | TermStructElim [(Hint, Ident, ArrayKind)] TermPlus TermPlus
-  | TermExploit ExploitKind TermPlus [(TermPlus, SyscallArgKind, TermPlus)]
+  | TermExploit ExploitKind TermPlus [(TermPlus, ExploitArgKind, TermPlus)]
   deriving (Show)
 
 type TermPlus =

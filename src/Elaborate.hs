@@ -6,6 +6,7 @@ where
 import Control.Monad.State.Lazy
 import Data.EnumCase
 import Data.Env
+import Data.Exploit
 import qualified Data.HashMap.Lazy as Map
 import Data.Hint
 import Data.Ident
@@ -14,7 +15,6 @@ import Data.List (nub)
 import Data.Log
 import Data.LowType
 import qualified Data.Set as S
-import Data.Syscall
 import Data.Term
 import qualified Data.Text as T
 import Data.WeakTerm
@@ -194,7 +194,7 @@ elaborate' term =
       let (es, ks, ts) = unzip3 ekts
       es' <- mapM elaborate' es
       ts' <- map reduceTermPlus <$> mapM elaborate' ts
-      forM_ (zip ks ts') $ \(k, tSyscall) -> checkSyscallArgSanity k tSyscall
+      forM_ (zip ks ts') $ \(k, tSyscall) -> checkExploitArgSanity k tSyscall
       t' <- elaborate' t
       return (m, TermExploit i t' (zip3 es' ks ts'))
 
@@ -203,20 +203,20 @@ elaboratePlus (m, x, t) = do
   t' <- elaborate' t
   return (m, x, t')
 
-checkSyscallArgSanity :: SyscallArgKind -> TermPlus -> WithEnv ()
-checkSyscallArgSanity k t =
+checkExploitArgSanity :: ExploitArgKind -> TermPlus -> WithEnv ()
+checkExploitArgSanity k t =
   case (k, t) of
-    (SyscallArgImm, (_, TermConst name))
+    (ExploitArgKindImm, (_, TermConst name))
       | Just (ArrayKindInt _) <- asArrayKindMaybe name ->
         return ()
       | Just (ArrayKindFloat _) <- asArrayKindMaybe name ->
         return ()
-    (SyscallArgStruct, (_, TermStruct {})) ->
+    (ExploitArgKindStruct, (_, TermStruct {})) ->
       return ()
-    (SyscallArgArray, (_, TermArray {})) ->
+    (ExploitArgKindArray, (_, TermArray {})) ->
       return ()
     _ ->
-      raiseError (fst t) $ "the term here must be a `" <> showSyscallArgKind k <> "`, but its type is: " <> toText (weaken t)
+      raiseError (fst t) $ "the term here must be a `" <> showExploitArgKind k <> "`, but its type is: " <> toText (weaken t)
 
 caseCheckEnumIdent :: Hint -> T.Text -> [EnumCase] -> WithEnv ()
 caseCheckEnumIdent m x ls = do

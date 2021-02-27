@@ -391,20 +391,6 @@ binaryOpToDomCod binaryOp =
     BinaryOpFCmpTRUE t ->
       (t, LowTypeBool)
 
-asArrayAccessMaybe :: T.Text -> Maybe LowType
-asArrayAccessMaybe name
-  | Just (typeStr, "array-access") <- breakOnMaybe (T.singleton '.') name =
-    asLowTypeMaybe typeStr
-  | otherwise =
-    Nothing
-
--- asArrayAccessMaybe :: T.Text -> Maybe LowType
--- asArrayAccessMaybe name
---   | Just (typeStr, "array-access") <- breakOnMaybe nsSep name =
---     asLowTypeMaybe typeStr
---   | otherwise =
---     Nothing
-
 {-# INLINE breakOnMaybe #-}
 breakOnMaybe :: T.Text -> T.Text -> Maybe (T.Text, T.Text)
 breakOnMaybe needle text =

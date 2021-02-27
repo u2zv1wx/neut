@@ -214,10 +214,6 @@ distinguishPrimitive zs term =
       (vs1, d1') <- distinguishValue zs d1
       (vs2, d2') <- distinguishValue zs d2
       return (merge [vs1, vs2], PrimitiveBinaryOp op d1' d2')
-    PrimitiveArrayAccess lowType d1 d2 -> do
-      (vs1, d1') <- distinguishValue zs d1
-      (vs2, d2') <- distinguishValue zs d2
-      return (merge [vs1, vs2], PrimitiveArrayAccess lowType d1' d2')
     PrimitiveExploit k ds -> do
       (vss, ds') <- unzip <$> mapM (distinguishValue zs) ds
       return (merge vss, PrimitiveExploit k ds')

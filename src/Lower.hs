@@ -171,21 +171,6 @@ lowerCompPrimitive _ codeOp =
       lowerCompUnaryOp op v
     PrimitiveBinaryOp op v1 v2 ->
       lowerCompBinaryOp op v1 v2
-    PrimitiveArrayAccess lowType arr idx -> do
-      let arrayType = LowTypePtr $ LowTypeArray 0 lowType
-      (arrVar, castArrThen) <- llvmCast (Just $ takeBaseName arr) arr arrayType
-      (idxVar, castIdxThen) <- llvmCast (Just $ takeBaseName idx) idx i64
-      (resPtrName, resPtr) <- newValueLocal "result-ptr"
-      resName <- newNameWith' "result"
-      uncast <- llvmUncast (Just $ asText resName) (LowValueLocal resName) lowType
-      (castArrThen >=> castIdxThen) $
-        LowCompLet
-          resPtrName
-          ( LowOpGetElementPtr
-              (arrVar, arrayType)
-              [(LowValueInt 0, i32), (idxVar, i64)]
-          )
-          (LowCompLet resName (LowOpLoad resPtr lowType) uncast)
     PrimitiveExploit expKind args -> do
       (xs, vs) <- unzip <$> mapM (const $ newValueLocal "sys-call-arg") args
       case expKind of
@@ -195,11 +180,20 @@ lowerCompPrimitive _ codeOp =
         ExploitKindExternal name -> do
           call <- externalToLowComp name vs
           lowerValueLet' (zip xs args) call
-
--- PrimitiveSyscall syscall args -> do
---   (xs, vs) <- unzip <$> mapM (const $ newValueLocal "sys-call-arg") args
---   call <- syscallToLowComp syscall vs
---   lowerValueLet' (zip xs args) call
+        ExploitKindArrayAccess lowType -> do
+          let arr = args !! 0
+          let idx = args !! 1
+          let arrayType = LowTypePtr $ LowTypeArray 0 lowType
+          (arrVar, castArrThen) <- llvmCast (Just $ takeBaseName arr) arr arrayType
+          (idxVar, castIdxThen) <- llvmCast (Just $ takeBaseName idx) idx i64
+          (resPtrName, resPtr) <- newValueLocal "result-ptr"
+          resName <- newNameWith' "result"
+          uncast <- llvmUncast (Just $ asText resName) (LowValueLocal resName) lowType
+          (castArrThen >=> castIdxThen) $
+            LowCompLet
+              resPtrName
+              (LowOpGetElementPtr (arrVar, arrayType) [(LowValueInt 0, i32), (idxVar, i64)])
+              (LowCompLet resName (LowOpLoad resPtr lowType) uncast)
 
 lowerCompUnaryOp :: UnaryOp -> ValuePlus -> WithEnv LowComp
 lowerCompUnaryOp op d = do
@@ -382,22 +376,6 @@ externalToLowComp name ds = do
     let cod = voidPtr
     modify (\env -> env {declEnv = Map.insert name (dom, cod) denv})
   return $ LowCompCall (LowValueGlobal name) ds
-
--- syscallToLowComp :: Syscall -> [LowValue] -> WithEnv LowComp
--- syscallToLowComp syscall ds =
---   case syscall of
---     Left name -> do
---       denv <- gets declEnv
---       when (not $ name `Map.member` denv) $ do
---         let dom = map (const voidPtr) ds
---         let cod = voidPtr
---         modify (\env -> env {declEnv = Map.insert name (dom, cod) denv})
---       return $ LowCompCall (LowValueGlobal name) ds
---     Right (num) -> do
---       res <- newNameWith' "result"
---       return $
---         LowCompLet res (LowOpSyscall num ds) $
---           LowCompReturn (LowValueLocal res)
 
 lowerValueLet' :: [(Ident, ValuePlus)] -> LowComp -> WithEnv LowComp
 lowerValueLet' binder cont =

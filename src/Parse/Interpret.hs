@@ -16,7 +16,6 @@ import Data.Ident
 import Data.Log
 import Data.LowType
 import Data.Size
-import Data.Syscall
 import qualified Data.Text as T
 import Data.Tree
 import Data.WeakTerm
@@ -173,18 +172,14 @@ interpret inputTree =
           | otherwise ->
             raiseSyntaxError m "(question TREE)"
         "exploit"
-          -- ((mInt, TreeLeaf intStr) : resultType : eks) <- rest -> do
           | (expKind : resultType : eks) <- rest -> do
             expKind' <- interpretExploitKind expKind
-            -- case readMaybe (T.unpack intStr) of
-            -- Just i -> do
+            ensureExpArgSanity m expKind' eks
             resultType' <- interpret resultType
-            eks' <- mapM interpretSyscallItem eks
+            eks' <- mapM interpretExploitItem eks
             let (es, ks) = unzip eks'
             hs <- mapM (\(me, _) -> newAster me) es
             return (m, WeakTermExploit expKind' resultType' (zip3 es ks hs))
-          -- Nothing ->
-          --   raiseError mInt "the leaf here must be an integer"
           | otherwise ->
             raiseSyntaxError m "(exploit LEAF TREE TREE*)"
         "irreducible"
@@ -397,26 +392,26 @@ asArrayKind tree =
     _ ->
       raiseSyntaxError (fst tree) "LEAF"
 
-interpretSyscallItem :: TreePlus -> WithEnv (WeakTermPlus, SyscallArgKind)
-interpretSyscallItem tree =
+interpretExploitItem :: TreePlus -> WithEnv (WeakTermPlus, ExploitArgKind)
+interpretExploitItem tree =
   case tree of
     (_, TreeNode [k, e]) -> do
-      k' <- asSyscallArg k
+      k' <- asExploitArg k
       e' <- interpret e
       return (e', k')
     e ->
       raiseSyntaxError (fst e) "(TREE TREE)"
 
-asSyscallArg :: TreePlus -> WithEnv SyscallArgKind
-asSyscallArg tree =
+asExploitArg :: TreePlus -> WithEnv ExploitArgKind
+asExploitArg tree =
   case tree of
     (m, TreeLeaf x)
       | x == "arg-immediate" ->
-        return SyscallArgImm
+        return ExploitArgKindImm
       | x == "arg-struct" ->
-        return SyscallArgStruct
+        return ExploitArgKindStruct
       | x == "arg-array" ->
-        return SyscallArgArray
+        return ExploitArgKindArray
       | otherwise ->
         raiseSyntaxError m "arg-immediate | arg-struct | arg-array"
     (m, _) ->
@@ -433,5 +428,23 @@ interpretExploitKind tree =
           raiseError mInt "the leaf here must be an integer"
     (_, TreeNode [(_, TreeLeaf "external"), (_, TreeLeaf s)]) ->
       return $ ExploitKindExternal s
+    (_, TreeNode [(_, TreeLeaf "array-access"), (_, TreeLeaf arrayKindStr)]) ->
+      case asLowTypeMaybe arrayKindStr of
+        Just t@(LowTypeInt _) ->
+          return $ ExploitKindArrayAccess t
+        Just t@(LowTypeFloat _) ->
+          return $ ExploitKindArrayAccess t
+        _ ->
+          raiseSyntaxError (fst tree) "(array-access INT_TYPE) | (array-access FLOAT_TYPE)"
     _ ->
       raiseSyntaxError (fst tree) "(syscall LEAF) | (exteral LEAF)"
+
+ensureExpArgSanity :: Hint -> ExploitKind -> [a] -> WithEnv ()
+ensureExpArgSanity m k args =
+  case k of
+    ExploitKindArrayAccess _ ->
+      if length args == 2
+        then return ()
+        else raiseError m "the number of the arguments for array-access must be 2"
+    _ ->
+      return ()

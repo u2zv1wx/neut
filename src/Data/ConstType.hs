@@ -19,8 +19,6 @@ lookupConstTypeEnv m x
     unaryOpToType m op
   | Just op <- asBinaryOpMaybe x =
     binaryOpToType m op
-  | Just lowType <- asArrayAccessMaybe x =
-    arrayAccessToType m lowType
   | otherwise = do
     ctenv <- gets constTypeEnv
     case Map.lookup x ctenv of
@@ -48,21 +46,6 @@ binaryOpToType m op = do
   let xts = [(m, x1, dom'), (m, x2, dom')]
   return (m, TermPi xts cod')
 
-arrayAccessToType :: Hint -> LowType -> WithEnv TermPlus
-arrayAccessToType m lowType = do
-  t <- lowTypeToType m lowType
-  k <- lowTypeToArrayKind m lowType
-  idx <- newNameWith' "i"
-  len <- newNameWith' "n"
-  arrName <- newNameWith'' "_"
-  let int64 = (m, TermConst (showIntSize 64))
-  let arr = (m, TermArray (m, TermUpsilon len) k)
-  let xts = [(m, idx, int64), (m, len, int64), (m, arrName, arr)]
-  x4 <- newNameWith'' "_"
-  x5 <- newNameWith'' "_"
-  cod <- termSigma m [(m, x4, arr), (m, x5, t)]
-  return (m, TermPi xts cod)
-
 inferKind :: Hint -> ArrayKind -> WithEnv TermPlus
 inferKind m arrayKind =
   case arrayKind of
@@ -72,14 +55,6 @@ inferKind m arrayKind =
       return (m, TermConst (showFloatSize size))
     _ ->
       raiseCritical m "inferKind for void-pointer"
-
-termSigma :: Hint -> [IdentPlus] -> WithEnv TermPlus
-termSigma m xts = do
-  z <- newNameWith' "internal.sigma-tau"
-  let vz = (m, TermUpsilon z)
-  k <- newNameWith'' "sigma"
-  let yts = [(m, z, (m, TermTau)), (m, k, (m, TermPi xts vz))]
-  return (m, TermPi yts vz)
 
 termSigmaIntro :: Hint -> [IdentPlus] -> WithEnv TermPlus
 termSigmaIntro m xts = do

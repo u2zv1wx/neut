@@ -12,6 +12,7 @@ import Control.Monad.State.Lazy
 import Data.ConstType
 import Data.EnumCase
 import Data.Env
+import Data.Exploit
 import qualified Data.HashMap.Lazy as Map
 import Data.Hint
 import Data.Ident
@@ -19,7 +20,6 @@ import qualified Data.IntMap as IntMap
 import Data.Log
 import Data.LowType
 import Data.Primitive
-import Data.Syscall
 import Data.Term
 import qualified Data.Text as T
 import Data.WeakTerm
@@ -72,8 +72,6 @@ infer' ctx term =
         inferExternal m x (unaryOpToType m op)
       | Just op <- asBinaryOpMaybe x ->
         inferExternal m x (binaryOpToType m op)
-      | Just lt <- asArrayAccessMaybe x ->
-        inferExternal m x (arrayAccessToType m lt)
       | otherwise -> do
         t <- lookupConstTypeEnv m x
         return ((m, WeakTermConst x), (m, snd $ weaken t))
@@ -354,14 +352,14 @@ productTypeOf m ts =
       let xts = zipWith (\x t -> (m, x, t)) xs ts
       weakTermSigma m xts
 
-takeBorrowedTypes :: [(WeakTermPlus, SyscallArgKind)] -> [WeakTermPlus]
+takeBorrowedTypes :: [(WeakTermPlus, ExploitArgKind)] -> [WeakTermPlus]
 takeBorrowedTypes tks =
   case tks of
     [] ->
       []
     ((t, k) : rest) ->
       case k of
-        SyscallArgImm ->
+        ExploitArgKindImm ->
           takeBorrowedTypes rest
         _ ->
           t : takeBorrowedTypes rest

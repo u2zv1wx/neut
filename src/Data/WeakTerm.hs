@@ -8,7 +8,6 @@ import qualified Data.IntMap as IntMap
 import Data.LowType
 import qualified Data.Set as S
 import Data.Size
-import Data.Syscall
 import qualified Data.Text as T
 
 data WeakTerm
@@ -32,7 +31,7 @@ data WeakTerm
   | WeakTermStructIntro [(WeakTermPlus, ArrayKind)]
   | WeakTermStructElim [(Hint, Ident, ArrayKind)] WeakTermPlus WeakTermPlus
   | WeakTermQuestion WeakTermPlus WeakTermPlus -- e : t (output the type `t` as note)
-  | WeakTermExploit ExploitKind WeakTermPlus [(WeakTermPlus, SyscallArgKind, WeakTermPlus)] -- (syscall NUM result-type arg-1 ... arg-n)
+  | WeakTermExploit ExploitKind WeakTermPlus [(WeakTermPlus, ExploitArgKind, WeakTermPlus)] -- (exploit NUM result-type arg-1 ... arg-n)
   deriving (Show, Eq)
 
 type WeakTermPlus =
@@ -447,14 +446,14 @@ showArrayKind arrayKind =
     ArrayKindVoidPtr ->
       "void*"
 
-showSyscallArgKind :: SyscallArgKind -> T.Text
-showSyscallArgKind arrayKind =
+showExploitArgKind :: ExploitArgKind -> T.Text
+showExploitArgKind arrayKind =
   case arrayKind of
-    SyscallArgImm ->
+    ExploitArgKindImm ->
       "immediate"
-    SyscallArgArray ->
+    ExploitArgKindArray ->
       "array"
-    SyscallArgStruct ->
+    ExploitArgKindStruct ->
       "struct"
 
 showItems :: [T.Text] -> T.Text

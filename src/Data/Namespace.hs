@@ -170,8 +170,6 @@ asWeakConstant m name
     return $ Just (m, WeakTermConst name)
   | Just _ <- asBinaryOpMaybe name =
     return $ Just (m, WeakTermConst name)
-  | Just _ <- asArrayAccessMaybe name =
-    return $ Just (m, WeakTermConst name)
   | otherwise = do
     set <- gets constantSet
     if S.member name set
