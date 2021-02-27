@@ -2,6 +2,7 @@ module Data.Term where
 
 import Control.Exception.Safe
 import Data.EnumCase
+import Data.Exploit
 import Data.Hint
 import Data.Ident
 import qualified Data.IntMap as IntMap
@@ -33,7 +34,7 @@ data Term
   | TermStruct [ArrayKind]
   | TermStructIntro [(TermPlus, ArrayKind)]
   | TermStructElim [(Hint, Ident, ArrayKind)] TermPlus TermPlus
-  | TermExploit Integer TermPlus [(TermPlus, SyscallArgKind, TermPlus)]
+  | TermExploit ExploitKind TermPlus [(TermPlus, SyscallArgKind, TermPlus)]
   deriving (Show)
 
 type TermPlus =

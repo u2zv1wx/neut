@@ -111,15 +111,15 @@ clarify' tenv term =
       e2' <- clarify' (insTypeEnv (zip3 ms xs ts) tenv) e2
       (struct, structVar) <- newValueUpsilonWith m "struct"
       return $ bindLet [(struct, e1')] (m, CompStructElim (zip xs ks) structVar e2')
-    (m, TermExploit i resultType ekts) -> do
+    (m, TermExploit expKind resultType ekts) -> do
       let (es, ks, ts) = unzip3 ekts
       xs <- mapM (const $ newNameWith' "sys") es
       let xts = zipWith (\x t -> (fst t, x, t)) xs ts
-      (borrowedVarList, argsForSyscall, headerList) <- computeHeader (zip xts ks)
+      (borrowedVarList, args, headerList) <- computeHeader (zip xts ks)
       resultVarName <- newNameWith' "result"
       tuple <- constructResultTuple tenv m borrowedVarList (m, resultVarName, resultType)
-      let syscall = (m, CompPrimitive (PrimitiveSyscall (Right i) argsForSyscall))
-      let body = iterativeApp headerList (m, CompUpElim resultVarName syscall tuple)
+      let call = (m, CompPrimitive (PrimitiveExploit expKind args))
+      let body = iterativeApp headerList (m, CompUpElim resultVarName call tuple)
       cls <- retClosure tenv Nothing [] m xts body
       es' <- mapM (clarifyPlus tenv) es
       callClosure m cls es'

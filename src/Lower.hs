@@ -9,6 +9,7 @@ import Data.Comp
 import Data.ConstType
 import Data.EnumCase
 import Data.Env hiding (newNameWith'')
+import Data.Exploit
 import qualified Data.HashMap.Lazy as Map
 import Data.Hint
 import Data.Ident
@@ -17,7 +18,6 @@ import Data.LowComp
 import Data.LowType
 import Data.Primitive
 import Data.Size
-import Data.Syscall
 import Data.Term
 import qualified Data.Text as T
 import Data.WeakTerm hiding (i64)
@@ -186,10 +186,20 @@ lowerCompPrimitive _ codeOp =
               [(LowValueInt 0, i32), (idxVar, i64)]
           )
           (LowCompLet resName (LowOpLoad resPtr lowType) uncast)
-    PrimitiveSyscall syscall args -> do
+    PrimitiveExploit expKind args -> do
       (xs, vs) <- unzip <$> mapM (const $ newValueLocal "sys-call-arg") args
-      call <- syscallToLowComp syscall vs
-      lowerValueLet' (zip xs args) call
+      case expKind of
+        ExploitKindSyscall i -> do
+          call <- syscallToLowComp i vs
+          lowerValueLet' (zip xs args) call
+        ExploitKindExternal name -> do
+          call <- externalToLowComp name vs
+          lowerValueLet' (zip xs args) call
+
+-- PrimitiveSyscall syscall args -> do
+--   (xs, vs) <- unzip <$> mapM (const $ newValueLocal "sys-call-arg") args
+--   call <- syscallToLowComp syscall vs
+--   lowerValueLet' (zip xs args) call
 
 lowerCompUnaryOp :: UnaryOp -> ValuePlus -> WithEnv LowComp
 lowerCompUnaryOp op d = do
@@ -357,21 +367,37 @@ lowerValueLet x lowerValue cont =
       let structType = AggPtrTypeStruct ts
       storeContent m x structType (zip ds ts) cont
 
-syscallToLowComp :: Syscall -> [LowValue] -> WithEnv LowComp
-syscallToLowComp syscall ds =
-  case syscall of
-    Left name -> do
-      denv <- gets declEnv
-      when (not $ name `Map.member` denv) $ do
-        let dom = map (const voidPtr) ds
-        let cod = voidPtr
-        modify (\env -> env {declEnv = Map.insert name (dom, cod) denv})
-      return $ LowCompCall (LowValueGlobal name) ds
-    Right (num) -> do
-      res <- newNameWith' "result"
-      return $
-        LowCompLet res (LowOpSyscall num ds) $
-          LowCompReturn (LowValueLocal res)
+syscallToLowComp :: Integer -> [LowValue] -> WithEnv LowComp
+syscallToLowComp num ds = do
+  res <- newNameWith' "result"
+  return $
+    LowCompLet res (LowOpSyscall num ds) $
+      LowCompReturn (LowValueLocal res)
+
+externalToLowComp :: T.Text -> [LowValue] -> WithEnv LowComp
+externalToLowComp name ds = do
+  denv <- gets declEnv
+  when (not $ name `Map.member` denv) $ do
+    let dom = map (const voidPtr) ds
+    let cod = voidPtr
+    modify (\env -> env {declEnv = Map.insert name (dom, cod) denv})
+  return $ LowCompCall (LowValueGlobal name) ds
+
+-- syscallToLowComp :: Syscall -> [LowValue] -> WithEnv LowComp
+-- syscallToLowComp syscall ds =
+--   case syscall of
+--     Left name -> do
+--       denv <- gets declEnv
+--       when (not $ name `Map.member` denv) $ do
+--         let dom = map (const voidPtr) ds
+--         let cod = voidPtr
+--         modify (\env -> env {declEnv = Map.insert name (dom, cod) denv})
+--       return $ LowCompCall (LowValueGlobal name) ds
+--     Right (num) -> do
+--       res <- newNameWith' "result"
+--       return $
+--         LowCompLet res (LowOpSyscall num ds) $
+--           LowCompReturn (LowValueLocal res)
 
 lowerValueLet' :: [(Ident, ValuePlus)] -> LowComp -> WithEnv LowComp
 lowerValueLet' binder cont =

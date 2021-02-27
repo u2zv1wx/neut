@@ -1,6 +1,7 @@
 module Data.WeakTerm where
 
 import Data.EnumCase
+import Data.Exploit
 import Data.Hint
 import Data.Ident
 import qualified Data.IntMap as IntMap
@@ -31,7 +32,7 @@ data WeakTerm
   | WeakTermStructIntro [(WeakTermPlus, ArrayKind)]
   | WeakTermStructElim [(Hint, Ident, ArrayKind)] WeakTermPlus WeakTermPlus
   | WeakTermQuestion WeakTermPlus WeakTermPlus -- e : t (output the type `t` as note)
-  | WeakTermExploit Integer WeakTermPlus [(WeakTermPlus, SyscallArgKind, WeakTermPlus)] -- (syscall NUM result-type arg-1 ... arg-n)
+  | WeakTermExploit ExploitKind WeakTermPlus [(WeakTermPlus, SyscallArgKind, WeakTermPlus)] -- (syscall NUM result-type arg-1 ... arg-n)
   deriving (Show, Eq)
 
 type WeakTermPlus =

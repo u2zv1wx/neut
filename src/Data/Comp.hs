@@ -8,7 +8,7 @@ import Data.LowType
 import Data.Maybe (fromMaybe)
 import Data.Primitive
 import Data.Size
-import Data.Syscall
+import Data.Exploit
 import qualified Data.Text as T
 
 data Value
@@ -35,7 +35,8 @@ data Primitive
   = PrimitiveUnaryOp UnaryOp ValuePlus
   | PrimitiveBinaryOp BinaryOp ValuePlus ValuePlus
   | PrimitiveArrayAccess LowType ValuePlus ValuePlus
-  | PrimitiveSyscall Syscall [ValuePlus]
+  | PrimitiveExploit ExploitKind [ValuePlus]
+  -- | PrimitiveSyscall Syscall [ValuePlus]
   deriving (Show)
 
 newtype IsFixed
@@ -140,6 +141,6 @@ substPrimitive sub c =
       let d1' = substValuePlus sub d1
       let d2' = substValuePlus sub d2
       PrimitiveArrayAccess t d1' d2'
-    PrimitiveSyscall syscall ds -> do
+    PrimitiveExploit expKind ds -> do
       let ds' = map (substValuePlus sub) ds
-      PrimitiveSyscall syscall ds'
+      PrimitiveExploit expKind ds'

@@ -10,6 +10,7 @@ import Codec.Binary.UTF8.String
 import Control.Monad.State.Lazy
 import Data.EnumCase
 import Data.Env
+import Data.Exploit
 import Data.Hint
 import Data.Ident
 import Data.Log
@@ -172,16 +173,18 @@ interpret inputTree =
           | otherwise ->
             raiseSyntaxError m "(question TREE)"
         "exploit"
-          | ((mInt, TreeLeaf intStr) : resultType : eks) <- rest -> do
-            case readMaybe (T.unpack intStr) of
-              Just i -> do
-                resultType' <- interpret resultType
-                eks' <- mapM interpretSyscallItem eks
-                let (es, ks) = unzip eks'
-                hs <- mapM (\(me, _) -> newAster me) es
-                return (m, WeakTermExploit i resultType' (zip3 es ks hs))
-              Nothing ->
-                raiseError mInt "the leaf here must be an integer"
+          -- ((mInt, TreeLeaf intStr) : resultType : eks) <- rest -> do
+          | (expKind : resultType : eks) <- rest -> do
+            expKind' <- interpretExploitKind expKind
+            -- case readMaybe (T.unpack intStr) of
+            -- Just i -> do
+            resultType' <- interpret resultType
+            eks' <- mapM interpretSyscallItem eks
+            let (es, ks) = unzip eks'
+            hs <- mapM (\(me, _) -> newAster me) es
+            return (m, WeakTermExploit expKind' resultType' (zip3 es ks hs))
+          -- Nothing ->
+          --   raiseError mInt "the leaf here must be an integer"
           | otherwise ->
             raiseSyntaxError m "(exploit LEAF TREE TREE*)"
         "irreducible"
@@ -418,3 +421,17 @@ asSyscallArg tree =
         raiseSyntaxError m "arg-immediate | arg-struct | arg-array"
     (m, _) ->
       raiseSyntaxError m "LEAF"
+
+interpretExploitKind :: TreePlus -> WithEnv ExploitKind
+interpretExploitKind tree =
+  case tree of
+    (_, TreeNode [(_, TreeLeaf "syscall"), (mInt, TreeLeaf intStr)]) ->
+      case readMaybe (T.unpack intStr) of
+        Just i ->
+          return $ ExploitKindSyscall i
+        Nothing ->
+          raiseError mInt "the leaf here must be an integer"
+    (_, TreeNode [(_, TreeLeaf "external"), (_, TreeLeaf s)]) ->
+      return $ ExploitKindExternal s
+    _ ->
+      raiseSyntaxError (fst tree) "(syscall LEAF) | (exteral LEAF)"
