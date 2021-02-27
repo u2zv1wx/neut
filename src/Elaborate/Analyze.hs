@@ -84,6 +84,13 @@ simp' constraintList =
             simp $ zip es1 es2 ++ cs
         ((_, WeakTermQuestion e1 t1), (_, WeakTermQuestion e2 t2)) ->
           simp $ (e1, e2) : (t1, t2) : cs
+        ((_, WeakTermSyscall i1 t1 ekts1), (_, WeakTermSyscall i2 t2 ekts2))
+          | length ekts1 == length ekts2,
+            i1 == i2,
+            (es1, ks1, ts1) <- unzip3 ekts1,
+            (es2, ks2, ts2) <- unzip3 ekts2,
+            ks1 == ks2 -> do
+            simp $ (t1, t2) : zip es1 es2 ++ zip ts1 ts2 ++ cs
         (e1@(m1, _), e2@(m2, _)) -> do
           let ms1 = asStuckedTerm e1
           let ms2 = asStuckedTerm e2

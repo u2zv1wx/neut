@@ -367,7 +367,7 @@ syscallToLowComp syscall ds =
         let cod = voidPtr
         modify (\env -> env {declEnv = Map.insert name (dom, cod) denv})
       return $ LowCompCall (LowValueGlobal name) ds
-    Right (_, num) -> do
+    Right (num) -> do
       res <- newNameWith' "result"
       return $
         LowCompLet res (LowOpSyscall num ds) $

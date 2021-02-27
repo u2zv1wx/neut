@@ -14,6 +14,7 @@ import Data.List (nub)
 import Data.Log
 import Data.LowType
 import qualified Data.Set as S
+import Data.Syscall
 import Data.Term
 import qualified Data.Text as T
 import Data.WeakTerm
@@ -189,11 +190,33 @@ elaborate' term =
       t' <- elaborate' t
       note m $ toText (weaken t')
       return e'
+    (m, WeakTermSyscall i t ekts) -> do
+      let (es, ks, ts) = unzip3 ekts
+      es' <- mapM elaborate' es
+      ts' <- map reduceTermPlus <$> mapM elaborate' ts
+      forM_ (zip ks ts') $ \(k, tSyscall) -> checkSyscallArgSanity k tSyscall
+      t' <- elaborate' t
+      return (m, TermSyscall i t' (zip3 es' ks ts'))
 
 elaboratePlus :: (Hint, a, WeakTermPlus) -> WithEnv (Hint, a, TermPlus)
 elaboratePlus (m, x, t) = do
   t' <- elaborate' t
   return (m, x, t')
+
+checkSyscallArgSanity :: SyscallArgKind -> TermPlus -> WithEnv ()
+checkSyscallArgSanity k t =
+  case (k, t) of
+    (SyscallArgImm, (_, TermConst name))
+      | Just (ArrayKindInt _) <- asArrayKindMaybe name ->
+        return ()
+      | Just (ArrayKindFloat _) <- asArrayKindMaybe name ->
+        return ()
+    (SyscallArgStruct, (_, TermStruct {})) ->
+      return ()
+    (SyscallArgArray, (_, TermArray {})) ->
+      return ()
+    _ ->
+      raiseError (fst t) $ "the term here must be a `" <> showSyscallArgKind k <> "`, but its type is: " <> toText (weaken t)
 
 caseCheckEnumIdent :: Hint -> T.Text -> [EnumCase] -> WithEnv ()
 caseCheckEnumIdent m x ls = do

@@ -21,7 +21,6 @@ import Data.List (nubBy)
 import Data.Log
 import Data.LowType
 import Data.Namespace
-import Data.Platform
 import Data.Primitive
 import Data.Syscall
 import Data.Term
@@ -112,12 +111,34 @@ clarify' tenv term =
       e2' <- clarify' (insTypeEnv (zip3 ms xs ts) tenv) e2
       (struct, structVar) <- newValueUpsilonWith m "struct"
       return $ bindLet [(struct, e1')] (m, CompStructElim (zip xs ks) structVar e2')
+    (m, TermSyscall i resultType ekts) -> do
+      let (es, ks, ts) = unzip3 ekts
+      xs <- mapM (const $ newNameWith' "sys") es
+      let xts = zipWith (\x t -> (fst t, x, t)) xs ts
+      (borrowedVarList, argsForSyscall, headerList) <- computeHeader (zip xts ks)
+      resultVarName <- newNameWith' "result"
+      tuple <- constructResultTuple tenv m borrowedVarList (m, resultVarName, resultType)
+      let syscall = (m, CompPrimitive (PrimitiveSyscall (Right i) argsForSyscall))
+      let body = iterativeApp headerList (m, CompUpElim resultVarName syscall tuple)
+      cls <- retClosure tenv Nothing [] m xts body
+      es' <- mapM (clarifyPlus tenv) es
+      callClosure m cls es'
 
 clarifyPlus :: TypeEnv -> TermPlus -> WithEnv (Ident, CompPlus, ValuePlus)
 clarifyPlus tenv e@(m, _) = do
   e' <- clarify' tenv e
   (varName, var) <- newValueUpsilonWith m "var"
   return (varName, e', var)
+
+clarifyBinder :: TypeEnv -> [IdentPlus] -> WithEnv [(Hint, Ident, CompPlus)]
+clarifyBinder tenv binder =
+  case binder of
+    [] ->
+      return []
+    ((m, x, t) : xts) -> do
+      t' <- clarify' tenv t
+      xts' <- clarifyBinder (IntMap.insert (asInt x) t tenv) xts
+      return $ (m, x, t') : xts'
 
 constructEnumFVS :: TypeEnv -> [TermPlus] -> WithEnv [IdentPlus]
 constructEnumFVS tenv es =
@@ -140,8 +161,8 @@ clarifyConst tenv m x
     clarifyBinaryOp tenv x op m
   | Just _ <- asLowTypeMaybe x =
     returnCartesianImmediate m
-  | Just lowType <- asArrayAccessMaybe x =
-    clarifyArrayAccess tenv m x lowType
+  --  Just lowType <- asArrayAccessMaybe x =
+  --   clarifyArrayAccess tenv m x lowType
   | x == nsOS <> "file-descriptor" =
     returnCartesianImmediate m
   | x == nsOS <> "stdin" =
@@ -152,14 +173,8 @@ clarifyConst tenv m x
     clarify' tenv (m, TermInt 64 2)
   | x == nsUnsafe <> "cast" =
     clarifyCast tenv m
-  | otherwise = do
-    os <- getOS
-    arch <- getArch
-    case asSyscallMaybe os arch x of
-      Just (syscall, argInfo) ->
-        clarifySyscall tenv x syscall argInfo m
-      _ ->
-        return (m, CompUpIntro (m, ValueConst x)) -- external constant
+  | otherwise =
+    return (m, CompUpIntro (m, ValueConst x))
 
 clarifyCast :: TypeEnv -> Hint -> WithEnv CompPlus
 clarifyCast tenv m = do
@@ -168,9 +183,7 @@ clarifyCast tenv m = do
   z <- newNameWith' "z"
   let varA = (m, TermUpsilon a)
   let u = (m, TermTau)
-  clarify'
-    tenv
-    (m, TermPiIntro [(m, a, u), (m, b, u), (m, z, varA)] (m, TermUpsilon z))
+  clarify' tenv (m, TermPiIntro [(m, a, u), (m, b, u), (m, z, varA)] (m, TermUpsilon z))
 
 clarifyUnaryOp :: TypeEnv -> T.Text -> UnaryOp -> Hint -> WithEnv CompPlus
 clarifyUnaryOp tenv name op m = do
@@ -179,13 +192,7 @@ clarifyUnaryOp tenv name op m = do
   case t' of
     (_, TermPi [(mx, x, tx)] _) -> do
       let varX = (mx, ValueUpsilon x)
-      retClosure
-        tenv
-        Nothing
-        []
-        m
-        [(mx, x, tx)]
-        (m, CompPrimitive (PrimitiveUnaryOp op varX))
+      retClosure tenv Nothing [] m [(mx, x, tx)] (m, CompPrimitive (PrimitiveUnaryOp op varX))
     _ ->
       raiseCritical m $ "the arity of " <> name <> " is wrong"
 
@@ -197,87 +204,65 @@ clarifyBinaryOp tenv name op m = do
     (_, TermPi [(mx, x, tx), (my, y, ty)] _) -> do
       let varX = (mx, ValueUpsilon x)
       let varY = (my, ValueUpsilon y)
-      retClosure
-        tenv
-        Nothing
-        []
-        m
-        [(mx, x, tx), (my, y, ty)]
-        (m, CompPrimitive (PrimitiveBinaryOp op varX varY))
+      retClosure tenv Nothing [] m [(mx, x, tx), (my, y, ty)] (m, CompPrimitive (PrimitiveBinaryOp op varX varY))
     _ ->
       raiseCritical m $ "the arity of " <> name <> " is wrong"
 
-clarifyArrayAccess :: TypeEnv -> Hint -> T.Text -> LowType -> WithEnv CompPlus
-clarifyArrayAccess tenv m name lowType = do
-  arrayAccessType <- lookupConstTypeEnv m name
-  let arrayAccessType' = reduceTermPlus arrayAccessType
-  case arrayAccessType' of
-    (_, TermPi xts cod)
-      | length xts == 3 -> do
-        (xs, ds, headerList) <- computeHeader m xts [ArgImm, ArgUnused, ArgArray]
-        case ds of
-          [index, arr] -> do
-            let tenv' = insTypeEnv xts tenv
-            callThenReturn <- toArrayAccessTail tenv' m lowType cod arr index xs
-            let body = iterativeApp headerList callThenReturn
-            retClosure tenv Nothing [] m xts body
-          _ ->
-            raiseCritical m "the type of array-access is wrong"
-    _ ->
-      raiseCritical m "the type of array-access is wrong"
+-- clarifyArrayAccess :: TypeEnv -> Hint -> T.Text -> LowType -> WithEnv CompPlus
+-- clarifyArrayAccess tenv m name lowType = do
+--   arrayAccessType <- lookupConstTypeEnv m name
+--   let arrayAccessType' = reduceTermPlus arrayAccessType
+--   case arrayAccessType' of
+--     (_, TermPi xts _)
+--       | length xts == 3 -> do
+--         (xs, ds, headerList) <- computeHeader m (map (\(_, y, _) -> y) xts) [ArgImm, ArgUnused, ArgArray]
+--         case ds of
+--           [index, arr] -> do
+--             let tenv' = insTypeEnv xts tenv
+--             -- fixme: codじゃなくてresult typeを与えるべき
+--             -- callThenReturn <- toArrayAccessTail tenv' m lowType cod arr index xs
+--             -- どうせ中身はimmediateなんだからtauとしてオッケー
+--             callThenReturn <- toArrayAccessTail tenv' m lowType arr index xs
+--             let body = iterativeApp headerList callThenReturn
+--             retClosure tenv Nothing [] m xts body
+--           _ ->
+--             raiseCritical m "the type of array-access is wrong"
+--     _ ->
+--       raiseCritical m "the type of array-access is wrong"
 
-clarifySyscall ::
-  TypeEnv ->
-  T.Text -> -- the name of theta
-  Syscall ->
-  [Arg] -> -- the length of the arguments of the theta
-  Hint -> -- the meta of the theta
-  WithEnv CompPlus
-clarifySyscall tenv name syscall args m = do
-  syscallType <- lookupConstTypeEnv m name
-  let syscallType' = reduceTermPlus syscallType
-  case syscallType' of
-    (_, TermPi xts cod)
-      | length xts == length args -> do
-        (xs, ds, headerList) <- computeHeader m xts args
-        let tenv' = insTypeEnv xts tenv
-        callThenReturn <- toSyscallTail tenv' m cod syscall ds xs
-        let body = iterativeApp headerList callThenReturn
-        retClosure tenv Nothing [] m xts body
-    _ ->
-      raiseCritical m $ "the type of " <> name <> " is wrong"
+-- clarifyArrayAccess :: TypeEnv -> Hint -> T.Text -> LowType -> WithEnv CompPlus
+-- clarifyArrayAccess tenv m name lowType = do
+--   arrayAccessType <- lookupConstTypeEnv m name
+--   let arrayAccessType' = reduceTermPlus arrayAccessType
+--   case arrayAccessType' of
+--     (_, TermPi xts _)
+--       | length xts == 3 -> do
+--         (xs, ds, headerList) <- computeHeader m xts [ArgImm, ArgUnused, ArgArray]
+--         case ds of
+--           [index, arr] -> do
+--             let tenv' = insTypeEnv xts tenv
+--             -- fixme: codじゃなくてresult typeを与えるべき
+--             -- callThenReturn <- toArrayAccessTail tenv' m lowType cod arr index xs
+--             -- どうせ中身はimmediateなんだからtauとしてオッケー
+--             callThenReturn <- toArrayAccessTail tenv' m lowType (m, TermTau) arr index xs
+--             let body = iterativeApp headerList callThenReturn
+--             retClosure tenv Nothing [] m xts body
+--           _ ->
+--             raiseCritical m "the type of array-access is wrong"
+--     _ ->
+--       raiseCritical m "the type of array-access is wrong"
 
-iterativeApp :: [a -> a] -> a -> a
-iterativeApp functionList x =
-  case functionList of
-    [] ->
-      x
-    f : fs ->
-      f (iterativeApp fs x)
+computeHeader :: [(IdentPlus, SyscallArgKind)] -> WithEnv ([IdentPlus], [ValuePlus], [CompPlus -> CompPlus])
+computeHeader xtks = do
+  (xss, dss, headerList) <- unzip3 <$> mapM (\(xt, k) -> computeHeader' xt k) xtks
+  return (concat xss, concat dss, headerList)
 
-clarifyBinder :: TypeEnv -> [IdentPlus] -> WithEnv [(Hint, Ident, CompPlus)]
-clarifyBinder tenv binder =
-  case binder of
-    [] ->
-      return []
-    ((m, x, t) : xts) -> do
-      t' <- clarify' tenv t
-      xts' <- clarifyBinder (IntMap.insert (asInt x) t tenv) xts
-      return $ (m, x, t') : xts'
-
-toHeaderInfo ::
-  Hint ->
-  Ident -> -- argument
-  TermPlus -> -- the type of argument
-  Arg -> -- the way of use of argument (specifically)
-  WithEnv ([IdentPlus], [ValuePlus], CompPlus -> CompPlus) -- ([borrow], arg-to-syscall, ADD_HEADER_TO_CONTINUATION)
-toHeaderInfo m x t argKind =
-  case argKind of
-    ArgImm ->
-      return ([], [(m, ValueUpsilon x)], id)
-    ArgUnused ->
-      return ([], [], id)
-    ArgStruct -> do
+computeHeader' :: IdentPlus -> SyscallArgKind -> WithEnv ([IdentPlus], [ValuePlus], CompPlus -> CompPlus) -- ([borrow], arg-to-syscall, ADD_HEADER_TO_CONTINUATION)
+computeHeader' (m, x, t) k =
+  case k of
+    SyscallArgImm ->
+      return ([], [(m, ValueUpsilon x)], id) -- immediate
+    SyscallArgStruct -> do
       (structVarName, structVar) <- newValueUpsilonWith m "struct"
       return
         ( [(m, structVarName, t)],
@@ -285,7 +270,7 @@ toHeaderInfo m x t argKind =
           \cont ->
             (m, CompUpElim structVarName (m, CompUpIntro (m, ValueUpsilon x)) cont)
         )
-    ArgArray -> do
+    SyscallArgArray -> do
       arrayVarName <- newNameWith' "array"
       (arrayTypeName, arrayType) <- newValueUpsilonWith m "array-type"
       (arrayInnerName, arrayInner) <- newValueUpsilonWith m "array-inner"
@@ -312,90 +297,213 @@ toHeaderInfo m x t argKind =
             )
         )
 
-computeHeader ::
+-- _ ->
+--   raiseError m "compute-header (illegal argument for a syscall)"
+
+-- generate tuple like (borrowed-1, ..., borrowed-n, result)
+constructResultTuple ::
+  TypeEnv ->
   Hint ->
   [IdentPlus] ->
-  [Arg] ->
-  WithEnv ([IdentPlus], [ValuePlus], [CompPlus -> CompPlus])
-computeHeader m xts argInfoList = do
-  let xtas = zip xts argInfoList
-  (xss, dss, headerList) <-
-    unzip3 <$> mapM (\((_, x, t), a) -> toHeaderInfo m x t a) xtas
-  return (concat xss, concat dss, headerList)
-
-toSyscallTail ::
-  TypeEnv ->
-  Hint ->
-  TermPlus -> -- cod type
-  Syscall -> -- read, write, open, etc
-  [ValuePlus] -> -- args of syscall
-  [IdentPlus] -> -- borrowed variables
+  IdentPlus ->
   WithEnv CompPlus
-toSyscallTail tenv m cod syscall args xs = do
-  resultVarName <- newNameWith' "result"
-  result <- retWithBorrowedVars tenv m cod xs resultVarName
-  return
-    ( m,
-      CompUpElim resultVarName (m, CompPrimitive (PrimitiveSyscall syscall args)) result
-    )
-
-toArrayAccessTail ::
-  TypeEnv ->
-  Hint ->
-  LowType ->
-  TermPlus -> -- cod type
-  ValuePlus -> -- array (inner)
-  ValuePlus -> -- index
-  [IdentPlus] -> -- borrowed variables
-  WithEnv CompPlus
-toArrayAccessTail tenv m lowType cod arr index xts = do
-  resultVarName <- newNameWith' "result"
-  result <- retWithBorrowedVars tenv m cod xts resultVarName
-  return
-    ( m,
-      CompUpElim
-        resultVarName
-        (m, CompPrimitive (PrimitiveArrayAccess lowType arr index))
-        result
-    )
-
-retWithBorrowedVars ::
-  TypeEnv ->
-  Hint ->
-  TermPlus ->
-  [IdentPlus] ->
-  Ident ->
-  WithEnv CompPlus
-retWithBorrowedVars tenv m cod xts resultVarName =
-  if null xts
+constructResultTuple tenv m borrowedVarTypeList result@(_, resultVarName, _) =
+  if null borrowedVarTypeList
     then return (m, CompUpIntro (m, ValueUpsilon resultVarName))
     else do
-      (zu, kp@(mk, k, sigArgs)) <- sigToPi m cod
-      (_, resultType) <- rightmostOf sigArgs
-      let xs = map (\(_, x, _) -> x) xts
-      let vs = map (\x -> (m, TermUpsilon x)) $ xs ++ [resultVarName]
-      let tenv' = insTypeEnv (xts ++ [(m, resultVarName, resultType)]) tenv
-      clarify'
-        tenv'
-        (m, TermPiIntro [zu, kp] (m, TermPiElim (mk, TermUpsilon k) vs))
+      let tupleTypeInfo = borrowedVarTypeList ++ [result]
+      tuple <- termSigmaIntro m tupleTypeInfo
+      let tenv' = insTypeEnv tupleTypeInfo tenv
+      clarify' tenv' tuple
 
-rightmostOf :: TermPlus -> WithEnv (Hint, TermPlus)
-rightmostOf term =
-  case term of
-    (_, TermPi xts _)
-      | length xts >= 1 -> do
-        let (m, _, t) = last xts
-        return (m, t)
-    _ ->
-      raiseCritical (fst term) "rightmost"
+-- clarifySyscall ::
+--   TypeEnv ->
+--   T.Text -> -- the name of theta
+--   Syscall ->
+--   [Arg] -> -- the length of the arguments of the theta
+--   Hint -> -- the meta of the theta
+--   WithEnv CompPlus
+-- clarifySyscall tenv name syscall args m = do
+--   syscallType <- lookupConstTypeEnv m name
+--   let syscallType' = reduceTermPlus syscallType
+--   case syscallType' of
+--     (_, TermPi xts cod)
+--       | length xts == length args -> do
+--         (xs, ds, headerList) <- computeHeader m xts args
+--         let tenv' = insTypeEnv xts tenv
+--         callThenReturn <- toSyscallTail tenv' m cod syscall ds xs
+--         let body = iterativeApp headerList callThenReturn
+--         retClosure tenv Nothing [] m xts body
+--     _ ->
+--       raiseCritical m $ "the type of " <> name <> " is wrong"
+-- computeHeader' ::
+--   Hint ->
+--   Ident -> -- argument
+--   TermPlus -> -- the type of argument
+--   Arg -> -- the way of use of argument (specifically)
+--   WithEnv ([IdentPlus], [ValuePlus], CompPlus -> CompPlus) -- ([borrow], arg-to-syscall, ADD_HEADER_TO_CONTINUATION)
+-- computeHeader' m x t argKind =
+--   case argKind of
+--     ArgImm ->
+--       return ([], [(m, ValueUpsilon x)], id)
+--     ArgUnused ->
+--       return ([], [], id)
+--     ArgStruct -> do
+--       (structVarName, structVar) <- newValueUpsilonWith m "struct"
+--       return
+--         ( [(m, structVarName, t)],
+--           [structVar],
+--           \cont ->
+--             (m, CompUpElim structVarName (m, CompUpIntro (m, ValueUpsilon x)) cont)
+--         )
+--     ArgArray -> do
+--       arrayVarName <- newNameWith' "array"
+--       (arrayTypeName, arrayType) <- newValueUpsilonWith m "array-type"
+--       (arrayInnerName, arrayInner) <- newValueUpsilonWith m "array-inner"
+--       (arrayInnerTmpName, arrayInnerTmp) <- newValueUpsilonWith m "array-tmp"
+--       return
+--         ( [(m, arrayVarName, t)],
+--           [arrayInnerTmp],
+--           \cont ->
+--             ( m,
+--               sigmaElim
+--                 [arrayTypeName, arrayInnerName]
+--                 (m, ValueUpsilon x)
+--                 ( m,
+--                   CompUpElim
+--                     arrayInnerTmpName
+--                     (m {metaIsReducible = False}, CompUpIntro arrayInner)
+--                     ( m,
+--                       CompUpElim
+--                         arrayVarName
+--                         (m, CompUpIntro (m, sigmaIntro [arrayType, arrayInnerTmp]))
+--                         cont
+--                     )
+--                 )
+--             )
+--         )
+-- computeHeader ::
+--   Hint ->
+--   [Ident] ->
+--   [Arg] ->
+--   WithEnv ([(Ident, Arg)], [ValuePlus], [CompPlus -> CompPlus])
+-- computeHeader m xs as = do
+--   (xss, dss, headerList) <- unzip3 <$> zipWithM (\x a -> computeHeader' m x a) xs as
+--   return (concat xss, concat dss, headerList)
 
-sigToPi :: Hint -> TermPlus -> WithEnv (IdentPlus, IdentPlus)
-sigToPi m tPi =
-  case tPi of
-    (_, TermPi [zu, kp] _) ->
-      return (zu, kp)
-    _ ->
-      raiseCritical m "the type of sigma-intro is wrong"
+-- toSyscallTail ::
+--   TypeEnv ->
+--   Hint ->
+--   TermPlus -> -- cod type
+--   Syscall -> -- read, write, open, etc
+--   [ValuePlus] -> -- args of syscall
+--   [IdentPlus] -> -- borrowed variables
+--   WithEnv CompPlus
+-- toSyscallTail tenv m cod syscall args xs = do
+--   resultVarName <- newNameWith' "result"
+--   result <- constructResultTuple tenv m cod xs resultVarName
+--   return
+--     ( m,
+--       CompUpElim
+--         resultVarName
+--         (m, CompPrimitive (PrimitiveSyscall syscall args))
+--         result
+--     )
+
+-- toArrayAccessTail ::
+--   TypeEnv ->
+--   Hint ->
+--   LowType ->
+--   TermPlus -> -- cod type
+--   ValuePlus -> -- array (inner)
+--   ValuePlus -> -- index
+--   [IdentPlus] -> -- borrowed variables
+--   WithEnv CompPlus
+-- toArrayAccessTail tenv m lowType resultType arr index xts = do
+--   resultVarName <- newNameWith' "result"
+--   result <- constructResultTuple tenv m resultType xts resultVarName
+--   return
+--     ( m,
+--       CompUpElim
+--         resultVarName
+--         (m, CompPrimitive (PrimitiveArrayAccess lowType arr index))
+--         result
+--     )
+-- toArrayAccessTail ::
+--   TypeEnv ->
+--   Hint ->
+--   LowType ->
+--   ValuePlus -> -- array (inner)
+--   ValuePlus -> -- index
+--   [Ident] -> -- borrowed variables
+--   WithEnv CompPlus
+-- toArrayAccessTail tenv m lowType arr index xts = do
+--   resultVarName <- newNameWith' "result"
+--   result <- constructResultTuple tenv m xts resultVarName
+--   return
+--     ( m,
+--       CompUpElim
+--         resultVarName
+--         (m, CompPrimitive (PrimitiveArrayAccess lowType arr index))
+--         result
+--     )
+
+-- toSyscallTail ::
+--   TypeEnv ->
+--   Hint ->
+--   Syscall -> -- read, write, open, etc
+--   [ValuePlus] -> -- args of syscall
+--   [IdentPlus] -> -- borrowed variables
+--   TermPlus -> -- result type
+--   WithEnv CompPlus
+-- toSyscallTail tenv m syscall argsForSyscall borrowedVarList resultType = do
+--   resultVarName <- newNameWith' "result"
+--   result <- constructResultTuple tenv m borrowedVarList (m, resultVarName, resultType)
+--   return
+--     ( m,
+--       CompUpElim
+--         resultVarName
+--         (m, CompPrimitive (PrimitiveSyscall syscall argsForSyscall))
+--         result
+--     )
+
+-- constructResultTuple ::
+--   TypeEnv ->
+--   Hint ->
+--   TermPlus ->
+--   [IdentPlus] ->
+--   Ident ->
+--   WithEnv CompPlus
+-- constructResultTuple tenv m cod xts resultVarName =
+--   if null xts
+--     then return (m, CompUpIntro (m, ValueUpsilon resultVarName))
+--     else do
+--       (zu, kp@(mk, k, sigArgs)) <- sigToPi m cod
+--       (_, resultType) <- rightmostOf sigArgs
+--       let xs = map (\(_, x, _) -> x) xts
+--       let vs = map (\x -> (m, TermUpsilon x)) $ xs ++ [resultVarName]
+--       let tenv' = insTypeEnv (xts ++ [(m, resultVarName, resultType)]) tenv
+--       clarify'
+--         tenv'
+--         (m, TermPiIntro [zu, kp] (m, TermPiElim (mk, TermUpsilon k) vs))
+
+-- rightmostOf :: TermPlus -> WithEnv (Hint, TermPlus)
+-- rightmostOf term =
+--   case term of
+--     (_, TermPi xts _)
+--       | length xts >= 1 -> do
+--         let (m, _, t) = last xts
+--         return (m, t)
+--     _ ->
+--       raiseCritical (fst term) "rightmost"
+
+-- sigToPi :: Hint -> TermPlus -> WithEnv (IdentPlus, IdentPlus)
+-- sigToPi m tPi =
+--   case tPi of
+--     (_, TermPi [zu, kp] _) ->
+--       return (zu, kp)
+--     _ ->
+--       raiseCritical m "the type of sigma-intro is wrong"
 
 makeClosure ::
   Maybe Ident ->
@@ -536,6 +644,11 @@ chainOf tenv term =
       ts <- mapM (inferKind m) ks
       xs2 <- chainOf (insTypeEnv (zip3 ms xs ts) tenv) e2
       return $ xs1 ++ filter (\(_, y, _) -> y `notElem` xs) xs2
+    (_, TermSyscall _ t ekts) -> do
+      let (es, _, ts) = unzip3 ekts
+      xs1 <- chainOf tenv t
+      xs2 <- concat <$> mapM (chainOf tenv) (es ++ ts)
+      return $ xs1 ++ xs2
 
 chainOf' :: TypeEnv -> [IdentPlus] -> [TermPlus] -> WithEnv [IdentPlus]
 chainOf' tenv binder es =
@@ -568,3 +681,11 @@ lookupTypeEnv m (I (name, x)) tenv =
     Nothing ->
       raiseCritical m $
         "the variable `" <> name <> "` is not found in the type environment."
+
+iterativeApp :: [a -> a] -> a -> a
+iterativeApp functionList x =
+  case functionList of
+    [] ->
+      x
+    f : fs ->
+      f (iterativeApp fs x)

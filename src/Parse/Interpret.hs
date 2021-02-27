@@ -15,6 +15,7 @@ import Data.Ident
 import Data.Log
 import Data.LowType
 import Data.Size
+import Data.Syscall
 import qualified Data.Text as T
 import Data.Tree
 import Data.WeakTerm
@@ -170,6 +171,21 @@ interpret inputTree =
             return (m, WeakTermQuestion e' h)
           | otherwise ->
             raiseSyntaxError m "(question TREE)"
+        "syscall"
+          | ((mInt, TreeLeaf intStr) : resultType : eks) <- rest -> do
+            case readMaybe (T.unpack intStr) of
+              Just i -> do
+                resultType' <- interpret resultType
+                -- es' <- mapM interpret es
+                eks' <- mapM interpretSyscallItem eks
+                let (es, ks) = unzip eks'
+                -- h <- newAster m
+                hs <- mapM (\(me, _) -> newAster me) es
+                return (m, WeakTermSyscall i resultType' (zip3 es ks hs))
+              Nothing ->
+                raiseError mInt "the leaf here must be an integer"
+          | otherwise ->
+            raiseSyntaxError m "(syscall LEAF TREE TREE*)"
         "irreducible"
           | [e] <- rest -> do
             e' <- interpret e
@@ -222,6 +238,8 @@ interpretArg es =
 --     (array len u8)))
 sigmaIntroString :: Hint -> [WeakTermPlus] -> WithEnv WeakTermPlus
 sigmaIntroString m u8s = do
+  p "u8s:"
+  p' u8s
   let z = asIdent "internal.sigma-tau"
   k <- newNameWith'' "sigma"
   let lenVar = asIdent "length"
@@ -377,3 +395,28 @@ asArrayKind tree =
           return t
     _ ->
       raiseSyntaxError (fst tree) "LEAF"
+
+interpretSyscallItem :: TreePlus -> WithEnv (WeakTermPlus, SyscallArgKind)
+interpretSyscallItem tree =
+  case tree of
+    (_, TreeNode [k, e]) -> do
+      k' <- asSyscallArg k
+      e' <- interpret e
+      return (e', k')
+    e ->
+      raiseSyntaxError (fst e) "(TREE TREE)"
+
+asSyscallArg :: TreePlus -> WithEnv SyscallArgKind
+asSyscallArg tree =
+  case tree of
+    (m, TreeLeaf x)
+      | x == "arg-immediate" ->
+        return SyscallArgImm
+      | x == "arg-struct" ->
+        return SyscallArgStruct
+      | x == "arg-array" ->
+        return SyscallArgArray
+      | otherwise ->
+        raiseSyntaxError m "arg-immediate | arg-struct | arg-array"
+    (m, _) ->
+      raiseSyntaxError m "LEAF"

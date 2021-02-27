@@ -92,6 +92,12 @@ reduceTermPlus term =
             reduceTermPlus $ substTermPlus sub e2
         _ ->
           (m, TermStructElim xks e1' e2)
+    (m, TermSyscall i t ekts) -> do
+      let t' = reduceTermPlus t
+      let (es, ks, ts) = unzip3 ekts
+      let es' = map reduceTermPlus es
+      let ts' = map reduceTermPlus ts
+      (m, TermSyscall i t' (zip3 es' ks ts'))
     _ ->
       term
 

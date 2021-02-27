@@ -19,6 +19,7 @@ import qualified Data.IntMap as IntMap
 import Data.Log
 import Data.LowType
 import Data.Primitive
+import Data.Syscall
 import Data.Term
 import qualified Data.Text as T
 import Data.WeakTerm
@@ -147,6 +148,13 @@ infer' ctx term =
     (m, WeakTermQuestion e _) -> do
       (e', te) <- infer' ctx e
       return ((m, WeakTermQuestion e' te), te)
+    (m, WeakTermSyscall i t ekts) -> do
+      t' <- inferType' ctx t
+      let (es, ks, _) = unzip3 ekts
+      (es', ts') <- unzip <$> mapM (infer' ctx) es
+      let borrowedTypes = takeBorrowedTypes $ zip ts' ks
+      productType <- productTypeOf m (borrowedTypes ++ [t'])
+      return ((m, WeakTermSyscall i t' (zip3 es' ks ts')), productType)
 
 inferArgs ::
   Hint ->
@@ -334,3 +342,33 @@ lookupKind m name = do
       raiseError m $ "no such enum-intro is defined: " <> name
     Just (j, _) ->
       return j
+
+-- A1 * ... * An := Pi (z : tau, k : Pi (_ : A1, ..., _ : An).Z). Z
+productTypeOf :: Hint -> [WeakTermPlus] -> WithEnv WeakTermPlus
+productTypeOf m ts =
+  case ts of
+    [t] ->
+      return t
+    _ -> do
+      xs <- mapM (const $ newNameWith'' "_") ts
+      let xts = zipWith (\x t -> (m, x, t)) xs ts
+      weakTermSigma m xts
+
+takeBorrowedTypes :: [(WeakTermPlus, SyscallArgKind)] -> [WeakTermPlus]
+takeBorrowedTypes tks =
+  case tks of
+    [] ->
+      []
+    ((t, k) : rest) ->
+      case k of
+        SyscallArgImm ->
+          takeBorrowedTypes rest
+        _ ->
+          t : takeBorrowedTypes rest
+
+weakTermSigma :: Hint -> [WeakIdentPlus] -> WithEnv WeakTermPlus
+weakTermSigma m xts = do
+  z <- newNameWith' "internal.sigma-tau"
+  let vz = (m, WeakTermUpsilon z)
+  k <- newNameWith'' "sigma"
+  return (m, WeakTermPi [(m, z, (m, WeakTermTau)), (m, k, (m, WeakTermPi xts vz))] vz)

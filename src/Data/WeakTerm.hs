@@ -31,7 +31,7 @@ data WeakTerm
   | WeakTermStructIntro [(WeakTermPlus, ArrayKind)]
   | WeakTermStructElim [(Hint, Ident, ArrayKind)] WeakTermPlus WeakTermPlus
   | WeakTermQuestion WeakTermPlus WeakTermPlus -- e : t (output the type `t` as note)
-  -- | WeakTermSyscall Int WeakTermPlus [(WeakTermPlus, SyscallArgKind)] -- (syscall NUM result-type (arg-1 kind-1) ... (arg-n kind-n))
+  | WeakTermSyscall Integer WeakTermPlus [(WeakTermPlus, SyscallArgKind, WeakTermPlus)] -- (syscall NUM result-type arg-1 ... arg-n)
   deriving (Show, Eq)
 
 type WeakTermPlus =
@@ -125,6 +125,9 @@ varWeakTermPlus term =
       let set1 = varWeakTermPlus e
       let set2 = varWeakTermPlus t
       S.union set1 set2
+    (_, WeakTermSyscall _ t ekts) -> do
+      let (es, _, ts) = unzip3 ekts
+      S.unions $ varWeakTermPlus t : map varWeakTermPlus (es ++ ts)
 
 varWeakTermPlus' :: [WeakIdentPlus] -> [WeakTermPlus] -> S.Set Ident
 varWeakTermPlus' binder es =
@@ -192,6 +195,10 @@ asterWeakTermPlus term =
       let set1 = asterWeakTermPlus e
       let set2 = asterWeakTermPlus t
       S.union set1 set2
+    (_, WeakTermSyscall _ t ekts) -> do
+      let (es, _, ts) = unzip3 ekts
+      -- S.unions $ (asterWeakTermPlus t) : map (asterWeakTermPlus . fst) eks
+      S.unions $ asterWeakTermPlus t : map asterWeakTermPlus (es ++ ts)
 
 asterWeakTermPlus' :: [WeakIdentPlus] -> [WeakTermPlus] -> S.Set Int
 asterWeakTermPlus' binder es =
@@ -279,6 +286,12 @@ substWeakTermPlus sub term =
       let e' = substWeakTermPlus sub e
       let t' = substWeakTermPlus sub t
       (m, WeakTermQuestion e' t')
+    (m, WeakTermSyscall i t ekts) -> do
+      let t' = substWeakTermPlus sub t
+      let (es, ks, ts) = unzip3 ekts
+      let es' = map (substWeakTermPlus sub) es
+      let ts' = map (substWeakTermPlus sub) ts
+      (m, WeakTermSyscall i t' (zip3 es' ks ts'))
 
 substWeakTermPlus' :: SubstWeakTerm -> [WeakIdentPlus] -> [WeakIdentPlus]
 substWeakTermPlus' sub binder =
@@ -378,6 +391,12 @@ toText term =
       showCons ["struct-elimination", argStr, toText e1, toText e2]
     (_, WeakTermQuestion e _) ->
       toText e
+    (_, WeakTermSyscall i t ekts) -> do
+      let t' = toText t
+      let (es, _, _) = unzip3 ekts
+      let es' = map toText es
+      -- let ks' = map showSyscallArgKind ks
+      showCons $ "syscall" : T.pack (show i) : t' : es'
 
 inParen :: T.Text -> T.Text
 inParen s =
@@ -426,6 +445,16 @@ showArrayKind arrayKind =
       showFloatSize size
     ArrayKindVoidPtr ->
       "void*"
+
+showSyscallArgKind :: SyscallArgKind -> T.Text
+showSyscallArgKind arrayKind =
+  case arrayKind of
+    SyscallArgImm ->
+      "immediate"
+    SyscallArgArray ->
+      "array"
+    SyscallArgStruct ->
+      "struct"
 
 showItems :: [T.Text] -> T.Text
 showItems =
