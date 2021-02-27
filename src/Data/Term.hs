@@ -33,7 +33,7 @@ data Term
   | TermStruct [ArrayKind]
   | TermStructIntro [(TermPlus, ArrayKind)]
   | TermStructElim [(Hint, Ident, ArrayKind)] TermPlus TermPlus
-  | TermSyscall Integer TermPlus [(TermPlus, SyscallArgKind, TermPlus)]
+  | TermExploit Integer TermPlus [(TermPlus, SyscallArgKind, TermPlus)]
   deriving (Show)
 
 type TermPlus =
@@ -105,7 +105,7 @@ varTermPlus term =
       let set1 = varTermPlus d
       let set2 = S.filter (`notElem` xs) (varTermPlus e)
       S.union set1 set2
-    (_, TermSyscall _ t ekts) -> do
+    (_, TermExploit _ t ekts) -> do
       let (es, _, ts) = unzip3 ekts
       S.unions $ varTermPlus t : map varTermPlus (es ++ ts)
 
@@ -179,12 +179,12 @@ substTermPlus sub term =
       let sub' = foldr IntMap.delete sub xs
       let e' = substTermPlus sub' e
       (m, TermStructElim xts v' e')
-    (m, TermSyscall i t ekts) -> do
+    (m, TermExploit i t ekts) -> do
       let t' = substTermPlus sub t
       let (es, ks, ts) = unzip3 ekts
       let es' = map (substTermPlus sub) es
       let ts' = map (substTermPlus sub) ts
-      (m, TermSyscall i t' (zip3 es' ks ts'))
+      (m, TermExploit i t' (zip3 es' ks ts'))
 
 substTermPlus' :: SubstTerm -> [IdentPlus] -> [IdentPlus]
 substTermPlus' sub binder =
@@ -265,12 +265,12 @@ weaken term =
       let v' = weaken v
       let e' = weaken e
       (m, WeakTermStructElim xts v' e')
-    (m, TermSyscall i t ekts) -> do
+    (m, TermExploit i t ekts) -> do
       let t' = weaken t
       let (es, ks, ts) = unzip3 ekts
       let es' = map weaken es
       let ts' = map weaken ts
-      (m, WeakTermSyscall i t' (zip3 es' ks ts'))
+      (m, WeakTermExploit i t' (zip3 es' ks ts'))
 
 weakenArgs :: [(Hint, Ident, TermPlus)] -> [(Hint, Ident, WeakTermPlus)]
 weakenArgs xts = do

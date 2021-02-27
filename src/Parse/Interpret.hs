@@ -171,21 +171,19 @@ interpret inputTree =
             return (m, WeakTermQuestion e' h)
           | otherwise ->
             raiseSyntaxError m "(question TREE)"
-        "syscall"
+        "exploit"
           | ((mInt, TreeLeaf intStr) : resultType : eks) <- rest -> do
             case readMaybe (T.unpack intStr) of
               Just i -> do
                 resultType' <- interpret resultType
-                -- es' <- mapM interpret es
                 eks' <- mapM interpretSyscallItem eks
                 let (es, ks) = unzip eks'
-                -- h <- newAster m
                 hs <- mapM (\(me, _) -> newAster me) es
-                return (m, WeakTermSyscall i resultType' (zip3 es ks hs))
+                return (m, WeakTermExploit i resultType' (zip3 es ks hs))
               Nothing ->
                 raiseError mInt "the leaf here must be an integer"
           | otherwise ->
-            raiseSyntaxError m "(syscall LEAF TREE TREE*)"
+            raiseSyntaxError m "(exploit LEAF TREE TREE*)"
         "irreducible"
           | [e] <- rest -> do
             e' <- interpret e

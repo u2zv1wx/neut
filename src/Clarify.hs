@@ -111,7 +111,7 @@ clarify' tenv term =
       e2' <- clarify' (insTypeEnv (zip3 ms xs ts) tenv) e2
       (struct, structVar) <- newValueUpsilonWith m "struct"
       return $ bindLet [(struct, e1')] (m, CompStructElim (zip xs ks) structVar e2')
-    (m, TermSyscall i resultType ekts) -> do
+    (m, TermExploit i resultType ekts) -> do
       let (es, ks, ts) = unzip3 ekts
       xs <- mapM (const $ newNameWith' "sys") es
       let xts = zipWith (\x t -> (fst t, x, t)) xs ts
@@ -261,7 +261,7 @@ computeHeader' :: IdentPlus -> SyscallArgKind -> WithEnv ([IdentPlus], [ValuePlu
 computeHeader' (m, x, t) k =
   case k of
     SyscallArgImm ->
-      return ([], [(m, ValueUpsilon x)], id) -- immediate
+      return ([], [(m, ValueUpsilon x)], id)
     SyscallArgStruct -> do
       (structVarName, structVar) <- newValueUpsilonWith m "struct"
       return
@@ -490,7 +490,7 @@ chainOf tenv term =
       ts <- mapM (inferKind m) ks
       xs2 <- chainOf (insTypeEnv (zip3 ms xs ts) tenv) e2
       return $ xs1 ++ filter (\(_, y, _) -> y `notElem` xs) xs2
-    (_, TermSyscall _ t ekts) -> do
+    (_, TermExploit _ t ekts) -> do
       let (es, _, ts) = unzip3 ekts
       xs1 <- chainOf tenv t
       xs2 <- concat <$> mapM (chainOf tenv) (es ++ ts)

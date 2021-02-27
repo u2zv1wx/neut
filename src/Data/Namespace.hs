@@ -29,6 +29,11 @@ nsUnsafe :: T.Text
 nsUnsafe =
   "unsafe" <> nsSep
 
+{-# INLINE nsOS #-}
+nsOS :: T.Text
+nsOS =
+  "os."
+
 use :: T.Text -> WithEnv ()
 use s =
   modify (\e -> e {prefixEnv = s : prefixEnv e})

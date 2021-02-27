@@ -148,13 +148,13 @@ infer' ctx term =
     (m, WeakTermQuestion e _) -> do
       (e', te) <- infer' ctx e
       return ((m, WeakTermQuestion e' te), te)
-    (m, WeakTermSyscall i t ekts) -> do
+    (m, WeakTermExploit i t ekts) -> do
       t' <- inferType' ctx t
       let (es, ks, _) = unzip3 ekts
       (es', ts') <- unzip <$> mapM (infer' ctx) es
       let borrowedTypes = takeBorrowedTypes $ zip ts' ks
       productType <- productTypeOf m (borrowedTypes ++ [t'])
-      return ((m, WeakTermSyscall i t' (zip3 es' ks ts')), productType)
+      return ((m, WeakTermExploit i t' (zip3 es' ks ts')), productType)
 
 inferArgs ::
   Hint ->

@@ -22,10 +22,10 @@ data Arg
   | ArgUnused
   deriving (Show)
 
-{-# INLINE nsOS #-}
-nsOS :: T.Text
-nsOS =
-  "os."
+-- {-# INLINE nsOS #-}
+-- nsOS :: T.Text
+-- nsOS =
+--   "os."
 
 -- {-# INLINE nsOS #-}
 -- nsOS :: T.Text
