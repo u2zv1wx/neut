@@ -99,8 +99,8 @@ initialEnv =
       lowCompEnv = Map.empty,
       declEnv =
         Map.fromList
-          [ ("malloc", ([LowTypeInt 64], voidPtr)),
-            ("free", ([voidPtr], LowTypeVoid))
+          [ ("malloc", ([voidPtr], voidPtr)),
+            ("free", ([voidPtr], voidPtr))
           ],
       constraintEnv = [],
       constraintQueue = Q.empty,

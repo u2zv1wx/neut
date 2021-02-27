@@ -462,7 +462,6 @@ storeContent' bp bt values cont =
 storeContent'' :: Ident -> LowType -> SizeInfo -> Int -> LowComp -> WithEnv LowComp
 storeContent'' reg elemType sizeInfo len cont = do
   (c, cVar) <- newValueLocal $ "sizeof-" <> asText reg
-  (i, iVar) <- newValueLocal $ "sizeof-" <> asText reg
   return $
     LowCompLet
       c
@@ -470,8 +469,7 @@ storeContent'' reg elemType sizeInfo len cont = do
           (LowValueNull, LowTypePtr elemType)
           [(LowValueInt (toInteger len), i64)]
       )
-      $ LowCompLet i (LowOpPointerToInt cVar (LowTypePtr elemType) (LowTypeInt 64)) $
-        LowCompLet reg (LowOpAlloc iVar sizeInfo) cont
+      $ LowCompLet reg (LowOpAlloc cVar sizeInfo) cont
 
 indexTypeOf :: LowType -> LowType
 indexTypeOf lowType =

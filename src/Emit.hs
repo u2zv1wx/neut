@@ -153,12 +153,12 @@ emitLowOp llvmOp =
             showLowValue d2
           ]
     LowOpAlloc d _ ->
-      return $ unwordsL ["call fastcc", "i8*", "@malloc(i64 " <> showLowValue d <> ")"]
+      return $ unwordsL ["call fastcc", "i8*", "@malloc(i8* " <> showLowValue d <> ")"]
     LowOpFree d _ j -> do
       nenv <- gets nopFreeSet
       if S.member j nenv
         then return "bitcast i8* null to i8*" -- nop
-        else return $ unwordsL ["call fastcc", "void", "@free(i8* " <> showLowValue d <> ")"]
+        else return $ unwordsL ["call fastcc", "i8*", "@free(i8* " <> showLowValue d <> ")"]
     LowOpSyscall num ds ->
       emitSyscallOp num ds
     LowOpUnaryOp (UnaryOpFNeg t) d ->
