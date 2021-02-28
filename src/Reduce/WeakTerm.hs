@@ -62,38 +62,38 @@ reduceWeakTermPlus term =
                 Nothing -> (m, WeakTermEnumElim (e', t') les')
         _ ->
           (m, WeakTermEnumElim (e', t') les')
-    (m, WeakTermArray dom k) -> do
-      let dom' = reduceWeakTermPlus dom
-      (m, WeakTermArray dom' k)
-    (m, WeakTermArrayIntro k es) -> do
-      let es' = map reduceWeakTermPlus es
-      (m, WeakTermArrayIntro k es')
-    (m, WeakTermArrayElim k xts e1 e2) -> do
-      let e1' = reduceWeakTermPlus e1
-      case e1' of
-        (_, WeakTermArrayIntro k' es)
-          | length es == length xts,
-            k == k' -> do
-            let (_, xs, _) = unzip3 xts
-            let sub = IntMap.fromList $ zip (map asInt xs) es
-            reduceWeakTermPlus $ substWeakTermPlus sub e2
-        _ ->
-          (m, WeakTermArrayElim k xts e1' e2)
-    (m, WeakTermStructIntro eks) -> do
-      let (es, ks) = unzip eks
-      let es' = map reduceWeakTermPlus es
-      (m, WeakTermStructIntro $ zip es' ks)
-    (m, WeakTermStructElim xks e1 e2) -> do
-      let e1' = reduceWeakTermPlus e1
-      case e1' of
-        (_, WeakTermStructIntro eks)
-          | (_, xs, ks1) <- unzip3 xks,
-            (es, ks2) <- unzip eks,
-            ks1 == ks2 -> do
-            let sub = IntMap.fromList $ zip (map asInt xs) es
-            reduceWeakTermPlus $ substWeakTermPlus sub e2
-        _ ->
-          (m, WeakTermStructElim xks e1' e2)
+    -- (m, WeakTermArray dom k) -> do
+    --   let dom' = reduceWeakTermPlus dom
+    --   (m, WeakTermArray dom' k)
+    -- (m, WeakTermArrayIntro k es) -> do
+    --   let es' = map reduceWeakTermPlus es
+    --   (m, WeakTermArrayIntro k es')
+    -- (m, WeakTermArrayElim k xts e1 e2) -> do
+    --   let e1' = reduceWeakTermPlus e1
+    --   case e1' of
+    --     (_, WeakTermArrayIntro k' es)
+    --       | length es == length xts,
+    --         k == k' -> do
+    --         let (_, xs, _) = unzip3 xts
+    --         let sub = IntMap.fromList $ zip (map asInt xs) es
+    --         reduceWeakTermPlus $ substWeakTermPlus sub e2
+    --     _ ->
+    --       (m, WeakTermArrayElim k xts e1' e2)
+    -- (m, WeakTermStructIntro eks) -> do
+    --   let (es, ks) = unzip eks
+    --   let es' = map reduceWeakTermPlus es
+    --   (m, WeakTermStructIntro $ zip es' ks)
+    -- (m, WeakTermStructElim xks e1 e2) -> do
+    --   let e1' = reduceWeakTermPlus e1
+    --   case e1' of
+    --     (_, WeakTermStructIntro eks)
+    --       | (_, xs, ks1) <- unzip3 xks,
+    --         (es, ks2) <- unzip eks,
+    --         ks1 == ks2 -> do
+    --         let sub = IntMap.fromList $ zip (map asInt xs) es
+    --         reduceWeakTermPlus $ substWeakTermPlus sub e2
+    --     _ ->
+    --       (m, WeakTermStructElim xks e1' e2)
     (_, WeakTermQuestion e _) ->
       reduceWeakTermPlus e
     (m, WeakTermExploit i t ekts) -> do

@@ -60,38 +60,38 @@ reduceTermPlus term =
           let es' = map reduceTermPlus es
           let les' = zip ls es'
           (m, TermEnumElim (e', t') les')
-    (m, TermArray dom k) -> do
-      let dom' = reduceTermPlus dom
-      (m, TermArray dom' k)
-    (m, TermArrayIntro k es) -> do
-      let es' = map reduceTermPlus es
-      (m, TermArrayIntro k es')
-    (m, TermArrayElim k xts e1 e2) -> do
-      let e1' = reduceTermPlus e1
-      case e1 of
-        (_, TermArrayIntro k' es)
-          | length es == length xts,
-            k == k' -> do
-            let xs = map (\(_, x, _) -> asInt x) xts
-            let sub = IntMap.fromList $ zip xs es
-            reduceTermPlus $ substTermPlus sub e2
-        _ ->
-          (m, TermArrayElim k xts e1' e2)
-    (m, TermStructIntro eks) -> do
-      let (es, ks) = unzip eks
-      let es' = map reduceTermPlus es
-      (m, TermStructIntro $ zip es' ks)
-    (m, TermStructElim xks e1 e2) -> do
-      let e1' = reduceTermPlus e1
-      case e1' of
-        (_, TermStructIntro eks)
-          | (_, xs, ks1) <- unzip3 xks,
-            (es, ks2) <- unzip eks,
-            ks1 == ks2 -> do
-            let sub = IntMap.fromList $ zip (map asInt xs) es
-            reduceTermPlus $ substTermPlus sub e2
-        _ ->
-          (m, TermStructElim xks e1' e2)
+    -- (m, TermArray dom k) -> do
+    --   let dom' = reduceTermPlus dom
+    --   (mp, TermArray dom' k)
+    -- (m, TermArrayIntro k es) -> do
+    --   let es' = map reduceTermPlus es
+    --   (m, TermArrayIntro k es')
+    -- (m, TermArrayElim k xts e1 e2) -> do
+    --   let e1' = reduceTermPlus e1
+    --   case e1 of
+    --     (_, TermArrayIntro k' es)
+    --       | length es == length xts,
+    --         k == k' -> do
+    --         let xs = map (\(_, x, _) -> asInt x) xts
+    --         let sub = IntMap.fromList $ zip xs es
+    --         reduceTermPlus $ substTermPlus sub e2
+    --     _ ->
+    --       (m, TermArrayElim k xts e1' e2)
+    -- (m, TermStructIntro eks) -> do
+    --   let (es, ks) = unzip eks
+    --   let es' = map reduceTermPlus es
+    --   (m, TermStructIntro $ zip es' ks)
+    -- (m, TermStructElim xks e1 e2) -> do
+    --   let e1' = reduceTermPlus e1
+    --   case e1' of
+    --     (_, TermStructIntro eks)
+    --       | (_, xs, ks1) <- unzip3 xks,
+    --         (es, ks2) <- unzip eks,
+    --         ks1 == ks2 -> do
+    --         let sub = IntMap.fromList $ zip (map asInt xs) es
+    --         reduceTermPlus $ substTermPlus sub e2
+    --     _ ->
+    --       (m, TermStructElim xks e1' e2)
     (m, TermExploit i t ekts) -> do
       let (es, ks, ts) = unzip3 ekts
       let es' = map reduceTermPlus es
@@ -123,14 +123,14 @@ isValue term =
       True
     (_, TermEnumIntro _) ->
       True
-    (_, TermArray {}) ->
-      True
-    (_, TermArrayIntro _ es) ->
-      and $ map isValue es
-    (_, TermStruct {}) ->
-      True
-    (_, TermStructIntro eks) ->
-      and $ map (isValue . fst) eks
+    -- (_, TermArray {}) ->
+    --   True
+    -- (_, TermArrayIntro _ es) ->
+    --   and $ map isValue es
+    -- (_, TermStruct {}) ->
+    --   True
+    -- (_, TermStructIntro eks) ->
+    --   and $ map (isValue . fst) eks
     _ ->
       False
 

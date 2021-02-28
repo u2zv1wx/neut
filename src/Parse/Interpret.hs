@@ -128,42 +128,42 @@ interpret inputTree =
             return (m, WeakTermEnumElim (e', h) cs')
           | otherwise ->
             raiseSyntaxError m "(enum-elimination TREE TREE*)"
-        "array"
-          | [dom, kind] <- rest -> do
-            dom' <- interpret dom
-            kind' <- asArrayKind kind
-            return (m, WeakTermArray dom' kind')
-          | otherwise ->
-            raiseSyntaxError m "(array TREE TREE)"
-        "array-introduction"
-          | kind : es <- rest -> do
-            kind' <- asArrayKind kind
-            es' <- mapM interpret es
-            return (m, WeakTermArrayIntro kind' es')
-          | otherwise ->
-            raiseSyntaxError m "(array-introduction TREE TREE*)"
-        "array-elimination"
-          | [kind, (_, TreeNode xts), e1, e2] <- rest -> do
-            kind' <- asArrayKind kind
-            e1' <- interpret e1
-            (xts', e2') <- interpretBinder xts e2
-            return (m, WeakTermArrayElim kind' xts' e1' e2')
-          | otherwise ->
-            raiseSyntaxError m "(array-elimination TREE (TREE*) TREE TREE)"
-        "struct" -> do
-          ks' <- mapM asArrayKind rest
-          return (m, WeakTermStruct ks')
-        "struct-introduction" -> do
-          ets' <- mapM interpretStructIntro rest
-          return (m, WeakTermStructIntro ets')
-        "struct-elimination"
-          | [(_, TreeNode xts), e1, e2] <- rest -> do
-            e1' <- interpret e1
-            xts' <- mapM interpretStructElim xts
-            e2' <- interpret e2
-            return (m, WeakTermStructElim xts' e1' e2')
-          | otherwise ->
-            raiseSyntaxError m "(struct-elimination (TREE*) TREE TREE)"
+        -- "array"
+        --   | [dom, kind] <- rest -> do
+        --     dom' <- interpret dom
+        --     kind' <- asArrayKind kind
+        --     return (m, WeakTermArray dom' kind')
+        --   | otherwise ->
+        --     raiseSyntaxError m "(array TREE TREE)"
+        -- "array-introduction"
+        --   | kind : es <- rest -> do
+        --     kind' <- asArrayKind kind
+        --     es' <- mapM interpret es
+        --     return (m, WeakTermArrayIntro kind' es')
+        --   | otherwise ->
+        --     raiseSyntaxError m "(array-introduction TREE TREE*)"
+        -- "array-elimination"
+        --   | [kind, (_, TreeNode xts), e1, e2] <- rest -> do
+        --     kind' <- asArrayKind kind
+        --     e1' <- interpret e1
+        --     (xts', e2') <- interpretBinder xts e2
+        --     return (m, WeakTermArrayElim kind' xts' e1' e2')
+        --   | otherwise ->
+        --     raiseSyntaxError m "(array-elimination TREE (TREE*) TREE TREE)"
+        -- "struct" -> do
+        --   ks' <- mapM asArrayKind rest
+        --   return (m, WeakTermStruct ks')
+        -- "struct-introduction" -> do
+        --   ets' <- mapM interpretStructIntro rest
+        --   return (m, WeakTermStructIntro ets')
+        -- "struct-elimination"
+        --   | [(_, TreeNode xts), e1, e2] <- rest -> do
+        --     e1' <- interpret e1
+        --     xts' <- mapM interpretStructElim xts
+        --     e2' <- interpret e2
+        --     return (m, WeakTermStructElim xts' e1' e2')
+        --   | otherwise ->
+        --     raiseSyntaxError m "(struct-elimination (TREE*) TREE TREE)"
         "question"
           | [e] <- rest -> do
             e' <- interpret e
@@ -234,36 +234,38 @@ interpretArg es =
 --     ((len u64))
 --     (array len u8)))
 sigmaIntroString :: Hint -> [WeakTermPlus] -> WithEnv WeakTermPlus
-sigmaIntroString m u8s = do
-  p "u8s:"
-  p' u8s
-  let z = asIdent "internal.sigma-tau"
-  k <- newNameWith'' "sigma"
-  let lenVar = asIdent "length"
-  arrVar <- newNameWith'' "array"
-  return
-    ( m,
-      WeakTermPiIntro
-        [ (m, z, (m, WeakTermTau)),
-          ( m,
-            k,
-            ( m,
-              WeakTermPi
-                [ (m, lenVar, (m, WeakTermConst (showIntSize 64))),
-                  (m, arrVar, (m, WeakTermArray (m, WeakTermUpsilon lenVar) (ArrayKindInt 8)))
-                ]
-                (m, WeakTermUpsilon z)
-            )
-          )
-        ]
-        ( m,
-          WeakTermPiElim
-            (m, WeakTermUpsilon k)
-            [ (m, WeakTermInt (i64 m) (toInteger $ length u8s)),
-              (m, WeakTermArrayIntro (ArrayKindInt 8) u8s)
-            ]
-        )
-    )
+sigmaIntroString =
+  undefined
+
+-- p "u8s:"
+-- p' u8s
+-- let z = asIdent "internal.sigma-tau"
+-- k <- newNameWith'' "sigma"
+-- let lenVar = asIdent "length"
+-- arrVar <- newNameWith'' "array"
+-- return
+--   ( m,
+--     WeakTermPiIntro
+--       [ (m, z, (m, WeakTermTau)),
+--         ( m,
+--           k,
+--           ( m,
+--             WeakTermPi
+--               [ (m, lenVar, (m, WeakTermConst (showIntSize 64))),
+--                 (m, arrVar, (m, WeakTermArray (m, WeakTermUpsilon lenVar) (ArrayKindInt 8)))
+--               ]
+--               (m, WeakTermUpsilon z)
+--           )
+--         )
+--       ]
+--       ( m,
+--         WeakTermPiElim
+--           (m, WeakTermUpsilon k)
+--           [ (m, WeakTermInt (i64 m) (toInteger $ length u8s)),
+--             (m, WeakTermArrayIntro (ArrayKindInt 8) u8s)
+--           ]
+--       )
+--   )
 
 interpretWeakIdentPlus :: TreePlus -> WithEnv WeakIdentPlus
 interpretWeakIdentPlus tree =
@@ -353,25 +355,25 @@ interpretEnumCase tree =
     (m, _) ->
       raiseSyntaxError m "default | LEAF"
 
-interpretStructIntro :: TreePlus -> WithEnv (WeakTermPlus, ArrayKind)
-interpretStructIntro tree =
-  case tree of
-    (_, TreeNode [k, e]) -> do
-      k' <- asArrayKind k
-      e' <- interpret e
-      return (e', k')
-    e ->
-      raiseSyntaxError (fst e) "(TREE TREE)"
+-- interpretStructIntro :: TreePlus -> WithEnv (WeakTermPlus, ArrayKind)
+-- interpretStructIntro tree =
+--   case tree of
+--     (_, TreeNode [k, e]) -> do
+--       k' <- asArrayKind k
+--       e' <- interpret e
+--       return (e', k')
+--     e ->
+--       raiseSyntaxError (fst e) "(TREE TREE)"
 
-interpretStructElim :: TreePlus -> WithEnv (Hint, Ident, ArrayKind)
-interpretStructElim tree =
-  case tree of
-    (_, TreeNode [leaf, k]) -> do
-      (m, x) <- interpretLeaf leaf
-      k' <- asArrayKind k
-      return (m, x, k')
-    e ->
-      raiseSyntaxError (fst e) "(LEAF TREE)"
+-- interpretStructElim :: TreePlus -> WithEnv (Hint, Ident, ArrayKind)
+-- interpretStructElim tree =
+--   case tree of
+--     (_, TreeNode [leaf, k]) -> do
+--       (m, x) <- interpretLeaf leaf
+--       k' <- asArrayKind k
+--       return (m, x, k')
+--     e ->
+--       raiseSyntaxError (fst e) "(LEAF TREE)"
 
 readValueInt :: T.Text -> T.Text -> Maybe (IntSize, Integer)
 readValueInt t x
@@ -381,17 +383,17 @@ readValueInt t x
   | otherwise =
     Nothing
 
-asArrayKind :: TreePlus -> WithEnv ArrayKind
-asArrayKind tree =
-  case tree of
-    e@(_, TreeLeaf x) ->
-      case asArrayKindMaybe x of
-        Nothing ->
-          raiseSyntaxError (fst e) "SINT-TYPE | UINT-TYPE | FLOAT-TYPE"
-        Just t ->
-          return t
-    _ ->
-      raiseSyntaxError (fst tree) "LEAF"
+-- asArrayKind :: TreePlus -> WithEnv ArrayKind
+-- asArrayKind tree =
+--   case tree of
+--     e@(_, TreeLeaf x) ->
+--       case asArrayKindMaybe x of
+--         Nothing ->
+--           raiseSyntaxError (fst e) "SINT-TYPE | UINT-TYPE | FLOAT-TYPE"
+--         Just t ->
+--           return t
+--     _ ->
+--       raiseSyntaxError (fst tree) "LEAF"
 
 interpretExploitItem :: TreePlus -> WithEnv (WeakTermPlus, ExploitArgKind)
 interpretExploitItem tree =

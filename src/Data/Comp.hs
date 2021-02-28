@@ -5,7 +5,6 @@ import Data.Exploit
 import Data.Hint
 import Data.Ident
 import qualified Data.IntMap as IntMap
-import Data.LowType
 import Data.Maybe (fromMaybe)
 import Data.Primitive
 import Data.Size
@@ -14,21 +13,21 @@ import qualified Data.Text as T
 data Value
   = ValueConst T.Text
   | ValueUpsilon Ident
-  | ValueSigmaIntro ArrayKind [ValuePlus]
+  | ValueSigmaIntro [ValuePlus]
   | ValueInt IntSize Integer
   | ValueFloat FloatSize Double
   | ValueEnumIntro T.Text
-  | ValueStructIntro [(ValuePlus, ArrayKind)]
+  -- | ValueStructIntro [(ValuePlus, ArrayKind)]
   deriving (Show)
 
 data Comp
   = CompPrimitive Primitive
   | CompPiElimDownElim ValuePlus [ValuePlus] -- ((force v) v1 ... vn)
-  | CompSigmaElim ArrayKind [Ident] ValuePlus CompPlus
+  | CompSigmaElim [Ident] ValuePlus CompPlus
   | CompUpIntro ValuePlus
   | CompUpElim Ident CompPlus CompPlus
   | CompEnumElim ValuePlus [(EnumCase, CompPlus)]
-  | CompStructElim [(Ident, ArrayKind)] ValuePlus CompPlus
+  -- | CompStructElim [(Ident, ArrayKind)] ValuePlus CompPlus
   deriving (Show)
 
 data Primitive
@@ -59,13 +58,13 @@ asUpsilon term =
     _ ->
       Nothing
 
-sigmaIntro :: [ValuePlus] -> Value
-sigmaIntro =
-  ValueSigmaIntro arrVoidPtr
+-- sigmaIntro :: [ValuePlus] -> Value
+-- sigmaIntro =
+--   ValueSigmaIntro
 
-sigmaElim :: [Ident] -> ValuePlus -> CompPlus -> Comp
-sigmaElim =
-  CompSigmaElim arrVoidPtr
+-- sigmaElim :: [Ident] -> ValuePlus -> CompPlus -> Comp
+-- sigmaElim =
+--   CompSigmaElim
 
 type SubstValuePlus =
   IntMap.IntMap ValuePlus
@@ -77,19 +76,19 @@ substValuePlus sub term =
       (m, ValueConst x)
     (m, ValueUpsilon s) ->
       fromMaybe (m, ValueUpsilon s) (IntMap.lookup (asInt s) sub)
-    (m, ValueSigmaIntro mk vs) -> do
+    (m, ValueSigmaIntro vs) -> do
       let vs' = map (substValuePlus sub) vs
-      (m, ValueSigmaIntro mk vs')
+      (m, ValueSigmaIntro vs')
     (m, ValueInt size l) ->
       (m, ValueInt size l)
     (m, ValueFloat size l) ->
       (m, ValueFloat size l)
     (m, ValueEnumIntro l) ->
       (m, ValueEnumIntro l)
-    (m, ValueStructIntro dks) -> do
-      let (ds, ks) = unzip dks
-      let ds' = map (substValuePlus sub) ds
-      (m, ValueStructIntro $ zip ds' ks)
+    -- (m, ValueStructIntro dks) -> do
+    --   let (ds, ks) = unzip dks
+    --   let ds' = map (substValuePlus sub) ds
+    --   (m, ValueStructIntro $ zip ds' ks)
 
 substCompPlus :: SubstValuePlus -> CompPlus -> CompPlus
 substCompPlus sub term =
@@ -101,11 +100,11 @@ substCompPlus sub term =
       let v' = substValuePlus sub v
       let ds' = map (substValuePlus sub) ds
       (m, CompPiElimDownElim v' ds')
-    (m, CompSigmaElim mk xs v e) -> do
+    (m, CompSigmaElim xs v e) -> do
       let v' = substValuePlus sub v
       let sub' = foldr IntMap.delete sub (map asInt xs)
       let e' = substCompPlus sub' e
-      (m, CompSigmaElim mk xs v' e')
+      (m, CompSigmaElim xs v' e')
     (m, CompUpIntro v) -> do
       let v' = substValuePlus sub v
       (m, CompUpIntro v')
@@ -119,11 +118,11 @@ substCompPlus sub term =
       let (cs, es) = unzip branchList
       let es' = map (substCompPlus sub) es
       (m, CompEnumElim v' (zip cs es'))
-    (m, CompStructElim xks v e) -> do
-      let v' = substValuePlus sub v
-      let sub' = foldr IntMap.delete sub (map (asInt . fst) xks)
-      let e' = substCompPlus sub' e
-      (m, CompStructElim xks v' e')
+    -- (m, CompStructElim xks v e) -> do
+    --   let v' = substValuePlus sub v
+    --   let sub' = foldr IntMap.delete sub (map (asInt . fst) xks)
+    --   let e' = substCompPlus sub' e
+    --   (m, CompStructElim xks v' e')
 
 substPrimitive :: SubstValuePlus -> Primitive -> Primitive
 substPrimitive sub c =

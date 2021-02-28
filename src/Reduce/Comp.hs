@@ -27,22 +27,21 @@ reduceCompPlus term =
             reduceCompPlus $ substCompPlus sub body
         _ ->
           return (m, CompPiElimDownElim v ds)
-    (m, CompSigmaElim mk xs v e) ->
+    (m, CompSigmaElim xs v e) ->
       case v of
-        (_, ValueSigmaIntro mk' ds)
-          | length ds == length xs,
-            mk == mk' -> do
+        (_, ValueSigmaIntro ds)
+          | length ds == length xs -> do
             let sub = IntMap.fromList (zip (map asInt xs) ds)
             reduceCompPlus $ substCompPlus sub e
         _ -> do
           e' <- reduceCompPlus e
           case e' of
-            (mUp, CompUpIntro (_, ValueSigmaIntro _ ds))
+            (mUp, CompUpIntro (_, ValueSigmaIntro ds))
               | Just ys <- mapM asUpsilon ds,
                 xs == ys ->
                 return (mUp, CompUpIntro v) -- eta-reduce
             _ ->
-              return (m, CompSigmaElim mk xs v e')
+              return (m, CompSigmaElim xs v e')
     (m, CompUpIntro v) ->
       return (m, CompUpIntro v)
     (m, CompUpElim x e1 e2) -> do
@@ -54,10 +53,10 @@ reduceCompPlus term =
             reduceCompPlus $ substCompPlus sub e2
         (my, CompUpElim y ey1 ey2) ->
           reduceCompPlus (my, CompUpElim y ey1 (m, CompUpElim x ey2 e2)) -- commutative conversion
-        (my, CompSigmaElim mk yts vy ey) ->
-          reduceCompPlus (my, CompSigmaElim mk yts vy (m, CompUpElim x ey e2)) -- commutative conversion
-        (my, CompStructElim yts vy ey) ->
-          reduceCompPlus (my, CompStructElim yts vy (m, CompUpElim x ey e2)) -- commutative conversion
+        (my, CompSigmaElim yts vy ey) ->
+          reduceCompPlus (my, CompSigmaElim yts vy (m, CompUpElim x ey e2)) -- commutative conversion
+          -- (my, CompStructElim yts vy ey) ->
+          --   reduceCompPlus (my, CompStructElim yts vy (m, CompUpElim x ey e2)) -- commutative conversion
         _ -> do
           e2' <- reduceCompPlus e2
           case e2' of
@@ -77,22 +76,23 @@ reduceCompPlus term =
           let (ls, es) = unzip les
           es' <- mapM reduceCompPlus es
           return (m, CompEnumElim v (zip ls es'))
-    (m, CompStructElim xks d e) -> do
-      let (xs, ks1) = unzip xks
-      case d of
-        (_, ValueStructIntro eks)
-          | (es, ks2) <- unzip eks,
-            ks1 == ks2 -> do
-            let sub = IntMap.fromList (zip (map asInt xs) es)
-            reduceCompPlus $ substCompPlus sub e
-        _ -> do
-          e' <- reduceCompPlus e
-          case e' of
-            (mUp, CompUpIntro (_, ValueStructIntro dks))
-              | (ds2, ks2) <- unzip dks,
-                ks1 == ks2,
-                Just ys <- mapM asUpsilon ds2,
-                xs == ys ->
-                return (mUp, CompUpIntro d) -- eta-reduce
-            _ ->
-              return (m, CompStructElim xks d e')
+
+-- (m, CompStructElim xks d e) -> do
+--   let (xs, ks1) = unzip xks
+--   case d of
+--     (_, ValueStructIntro eks)
+--       | (es, ks2) <- unzip eks,
+--         ks1 == ks2 -> do
+--         let sub = IntMap.fromList (zip (map asInt xs) es)
+--         reduceCompPlus $ substCompPlus sub e
+--     _ -> do
+--       e' <- reduceCompPlus e
+--       case e' of
+--         (mUp, CompUpIntro (_, ValueStructIntro dks))
+--           | (ds2, ks2) <- unzip dks,
+--             ks1 == ks2,
+--             Just ys <- mapM asUpsilon ds2,
+--             xs == ys ->
+--             return (mUp, CompUpIntro d) -- eta-reduce
+--         _ ->
+--           return (m, CompStructElim xks d e')

@@ -39,12 +39,12 @@ lowerComp term =
       (fun, castThen) <- llvmCast (Just $ takeBaseName v) v $ toFunPtrType ds
       castThenCall <- castThen $ LowCompCall fun vs
       lowerValueLet' (zip xs ds) castThenCall
-    (_, CompSigmaElim k xs v e) -> do
-      let et = arrayKindToLowType k -- elem type
-      let bt = LowTypePtr $ LowTypeArray (length xs) et -- base pointer type  ([(length xs) x ARRAY_ELEM_TYPE])
+    (_, CompSigmaElim xs v e) -> do
+      -- let et = arrayKindToLowType k -- elem type
+      let bt = LowTypePtr $ LowTypeArray (length xs) voidPtr -- base pointer type  ([(length xs) x ARRAY_ELEM_TYPE])
       let idxList = map (\i -> (LowValueInt i, i32)) [0 ..]
       ys <- mapM newNameWith xs
-      let xts' = zip xs (repeat et)
+      let xts' = zip xs (repeat voidPtr)
       loadContent v bt (zip idxList (zip ys xts')) e
     (_, CompUpIntro d) -> do
       result <- newNameWith' $ takeBaseName d
@@ -62,14 +62,15 @@ lowerComp term =
           let t = LowTypeInt 64
           (cast, castThen) <- llvmCast (Just "enum-base") v t
           castThen $ LowCompSwitch (cast, t) defaultCase caseList
-    (_, CompStructElim xks v e) -> do
-      let (xs, ks) = unzip xks
-      let ts = map arrayKindToLowType ks
-      let xts = zip xs ts
-      let bt = LowTypePtr $ LowTypeStruct ts
-      let idxList = map (\i -> (LowValueInt i, i32)) [0 ..]
-      ys <- mapM newNameWith xs
-      loadContent v bt (zip idxList (zip ys xts)) e
+
+-- (_, CompStructElim xks v e) -> do
+--   let (xs, ks) = unzip xks
+--   let ts = map arrayKindToLowType ks
+--   let xts = zip xs ts
+--   let bt = LowTypePtr $ LowTypeStruct ts
+--   let idxList = map (\i -> (LowValueInt i, i32)) [0 ..]
+--   ys <- mapM newNameWith xs
+--   loadContent v bt (zip idxList (zip ys xts)) e
 
 uncastList :: [(Ident, (Ident, LowType))] -> CompPlus -> WithEnv LowComp
 uncastList args e =
@@ -87,7 +88,7 @@ takeBaseName term =
       s
     (_, ValueUpsilon (I (s, _))) ->
       s
-    (_, ValueSigmaIntro _ ds) ->
+    (_, ValueSigmaIntro ds) ->
       "array" <> T.pack (show (length ds))
     (_, ValueInt size _) ->
       "i" <> T.pack (show size)
@@ -99,8 +100,9 @@ takeBaseName term =
       "double"
     (_, ValueEnumIntro _) ->
       "i64"
-    (_, ValueStructIntro dks) ->
-      "struct" <> T.pack (show (length dks))
+
+-- (_, ValueStructIntro dks) ->
+--   "struct" <> T.pack (show (length dks))
 
 takeBaseName' :: LowValue -> T.Text
 takeBaseName' lowerValue =
@@ -354,10 +356,10 @@ lowerValueLet x lowerValue cont =
             llvmUncastLet x (LowValueGlobal y) (toFunPtrType args) cont
     (_, ValueUpsilon y) ->
       llvmUncastLet x (LowValueLocal y) voidPtr cont
-    (m, ValueSigmaIntro k ds) -> do
-      let elemType = arrayKindToLowType k
-      let arrayType = AggPtrTypeArray (length ds) elemType
-      let dts = zip ds (repeat elemType)
+    (m, ValueSigmaIntro ds) -> do
+      -- let elemType = arrayKindToLowType k
+      let arrayType = AggPtrTypeArray (length ds) voidPtr
+      let dts = zip ds (repeat voidPtr)
       storeContent m x arrayType dts cont
     (_, ValueInt size l) ->
       llvmUncastLet x (LowValueInt l) (LowTypeInt size) cont
@@ -366,11 +368,12 @@ lowerValueLet x lowerValue cont =
     (m, ValueEnumIntro l) -> do
       i <- toInteger <$> getEnumNum m l
       llvmUncastLet x (LowValueInt i) (LowTypeInt 64) cont
-    (m, ValueStructIntro dks) -> do
-      let (ds, ks) = unzip dks
-      let ts = map arrayKindToLowType ks
-      let structType = AggPtrTypeStruct ts
-      storeContent m x structType (zip ds ts) cont
+
+-- (m, ValueStructIntro dks) -> do
+--   let (ds, ks) = unzip dks
+--   let ts = map arrayKindToLowType ks
+--   let structType = AggPtrTypeStruct ts
+--   storeContent m x structType (zip ds ts) cont
 
 syscallToLowComp :: Integer -> [LowValue] -> WithEnv LowComp
 syscallToLowComp num ds = do

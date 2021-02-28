@@ -142,7 +142,7 @@ withHeaderRelevant' t expVar ch cont@(m, _) =
                 expVar
                 [(m, ValueEnumIntro boolTrue), (m, ValueUpsilon x)]
             )
-            (m, sigmaElim [x1, x2] sigVar cont')
+            (m, CompSigmaElim [x1, x2] sigVar cont')
         )
 
 merge :: [NameMap] -> NameMap
@@ -158,13 +158,13 @@ distinguishValue zs term =
         else do
           x' <- newNameWith x
           return (IntMap.singleton (asInt x) [x'], (ml, ValueUpsilon x'))
-    (ml, ValueSigmaIntro mk ds) -> do
+    (ml, ValueSigmaIntro ds) -> do
       (vss, ds') <- unzip <$> mapM (distinguishValue zs) ds
-      return (merge vss, (ml, ValueSigmaIntro mk ds'))
-    (m, ValueStructIntro dks) -> do
-      let (ds, ks) = unzip dks
-      (vss, ds') <- unzip <$> mapM (distinguishValue zs) ds
-      return (merge vss, (m, ValueStructIntro $ zip ds' ks))
+      return (merge vss, (ml, ValueSigmaIntro ds'))
+    -- (m, ValueStructIntro dks) -> do
+    --   let (ds, ks) = unzip dks
+    --   (vss, ds') <- unzip <$> mapM (distinguishValue zs) ds
+    --   return (merge vss, (m, ValueStructIntro $ zip ds' ks))
     _ ->
       return (IntMap.empty, term)
 
@@ -178,11 +178,11 @@ distinguishComp zs term =
       (vs, d') <- distinguishValue zs d
       (vss, ds') <- unzip <$> mapM (distinguishValue zs) ds
       return (merge $ vs : vss, (ml, CompPiElimDownElim d' ds'))
-    (ml, CompSigmaElim mk xs d e) -> do
+    (ml, CompSigmaElim xs d e) -> do
       (vs1, d') <- distinguishValue zs d
       let zs' = filter (`notElem` xs) zs
       (vs2, e') <- distinguishComp zs' e
-      return (merge [vs1, vs2], (ml, CompSigmaElim mk xs d' e'))
+      return (merge [vs1, vs2], (ml, CompSigmaElim xs d' e'))
     (ml, CompUpIntro d) -> do
       (vs, d') <- distinguishValue zs d
       return (vs, (ml, CompUpIntro d'))
@@ -198,11 +198,12 @@ distinguishComp zs term =
       let (cs, es) = unzip branchList
       (vss, es') <- unzip <$> mapM (distinguishComp zs) es
       return (merge $ vs : vss, (ml, CompEnumElim d' (zip cs es')))
-    (ml, CompStructElim xts d e) -> do
-      (vs1, d') <- distinguishValue zs d
-      let zs' = filter (`notElem` map fst xts) zs
-      (vs2, e') <- distinguishComp zs' e
-      return (merge [vs1, vs2], (ml, CompStructElim xts d' e'))
+
+-- (ml, CompStructElim xts d e) -> do
+--   (vs1, d') <- distinguishValue zs d
+--   let zs' = filter (`notElem` map fst xts) zs
+--   (vs2, e') <- distinguishComp zs' e
+--   return (merge [vs1, vs2], (ml, CompStructElim xts d' e'))
 
 distinguishPrimitive :: [Ident] -> Primitive -> WithEnv (NameMap, Primitive)
 distinguishPrimitive zs term =

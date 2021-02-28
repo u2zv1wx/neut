@@ -7,7 +7,6 @@ import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import Data.Hint
 import Data.Ident
-import Data.LowType
 import Data.Namespace
 import Data.Term
 import qualified Data.Text as T
@@ -97,40 +96,40 @@ cartesianImmediate m =
 
 affineImmediate :: ValuePlus -> WithEnv CompPlus
 affineImmediate (m, _) =
-  return (m, CompUpIntro (m, sigmaIntro []))
+  return (m, CompUpIntro (m, ValueSigmaIntro []))
 
 relevantImmediate :: ValuePlus -> WithEnv CompPlus
 relevantImmediate argVar@(m, _) =
-  return (m, CompUpIntro (m, sigmaIntro [argVar, argVar]))
+  return (m, CompUpIntro (m, ValueSigmaIntro [argVar, argVar]))
 
-cartesianStruct :: Hint -> [ArrayKind] -> WithEnv ValuePlus
-cartesianStruct m ks = do
-  (args, e) <- makeSwitcher m (affineStruct ks) (relevantStruct ks)
-  i <- newCount
-  let name = "cartesian-struct-" <> T.pack (show i)
-  insCompEnv name False args e
-  return (m, ValueConst name)
+-- cartesianStruct :: Hint -> [ArrayKind] -> WithEnv ValuePlus
+-- cartesianStruct m ks = do
+--   (args, e) <- makeSwitcher m (affineStruct ks) (relevantStruct ks)
+--   i <- newCount
+--   let name = "cartesian-struct-" <> T.pack (show i)
+--   insCompEnv name False args e
+--   return (m, ValueConst name)
 
-affineStruct :: [ArrayKind] -> ValuePlus -> WithEnv CompPlus
-affineStruct ks argVar@(m, _) = do
-  xs <- mapM (const $ newNameWith' "var") ks
-  return
-    (m, CompStructElim (zip xs ks) argVar (m, CompUpIntro (m, sigmaIntro [])))
+-- affineStruct :: [ArrayKind] -> ValuePlus -> WithEnv CompPlus
+-- affineStruct ks argVar@(m, _) = do
+--   xs <- mapM (const $ newNameWith' "var") ks
+--   return
+--     (m, CompStructElim (zip xs ks) argVar (m, CompUpIntro (m, sigmaIntro [])))
 
-relevantStruct :: [ArrayKind] -> ValuePlus -> WithEnv CompPlus
-relevantStruct ks argVar@(m, _) = do
-  xs <- mapM (const $ newNameWith' "var") ks
-  let vks = zip (map (\y -> (m, ValueUpsilon y)) xs) ks
-  return
-    ( m,
-      CompStructElim
-        (zip xs ks)
-        argVar
-        ( m,
-          CompUpIntro
-            (m, sigmaIntro [(m, ValueStructIntro vks), (m, ValueStructIntro vks)])
-        )
-    )
+-- relevantStruct :: [ArrayKind] -> ValuePlus -> WithEnv CompPlus
+-- relevantStruct ks argVar@(m, _) = do
+--   xs <- mapM (const $ newNameWith' "var") ks
+--   let vks = zip (map (\y -> (m, ValueUpsilon y)) xs) ks
+--   return
+--     ( m,
+--       CompStructElim
+--         (zip xs ks)
+--         argVar
+--         ( m,
+--           CompUpIntro
+--             (m, sigmaIntro [(m, ValueStructIntro vks), (m, ValueStructIntro vks)])
+--         )
+--     )
 
 insCompEnv :: T.Text -> Bool -> [Ident] -> CompPlus -> WithEnv ()
 insCompEnv name isFixed args e = do

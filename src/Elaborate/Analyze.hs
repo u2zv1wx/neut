@@ -70,18 +70,18 @@ simp' constraintList =
         ((_, WeakTermFloat t1 l1), (_, WeakTermFloat t2 l2))
           | l1 == l2 ->
             simp $ (t1, t2) : cs
-        ((_, WeakTermArray dom1 k1), (_, WeakTermArray dom2 k2))
-          | k1 == k2 ->
-            simp $ (dom1, dom2) : cs
-        ((_, WeakTermArrayIntro k1 es1), (_, WeakTermArrayIntro k2 es2))
-          | k1 == k2,
-            length es1 == length es2 ->
-            simp $ zip es1 es2 ++ cs
-        ((_, WeakTermStructIntro eks1), (_, WeakTermStructIntro eks2))
-          | (es1, ks1) <- unzip eks1,
-            (es2, ks2) <- unzip eks2,
-            ks1 == ks2 ->
-            simp $ zip es1 es2 ++ cs
+        -- ((_, WeakTermArray dom1 k1), (_, WeakTermArray dom2 k2))
+        --   | k1 == k2 ->
+        --     simp $ (dom1, dom2) : cs
+        -- ((_, WeakTermArrayIntro k1 es1), (_, WeakTermArrayIntro k2 es2))
+        --   | k1 == k2,
+        --     length es1 == length es2 ->
+        --     simp $ zip es1 es2 ++ cs
+        -- ((_, WeakTermStructIntro eks1), (_, WeakTermStructIntro eks2))
+        --   | (es1, ks1) <- unzip eks1,
+        --     (es2, ks2) <- unzip eks2,
+        --     ks1 == ks2 ->
+        --     simp $ zip es1 es2 ++ cs
         ((_, WeakTermQuestion e1 t1), (_, WeakTermQuestion e2 t2)) ->
           simp $ (e1, e2) : (t1, t2) : cs
         ((_, WeakTermExploit i1 t1 ekts1), (_, WeakTermExploit i2 t2 ekts2))

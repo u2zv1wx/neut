@@ -69,48 +69,48 @@ clarify' tenv term =
       es' <- (mapM (clarify' tenv) >=> alignFVS tenv m fvs) es
       (y, e', yVar) <- clarifyPlus tenv e
       return $ bindLet [(y, e')] (m, CompEnumElim yVar (zip (map snd cs) es'))
-    (m, TermArray {}) ->
-      returnArrayType m
-    (m, TermArrayIntro k es) -> do
-      retImmType <- returnCartesianImmediate m
-      -- arrayType = Sigma{k} [_ : IMMEDIATE, ..., _ : IMMEDIATE]
-      let ts = map Left $ replicate (length es) retImmType
-      arrayType <- cartesianSigma Nothing m k ts
-      (zs, es', xs) <- unzip3 <$> mapM (clarifyPlus tenv) es
-      return $
-        bindLet
-          (zip zs es')
-          (m, CompUpIntro (m, sigmaIntro [arrayType, (m, ValueSigmaIntro k xs)]))
-    (m, TermArrayElim k mxts e1 e2) -> do
-      e1' <- clarify' tenv e1
-      (arr, arrVar) <- newValueUpsilonWith m "arr"
-      arrType <- newNameWith' "arr-type"
-      (content, contentVar) <- newValueUpsilonWith m "arr-content"
-      e2' <- clarify' (insTypeEnv mxts tenv) e2
-      let (_, xs, _) = unzip3 mxts
-      return $
-        bindLet
-          [(arr, e1')]
-          ( m,
-            sigmaElim [arrType, content] arrVar (m, CompSigmaElim k xs contentVar e2')
-          )
-    (m, TermStruct ks) -> do
-      t <- cartesianStruct m ks
-      return (m, CompUpIntro t)
-    (m, TermStructIntro eks) -> do
-      let (es, ks) = unzip eks
-      (xs, es', vs) <- unzip3 <$> mapM (clarifyPlus tenv) es
-      return $
-        bindLet
-          (zip xs es')
-          (m, CompUpIntro (m, ValueStructIntro (zip vs ks)))
-    (m, TermStructElim xks e1 e2) -> do
-      e1' <- clarify' tenv e1
-      let (ms, xs, ks) = unzip3 xks
-      ts <- mapM (inferKind m) ks
-      e2' <- clarify' (insTypeEnv (zip3 ms xs ts) tenv) e2
-      (struct, structVar) <- newValueUpsilonWith m "struct"
-      return $ bindLet [(struct, e1')] (m, CompStructElim (zip xs ks) structVar e2')
+    -- (m, TermArray {}) ->
+    --   returnArrayType m
+    -- (m, TermArrayIntro k es) -> do
+    --   retImmType <- returnCartesianImmediate m
+    --   -- arrayType = Sigma{k} [_ : IMMEDIATE, ..., _ : IMMEDIATE]
+    --   let ts = map Left $ replicate (length es) retImmType
+    --   arrayType <- cartesianSigma Nothing m k ts
+    --   (zs, es', xs) <- unzip3 <$> mapM (clarifyPlus tenv) es
+    --   return $
+    --     bindLet
+    --       (zip zs es')
+    --       (m, CompUpIntro (m, sigmaIntro [arrayType, (m, ValueSigmaIntro k xs)]))
+    -- (m, TermArrayElim k mxts e1 e2) -> do
+    --   e1' <- clarify' tenv e1
+    --   (arr, arrVar) <- newValueUpsilonWith m "arr"
+    --   arrType <- newNameWith' "arr-type"
+    --   (content, contentVar) <- newValueUpsilonWith m "arr-content"
+    --   e2' <- clarify' (insTypeEnv mxts tenv) e2
+    --   let (_, xs, _) = unzip3 mxts
+    --   return $
+    --     bindLet
+    --       [(arr, e1')]
+    --       ( m,
+    --         sigmaElim [arrType, content] arrVar (m, CompSigmaElim k xs contentVar e2')
+    --       )
+    -- (m, TermStruct ks) -> do
+    --   t <- cartesianStruct m ks
+    --   return (m, CompUpIntro t)
+    -- (m, TermStructIntro eks) -> do
+    --   let (es, ks) = unzip eks
+    --   (xs, es', vs) <- unzip3 <$> mapM (clarifyPlus tenv) es
+    --   return $
+    --     bindLet
+    --       (zip xs es')
+    --       (m, CompUpIntro (m, ValueStructIntro (zip vs ks)))
+    -- (m, TermStructElim xks e1 e2) -> do
+    --   e1' <- clarify' tenv e1
+    --   let (ms, xs, ks) = unzip3 xks
+    --   ts <- mapM (inferKind m) ks
+    --   e2' <- clarify' (insTypeEnv (zip3 ms xs ts) tenv) e2
+    --   (struct, structVar) <- newValueUpsilonWith m "struct"
+    --   return $ bindLet [(struct, e1')] (m, CompStructElim (zip xs ks) structVar e2')
     (m, TermExploit expKind resultType ekts) -> do
       let (es, ks, ts) = unzip3 ekts
       xs <- mapM (const $ newNameWith' "sys") es
@@ -236,7 +236,7 @@ computeHeader' (m, x, t) k =
           [arrayInnerTmp],
           \cont ->
             ( m,
-              sigmaElim
+              CompSigmaElim
                 [arrayTypeName, arrayInnerName]
                 (m, ValueUpsilon x)
                 ( m,
@@ -246,7 +246,7 @@ computeHeader' (m, x, t) k =
                     ( m,
                       CompUpElim
                         arrayVarName
-                        (m, CompUpIntro (m, sigmaIntro [arrayType, arrayInnerTmp]))
+                        (m, CompUpIntro (m, ValueSigmaIntro [arrayType, arrayInnerTmp]))
                         cont
                     )
                 )
@@ -279,17 +279,17 @@ makeClosure ::
 makeClosure mName mxts2 m mxts1 e = do
   let xts1 = dropFst mxts1
   let xts2 = dropFst mxts2
-  envExp <- cartesianSigma Nothing m arrVoidPtr $ map Right xts2
+  envExp <- cartesianSigma Nothing m $ map Right xts2
   let vs = map (\(mx, x, _) -> (mx, ValueUpsilon x)) mxts2
-  let fvEnv = (m, sigmaIntro vs)
+  let fvEnv = (m, ValueSigmaIntro vs)
   case mName of
     Nothing -> do
       i <- newCount
       let name = "thunk-" <> T.pack (show i)
       registerIfNecessary m name False xts1 xts2 e
-      return (m, sigmaIntro [envExp, fvEnv, (m, ValueConst name)])
+      return (m, ValueSigmaIntro [envExp, fvEnv, (m, ValueConst name)])
     Just name -> do
-      let cls = (m, sigmaIntro [envExp, fvEnv, (m, ValueConst $ asText'' name)])
+      let cls = (m, ValueSigmaIntro [envExp, fvEnv, (m, ValueConst $ asText'' name)])
       let e' = substCompPlus (IntMap.fromList [(asInt name, cls)]) e
       registerIfNecessary m (asText'' name) True xts1 xts2 e'
       return cls
@@ -308,7 +308,7 @@ registerIfNecessary m name isFixed xts1 xts2 e = do
     e' <- linearize (xts2 ++ xts1) e
     (envVarName, envVar) <- newValueUpsilonWith m "env"
     let args = map fst xts1 ++ [envVarName]
-    let body = (m, sigmaElim (map fst xts2) envVar e')
+    let body = (m, CompSigmaElim (map fst xts2) envVar e')
     insCompEnv name isFixed args body
 
 makeClosure' ::
@@ -347,7 +347,7 @@ callClosure m e zexes = do
     bindLet
       ((clsVarName, e) : zip zs es')
       ( m,
-        sigmaElim
+        CompSigmaElim
           [typeVarName, envVarName, lamVarName]
           clsVar
           (m, CompPiElimDownElim lamVar (xs ++ [envVar]))
@@ -390,24 +390,24 @@ chainOf tenv term =
       let es = map snd les
       xs2 <- concat <$> mapM (chainOf tenv) es
       return $ xs0 ++ xs1 ++ xs2
-    (_, TermArray {}) ->
-      return []
-    (_, TermArrayIntro _ es) ->
-      concat <$> mapM (chainOf tenv) es
-    (_, TermArrayElim _ xts e1 e2) -> do
-      xs1 <- chainOf tenv e1
-      xs2 <- chainOf' tenv xts [e2]
-      return $ xs1 ++ xs2
-    (_, TermStruct _) ->
-      return []
-    (_, TermStructIntro eks) ->
-      concat <$> mapM (chainOf tenv . fst) eks
-    (m, TermStructElim xks e1 e2) -> do
-      xs1 <- chainOf tenv e1
-      let (ms, xs, ks) = unzip3 xks
-      ts <- mapM (inferKind m) ks
-      xs2 <- chainOf (insTypeEnv (zip3 ms xs ts) tenv) e2
-      return $ xs1 ++ filter (\(_, y, _) -> y `notElem` xs) xs2
+    -- (_, TermArray {}) ->
+    --   return []
+    -- (_, TermArrayIntro _ es) ->
+    --   concat <$> mapM (chainOf tenv) es
+    -- (_, TermArrayElim _ xts e1 e2) -> do
+    --   xs1 <- chainOf tenv e1
+    --   xs2 <- chainOf' tenv xts [e2]
+    --   return $ xs1 ++ xs2
+    -- (_, TermStruct _) ->
+    --   return []
+    -- (_, TermStructIntro eks) ->
+    --   concat <$> mapM (chainOf tenv . fst) eks
+    -- (m, TermStructElim xks e1 e2) -> do
+    --   xs1 <- chainOf tenv e1
+    --   let (ms, xs, ks) = unzip3 xks
+    --   ts <- mapM (inferKind m) ks
+    --   xs2 <- chainOf (insTypeEnv (zip3 ms xs ts) tenv) e2
+    --   return $ xs1 ++ filter (\(_, y, _) -> y `notElem` xs) xs2
     (_, TermExploit _ _ ekts) -> do
       let (es, _, ts) = unzip3 ekts
       concat <$> mapM (chainOf tenv) (es ++ ts)

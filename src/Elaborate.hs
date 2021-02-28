@@ -163,27 +163,27 @@ elaborate' term =
               <> toText (weaken e')
               <> "` must be an enum type, but is:\n"
               <> toText (weaken t')
-    (m, WeakTermArray dom k) -> do
-      dom' <- elaborate' dom
-      return (m, TermArray dom' k)
-    (m, WeakTermArrayIntro k es) -> do
-      es' <- mapM elaborate' es
-      return (m, TermArrayIntro k es')
-    (m, WeakTermArrayElim k xts e1 e2) -> do
-      e1' <- elaborate' e1
-      xts' <- mapM elaboratePlus xts
-      e2' <- elaborate' e2
-      return (m, TermArrayElim k xts' e1' e2')
-    (m, WeakTermStruct ts) ->
-      return (m, TermStruct ts)
-    (m, WeakTermStructIntro eks) -> do
-      let (es, ks) = unzip eks
-      es' <- mapM elaborate' es
-      return (m, TermStructIntro $ zip es' ks)
-    (m, WeakTermStructElim xts e1 e2) -> do
-      e1' <- elaborate' e1
-      e2' <- elaborate' e2
-      return (m, TermStructElim xts e1' e2')
+    -- (m, WeakTermArray dom k) -> do
+    --   dom' <- elaborate' dom
+    --   return (m, TermArray dom' k)
+    -- (m, WeakTermArrayIntro k es) -> do
+    --   es' <- mapM elaborate' es
+    --   return (m, TermArrayIntro k es')
+    -- (m, WeakTermArrayElim k xts e1 e2) -> do
+    --   e1' <- elaborate' e1
+    --   xts' <- mapM elaboratePlus xts
+    --   e2' <- elaborate' e2
+    --   return (m, TermArrayElim k xts' e1' e2')
+    -- (m, WeakTermStruct ts) ->
+    --   return (m, TermStruct ts)
+    -- (m, WeakTermStructIntro eks) -> do
+    --   let (es, ks) = unzip eks
+    --   es' <- mapM elaborate' es
+    --   return (m, TermStructIntro $ zip es' ks)
+    -- (m, WeakTermStructElim xts e1 e2) -> do
+    --   e1' <- elaborate' e1
+    --   e2' <- elaborate' e2
+    --   return (m, TermStructElim xts e1' e2')
     (m, WeakTermQuestion e t) -> do
       e' <- elaborate' e
       t' <- elaborate' t
