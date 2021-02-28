@@ -1,6 +1,5 @@
 module Clarify.Sigma
   ( cartesianSigma,
-    -- returnArrayType,
     returnClosureType,
   )
 where
@@ -135,22 +134,6 @@ supplyName mName =
     Left t -> do
       x <- newNameWith' "unused-sigarg"
       return (x, t)
-
--- cartArrayName :: T.Text
--- cartArrayName =
---   "cartesian-array"
-
--- returnArrayType :: Hint -> WithEnv CompPlus
--- returnArrayType m = do
---   (arr, arrVar) <- newValueUpsilonWith m "arr"
---   retImmType <- returnCartesianImmediate m
---   t <-
---     cartesianSigma
---       (Just cartArrayName)
---       m
---       arrVoidPtr
---       [Right (arr, retImmType), Left (m, CompUpIntro arrVar)]
---   return (m, CompUpIntro t)
 
 cartClsName :: T.Text
 cartClsName =

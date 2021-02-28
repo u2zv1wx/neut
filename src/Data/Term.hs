@@ -27,13 +27,7 @@ data Term
   | TermEnum T.Text
   | TermEnumIntro T.Text
   | TermEnumElim (TermPlus, TermPlus) [(EnumCasePlus, TermPlus)]
-  | -- | TermArray TermPlus ArrayKind -- array (LENGTH-in-i64) (KIND)
-    -- | TermArrayIntro ArrayKind [TermPlus]
-    -- | TermArrayElim ArrayKind [IdentPlus] TermPlus TermPlus
-    -- | TermStruct [ArrayKind]
-    -- | TermStructIntro [(TermPlus, ArrayKind)]
-    -- | TermStructElim [(Hint, Ident, ArrayKind)] TermPlus TermPlus
-    TermExploit ExploitKind TermPlus [(TermPlus, ExploitArgKind, TermPlus)]
+  | TermExploit ExploitKind TermPlus [(TermPlus, ExploitArgKind, TermPlus)]
   deriving (Show)
 
 type TermPlus =
@@ -90,21 +84,6 @@ varTermPlus term =
       let ys = varTermPlus e
       let zs = S.unions $ map (varTermPlus . snd) les
       S.unions [xs, ys, zs]
-    -- (_, TermArray dom _) ->
-    --   varTermPlus dom
-    -- (_, TermArrayIntro _ es) ->
-    --   S.unions $ map varTermPlus es
-    -- (_, TermArrayElim _ xts d e) ->
-    --   varTermPlus d `S.union` varTermPlus' xts [e]
-    -- (_, TermStruct {}) ->
-    --   S.empty
-    -- (_, TermStructIntro ets) ->
-    --   S.unions $ map (varTermPlus . fst) ets
-    -- (_, TermStructElim xts d e) -> do
-    --   let xs = map (\(_, x, _) -> asInt x) xts
-    --   let set1 = varTermPlus d
-    --   let set2 = S.filter (`notElem` xs) (varTermPlus e)
-    --   S.union set1 set2
     (_, TermExploit _ _ ekts) -> do
       let (es, _, ts) = unzip3 ekts
       S.unions $ map varTermPlus (es ++ ts)
@@ -157,28 +136,6 @@ substTermPlus sub term =
       let (caseList, es) = unzip branchList
       let es' = map (substTermPlus sub) es
       (m, TermEnumElim (e', t') (zip caseList es'))
-    -- (m, TermArray dom k) -> do
-    --   let dom' = substTermPlus sub dom
-    --   (m, TermArray dom' k)
-    -- (m, TermArrayIntro k es) -> do
-    --   let es' = map (substTermPlus sub) es
-    --   (m, TermArrayIntro k es')
-    -- (m, TermArrayElim mk xts v e) -> do
-    --   let v' = substTermPlus sub v
-    --   let (xts', e') = substTermPlus'' sub xts e
-    --   (m, TermArrayElim mk xts' v' e')
-    -- (m, TermStruct ts) ->
-    --   (m, TermStruct ts)
-    -- (m, TermStructIntro ets) -> do
-    --   let (es, ts) = unzip ets
-    --   let es' = map (substTermPlus sub) es
-    --   (m, TermStructIntro $ zip es' ts)
-    -- (m, TermStructElim xts v e) -> do
-    --   let v' = substTermPlus sub v
-    --   let xs = map (\(_, x, _) -> asInt x) xts
-    --   let sub' = foldr IntMap.delete sub xs
-    --   let e' = substTermPlus sub' e
-    --   (m, TermStructElim xts v' e')
     (m, TermExploit i resultLowType ekts) -> do
       let (es, ks, ts) = unzip3 ekts
       let es' = map (substTermPlus sub) es
@@ -243,27 +200,6 @@ weaken term =
       let (caseList, es) = unzip branchList
       let es' = map weaken es
       (m, WeakTermEnumElim (e', t') (zip caseList es'))
-    -- (m, TermArray dom k) -> do
-    --   let dom' = weaken dom
-    --   (m, WeakTermArray dom' k)
-    -- (m, TermArrayIntro k es) -> do
-    --   let es' = map weaken es
-    --   (m, WeakTermArrayIntro k es')
-    -- (m, TermArrayElim mk xts v e) -> do
-    --   let v' = weaken v
-    --   let xts' = weakenArgs xts
-    --   let e' = weaken e
-    --   (m, WeakTermArrayElim mk xts' v' e')
-    -- (m, TermStruct ts) ->
-    --   (m, WeakTermStruct ts)
-    -- (m, TermStructIntro ets) -> do
-    --   let (es, ts) = unzip ets
-    --   let es' = map weaken es
-    --   (m, WeakTermStructIntro $ zip es' ts)
-    -- (m, TermStructElim xts v e) -> do
-    --   let v' = weaken v
-    --   let e' = weaken e
-    --   (m, WeakTermStructElim xts v' e')
     (m, TermExploit i resultType ekts) -> do
       let (es, ks, ts) = unzip3 ekts
       let es' = map weaken es

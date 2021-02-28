@@ -11,27 +11,6 @@ data Tree
 type TreePlus =
   (Hint, Tree)
 
-toLeaf :: Hint -> T.Text -> TreePlus
-toLeaf m x = (m, TreeLeaf x)
-
-asLeaf :: TreePlus -> Maybe (Hint, T.Text)
-asLeaf tree =
-  case tree of
-    (m, TreeLeaf x) ->
-      Just (m, x)
-    _ ->
-      Nothing
-
-headAtomOf :: TreePlus -> Maybe T.Text
-headAtomOf tree =
-  case tree of
-    (_, TreeLeaf x) ->
-      return x
-    (_, TreeNode ((_, TreeLeaf x) : _)) ->
-      return x
-    (_, TreeNode _) ->
-      Nothing
-
 showAsSExp :: TreePlus -> T.Text
 showAsSExp tree =
   case tree of
@@ -47,12 +26,3 @@ showAsSExp tree =
       "#" <> showAsSExp t
     (_, TreeNode ts) ->
       "(" <> T.intercalate " " (map showAsSExp ts) <> ")"
-
-replaceHint :: Hint -> TreePlus -> TreePlus
-replaceHint m tree =
-  case tree of
-    (m', TreeLeaf x) ->
-      (supHint m m', TreeLeaf x)
-    (mt, TreeNode ts) -> do
-      let ts' = map (replaceHint m) ts
-      (supHint m mt, TreeNode ts')

@@ -161,10 +161,6 @@ distinguishValue zs term =
     (ml, ValueSigmaIntro ds) -> do
       (vss, ds') <- unzip <$> mapM (distinguishValue zs) ds
       return (merge vss, (ml, ValueSigmaIntro ds'))
-    -- (m, ValueStructIntro dks) -> do
-    --   let (ds, ks) = unzip dks
-    --   (vss, ds') <- unzip <$> mapM (distinguishValue zs) ds
-    --   return (merge vss, (m, ValueStructIntro $ zip ds' ks))
     _ ->
       return (IntMap.empty, term)
 
@@ -198,12 +194,6 @@ distinguishComp zs term =
       let (cs, es) = unzip branchList
       (vss, es') <- unzip <$> mapM (distinguishComp zs) es
       return (merge $ vs : vss, (ml, CompEnumElim d' (zip cs es')))
-
--- (ml, CompStructElim xts d e) -> do
---   (vs1, d') <- distinguishValue zs d
---   let zs' = filter (`notElem` map fst xts) zs
---   (vs2, e') <- distinguishComp zs' e
---   return (merge [vs1, vs2], (ml, CompStructElim xts d' e'))
 
 distinguishPrimitive :: [Ident] -> Primitive -> WithEnv (NameMap, Primitive)
 distinguishPrimitive zs term =

@@ -5,7 +5,6 @@ import Data.Exploit
 import Data.Hint
 import Data.Ident
 import qualified Data.IntMap as IntMap
--- import Data.LowType
 import qualified Data.Set as S
 import Data.Size
 import qualified Data.Text as T
@@ -24,13 +23,7 @@ data WeakTerm
   | WeakTermEnum T.Text
   | WeakTermEnumIntro T.Text
   | WeakTermEnumElim (WeakTermPlus, WeakTermPlus) [(EnumCasePlus, WeakTermPlus)]
-  | -- | WeakTermArray WeakTermPlus ArrayKind -- array n3 u8 ~= n3 -> u8
-    -- | WeakTermArrayIntro ArrayKind [WeakTermPlus]
-    -- | WeakTermArrayElim ArrayKind [WeakIdentPlus] WeakTermPlus WeakTermPlus
-    -- | WeakTermStruct [ArrayKind]
-    -- | WeakTermStructIntro [(WeakTermPlus, ArrayKind)]
-    -- | WeakTermStructElim [(Hint, Ident, ArrayKind)] WeakTermPlus WeakTermPlus
-    WeakTermQuestion WeakTermPlus WeakTermPlus -- e : t (output the type `t` as note)
+  | WeakTermQuestion WeakTermPlus WeakTermPlus -- e : t (output the type `t` as note)
   | WeakTermExploit ExploitKind WeakTermPlus [(WeakTermPlus, ExploitArgKind, WeakTermPlus)] -- (exploit NUM result-type arg-1 ... arg-n)
   deriving (Show, Eq)
 
@@ -106,21 +99,6 @@ varWeakTermPlus term =
       let ys = varWeakTermPlus e
       let zs = S.unions $ map (varWeakTermPlus . snd) les
       S.unions [xs, ys, zs]
-    -- (_, WeakTermArray dom _) ->
-    --   varWeakTermPlus dom
-    -- (_, WeakTermArrayIntro _ es) ->
-    --   S.unions $ map varWeakTermPlus es
-    -- (_, WeakTermArrayElim _ xts d e) ->
-    --   varWeakTermPlus d `S.union` varWeakTermPlus' xts [e]
-    -- (_, WeakTermStruct {}) ->
-    --   S.empty
-    -- (_, WeakTermStructIntro ets) ->
-    --   S.unions $ map (varWeakTermPlus . fst) ets
-    -- (_, WeakTermStructElim xts d e) -> do
-    --   let xs = map (\(_, x, _) -> x) xts
-    --   let set1 = varWeakTermPlus d
-    --   let set2 = S.filter (`notElem` xs) (varWeakTermPlus e)
-    --   S.union set1 set2
     (_, WeakTermQuestion e t) -> do
       let set1 = varWeakTermPlus e
       let set2 = varWeakTermPlus t
@@ -175,22 +153,6 @@ asterWeakTermPlus term =
       let set2 = asterWeakTermPlus t
       let set3 = S.unions $ map (\(_, body) -> asterWeakTermPlus body) les
       S.unions [set1, set2, set3]
-    -- (_, WeakTermArray dom _) ->
-    --   asterWeakTermPlus dom
-    -- (_, WeakTermArrayIntro _ es) ->
-    --   S.unions $ map asterWeakTermPlus es
-    -- (_, WeakTermArrayElim _ xts d e) -> do
-    --   let set1 = asterWeakTermPlus d
-    --   let set2 = asterWeakTermPlus' xts [e]
-    --   S.union set1 set2
-    -- (_, WeakTermStruct {}) ->
-    --   S.empty
-    -- (_, WeakTermStructIntro ets) ->
-    --   S.unions $ map (asterWeakTermPlus . fst) ets
-    -- (_, WeakTermStructElim _ d e) -> do
-    --   let set1 = asterWeakTermPlus d
-    --   let set2 = asterWeakTermPlus e
-    --   S.union set1 set2
     (_, WeakTermQuestion e t) -> do
       let set1 = asterWeakTermPlus e
       let set2 = asterWeakTermPlus t
@@ -198,8 +160,6 @@ asterWeakTermPlus term =
     (_, WeakTermExploit _ t ekts) -> do
       let (es, _, ts) = unzip3 ekts
       S.unions $ asterWeakTermPlus t : map asterWeakTermPlus (es ++ ts)
-
--- S.unions $ map asterWeakTermPlus (es ++ ts)
 
 asterWeakTermPlus' :: [WeakIdentPlus] -> [WeakTermPlus] -> S.Set Int
 asterWeakTermPlus' binder es =
@@ -261,28 +221,6 @@ substWeakTermPlus sub term =
       let (caseList, es) = unzip branchList
       let es' = map (substWeakTermPlus sub) es
       (m, WeakTermEnumElim (e', t') (zip caseList es'))
-    -- (m, WeakTermArray dom k) -> do
-    --   let dom' = substWeakTermPlus sub dom
-    --   (m, WeakTermArray dom' k)
-    -- (m, WeakTermArrayIntro k es) -> do
-    --   let es' = map (substWeakTermPlus sub) es
-    --   (m, WeakTermArrayIntro k es')
-    -- (m, WeakTermArrayElim mk xts v e) -> do
-    --   let v' = substWeakTermPlus sub v
-    --   let (xts', e') = substWeakTermPlus'' sub xts e
-    --   (m, WeakTermArrayElim mk xts' v' e')
-    -- (m, WeakTermStruct ts) ->
-    --   (m, WeakTermStruct ts)
-    -- (m, WeakTermStructIntro ets) -> do
-    --   let (es, ts) = unzip ets
-    --   let es' = map (substWeakTermPlus sub) es
-    --   (m, WeakTermStructIntro $ zip es' ts)
-    -- (m, WeakTermStructElim xts v e) -> do
-    --   let v' = substWeakTermPlus sub v
-    --   let xs = map (\(_, x, _) -> x) xts
-    --   let sub' = foldr IntMap.delete sub (map asInt xs)
-    --   let e' = substWeakTermPlus sub' e
-    --   (m, WeakTermStructElim xts v' e')
     (m, WeakTermQuestion e t) -> do
       let e' = substWeakTermPlus sub e
       let t' = substWeakTermPlus sub t
@@ -376,27 +314,12 @@ toText term =
       let (mls, es) = unzip mles
       let les = zip (map snd mls) es
       showCons ["switch", toText e, showItems (map showClause les)]
-    -- (_, WeakTermArray dom k) ->
-    --   showCons ["array", toText dom, showArrayKind k]
-    -- (_, WeakTermArrayIntro _ es) ->
-    --   showCons $ "array-introduction" : map toText es
-    -- (_, WeakTermArrayElim _ xts e1 e2) -> do
-    --   let argStr = inParen $ showItems $ map showArg xts
-    --   showCons ["array-elimination", argStr, toText e1, toText e2]
-    -- (_, WeakTermStruct ks) ->
-    --   showCons $ "struct" : map showArrayKind ks
-    -- (_, WeakTermStructIntro ets) ->
-    --   showCons $ "struct-introduction" : map (toText . fst) ets
-    -- (_, WeakTermStructElim xts e1 e2) -> do
-    --   let argStr = inParen $ showItems $ map (\(_, x, _) -> asText x) xts
-    --   showCons ["struct-elimination", argStr, toText e1, toText e2]
     (_, WeakTermQuestion e _) ->
       toText e
     (_, WeakTermExploit i resultType ekts) -> do
       let resultType' = toText resultType
       let (es, _, _) = unzip3 ekts
       let es' = map toText es
-      -- let ks' = map showSyscallArgKind ks
       showCons $ "exploit" : T.pack (show i) : resultType' : es'
 
 inParen :: T.Text -> T.Text
@@ -437,19 +360,9 @@ showCase c =
     EnumCaseDefault ->
       "default"
 
--- showArrayKind :: ArrayKind -> T.Text
--- showArrayKind arrayKind =
---   case arrayKind of
---     ArrayKindInt size ->
---       showIntSize size
---     ArrayKindFloat size ->
---       showFloatSize size
---     ArrayKindVoidPtr ->
---       "void*"
-
 showExploitArgKind :: ExploitArgKind -> T.Text
-showExploitArgKind arrayKind =
-  case arrayKind of
+showExploitArgKind k =
+  case k of
     ExploitArgKindImm ->
       "immediate"
     ExploitArgKindArray ->

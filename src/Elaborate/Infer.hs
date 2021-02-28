@@ -102,53 +102,11 @@ infer' ctx term =
           (es', ts) <- unzip <$> mapM (infer' ctx) es
           constrainList ts
           return ((m, WeakTermEnumElim (e', t') $ zip cs' es'), head ts)
-    -- (m, WeakTermArray dom k) -> do
-    --   (dom', tDom) <- infer' ctx dom
-    --   let tDom' = i64 m
-    --   insConstraintEnv tDom tDom'
-    --   return ((m, WeakTermArray dom' k), (m, WeakTermTau))
-    -- (m, WeakTermArrayIntro k es) -> do
-    --   tCod <- inferWeakKind m k
-    --   (es', ts) <- unzip <$> mapM (infer' ctx) es
-    --   forM_ (zip ts (repeat tCod)) $ uncurry insConstraintEnv
-    --   let len = toInteger $ length es
-    --   let dom = (m, WeakTermInt (i64 m) len)
-    --   let t = (m, WeakTermArray dom k)
-    --   return ((m, WeakTermArrayIntro k es'), t)
-    -- (m, WeakTermArrayElim k xts e1 e2) -> do
-    --   (e1', t1) <- infer' ctx e1
-    --   (xts', (e2', t2)) <- inferBinder ctx xts e2
-    --   let len = toInteger $ length xts
-    --   let dom = (m, WeakTermInt (i64 m) len)
-    --   insConstraintEnv t1 (fst e1', WeakTermArray dom k)
-    --   let ts = map (\(_, _, t) -> t) xts'
-    --   tCod <- inferWeakKind m k
-    --   forM_ (zip ts (repeat tCod)) $ uncurry insConstraintEnv
-    --   return ((m, WeakTermArrayElim k xts' e1' e2'), t2)
-    -- (m, WeakTermStruct ts) ->
-    --   return ((m, WeakTermStruct ts), (m, WeakTermTau))
-    -- (m, WeakTermStructIntro eks) -> do
-    --   let (es, ks) = unzip eks
-    --   ts <- mapM (inferWeakKind m) ks
-    --   let structType = (m, WeakTermStruct ks)
-    --   (es', ts') <- unzip <$> mapM (infer' ctx) es
-    --   forM_ (zip ts' ts) $ uncurry insConstraintEnv
-    --   return ((m, WeakTermStructIntro $ zip es' ks), structType)
-    -- (m, WeakTermStructElim xks e1 e2) -> do
-    --   (e1', t1) <- infer' ctx e1
-    --   let (ms, xs, ks) = unzip3 xks
-    --   ts <- mapM (inferWeakKind m) ks
-    --   let structType = (fst e1', WeakTermStruct ks)
-    --   insConstraintEnv t1 structType
-    --   forM_ (zip xs ts) $ uncurry insWeakTypeEnv
-    --   (e2', t2) <- infer' (ctx ++ zip3 ms xs ts) e2
-    --   return ((m, WeakTermStructElim xks e1' e2'), t2)
     (m, WeakTermQuestion e _) -> do
       (e', te) <- infer' ctx e
       return ((m, WeakTermQuestion e' te), te)
     (m, WeakTermExploit kind resultType ekts) -> do
       resultType' <- inferType' ctx resultType
-      -- let t' = lowTypeToWeakType m resultType
       let (es, ks, _) = unzip3 ekts
       (es', ts') <- unzip <$> mapM (infer' ctx) es
       let borrowedTypes = takeBorrowedTypes $ zip ts' ks
@@ -183,10 +141,6 @@ inferType' ctx t = do
   (t', u) <- infer' ctx t
   insConstraintEnv u (metaOf t, WeakTermTau)
   return t'
-
--- inferWeakKind :: Hint -> ArrayKind -> WithEnv WeakTermPlus
--- inferWeakKind m kind =
---   weaken <$> inferKind m kind
 
 inferPi ::
   Context ->

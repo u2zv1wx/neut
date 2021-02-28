@@ -55,8 +55,6 @@ reduceCompPlus term =
           reduceCompPlus (my, CompUpElim y ey1 (m, CompUpElim x ey2 e2)) -- commutative conversion
         (my, CompSigmaElim yts vy ey) ->
           reduceCompPlus (my, CompSigmaElim yts vy (m, CompUpElim x ey e2)) -- commutative conversion
-          -- (my, CompStructElim yts vy ey) ->
-          --   reduceCompPlus (my, CompStructElim yts vy (m, CompUpElim x ey e2)) -- commutative conversion
         _ -> do
           e2' <- reduceCompPlus e2
           case e2' of
@@ -76,23 +74,3 @@ reduceCompPlus term =
           let (ls, es) = unzip les
           es' <- mapM reduceCompPlus es
           return (m, CompEnumElim v (zip ls es'))
-
--- (m, CompStructElim xks d e) -> do
---   let (xs, ks1) = unzip xks
---   case d of
---     (_, ValueStructIntro eks)
---       | (es, ks2) <- unzip eks,
---         ks1 == ks2 -> do
---         let sub = IntMap.fromList (zip (map asInt xs) es)
---         reduceCompPlus $ substCompPlus sub e
---     _ -> do
---       e' <- reduceCompPlus e
---       case e' of
---         (mUp, CompUpIntro (_, ValueStructIntro dks))
---           | (ds2, ks2) <- unzip dks,
---             ks1 == ks2,
---             Just ys <- mapM asUpsilon ds2,
---             xs == ys ->
---             return (mUp, CompUpIntro d) -- eta-reduce
---         _ ->
---           return (m, CompStructElim xks d e')

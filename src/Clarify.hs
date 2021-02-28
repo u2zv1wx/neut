@@ -69,48 +69,6 @@ clarify' tenv term =
       es' <- (mapM (clarify' tenv) >=> alignFVS tenv m fvs) es
       (y, e', yVar) <- clarifyPlus tenv e
       return $ bindLet [(y, e')] (m, CompEnumElim yVar (zip (map snd cs) es'))
-    -- (m, TermArray {}) ->
-    --   returnArrayType m
-    -- (m, TermArrayIntro k es) -> do
-    --   retImmType <- returnCartesianImmediate m
-    --   -- arrayType = Sigma{k} [_ : IMMEDIATE, ..., _ : IMMEDIATE]
-    --   let ts = map Left $ replicate (length es) retImmType
-    --   arrayType <- cartesianSigma Nothing m k ts
-    --   (zs, es', xs) <- unzip3 <$> mapM (clarifyPlus tenv) es
-    --   return $
-    --     bindLet
-    --       (zip zs es')
-    --       (m, CompUpIntro (m, sigmaIntro [arrayType, (m, ValueSigmaIntro k xs)]))
-    -- (m, TermArrayElim k mxts e1 e2) -> do
-    --   e1' <- clarify' tenv e1
-    --   (arr, arrVar) <- newValueUpsilonWith m "arr"
-    --   arrType <- newNameWith' "arr-type"
-    --   (content, contentVar) <- newValueUpsilonWith m "arr-content"
-    --   e2' <- clarify' (insTypeEnv mxts tenv) e2
-    --   let (_, xs, _) = unzip3 mxts
-    --   return $
-    --     bindLet
-    --       [(arr, e1')]
-    --       ( m,
-    --         sigmaElim [arrType, content] arrVar (m, CompSigmaElim k xs contentVar e2')
-    --       )
-    -- (m, TermStruct ks) -> do
-    --   t <- cartesianStruct m ks
-    --   return (m, CompUpIntro t)
-    -- (m, TermStructIntro eks) -> do
-    --   let (es, ks) = unzip eks
-    --   (xs, es', vs) <- unzip3 <$> mapM (clarifyPlus tenv) es
-    --   return $
-    --     bindLet
-    --       (zip xs es')
-    --       (m, CompUpIntro (m, ValueStructIntro (zip vs ks)))
-    -- (m, TermStructElim xks e1 e2) -> do
-    --   e1' <- clarify' tenv e1
-    --   let (ms, xs, ks) = unzip3 xks
-    --   ts <- mapM (inferKind m) ks
-    --   e2' <- clarify' (insTypeEnv (zip3 ms xs ts) tenv) e2
-    --   (struct, structVar) <- newValueUpsilonWith m "struct"
-    --   return $ bindLet [(struct, e1')] (m, CompStructElim (zip xs ks) structVar e2')
     (m, TermExploit expKind resultType ekts) -> do
       let (es, ks, ts) = unzip3 ekts
       xs <- mapM (const $ newNameWith' "sys") es
@@ -390,31 +348,9 @@ chainOf tenv term =
       let es = map snd les
       xs2 <- concat <$> mapM (chainOf tenv) es
       return $ xs0 ++ xs1 ++ xs2
-    -- (_, TermArray {}) ->
-    --   return []
-    -- (_, TermArrayIntro _ es) ->
-    --   concat <$> mapM (chainOf tenv) es
-    -- (_, TermArrayElim _ xts e1 e2) -> do
-    --   xs1 <- chainOf tenv e1
-    --   xs2 <- chainOf' tenv xts [e2]
-    --   return $ xs1 ++ xs2
-    -- (_, TermStruct _) ->
-    --   return []
-    -- (_, TermStructIntro eks) ->
-    --   concat <$> mapM (chainOf tenv . fst) eks
-    -- (m, TermStructElim xks e1 e2) -> do
-    --   xs1 <- chainOf tenv e1
-    --   let (ms, xs, ks) = unzip3 xks
-    --   ts <- mapM (inferKind m) ks
-    --   xs2 <- chainOf (insTypeEnv (zip3 ms xs ts) tenv) e2
-    --   return $ xs1 ++ filter (\(_, y, _) -> y `notElem` xs) xs2
     (_, TermExploit _ _ ekts) -> do
       let (es, _, ts) = unzip3 ekts
       concat <$> mapM (chainOf tenv) (es ++ ts)
-
--- xs1 <- chainOf tenv t
--- xs2 <- concat <$> mapM (chainOf tenv) (es ++ ts)
--- return $ xs1 ++ xs2
 
 chainOf' :: TypeEnv -> [IdentPlus] -> [TermPlus] -> WithEnv [IdentPlus]
 chainOf' tenv binder es =

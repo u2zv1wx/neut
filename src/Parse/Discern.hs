@@ -86,26 +86,6 @@ discern' nenv term =
           body' <- discern' nenv body
           return ((mCase, l'), body')
       return (m, WeakTermEnumElim (e', t') caseList')
-    -- (m, WeakTermArray dom kind) -> do
-    --   dom' <- discern' nenv dom
-    --   return (m, WeakTermArray dom' kind)
-    -- (m, WeakTermArrayIntro kind es) -> do
-    --   es' <- mapM (discern' nenv) es
-    --   return (m, WeakTermArrayIntro kind es')
-    -- (m, WeakTermArrayElim kind xts e1 e2) -> do
-    --   e1' <- discern' nenv e1
-    --   (xts', e2') <- discernBinder nenv xts e2
-    --   return (m, WeakTermArrayElim kind xts' e1' e2')
-    -- (m, WeakTermStruct ts) ->
-    --   return (m, WeakTermStruct ts)
-    -- (m, WeakTermStructIntro ets) -> do
-    --   let (es, ts) = unzip ets
-    --   es' <- mapM (discern' nenv) es
-    --   return (m, WeakTermStructIntro $ zip es' ts)
-    -- (m, WeakTermStructElim xts e1 e2) -> do
-    --   e1' <- discern' nenv e1
-    --   (xts', e2') <- discernStruct nenv xts e2
-    --   return (m, WeakTermStructElim xts' e1' e2')
     (m, WeakTermQuestion e t) -> do
       e' <- discern' nenv e
       t' <- discern' nenv t
@@ -142,18 +122,3 @@ discernFix ::
 discernFix nenv self binder e = do
   (binder', e') <- discernBinder nenv (self : binder) e
   return (head binder', tail binder', e')
-
--- discernStruct ::
---   NameEnv ->
---   [(Hint, Ident, a)] ->
---   WeakTermPlus ->
---   WithEnv ([(Hint, Ident, a)], WeakTermPlus)
--- discernStruct nenv binder e =
---   case binder of
---     [] -> do
---       e' <- discern' nenv e
---       return ([], e')
---     ((mx, x, t) : xts) -> do
---       x' <- newNameWith x
---       (xts', e') <- discernStruct (Map.insert (asText x) x' nenv) xts e
---       return ((mx, x', t) : xts', e')

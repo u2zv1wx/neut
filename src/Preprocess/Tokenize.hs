@@ -258,7 +258,6 @@ raiseTokenizeError txt = do
   m <- currentHint
   throw $ Error [logError (getPosInfo m) txt]
 
--- '*' を "raw-pointer" にしてもいいかも。
 readMacroMap :: Map.HashMap Char T.Text
 readMacroMap =
   Map.fromList

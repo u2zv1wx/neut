@@ -7,7 +7,6 @@ import Data.Hint
 import Data.Log
 import Data.LowType
 import Data.Primitive
-import Data.Size
 import Data.Term
 import qualified Data.Text as T
 
@@ -45,16 +44,6 @@ binaryOpToType m op = do
   x2 <- newNameWith'' "_"
   let xts = [(m, x1, dom'), (m, x2, dom')]
   return (m, TermPi xts cod')
-
-inferKind :: Hint -> ArrayKind -> WithEnv TermPlus
-inferKind m arrayKind =
-  case arrayKind of
-    ArrayKindInt size ->
-      return (m, TermConst (showIntSize size))
-    ArrayKindFloat size ->
-      return (m, TermConst (showFloatSize size))
-    _ ->
-      raiseCritical m "inferKind for void-pointer"
 
 termSigmaIntro :: Hint -> [IdentPlus] -> WithEnv TermPlus
 termSigmaIntro m xts = do

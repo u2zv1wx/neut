@@ -1,8 +1,5 @@
 module Data.LowType where
 
-import Control.Exception.Safe
-import Data.Hint
-import Data.Log
 import Data.Size
 import qualified Data.Text as T
 import Text.Read hiding (get)
@@ -18,70 +15,17 @@ data LowType
   deriving (Eq, Ord, Show)
 
 asLowTypeMaybe :: T.Text -> Maybe LowType
-asLowTypeMaybe name = do
-  kind <- asArrayKindMaybe name
-  return $ arrayKindToLowType kind
-
-data ArrayKind
-  = ArrayKindInt Int
-  | ArrayKindFloat FloatSize
-  | ArrayKindVoidPtr
-  deriving (Show, Eq)
+asLowTypeMaybe name
+  | Just intSize <- asLowInt name =
+    Just $ LowTypeInt intSize
+  | Just floatSize <- asLowFloat name =
+    Just $ LowTypeFloat floatSize
+  | otherwise =
+    Nothing
 
 voidPtr :: LowType
 voidPtr =
   LowTypePtr (LowTypeInt 8)
-
-arrVoidPtr :: ArrayKind
-arrVoidPtr =
-  ArrayKindVoidPtr
-
-lowTypeToArrayKindMaybe :: LowType -> Maybe ArrayKind
-lowTypeToArrayKindMaybe lowType =
-  case lowType of
-    LowTypeInt i ->
-      Just $ ArrayKindInt i
-    LowTypeFloat size ->
-      Just $ ArrayKindFloat size
-    _ ->
-      Nothing
-
-lowTypeToArrayKind :: (MonadThrow m) => Hint -> LowType -> m ArrayKind
-lowTypeToArrayKind m lowType =
-  case lowTypeToArrayKindMaybe lowType of
-    Just k ->
-      return k
-    Nothing ->
-      raiseCritical m "Infer.lowTypeToArrayKind"
-
-arrayKindToLowType :: ArrayKind -> LowType
-arrayKindToLowType arrayKind =
-  case arrayKind of
-    ArrayKindInt i ->
-      LowTypeInt i
-    ArrayKindFloat size ->
-      LowTypeFloat size
-    ArrayKindVoidPtr ->
-      voidPtr
-
-asArrayKindMaybe :: T.Text -> Maybe ArrayKind
-asArrayKindMaybe s =
-  case T.uncons s of
-    Nothing ->
-      Nothing
-    Just (c, rest) ->
-      case c of
-        'i'
-          | Just n <- readMaybe $ T.unpack rest,
-            1 <= n,
-            n <= 64 ->
-            Just $ ArrayKindInt n
-        'f'
-          | Just n <- readMaybe $ T.unpack rest,
-            Just size <- asFloatSize n ->
-            Just $ ArrayKindFloat size
-        _ ->
-          Nothing
 
 asLowInt :: T.Text -> Maybe IntSize
 asLowInt s =
