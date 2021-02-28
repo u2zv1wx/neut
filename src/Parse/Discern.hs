@@ -90,12 +90,12 @@ discern' nenv term =
       e' <- discern' nenv e
       t' <- discern' nenv t
       return (m, WeakTermQuestion e' t')
-    (m, WeakTermExploit i resultType ekts) -> do
+    (m, WeakTermDerangement i resultType ekts) -> do
       resultType' <- discern' nenv resultType
       let (es, ks, ts) = unzip3 ekts
       es' <- mapM (discern' nenv) es
       ts' <- mapM (discern' nenv) ts
-      return (m, WeakTermExploit i resultType' (zip3 es' ks ts'))
+      return (m, WeakTermDerangement i resultType' (zip3 es' ks ts'))
 
 discernBinder ::
   NameEnv ->

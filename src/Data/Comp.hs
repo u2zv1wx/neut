@@ -1,7 +1,7 @@
 module Data.Comp where
 
+import Data.Derangement
 import Data.EnumCase
-import Data.Exploit
 import Data.Hint
 import Data.Ident
 import qualified Data.IntMap as IntMap
@@ -31,7 +31,7 @@ data Comp
 data Primitive
   = PrimitiveUnaryOp UnaryOp ValuePlus
   | PrimitiveBinaryOp BinaryOp ValuePlus ValuePlus
-  | PrimitiveExploit ExploitKind [ValuePlus]
+  | PrimitiveDerangement Derangement [ValuePlus]
   deriving (Show)
 
 newtype IsFixed
@@ -115,6 +115,6 @@ substPrimitive sub c =
       let v1' = substValuePlus sub v1
       let v2' = substValuePlus sub v2
       PrimitiveBinaryOp a v1' v2'
-    PrimitiveExploit expKind ds -> do
+    PrimitiveDerangement expKind ds -> do
       let ds' = map (substValuePlus sub) ds
-      PrimitiveExploit expKind ds'
+      PrimitiveDerangement expKind ds'

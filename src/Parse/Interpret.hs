@@ -8,9 +8,9 @@ where
 
 import Codec.Binary.UTF8.String
 import Control.Monad.State.Lazy
+import Data.Derangement
 import Data.EnumCase
 import Data.Env
-import Data.Exploit
 import Data.Hint
 import Data.Ident
 import Data.Log
@@ -135,17 +135,17 @@ interpret inputTree =
             return (m, WeakTermQuestion e' h)
           | otherwise ->
             raiseSyntaxError m "(question TREE)"
-        "exploit"
-          | (expKind : resultType : eks) <- rest -> do
-            expKind' <- interpretExploitKind expKind
-            checkExploitArity m expKind' eks
+        "derangement"
+          | (derangement : resultType : eks) <- rest -> do
+            derangement' <- interpretDerangement derangement
+            checkDerangementArity m derangement' eks
             resultType' <- interpret resultType
-            eks' <- mapM interpretExploitItem eks
+            eks' <- mapM interpretDerangementItem eks
             let (es, ks) = unzip eks'
             hs <- mapM (\(me, _) -> newAster me) es
-            return (m, WeakTermExploit expKind' resultType' (zip3 es ks hs))
+            return (m, WeakTermDerangement derangement' resultType' (zip3 es ks hs))
           | otherwise ->
-            raiseSyntaxError m "(exploit LEAF TREE TREE*)"
+            raiseSyntaxError m "(derangement LEAF TREE TREE*)"
         "irreducible"
           | [e] <- rest -> do
             e' <- interpret e
@@ -215,7 +215,7 @@ sigmaIntroString =
 --           ( m,
 --             WeakTermPi
 --               [ (m, lenVar, (m, WeakTermConst (showIntSize 64))),
---                 (m, arrVar, (m, WeakTermArray (m, WeakTermUpsilon lenVar) (ArrayKindInt 8)))
+--                 (m, arrVar, (m, WeakTermArray (m, WeakTermUpsilon lenVar) (ArrayInt 8)))
 --               ]
 --               (m, WeakTermUpsilon z)
 --           )
@@ -225,7 +225,7 @@ sigmaIntroString =
 --         WeakTermPiElim
 --           (m, WeakTermUpsilon k)
 --           [ (m, WeakTermInt (i64 m) (toInteger $ length u8s)),
---             (m, WeakTermArrayIntro (ArrayKindInt 8) u8s)
+--             (m, WeakTermArrayIntro (ArrayInt 8) u8s)
 --           ]
 --       )
 --   )
@@ -326,46 +326,46 @@ readValueInt t x
   | otherwise =
     Nothing
 
-interpretExploitItem :: TreePlus -> WithEnv (WeakTermPlus, ExploitArgKind)
-interpretExploitItem tree =
+interpretDerangementItem :: TreePlus -> WithEnv (WeakTermPlus, DerangementArg)
+interpretDerangementItem tree =
   case tree of
     (_, TreeNode [k, e]) -> do
-      k' <- asExploitArg k
+      k' <- asDerangementArg k
       e' <- interpret e
       return (e', k')
     e ->
       raiseSyntaxError (fst e) "(TREE TREE)"
 
-asExploitArg :: TreePlus -> WithEnv ExploitArgKind
-asExploitArg tree =
+asDerangementArg :: TreePlus -> WithEnv DerangementArg
+asDerangementArg tree =
   case tree of
     (m, TreeLeaf x)
       | x == "linear" ->
-        return ExploitArgKindLinear
+        return DerangementArgLinear
       | x == "affine" ->
-        return ExploitArgKindAffine
+        return DerangementArgAffine
       | otherwise ->
         raiseSyntaxError m "linear | affine"
     (m, _) ->
       raiseSyntaxError m "LEAF"
 
-interpretExploitKind :: TreePlus -> WithEnv ExploitKind
-interpretExploitKind tree =
+interpretDerangement :: TreePlus -> WithEnv Derangement
+interpretDerangement tree =
   case tree of
     (_, TreeNode [(_, TreeLeaf "store"), t]) -> do
       t' <- interpretLowType t
-      return $ ExploitKindStore t'
+      return $ DerangementStore t'
     (_, TreeNode [(_, TreeLeaf "load"), t]) -> do
       t' <- interpretLowType t
-      return $ ExploitKindLoad t'
+      return $ DerangementLoad t'
     (_, TreeNode [(_, TreeLeaf "syscall"), (mInt, TreeLeaf intStr)]) ->
       case readMaybe (T.unpack intStr) of
         Just i ->
-          return $ ExploitKindSyscall i
+          return $ DerangementSyscall i
         Nothing ->
           raiseError mInt "the leaf here must be an integer"
     (_, TreeNode [(_, TreeLeaf "external"), (_, TreeLeaf s)]) ->
-      return $ ExploitKindExternal s
+      return $ DerangementExternal s
     _ ->
       raiseSyntaxError (fst tree) "(syscall LEAF) | (exteral LEAF) | (load TREE) | (store TREE)"
 
@@ -393,15 +393,15 @@ interpretLowType tree =
     _ ->
       raiseSyntaxError (fst tree) "INT_TYPE | FLOAT_TYPE | (pointer TREE) | (array INT TREE) | (struct TREE*)"
 
-checkExploitArity :: Hint -> ExploitKind -> [TreePlus] -> WithEnv ()
-checkExploitArity m k args =
+checkDerangementArity :: Hint -> Derangement -> [TreePlus] -> WithEnv ()
+checkDerangementArity m k args =
   case k of
-    ExploitKindLoad _
+    DerangementLoad _
       | length args == 1 ->
         return ()
       | otherwise ->
         raiseError m $ "the arity of `load` is 2, but found " <> T.pack (show (length args + 1)) <> " arguments"
-    ExploitKindStore _
+    DerangementStore _
       | length args == 2 ->
         return ()
       | otherwise ->

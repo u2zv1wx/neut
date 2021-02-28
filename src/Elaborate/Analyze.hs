@@ -72,7 +72,7 @@ simp' constraintList =
             simp $ (t1, t2) : cs
         ((_, WeakTermQuestion e1 t1), (_, WeakTermQuestion e2 t2)) ->
           simp $ (e1, e2) : (t1, t2) : cs
-        ((_, WeakTermExploit i1 t1 ekts1), (_, WeakTermExploit i2 t2 ekts2))
+        ((_, WeakTermDerangement i1 t1 ekts1), (_, WeakTermDerangement i2 t2 ekts2))
           | length ekts1 == length ekts2,
             i1 == i2,
             (es1, ks1, ts1) <- unzip3 ekts1,

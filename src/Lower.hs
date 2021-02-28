@@ -5,9 +5,9 @@ where
 
 import Control.Monad.State.Lazy
 import Data.Comp
+import Data.Derangement
 import Data.EnumCase
 import Data.Env hiding (newNameWith'')
-import Data.Exploit
 import qualified Data.HashMap.Lazy as Map
 import Data.Hint
 import Data.Ident
@@ -156,23 +156,23 @@ lowerCompPrimitive _ codeOp =
       lowerCompUnaryOp op v
     PrimitiveBinaryOp op v1 v2 ->
       lowerCompBinaryOp op v1 v2
-    PrimitiveExploit expKind args -> do
+    PrimitiveDerangement expKind args -> do
       (xs, vs) <- unzip <$> mapM (const $ newValueLocal "sys-call-arg") args
       case expKind of
-        ExploitKindSyscall i -> do
+        DerangementSyscall i -> do
           call <- syscallToLowComp i vs
           lowerValueLet' (zip xs args) call
-        ExploitKindExternal name -> do
+        DerangementExternal name -> do
           call <- externalToLowComp name vs
           lowerValueLet' (zip xs args) call
-        ExploitKindLoad valueLowType -> do
+        DerangementLoad valueLowType -> do
           let ptr = args !! 0
           (ptrVar, castPtrThen) <- llvmCast (Just $ takeBaseName ptr) ptr (LowTypePtr valueLowType)
           resName <- newNameWith' "result"
           uncast <- llvmUncast (Just $ asText resName) (LowValueLocal resName) valueLowType
           castPtrThen $
             LowCompLet resName (LowOpLoad ptrVar valueLowType) uncast
-        ExploitKindStore valueLowType -> do
+        DerangementStore valueLowType -> do
           let ptr = args !! 0
           let val = args !! 1
           (ptrVar, castPtrThen) <- llvmCast (Just $ takeBaseName ptr) ptr (LowTypePtr valueLowType)

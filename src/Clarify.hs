@@ -12,8 +12,8 @@ import Clarify.Utility
 import Control.Monad.State.Lazy
 import Data.Comp
 import Data.ConstType
+import Data.Derangement
 import Data.Env
-import Data.Exploit
 import qualified Data.HashMap.Lazy as Map
 import Data.Hint
 import Data.Ident
@@ -70,7 +70,7 @@ clarify' tenv term =
       es' <- (mapM (clarify' tenv) >=> alignFVS tenv m fvs) es
       (y, e', yVar) <- clarifyPlus tenv e
       return $ bindLet [(y, e')] (m, CompEnumElim yVar (zip (map snd cs) es'))
-    (m, TermExploit expKind resultType ekts) -> do
+    (m, TermDerangement expKind resultType ekts) -> do
       let (es, ks, ts) = unzip3 ekts
       xs <- mapM (const $ newNameWith' "sys") es
       let xts = zipWith (\x t -> (fst t, x, t)) xs ts
@@ -78,7 +78,7 @@ clarify' tenv term =
       let xsAsVars = map (\(mx, x, _) -> (mx, ValueUpsilon x)) xts
       resultVarName <- newNameWith' "result"
       tuple <- constructResultTuple tenv m borrowedVarList (m, resultVarName, resultType)
-      let lamBody = (m, CompUpElim resultVarName (m, CompPrimitive (PrimitiveExploit expKind xsAsVars)) tuple)
+      let lamBody = (m, CompUpElim resultVarName (m, CompPrimitive (PrimitiveDerangement expKind xsAsVars)) tuple)
       cls <- retClosure tenv Nothing [] m xts lamBody
       es' <- mapM (clarifyPlus tenv) es
       callClosure m cls es'
@@ -167,12 +167,12 @@ clarifyBinaryOp tenv name op m = do
     _ ->
       raiseCritical m $ "the arity of " <> name <> " is wrong"
 
-takeIffLinear :: (IdentPlus, ExploitArgKind) -> Maybe IdentPlus
+takeIffLinear :: (IdentPlus, DerangementArg) -> Maybe IdentPlus
 takeIffLinear (xt, k) =
   case k of
-    ExploitArgKindAffine ->
+    DerangementArgAffine ->
       Nothing
-    ExploitArgKindLinear ->
+    DerangementArgLinear ->
       Just xt
 
 -- generate tuple like (borrowed-1, ..., borrowed-n, result)
@@ -312,7 +312,7 @@ chainOf tenv term =
       let es = map snd les
       xs2 <- concat <$> mapM (chainOf tenv) es
       return $ xs0 ++ xs1 ++ xs2
-    (_, TermExploit _ _ ekts) -> do
+    (_, TermDerangement _ _ ekts) -> do
       let (es, _, ts) = unzip3 ekts
       concat <$> mapM (chainOf tenv) (es ++ ts)
 

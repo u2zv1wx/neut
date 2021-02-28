@@ -1,8 +1,8 @@
 module Data.Term where
 
 import Control.Exception.Safe
+import Data.Derangement
 import Data.EnumCase
-import Data.Exploit
 import Data.Hint
 import Data.Ident
 import qualified Data.IntMap as IntMap
@@ -27,7 +27,7 @@ data Term
   | TermEnum T.Text
   | TermEnumIntro T.Text
   | TermEnumElim (TermPlus, TermPlus) [(EnumCasePlus, TermPlus)]
-  | TermExploit ExploitKind TermPlus [(TermPlus, ExploitArgKind, TermPlus)]
+  | TermDerangement Derangement TermPlus [(TermPlus, DerangementArg, TermPlus)]
   deriving (Show)
 
 type TermPlus =
@@ -84,7 +84,7 @@ varTermPlus term =
       let ys = varTermPlus e
       let zs = S.unions $ map (varTermPlus . snd) les
       S.unions [xs, ys, zs]
-    (_, TermExploit _ _ ekts) -> do
+    (_, TermDerangement _ _ ekts) -> do
       let (es, _, ts) = unzip3 ekts
       S.unions $ map varTermPlus (es ++ ts)
 
@@ -136,11 +136,11 @@ substTermPlus sub term =
       let (caseList, es) = unzip branchList
       let es' = map (substTermPlus sub) es
       (m, TermEnumElim (e', t') (zip caseList es'))
-    (m, TermExploit i resultLowType ekts) -> do
+    (m, TermDerangement i resultLowType ekts) -> do
       let (es, ks, ts) = unzip3 ekts
       let es' = map (substTermPlus sub) es
       let ts' = map (substTermPlus sub) ts
-      (m, TermExploit i resultLowType (zip3 es' ks ts'))
+      (m, TermDerangement i resultLowType (zip3 es' ks ts'))
 
 substTermPlus' :: SubstTerm -> [IdentPlus] -> [IdentPlus]
 substTermPlus' sub binder =
@@ -200,12 +200,12 @@ weaken term =
       let (caseList, es) = unzip branchList
       let es' = map weaken es
       (m, WeakTermEnumElim (e', t') (zip caseList es'))
-    (m, TermExploit i resultType ekts) -> do
+    (m, TermDerangement i resultType ekts) -> do
       let (es, ks, ts) = unzip3 ekts
       let es' = map weaken es
       let ts' = map weaken ts
       let resultType' = weaken resultType
-      (m, WeakTermExploit i resultType' (zip3 es' ks ts'))
+      (m, WeakTermDerangement i resultType' (zip3 es' ks ts'))
 
 weakenArgs :: [(Hint, Ident, TermPlus)] -> [(Hint, Ident, WeakTermPlus)]
 weakenArgs xts = do

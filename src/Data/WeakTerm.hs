@@ -1,7 +1,7 @@
 module Data.WeakTerm where
 
+import Data.Derangement
 import Data.EnumCase
-import Data.Exploit
 import Data.Hint
 import Data.Ident
 import qualified Data.IntMap as IntMap
@@ -24,7 +24,7 @@ data WeakTerm
   | WeakTermEnumIntro T.Text
   | WeakTermEnumElim (WeakTermPlus, WeakTermPlus) [(EnumCasePlus, WeakTermPlus)]
   | WeakTermQuestion WeakTermPlus WeakTermPlus -- e : t (output the type `t` as note)
-  | WeakTermExploit ExploitKind WeakTermPlus [(WeakTermPlus, ExploitArgKind, WeakTermPlus)] -- (exploit NUM result-type arg-1 ... arg-n)
+  | WeakTermDerangement Derangement WeakTermPlus [(WeakTermPlus, DerangementArg, WeakTermPlus)] -- (derangement NUM result-type arg-1 ... arg-n)
   deriving (Show, Eq)
 
 type WeakTermPlus =
@@ -103,7 +103,7 @@ varWeakTermPlus term =
       let set1 = varWeakTermPlus e
       let set2 = varWeakTermPlus t
       S.union set1 set2
-    (_, WeakTermExploit _ t ekts) -> do
+    (_, WeakTermDerangement _ t ekts) -> do
       let (es, _, ts) = unzip3 ekts
       S.unions $ varWeakTermPlus t : map varWeakTermPlus (es ++ ts)
 
@@ -157,7 +157,7 @@ asterWeakTermPlus term =
       let set1 = asterWeakTermPlus e
       let set2 = asterWeakTermPlus t
       S.union set1 set2
-    (_, WeakTermExploit _ t ekts) -> do
+    (_, WeakTermDerangement _ t ekts) -> do
       let (es, _, ts) = unzip3 ekts
       S.unions $ asterWeakTermPlus t : map asterWeakTermPlus (es ++ ts)
 
@@ -225,12 +225,12 @@ substWeakTermPlus sub term =
       let e' = substWeakTermPlus sub e
       let t' = substWeakTermPlus sub t
       (m, WeakTermQuestion e' t')
-    (m, WeakTermExploit i resultType ekts) -> do
+    (m, WeakTermDerangement i resultType ekts) -> do
       let resultType' = substWeakTermPlus sub resultType
       let (es, ks, ts) = unzip3 ekts
       let es' = map (substWeakTermPlus sub) es
       let ts' = map (substWeakTermPlus sub) ts
-      (m, WeakTermExploit i resultType' (zip3 es' ks ts'))
+      (m, WeakTermDerangement i resultType' (zip3 es' ks ts'))
 
 substWeakTermPlus' :: SubstWeakTerm -> [WeakIdentPlus] -> [WeakIdentPlus]
 substWeakTermPlus' sub binder =
@@ -316,11 +316,11 @@ toText term =
       showCons ["switch", toText e, showItems (map showClause les)]
     (_, WeakTermQuestion e _) ->
       toText e
-    (_, WeakTermExploit i resultType ekts) -> do
+    (_, WeakTermDerangement i resultType ekts) -> do
       let resultType' = toText resultType
       let (es, _, _) = unzip3 ekts
       let es' = map toText es
-      showCons $ "exploit" : T.pack (show i) : resultType' : es'
+      showCons $ "derangement" : T.pack (show i) : resultType' : es'
 
 inParen :: T.Text -> T.Text
 inParen s =
@@ -360,12 +360,12 @@ showCase c =
     EnumCaseDefault ->
       "default"
 
-showExploitArgKind :: ExploitArgKind -> T.Text
-showExploitArgKind k =
+showDerangementArgKind :: DerangementArg -> T.Text
+showDerangementArgKind k =
   case k of
-    ExploitArgKindLinear ->
+    DerangementArgLinear ->
       "linear"
-    ExploitArgKindAffine ->
+    DerangementArgAffine ->
       "affine"
 
 showItems :: [T.Text] -> T.Text

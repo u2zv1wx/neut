@@ -10,9 +10,9 @@ where
 
 import Control.Monad.State.Lazy
 import Data.ConstType
+import Data.Derangement
 import Data.EnumCase
 import Data.Env
-import Data.Exploit
 import qualified Data.HashMap.Lazy as Map
 import Data.Hint
 import Data.Ident
@@ -105,13 +105,13 @@ infer' ctx term =
     (m, WeakTermQuestion e _) -> do
       (e', te) <- infer' ctx e
       return ((m, WeakTermQuestion e' te), te)
-    (m, WeakTermExploit kind resultType ekts) -> do
+    (m, WeakTermDerangement kind resultType ekts) -> do
       resultType' <- inferType' ctx resultType
       let (es, ks, _) = unzip3 ekts
       (es', ts') <- unzip <$> mapM (infer' ctx) es
       let borrowedTypes = takeBorrowedTypes $ zip ts' ks
       productType <- productTypeOf m (borrowedTypes ++ [resultType'])
-      return ((m, WeakTermExploit kind resultType' (zip3 es' ks ts')), productType)
+      return ((m, WeakTermDerangement kind resultType' (zip3 es' ks ts')), productType)
 
 inferArgs ::
   Hint ->
@@ -307,16 +307,16 @@ productTypeOf m ts =
       let xts = zipWith (\x t -> (m, x, t)) xs ts
       weakTermSigma m xts
 
-takeBorrowedTypes :: [(WeakTermPlus, ExploitArgKind)] -> [WeakTermPlus]
+takeBorrowedTypes :: [(WeakTermPlus, DerangementArg)] -> [WeakTermPlus]
 takeBorrowedTypes tks =
   case tks of
     [] ->
       []
     ((t, k) : rest) ->
       case k of
-        ExploitArgKindLinear ->
+        DerangementArgLinear ->
           t : takeBorrowedTypes rest
-        ExploitArgKindAffine ->
+        DerangementArgAffine ->
           takeBorrowedTypes rest
 
 weakTermSigma :: Hint -> [WeakIdentPlus] -> WithEnv WeakTermPlus

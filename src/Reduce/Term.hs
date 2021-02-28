@@ -60,11 +60,11 @@ reduceTermPlus term =
           let es' = map reduceTermPlus es
           let les' = zip ls es'
           (m, TermEnumElim (e', t') les')
-    (m, TermExploit i t ekts) -> do
+    (m, TermDerangement i t ekts) -> do
       let (es, ks, ts) = unzip3 ekts
       let es' = map reduceTermPlus es
       let ts' = map reduceTermPlus ts
-      (m, TermExploit i t (zip3 es' ks ts'))
+      (m, TermDerangement i t (zip3 es' ks ts'))
     _ ->
       term
 
