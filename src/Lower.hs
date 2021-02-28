@@ -160,12 +160,18 @@ lowerCompPrimitive m codeOp =
       case expKind of
         DerangementSyscall i -> do
           (xs, vs) <- unzip <$> mapM (const $ newValueLocal "sys-call-arg") args
-          call <- syscallToLowComp i vs
-          lowerValueLet' (zip xs args) call
+          res <- newNameWith' "result"
+          lowerValueLet' (zip xs args) $
+            LowCompLet res (LowOpSyscall i vs) $
+              LowCompReturn (LowValueLocal res)
         DerangementExternal name -> do
           (xs, vs) <- unzip <$> mapM (const $ newValueLocal "ext-call-arg") args
-          call <- externalToLowComp name vs
-          lowerValueLet' (zip xs args) call
+          denv <- gets declEnv
+          when (not $ name `Map.member` denv) $ do
+            let dom = map (const voidPtr) vs
+            let cod = voidPtr
+            modify (\env -> env {declEnv = Map.insert name (dom, cod) denv})
+          lowerValueLet' (zip xs args) $ LowCompCall (LowValueGlobal name) vs
         DerangementLoad valueLowType -> do
           let ptr = args !! 0
           (ptrVar, castPtrThen) <- llvmCast (Just $ takeBaseName ptr) ptr (LowTypePtr valueLowType)
@@ -332,22 +338,6 @@ lowerValueLet x lowerValue cont =
     (m, ValueEnumIntro l) -> do
       i <- toInteger <$> getEnumNum m l
       llvmUncastLet x (LowValueInt i) (LowTypeInt 64) cont
-
-syscallToLowComp :: Integer -> [LowValue] -> WithEnv LowComp
-syscallToLowComp num ds = do
-  res <- newNameWith' "result"
-  return $
-    LowCompLet res (LowOpSyscall num ds) $
-      LowCompReturn (LowValueLocal res)
-
-externalToLowComp :: T.Text -> [LowValue] -> WithEnv LowComp
-externalToLowComp name ds = do
-  denv <- gets declEnv
-  when (not $ name `Map.member` denv) $ do
-    let dom = map (const voidPtr) ds
-    let cod = voidPtr
-    modify (\env -> env {declEnv = Map.insert name (dom, cod) denv})
-  return $ LowCompCall (LowValueGlobal name) ds
 
 lowerValueLet' :: [(Ident, ValuePlus)] -> LowComp -> WithEnv LowComp
 lowerValueLet' binder cont =
