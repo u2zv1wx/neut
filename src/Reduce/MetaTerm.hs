@@ -1,5 +1,6 @@
 module Reduce.MetaTerm (reduceMetaTerm) where
 
+import Codec.Binary.UTF8.String
 import Control.Exception.Safe
 import Control.Monad.State.Lazy hiding (get)
 import Data.EnumCase
@@ -14,6 +15,7 @@ import Data.Maybe (catMaybes)
 import Data.MetaTerm
 import qualified Data.Text as T
 import Data.Tree
+import Text.Read (readMaybe)
 
 reduceMetaTerm :: MetaTermPlus -> WithEnv MetaTermPlus
 reduceMetaTerm term =
@@ -136,6 +138,15 @@ reduceConstApp m c es =
         if 0 <= i && i < fromIntegral (length ts)
           then return $ ts !! (fromIntegral i)
           else raiseError m "index out of range"
+    "string-to-u8-list"
+      | [(mStr, MetaTermLeaf atom)] <- es -> do
+        case readMaybe (T.unpack atom) of
+          Just str -> do
+            -- (string-to-u8-list "abcd") ~> (97 98 99 100)
+            let u8s = encode str
+            return (m, MetaTermNode (map (\i -> (mStr, MetaTermLeaf (T.pack (show i)))) u8s))
+          Nothing ->
+            raiseError mStr "the argument of `string-to-u8-list` must be a string"
     _
       | Just op <- toArithOp c,
         [(_, MetaTermInt64 i1), (_, MetaTermInt64 i2)] <- es ->

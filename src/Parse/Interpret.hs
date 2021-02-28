@@ -6,8 +6,8 @@ module Parse.Interpret
   )
 where
 
-import Codec.Binary.UTF8.String
-import Control.Monad.State.Lazy
+-- import Codec.Binary.UTF8.String
+-- import Control.Monad.State.Lazy
 import Data.Derangement
 import Data.EnumCase
 import Data.Env
@@ -35,10 +35,10 @@ interpret inputTree =
       | Just x' <- readMaybe $ T.unpack atom -> do
         h <- newAster m
         return (m, WeakTermFloat h x')
-      | Just str <- readMaybe $ T.unpack atom -> do
-        u8s <- forM (encode str) $ \u ->
-          return (m, WeakTermInt (i8 m) (toInteger u))
-        sigmaIntroString m u8s
+      -- | Just str <- readMaybe $ T.unpack atom -> do
+      --   u8s <- forM (encode str) $ \u ->
+      --     return (m, WeakTermInt (i8 m) (toInteger u))
+      --   sigmaIntroString m u8s
       | otherwise ->
         case T.uncons atom of
           Nothing ->
@@ -196,9 +196,10 @@ interpretArg es =
 --   (Σ
 --     ((len u64))
 --     (array len u8)))
-sigmaIntroString :: Hint -> [WeakTermPlus] -> WithEnv WeakTermPlus
-sigmaIntroString =
-  undefined
+-- sigmaIntroString :: Hint -> [WeakTermPlus] -> WithEnv WeakTermPlus
+-- sigmaIntroString m ts = do
+--   p' ts
+--   undefined
 
 -- p "u8s:"
 -- p' u8s
