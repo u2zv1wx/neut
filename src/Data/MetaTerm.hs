@@ -25,6 +25,19 @@ data MetaTerm
 type MetaTermPlus =
   (Hint, MetaTerm)
 
+type SubstMetaTerm =
+  IntMap.IntMap MetaTermPlus
+
+-- これをmetaconstantsの中で使って引数の形を指定する
+data Arg
+  = ArgLeaf
+  | ArgNode
+  | ArgInt
+  | ArgEnum
+  | ArgLam
+  | ArgAny
+  deriving (Ord, Eq, Show)
+
 embed :: TreePlus -> MetaTermPlus
 embed term =
   case term of
@@ -32,9 +45,6 @@ embed term =
       (m, MetaTermLeaf x)
     (m, TreeNode es) ->
       (m, MetaTermNode (map embed es))
-
-type SubstMetaTerm =
-  IntMap.IntMap MetaTermPlus
 
 substMetaTerm :: SubstMetaTerm -> MetaTermPlus -> MetaTermPlus
 substMetaTerm sub term =
@@ -131,16 +141,6 @@ toTreeEnumCase (m, v) =
       (m, TreeLeaf l)
     EnumCaseDefault ->
       (m, TreeLeaf "default")
-
--- これをmetaconstantsの中で使って引数の形を指定する
-data Arg
-  = ArgLeaf
-  | ArgNode
-  | ArgInt
-  | ArgEnum
-  | ArgLam
-  | ArgAny
-  deriving (Ord, Eq, Show)
 
 showArgForm :: Arg -> T.Text
 showArgForm arg =
