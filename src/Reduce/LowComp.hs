@@ -27,10 +27,10 @@ reduceLowComp sub sizeMap llvm = do
           | from == to -> do
             let sub' = IntMap.insert (asInt x) (substLowValue sub d) sub
             reduceLowComp sub' sizeMap cont
-        LowOpAlloc _ (LowTypePtr (LowTypeArray 0 _)) -> do
+        LowOpAlloc _ (LowTypePointer (LowTypeArray 0 _)) -> do
           let sub' = IntMap.insert (asInt x) LowValueNull sub
           reduceLowComp sub' sizeMap cont
-        LowOpAlloc _ (LowTypePtr (LowTypeStruct [])) -> do
+        LowOpAlloc _ (LowTypePointer (LowTypeStruct [])) -> do
           let sub' = IntMap.insert (asInt x) LowValueNull sub
           reduceLowComp sub' sizeMap cont
         LowOpAlloc _ size

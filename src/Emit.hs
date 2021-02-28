@@ -385,12 +385,12 @@ showLowTypeAsIfNonPtr lowType =
       "double"
     LowTypeStruct ts ->
       "{" <> showItems showLowType ts <> "}"
-    LowTypeFunctionPtr ts t ->
+    LowTypeFunction ts t ->
       showLowType t <> " (" <> showItems showLowType ts <> ")"
     LowTypeArray i t -> do
       let s = showLowType t
       "[" <> intDec i <> " x " <> s <> "]"
-    LowTypePtr t ->
+    LowTypePointer t ->
       showLowType t
 
 getRegList :: WithEnv [Builder]
@@ -420,12 +420,12 @@ showLowType lowType =
       "double"
     LowTypeStruct ts ->
       "{" <> showItems showLowType ts <> "}"
-    LowTypeFunctionPtr ts t ->
-      showLowType t <> " (" <> showItems showLowType ts <> ")*"
+    LowTypeFunction ts t ->
+      showLowType t <> " (" <> showItems showLowType ts <> ")"
     LowTypeArray i t -> do
       let s = showLowType t
       "[" <> intDec i <> " x " <> s <> "]"
-    LowTypePtr t ->
+    LowTypePointer t ->
       showLowType t <> "*"
 
 showLowValue :: LowValue -> Builder

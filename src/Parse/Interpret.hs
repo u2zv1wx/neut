@@ -376,7 +376,7 @@ interpretLowType tree =
         return $ LowTypeFloat size
     (_, TreeNode [(_, TreeLeaf "pointer"), t]) -> do
       t' <- interpretLowType t
-      return $ LowTypePtr t'
+      return $ LowTypePointer t'
     (_, TreeNode [(_, TreeLeaf "array"), (mInt, TreeLeaf intStr), t]) -> do
       case readMaybe (T.unpack intStr) of
         Nothing ->

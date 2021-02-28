@@ -6,10 +6,10 @@ import Text.Read hiding (get)
 data LowType
   = LowTypeInt IntSize
   | LowTypeFloat FloatSize
-  | LowTypeFunctionPtr [LowType] LowType
-  | LowTypeStruct [LowType]
+  | LowTypePointer LowType
   | LowTypeArray Int LowType -- [n x LOWTYPE]
-  | LowTypePtr LowType
+  | LowTypeStruct [LowType]
+  | LowTypeFunction [LowType] LowType
   deriving (Eq, Ord, Show)
 
 type IntSize =
@@ -107,7 +107,7 @@ asLowTypeMaybe name
 
 voidPtr :: LowType
 voidPtr =
-  LowTypePtr (LowTypeInt 8)
+  LowTypePointer (LowTypeInt 8)
 
 asLowInt :: T.Text -> Maybe IntSize
 asLowInt s =

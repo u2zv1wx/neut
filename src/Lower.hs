@@ -35,7 +35,7 @@ lowerComp term =
       castThenCall <- castThen $ LowCompCall fun vs
       lowerValueLet' (zip xs ds) castThenCall
     (_, CompSigmaElim xs v e) -> do
-      let basePtrType = LowTypePtr $ LowTypeArray (length xs) voidPtr -- base pointer type  ([(length xs) x ARRAY_ELEM_TYPE])
+      let basePtrType = LowTypePointer $ LowTypeArray (length xs) voidPtr -- base pointer type  ([(length xs) x ARRAY_ELEM_TYPE])
       let idxList = map (\i -> (LowValueInt i, LowTypeInt 32)) [0 ..]
       ys <- mapM newNameWith xs
       let xts' = zip xs (repeat voidPtr)
@@ -169,7 +169,7 @@ lowerCompPrimitive m codeOp =
           lowerValueLet' (zip xs args) $ LowCompCall (LowValueGlobal name) vs
         DerangementLoad valueLowType -> do
           let ptr = args !! 0
-          (ptrVar, castPtrThen) <- llvmCast (Just $ takeBaseName ptr) ptr (LowTypePtr valueLowType)
+          (ptrVar, castPtrThen) <- llvmCast (Just $ takeBaseName ptr) ptr (LowTypePointer valueLowType)
           resName <- newNameWith' "result"
           uncast <- llvmUncast (Just $ asText resName) (LowValueLocal resName) valueLowType
           castPtrThen $
@@ -177,7 +177,7 @@ lowerCompPrimitive m codeOp =
         DerangementStore valueLowType -> do
           let ptr = args !! 0
           let val = args !! 1
-          (ptrVar, castPtrThen) <- llvmCast (Just $ takeBaseName ptr) ptr (LowTypePtr valueLowType)
+          (ptrVar, castPtrThen) <- llvmCast (Just $ takeBaseName ptr) ptr (LowTypePointer valueLowType)
           (valVar, castValThen) <- llvmCast (Just $ takeBaseName val) val valueLowType
           (castPtrThen >=> castValThen) $
             LowCompCont (LowOpStore valueLowType valVar ptrVar) $
@@ -371,9 +371,9 @@ toLowType :: AggPtrType -> LowType
 toLowType aggPtrType =
   case aggPtrType of
     AggPtrTypeArray i t ->
-      LowTypePtr $ LowTypeArray i t
+      LowTypePointer $ LowTypeArray i t
     AggPtrTypeStruct ts ->
-      LowTypePtr $ LowTypeStruct ts
+      LowTypePointer $ LowTypeStruct ts
 
 storeContent ::
   Hint ->
@@ -423,7 +423,7 @@ storeContent'' reg elemType sizeInfo len cont = do
     LowCompLet
       c
       ( LowOpGetElementPtr
-          (LowValueNull, LowTypePtr elemType)
+          (LowValueNull, LowTypePointer elemType)
           [(LowValueInt (toInteger len), LowTypeInt 64)]
       )
       $ LowCompLet reg (LowOpAlloc cVar sizeInfo) cont
@@ -431,14 +431,16 @@ storeContent'' reg elemType sizeInfo len cont = do
 indexTypeOf :: LowType -> LowType
 indexTypeOf lowType =
   case lowType of
-    LowTypePtr (LowTypeStruct _) ->
+    LowTypePointer (LowTypeStruct _) ->
       LowTypeInt 32
     _ ->
       LowTypeInt 64
 
 toFunPtrType :: [a] -> LowType
 toFunPtrType xs =
-  LowTypeFunctionPtr (map (const voidPtr) xs) voidPtr
+  LowTypePointer (LowTypeFunction (map (const voidPtr) xs) voidPtr)
+
+-- LowTypeFunctionPtr (map (const voidPtr) xs) voidPtr
 
 newValueLocal :: T.Text -> WithEnv (Ident, LowValue)
 newValueLocal name = do
