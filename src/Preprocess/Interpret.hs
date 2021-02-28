@@ -5,10 +5,8 @@ module Preprocess.Interpret
   )
 where
 
-import Data.EnumCase
+import Data.Basic
 import Data.Env
-import Data.Hint
-import Data.Ident
 import Data.Log
 import Data.Maybe (fromMaybe)
 import Data.MetaTerm

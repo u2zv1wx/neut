@@ -9,17 +9,13 @@ module Elaborate.Infer
 where
 
 import Control.Monad.State.Lazy
+import Data.Basic
 import Data.ConstType
-import Data.Derangement
-import Data.EnumCase
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
-import Data.Hint
-import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.Log
 import Data.LowType
-import Data.Primitive
 import Data.Term
 import qualified Data.Text as T
 import Data.WeakTerm

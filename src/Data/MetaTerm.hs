@@ -1,9 +1,7 @@
 module Data.MetaTerm where
 
-import Data.EnumCase
+import Data.Basic
 import qualified Data.HashMap.Lazy as Map
-import Data.Hint
-import Data.Ident
 import Data.Int
 import qualified Data.IntMap as IntMap
 import Data.Maybe (catMaybes)

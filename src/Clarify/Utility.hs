@@ -1,12 +1,10 @@
 module Clarify.Utility where
 
 import Control.Monad.State.Lazy
+import Data.Basic
 import Data.Comp
-import Data.EnumCase
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
-import Data.Hint
-import Data.Ident
 import Data.Namespace
 import Data.Term
 import qualified Data.Text as T

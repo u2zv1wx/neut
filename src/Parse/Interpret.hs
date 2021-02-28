@@ -6,16 +6,10 @@ module Parse.Interpret
   )
 where
 
--- import Codec.Binary.UTF8.String
--- import Control.Monad.State.Lazy
-import Data.Derangement
-import Data.EnumCase
 import Data.Env
-import Data.Hint
-import Data.Ident
+import Data.Basic
 import Data.Log
 import Data.LowType
-import Data.Size
 import qualified Data.Text as T
 import Data.Tree
 import Data.WeakTerm

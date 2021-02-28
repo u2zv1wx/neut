@@ -1,16 +1,12 @@
 module Data.Term where
 
 import Control.Exception.Safe
-import Data.Derangement
-import Data.EnumCase
-import Data.Hint
-import Data.Ident
+import Data.Basic
 import qualified Data.IntMap as IntMap
 import Data.Log
 import Data.LowType
 import Data.Maybe (fromMaybe)
 import qualified Data.Set as S
-import Data.Size
 import qualified Data.Text as T
 import Data.WeakTerm
 

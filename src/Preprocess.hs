@@ -1,10 +1,9 @@
 module Preprocess (preprocess) where
 
 import Control.Monad.State.Lazy hiding (get)
+import Data.Basic
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
-import Data.Hint
-import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.List (find)
 import Data.Log

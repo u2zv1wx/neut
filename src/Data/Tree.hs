@@ -1,6 +1,6 @@
 module Data.Tree where
 
-import Data.Hint
+import Data.Basic
 import qualified Data.Text as T
 
 data Tree

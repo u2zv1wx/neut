@@ -4,12 +4,10 @@ module Reduce.Comp
 where
 
 import Control.Monad.State.Lazy
+import Data.Basic
 import Data.Comp
-import Data.EnumCase
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
-import Data.Hint
-import Data.Ident
 import qualified Data.IntMap as IntMap
 
 reduceCompPlus :: CompPlus -> WithEnv CompPlus

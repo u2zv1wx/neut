@@ -4,8 +4,8 @@ module Reduce.LowComp
 where
 
 import Control.Monad.State.Lazy
+import Data.Basic
 import Data.Env
-import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.LowComp
 import Data.LowType

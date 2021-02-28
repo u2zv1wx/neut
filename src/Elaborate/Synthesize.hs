@@ -5,10 +5,8 @@ where
 
 import Control.Exception.Safe
 import Control.Monad.State.Lazy
-import Data.Constraint
+import Data.Basic
 import Data.Env
-import Data.Hint
-import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.List (nub, sortOn)
 import Data.Log

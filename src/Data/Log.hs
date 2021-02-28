@@ -21,7 +21,7 @@ module Data.Log
 where
 
 import Control.Exception.Safe
-import Data.Hint
+import Data.Basic
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import System.Console.ANSI

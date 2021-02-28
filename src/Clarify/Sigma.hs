@@ -7,10 +7,9 @@ where
 import Clarify.Linearize
 import Clarify.Utility
 import Control.Monad.State.Lazy
+import Data.Basic
 import Data.Comp
 import Data.Env
-import Data.Hint
-import Data.Ident
 import qualified Data.Text as T
 
 cartesianSigma ::

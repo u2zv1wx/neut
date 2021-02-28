@@ -1,12 +1,11 @@
 module Data.ConstType where
 
 import Control.Monad.State.Lazy
+import Data.Basic
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
-import Data.Hint
 import Data.Log
 import Data.LowType
-import Data.Primitive
 import Data.Term
 import qualified Data.Text as T
 

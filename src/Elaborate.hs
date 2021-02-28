@@ -4,11 +4,9 @@ module Elaborate
 where
 
 import Control.Monad.State.Lazy
-import Data.EnumCase
+import Data.Basic
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
-import Data.Hint
-import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.List (nub)
 import Data.Log

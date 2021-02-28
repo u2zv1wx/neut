@@ -5,9 +5,9 @@ where
 
 import Control.Exception.Safe
 import Control.Monad.State.Lazy
+import Data.Basic
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
-import Data.Hint
 import Data.Log
 import qualified Data.Set as S
 import qualified Data.Text as T

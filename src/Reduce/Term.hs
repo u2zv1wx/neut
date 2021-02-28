@@ -3,12 +3,10 @@ module Reduce.Term
   )
 where
 
-import Data.EnumCase
-import Data.Ident
+import Data.Basic
 import qualified Data.IntMap as IntMap
 import Data.LowType
 import Data.Namespace
-import Data.Primitive
 import qualified Data.Set as S
 import Data.Term
 import qualified Data.Text as T

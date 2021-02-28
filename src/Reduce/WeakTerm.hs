@@ -3,9 +3,7 @@ module Reduce.WeakTerm
   )
 where
 
-import Data.EnumCase
-import Data.Hint
-import Data.Ident
+import Data.Basic
 import qualified Data.IntMap as IntMap
 import Data.WeakTerm
 

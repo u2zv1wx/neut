@@ -8,10 +8,8 @@ module Elaborate.Analyze
 where
 
 import Control.Monad.State.Lazy
-import Data.Constraint
+import Data.Basic
 import Data.Env
-import Data.Hint
-import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.Maybe
 import qualified Data.PQueue.Min as Q

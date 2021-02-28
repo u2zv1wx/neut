@@ -1,15 +1,12 @@
 module Data.Namespace where
 
 import Control.Monad.State.Lazy
-import Data.EnumCase
+import Data.Basic
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
-import Data.Hint
-import Data.Ident
 import Data.Log
 import Data.LowType
 import Data.MetaTerm
-import Data.Primitive
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Tree

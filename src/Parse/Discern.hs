@@ -6,9 +6,9 @@ module Parse.Discern
 where
 
 import Control.Monad.State.Lazy
+import Data.Basic
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
-import Data.Ident
 import Data.Log
 import Data.Namespace
 import qualified Data.Text as T

@@ -4,9 +4,9 @@ module Clarify.Linearize
 where
 
 import Clarify.Utility
+import Data.Basic
 import Data.Comp
 import Data.Env
-import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.Log
 

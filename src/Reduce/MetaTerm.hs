@@ -3,11 +3,9 @@ module Reduce.MetaTerm (reduceMetaTerm) where
 import Codec.Binary.UTF8.String
 import Control.Exception.Safe
 import Control.Monad.State.Lazy hiding (get)
-import Data.EnumCase
+import Data.Basic
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
-import Data.Hint
-import Data.Ident
 import Data.Int
 import qualified Data.IntMap as IntMap
 import Data.Log

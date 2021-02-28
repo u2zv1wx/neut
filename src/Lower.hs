@@ -4,18 +4,13 @@ module Lower
 where
 
 import Control.Monad.State.Lazy
+import Data.Basic
 import Data.Comp
-import Data.Derangement
-import Data.EnumCase
 import Data.Env hiding (newNameWith'')
 import qualified Data.HashMap.Lazy as Map
-import Data.Hint
-import Data.Ident
 import Data.Log
 import Data.LowComp
 import Data.LowType
-import Data.Primitive
-import Data.Size
 import qualified Data.Text as T
 import Reduce.Comp
 

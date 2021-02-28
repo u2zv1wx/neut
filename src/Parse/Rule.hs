@@ -8,8 +8,7 @@ where
 import Data.Log
 import Control.Monad.State.Lazy
 import Data.Env
-import Data.Ident
-import Data.Hint
+import Data.Basic
 import Data.Namespace
 import qualified Data.Set as S
 import qualified Data.Text as T

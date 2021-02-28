@@ -4,19 +4,17 @@ module Emit
 where
 
 import Control.Monad.State.Lazy
+import Data.Basic
 import Data.ByteString.Builder
 import Data.Env
 import qualified Data.HashMap.Lazy as HashMap
-import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.Log
 import Data.LowComp
 import Data.LowType
 import qualified Data.Map as Map
 import Data.Platform
-import Data.Primitive
 import qualified Data.Set as S
-import Data.Size
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Numeric.Half

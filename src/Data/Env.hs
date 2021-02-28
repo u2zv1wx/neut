@@ -2,11 +2,9 @@ module Data.Env where
 
 import Control.Exception.Safe
 import Control.Monad.State.Lazy
+import Data.Basic
 import Data.Comp
-import Data.Constraint
 import qualified Data.HashMap.Lazy as Map
-import Data.Hint
-import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.Log
 import Data.LowComp

@@ -4,8 +4,8 @@ module Parse
 where
 
 import Control.Monad.State.Lazy hiding (get)
+import Data.Basic
 import Data.Env
-import Data.Hint
 import Data.Log
 import Data.Namespace
 import qualified Data.Set as S

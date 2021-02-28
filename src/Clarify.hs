@@ -10,20 +10,17 @@ import Clarify.Linearize
 import Clarify.Sigma
 import Clarify.Utility
 import Control.Monad.State.Lazy
+import Data.Basic
 import Data.Comp
 import Data.ConstType
-import Data.Derangement
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
-import Data.Hint
-import Data.Ident
 import qualified Data.IntMap as IntMap
 import Data.List (nubBy)
 import Data.Log
 import Data.LowType
 import Data.Maybe (catMaybes)
 import Data.Namespace
-import Data.Primitive
 import Data.Term
 import qualified Data.Text as T
 import Reduce.Term
