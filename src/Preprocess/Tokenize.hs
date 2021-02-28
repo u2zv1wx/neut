@@ -233,7 +233,7 @@ newlineSet =
 {-# INLINE nonSymbolSet #-}
 nonSymbolSet :: S.Set Char
 nonSymbolSet =
-  S.fromList "() \"\n;`#"
+  S.fromList "() \"\n;`,"
 
 {-# INLINE updateStreamL #-}
 updateStreamL :: T.Text -> Tokenizer ()
@@ -262,5 +262,5 @@ readMacroMap :: Map.HashMap Char T.Text
 readMacroMap =
   Map.fromList
     [ ('`', "quote"),
-      ('#', "unquote")
+      (',', "unquote")
     ]
