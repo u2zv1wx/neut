@@ -174,7 +174,8 @@ interpret inputTree =
         "exploit"
           | (expKind : resultType : eks) <- rest -> do
             expKind' <- interpretExploitKind expKind
-            ensureExpArgSanity m expKind' eks
+            -- ensureExpArgSanity m expKind' eks
+            -- resultType' <- interpretLowType resultType
             resultType' <- interpret resultType
             eks' <- mapM interpretExploitItem eks
             let (es, ks) = unzip eks'
@@ -420,6 +421,12 @@ asExploitArg tree =
 interpretExploitKind :: TreePlus -> WithEnv ExploitKind
 interpretExploitKind tree =
   case tree of
+    (_, TreeNode [(_, TreeLeaf "store"), t]) -> do
+      t' <- interpretLowType t
+      return $ ExploitKindStore t'
+    (_, TreeNode [(_, TreeLeaf "load"), t]) -> do
+      t' <- interpretLowType t
+      return $ ExploitKindLoad t'
     (_, TreeNode [(_, TreeLeaf "syscall"), (mInt, TreeLeaf intStr)]) ->
       case readMaybe (T.unpack intStr) of
         Just i ->
@@ -428,23 +435,41 @@ interpretExploitKind tree =
           raiseError mInt "the leaf here must be an integer"
     (_, TreeNode [(_, TreeLeaf "external"), (_, TreeLeaf s)]) ->
       return $ ExploitKindExternal s
-    (_, TreeNode [(_, TreeLeaf "array-access"), (_, TreeLeaf arrayKindStr)]) ->
-      case asLowTypeMaybe arrayKindStr of
-        Just t@(LowTypeInt _) ->
-          return $ ExploitKindArrayAccess t
-        Just t@(LowTypeFloat _) ->
-          return $ ExploitKindArrayAccess t
-        _ ->
-          raiseSyntaxError (fst tree) "(array-access INT_TYPE) | (array-access FLOAT_TYPE)"
     _ ->
-      raiseSyntaxError (fst tree) "(syscall LEAF) | (exteral LEAF)"
+      raiseSyntaxError (fst tree) "(syscall LEAF) | (exteral LEAF) | (load TREE) | (store TREE)"
 
-ensureExpArgSanity :: Hint -> ExploitKind -> [a] -> WithEnv ()
-ensureExpArgSanity m k args =
-  case k of
-    ExploitKindArrayAccess _ ->
-      if length args == 2
-        then return ()
-        else raiseError m "the number of the arguments for array-access must be 2"
+interpretLowType :: TreePlus -> WithEnv LowType
+interpretLowType tree =
+  case tree of
+    (_, TreeLeaf s)
+      | Just size <- asLowInt s ->
+        return $ LowTypeInt size
+      | Just size <- asLowFloat s ->
+        return $ LowTypeFloat size
+    (_, TreeNode [(_, TreeLeaf "pointer"), t]) -> do
+      t' <- interpretLowType t
+      return $ LowTypePtr t'
+    (_, TreeNode [(_, TreeLeaf "array"), (mInt, TreeLeaf intStr), t]) -> do
+      case readMaybe (T.unpack intStr) of
+        Nothing ->
+          raiseError mInt "the leaf here must be an integer"
+        Just i -> do
+          t' <- interpretLowType t
+          return $ LowTypeArray i t'
+    (_, TreeNode ((_, TreeLeaf "struct") : ts)) -> do
+      ts' <- mapM interpretLowType ts
+      return $ LowTypeStruct ts'
     _ ->
-      return ()
+      raiseSyntaxError (fst tree) "INT_TYPE | FLOAT_TYPE | (pointer TREE) | (array INT TREE) | (struct TREE*)"
+
+-- (_, TreeNode [(_, TreeLeaf "calculate-pointer"), t]) -> do
+--   t' <- interpretLowType t
+--   return $ ExploitKindCalcPtr t'
+-- (_, TreeNode [(_, TreeLeaf "array-access"), (_, TreeLeaf arrayKindStr)]) ->
+--   case asLowTypeMaybe arrayKindStr of
+--     Just t@(LowTypeInt _) ->
+--       return $ ExploitKindArrayAccess t
+--     Just t@(LowTypeFloat _) ->
+--       return $ ExploitKindArrayAccess t
+--     _ ->
+--       raiseSyntaxError (fst tree) "(array-access INT_TYPE) | (array-access FLOAT_TYPE)"

@@ -103,7 +103,6 @@ handleEnd m s cont = do
 resolveSymbol :: (T.Text -> WithEnv (Maybe b)) -> T.Text -> WithEnv (Maybe b)
 resolveSymbol predicate name = do
   penv <- gets prefixEnv
-  -- let nsSep = undefined
   takeFirst predicate $ name : (map (\prefix -> prefix <> nsSep <> name) penv)
 
 takeFirst :: (a -> WithEnv (Maybe b)) -> [a] -> WithEnv (Maybe b)

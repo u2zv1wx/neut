@@ -97,10 +97,9 @@ reduceWeakTermPlus term =
     (_, WeakTermQuestion e _) ->
       reduceWeakTermPlus e
     (m, WeakTermExploit i t ekts) -> do
-      let t' = reduceWeakTermPlus t
       let (es, ks, ts) = unzip3 ekts
       let es' = map reduceWeakTermPlus es
       let ts' = map reduceWeakTermPlus ts
-      (m, WeakTermExploit i t' (zip3 es' ks ts'))
+      (m, WeakTermExploit i t (zip3 es' ks ts'))
     _ ->
       term

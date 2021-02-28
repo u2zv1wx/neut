@@ -189,12 +189,12 @@ elaborate' term =
       t' <- elaborate' t
       note m $ toText (weaken t')
       return e'
-    (m, WeakTermExploit i t ekts) -> do
+    (m, WeakTermExploit i resultType ekts) -> do
+      resultType' <- elaborate' resultType
       let (es, ks, ts) = unzip3 ekts
       es' <- mapM elaborate' es
       ts' <- map reduceTermPlus <$> mapM elaborate' ts
-      t' <- elaborate' t
-      return (m, TermExploit i t' (zip3 es' ks ts'))
+      return (m, TermExploit i resultType' (zip3 es' ks ts'))
 
 elaboratePlus :: (Hint, a, WeakTermPlus) -> WithEnv (Hint, a, TermPlus)
 elaboratePlus (m, x, t) = do

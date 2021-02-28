@@ -28,7 +28,7 @@ data LowOp
   = LowOpCall LowValue [LowValue]
   | LowOpGetElementPtr
       (LowValue, LowType) -- (base pointer, the type of base pointer)
-      [(LowValue, LowType)] -- [(index, the-typee-of-index)]
+      [(LowValue, LowType)] -- [(index, the-type-of-index)]
   | LowOpBitcast
       LowValue
       LowType -- cast from

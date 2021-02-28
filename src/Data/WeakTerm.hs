@@ -197,8 +197,9 @@ asterWeakTermPlus term =
       S.union set1 set2
     (_, WeakTermExploit _ t ekts) -> do
       let (es, _, ts) = unzip3 ekts
-      -- S.unions $ (asterWeakTermPlus t) : map (asterWeakTermPlus . fst) eks
       S.unions $ asterWeakTermPlus t : map asterWeakTermPlus (es ++ ts)
+
+-- S.unions $ map asterWeakTermPlus (es ++ ts)
 
 asterWeakTermPlus' :: [WeakIdentPlus] -> [WeakTermPlus] -> S.Set Int
 asterWeakTermPlus' binder es =
@@ -286,12 +287,12 @@ substWeakTermPlus sub term =
       let e' = substWeakTermPlus sub e
       let t' = substWeakTermPlus sub t
       (m, WeakTermQuestion e' t')
-    (m, WeakTermExploit i t ekts) -> do
-      let t' = substWeakTermPlus sub t
+    (m, WeakTermExploit i resultType ekts) -> do
+      let resultType' = substWeakTermPlus sub resultType
       let (es, ks, ts) = unzip3 ekts
       let es' = map (substWeakTermPlus sub) es
       let ts' = map (substWeakTermPlus sub) ts
-      (m, WeakTermExploit i t' (zip3 es' ks ts'))
+      (m, WeakTermExploit i resultType' (zip3 es' ks ts'))
 
 substWeakTermPlus' :: SubstWeakTerm -> [WeakIdentPlus] -> [WeakIdentPlus]
 substWeakTermPlus' sub binder =
@@ -391,12 +392,12 @@ toText term =
       showCons ["struct-elimination", argStr, toText e1, toText e2]
     (_, WeakTermQuestion e _) ->
       toText e
-    (_, WeakTermExploit i t ekts) -> do
-      let t' = toText t
+    (_, WeakTermExploit i resultType ekts) -> do
+      let resultType' = toText resultType
       let (es, _, _) = unzip3 ekts
       let es' = map toText es
       -- let ks' = map showSyscallArgKind ks
-      showCons $ "syscall" : T.pack (show i) : t' : es'
+      showCons $ "exploit" : T.pack (show i) : resultType' : es'
 
 inParen :: T.Text -> T.Text
 inParen s =

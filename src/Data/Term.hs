@@ -105,9 +105,9 @@ varTermPlus term =
       let set1 = varTermPlus d
       let set2 = S.filter (`notElem` xs) (varTermPlus e)
       S.union set1 set2
-    (_, TermExploit _ t ekts) -> do
+    (_, TermExploit _ _ ekts) -> do
       let (es, _, ts) = unzip3 ekts
-      S.unions $ varTermPlus t : map varTermPlus (es ++ ts)
+      S.unions $ map varTermPlus (es ++ ts)
 
 varTermPlus' :: [IdentPlus] -> [TermPlus] -> S.Set Int
 varTermPlus' binder es =
@@ -179,12 +179,11 @@ substTermPlus sub term =
       let sub' = foldr IntMap.delete sub xs
       let e' = substTermPlus sub' e
       (m, TermStructElim xts v' e')
-    (m, TermExploit i t ekts) -> do
-      let t' = substTermPlus sub t
+    (m, TermExploit i resultLowType ekts) -> do
       let (es, ks, ts) = unzip3 ekts
       let es' = map (substTermPlus sub) es
       let ts' = map (substTermPlus sub) ts
-      (m, TermExploit i t' (zip3 es' ks ts'))
+      (m, TermExploit i resultLowType (zip3 es' ks ts'))
 
 substTermPlus' :: SubstTerm -> [IdentPlus] -> [IdentPlus]
 substTermPlus' sub binder =
@@ -265,12 +264,12 @@ weaken term =
       let v' = weaken v
       let e' = weaken e
       (m, WeakTermStructElim xts v' e')
-    (m, TermExploit i t ekts) -> do
-      let t' = weaken t
+    (m, TermExploit i resultType ekts) -> do
       let (es, ks, ts) = unzip3 ekts
       let es' = map weaken es
       let ts' = map weaken ts
-      (m, WeakTermExploit i t' (zip3 es' ks ts'))
+      let resultType' = weaken resultType
+      (m, WeakTermExploit i resultType' (zip3 es' ks ts'))
 
 weakenArgs :: [(Hint, Ident, TermPlus)] -> [(Hint, Ident, WeakTermPlus)]
 weakenArgs xts = do

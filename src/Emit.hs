@@ -387,8 +387,6 @@ showLowTypeAsIfNonPtr lowType =
       "float"
     LowTypeFloat FloatSize64 ->
       "double"
-    LowTypeVoid ->
-      "void"
     LowTypeStruct ts ->
       "{" <> showItems showLowType ts <> "}"
     LowTypeFunctionPtr ts t ->
@@ -426,8 +424,6 @@ showLowType lowType =
       "float"
     LowTypeFloat FloatSize64 ->
       "double"
-    LowTypeVoid ->
-      "void"
     LowTypeStruct ts ->
       "{" <> showItems showLowType ts <> "}"
     LowTypeFunctionPtr ts t ->

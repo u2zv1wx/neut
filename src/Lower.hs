@@ -3,10 +3,8 @@ module Lower
   )
 where
 
-import Control.Exception.Safe
 import Control.Monad.State.Lazy
 import Data.Comp
-import Data.ConstType
 import Data.EnumCase
 import Data.Env hiding (newNameWith'')
 import Data.Exploit
@@ -18,9 +16,7 @@ import Data.LowComp
 import Data.LowType
 import Data.Primitive
 import Data.Size
-import Data.Term
 import qualified Data.Text as T
-import Data.WeakTerm hiding (i64)
 import Reduce.Comp
 
 lower :: CompPlus -> WithEnv LowComp
@@ -180,20 +176,50 @@ lowerCompPrimitive _ codeOp =
         ExploitKindExternal name -> do
           call <- externalToLowComp name vs
           lowerValueLet' (zip xs args) call
-        ExploitKindArrayAccess lowType -> do
-          let arr = args !! 0
-          let idx = args !! 1
-          let arrayType = LowTypePtr $ LowTypeArray 0 lowType
-          (arrVar, castArrThen) <- llvmCast (Just $ takeBaseName arr) arr arrayType
-          (idxVar, castIdxThen) <- llvmCast (Just $ takeBaseName idx) idx i64
-          (resPtrName, resPtr) <- newValueLocal "result-ptr"
+        ExploitKindLoad valueLowType -> do
+          let ptr = args !! 0
+          (ptrVar, castPtrThen) <- llvmCast (Just $ takeBaseName ptr) ptr (LowTypePtr valueLowType)
           resName <- newNameWith' "result"
-          uncast <- llvmUncast (Just $ asText resName) (LowValueLocal resName) lowType
-          (castArrThen >=> castIdxThen) $
-            LowCompLet
-              resPtrName
-              (LowOpGetElementPtr (arrVar, arrayType) [(LowValueInt 0, i32), (idxVar, i64)])
-              (LowCompLet resName (LowOpLoad resPtr lowType) uncast)
+          uncast <- llvmUncast (Just $ asText resName) (LowValueLocal resName) valueLowType
+          castPtrThen $
+            LowCompLet resName (LowOpLoad ptrVar valueLowType) uncast
+        ExploitKindStore valueLowType -> do
+          let ptr = args !! 0
+          let val = args !! 1
+          (ptrVar, castPtrThen) <- llvmCast (Just $ takeBaseName ptr) ptr (LowTypePtr valueLowType)
+          (valVar, castValThen) <- llvmCast (Just $ takeBaseName val) val valueLowType
+          (castPtrThen >=> castValThen) $
+            LowCompCont (LowOpStore valueLowType valVar ptrVar) $
+              LowCompReturn (LowValueInt 0)
+
+-- ExploitKindCalcPtr lowType -> do
+--   let basePtr = head args
+--   let indexList = tail args
+--   (is, indexVarList) <- unzip <$> mapM (newValueLocal . takeBaseName) indexList
+--   let basePtrType = LowTypePtr lowType
+--   (basePtrVar, castBasePtrThen) <- llvmCast (Just $ takeBaseName basePtr) basePtr basePtrType
+--   (resPtrName, resPtr) <- newValueLocal "result-ptr"
+--   uncast <- llvmUncast (Just $ asText resPtrName) resPtr resultType
+--   let castIndicesThen = lowerValueLet' (zip is indexList)
+--   (castIndicesThen >=> castBasePtrThen) $
+--     LowCompLet
+--       resPtrName
+--       (LowOpGetElementPtr (basePtrVar, (LowTypePtr lowType)) (map (\i -> (i, i32)) indexVarList))
+--       uncast
+-- ExploitKindArrayAccess lowType -> do
+--   let arr = args !! 0
+--   let idx = args !! 1
+--   let arrayType = LowTypePtr $ LowTypeArray 0 lowType
+--   (arrVar, castArrThen) <- llvmCast (Just $ takeBaseName arr) arr arrayType
+--   (idxVar, castIdxThen) <- llvmCast (Just $ takeBaseName idx) idx i64
+--   (resPtrName, resPtr) <- newValueLocal "result-ptr"
+--   resName <- newNameWith' "result"
+--   uncast <- llvmUncast (Just $ asText resName) (LowValueLocal resName) lowType
+--   (castArrThen >=> castIdxThen) $
+--     LowCompLet
+--       resPtrName
+--       (LowOpGetElementPtr (arrVar, arrayType) [(LowValueInt 0, i32), (idxVar, i64)])
+--       (LowCompLet resName (LowOpLoad resPtr lowType) uncast)
 
 lowerCompUnaryOp :: UnaryOp -> ValuePlus -> WithEnv LowComp
 lowerCompUnaryOp op d = do
@@ -316,23 +342,8 @@ lowerValueLet x lowerValue cont =
       cenv <- gets codeEnv
       lenv <- gets lowCompEnv
       case Map.lookup y cenv of
-        Nothing -> do
-          mt <- lookupTypeEnvMaybe m y
-          case mt of
-            Just (_, TermPi xts _) -> do
-              let y' = "llvm_" <> y
-              denv <- gets declEnv
-              let argType = map (const voidPtr) xts
-              modify (\env -> env {declEnv = Map.insert y' (argType, voidPtr) denv})
-              llvmUncastLet x (LowValueGlobal y') (toFunPtrType xts) cont
-            Just t ->
-              raiseError m $
-                "external constants must have pi-type, but the type of `"
-                  <> y
-                  <> "` is:\n"
-                  <> toText (weaken t)
-            Nothing ->
-              raiseCritical m $ "no such global label defined: " <> y
+        Nothing ->
+          raiseCritical m $ "no such global label defined: " <> y
         Just (Definition _ args e)
           | not (Map.member y lenv) -> do
             insLowCompEnv y args LowCompUnreachable
@@ -547,11 +558,3 @@ commConv x llvm cont2 =
       return $ LowCompLet x (LowOpCall d ds) cont2
     LowCompUnreachable ->
       return LowCompUnreachable
-
-lookupTypeEnvMaybe :: Hint -> T.Text -> WithEnv (Maybe TermPlus)
-lookupTypeEnvMaybe m x =
-  catch (lookupConstTypeEnv m x >>= \e -> return (Just e)) returnNothing
-
-returnNothing :: Error -> WithEnv (Maybe a)
-returnNothing _ =
-  return Nothing

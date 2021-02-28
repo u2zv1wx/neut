@@ -169,6 +169,8 @@ clarifyConst tenv m x
     clarify' tenv (m, TermInt 64 1)
   | x == nsOS <> "stderr" =
     clarify' tenv (m, TermInt 64 2)
+  | x == nsUnsafe <> "pointer" =
+    returnCartesianImmediate m
   | x == nsUnsafe <> "cast" =
     clarifyCast tenv m
   | otherwise =
@@ -406,11 +408,13 @@ chainOf tenv term =
       ts <- mapM (inferKind m) ks
       xs2 <- chainOf (insTypeEnv (zip3 ms xs ts) tenv) e2
       return $ xs1 ++ filter (\(_, y, _) -> y `notElem` xs) xs2
-    (_, TermExploit _ t ekts) -> do
+    (_, TermExploit _ _ ekts) -> do
       let (es, _, ts) = unzip3 ekts
-      xs1 <- chainOf tenv t
-      xs2 <- concat <$> mapM (chainOf tenv) (es ++ ts)
-      return $ xs1 ++ xs2
+      concat <$> mapM (chainOf tenv) (es ++ ts)
+
+-- xs1 <- chainOf tenv t
+-- xs2 <- concat <$> mapM (chainOf tenv) (es ++ ts)
+-- return $ xs1 ++ xs2
 
 chainOf' :: TypeEnv -> [IdentPlus] -> [TermPlus] -> WithEnv [IdentPlus]
 chainOf' tenv binder es =
