@@ -324,13 +324,13 @@ quoteData nenv tree@(m, _) = do
   b <- isSpecialForm nenv tree
   if b
     then return tree
-    else return (m, TreeNode [(m, TreeLeaf "quasiquote"), tree])
+    else return (m, TreeNode [(m, TreeLeaf "quote"), tree])
 
 unquoteCode :: Map.HashMap T.Text Ident -> TreePlus -> WithEnv TreePlus
 unquoteCode nenv tree@(m, _) = do
   b <- isSpecialForm nenv tree
   if b
-    then return (m, TreeNode [(m, TreeLeaf "quasiunquote"), tree])
+    then return (m, TreeNode [(m, TreeLeaf "unquote"), tree])
     else return tree
 
 isSpecialForm :: Map.HashMap T.Text Ident -> TreePlus -> WithEnv Bool

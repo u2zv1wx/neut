@@ -17,12 +17,8 @@ showAsSExp tree =
     (_, TreeLeaf x) ->
       x
     (_, TreeNode [(_, TreeLeaf "quote"), t]) ->
-      "'" <> showAsSExp t
+      "`" <> showAsSExp t
     (_, TreeNode [(_, TreeLeaf "unquote"), t]) ->
       "," <> showAsSExp t
-    (_, TreeNode [(_, TreeLeaf "quasiquote"), t]) ->
-      "`" <> showAsSExp t
-    (_, TreeNode [(_, TreeLeaf "quasiunquote"), t]) ->
-      "#" <> showAsSExp t
     (_, TreeNode ts) ->
       "(" <> T.intercalate " " (map showAsSExp ts) <> ")"

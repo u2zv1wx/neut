@@ -93,16 +93,16 @@ interpretCode tree =
             "node" -> do
               rest' <- mapM interpretCode rest
               return (m, MetaTermNode rest')
-            "quasiquote"
+            "quote"
               | [e] <- rest -> do
                 interpretData 1 e
               | otherwise ->
-                raiseSyntaxError m "(quasiquote TREE)"
-            "quasiunquote"
+                raiseSyntaxError m "(quote TREE)"
+            "unquote"
               | [_] <- rest -> do
-                raiseSyntaxError m "found a quasiunquote not inside a quote"
+                raiseSyntaxError m "found a unquote not inside a quote"
               | otherwise ->
-                raiseSyntaxError m "(quasiunquote TREE)"
+                raiseSyntaxError m "(unquote TREE)"
             "begin-meta" -> do
               let x = (m, TreeLeaf "x")
               let k = (m, TreeLeaf "k")
@@ -123,21 +123,21 @@ interpretData level tree = do
       return (m, MetaTermLeaf atom)
     (m, TreeNode treeList) ->
       case treeList of
-        (_, TreeLeaf "quasiquote") : rest
+        (_, TreeLeaf "quote") : rest
           | [e] <- rest -> do
             e' <- interpretData (level + 1) e
-            return (m, MetaTermNode [(m, MetaTermLeaf "quasiquote"), e'])
+            return (m, MetaTermNode [(m, MetaTermLeaf "quote"), e'])
           | otherwise ->
             raiseSyntaxError m "(quote TREE)"
-        (_, TreeLeaf "quasiunquote") : rest
+        (_, TreeLeaf "unquote") : rest
           | [e] <- rest -> do
             if level == 1
               then interpretCode e
               else do
                 e' <- interpretData (level - 1) e
-                return (m, MetaTermNode [(m, MetaTermLeaf "quasiunquote"), e'])
+                return (m, MetaTermNode [(m, MetaTermLeaf "unquote"), e'])
           | otherwise ->
-            raiseSyntaxError m "(quasiunquote TREE)"
+            raiseSyntaxError m "(unquote TREE)"
         _ -> do
           treeList' <- mapM (interpretData level) treeList
           return (m, MetaTermNode treeList')
