@@ -359,6 +359,10 @@ interpretDerangement tree =
     (_, TreeNode [(_, TreeLeaf "load"), t]) -> do
       t' <- interpretLowType t
       return $ DerangementLoad t'
+    (_, TreeNode [(_, TreeLeaf "get-element-pointer"), baseType, resultType]) -> do
+      baseType' <- interpretLowType baseType
+      resultType' <- interpretLowType resultType
+      return $ DerangementGetElementPtr baseType' resultType'
     (_, TreeNode [(_, TreeLeaf "create-array"), t]) -> do
       t' <- interpretLowType t
       return $ DerangementCreateArray t'

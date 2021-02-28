@@ -9,6 +9,7 @@ data Derangement
   | DerangementExternal T.Text
   | DerangementLoad LowType
   | DerangementStore LowType
+  | DerangementGetElementPtr LowType LowType
   | DerangementCreateArray LowType
   | DerangementCreateStruct [LowType]
   deriving (Show, Eq)
