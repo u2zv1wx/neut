@@ -6,8 +6,8 @@ module Parse.Interpret
   )
 where
 
-import Data.Env
 import Data.Basic
+import Data.Env
 import Data.Log
 import Data.LowType
 import qualified Data.Text as T
@@ -29,10 +29,6 @@ interpret inputTree =
       | Just x' <- readMaybe $ T.unpack atom -> do
         h <- newAster m
         return (m, WeakTermFloat h x')
-      -- | Just str <- readMaybe $ T.unpack atom -> do
-      --   u8s <- forM (encode str) $ \u ->
-      --     return (m, WeakTermInt (i8 m) (toInteger u))
-      --   sigmaIntroString m u8s
       | otherwise ->
         case T.uncons atom of
           Nothing ->
@@ -369,7 +365,6 @@ interpretDerangement tree =
       return $ DerangementExternal s
     _ ->
       raiseSyntaxError (fst tree) "(syscall LEAF) | (exteral LEAF) | (load TREE) | (store TREE)"
-
 
 interpretLowType :: TreePlus -> WithEnv LowType
 interpretLowType tree =
