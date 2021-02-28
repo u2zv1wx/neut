@@ -335,6 +335,7 @@ unquoteCode nenv tree@(m, _) =
     then (m, TreeNode [(m, TreeLeaf "quasiunquote"), tree])
     else tree
 
+-- fixme: ここでprefixもチェックする必要がある
 isSpecialForm :: Map.HashMap T.Text Ident -> TreePlus -> Bool
 isSpecialForm nenv tree =
   case tree of

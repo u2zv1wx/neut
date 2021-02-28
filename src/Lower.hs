@@ -150,7 +150,7 @@ loadContent' bp bt values cont =
           $ LowCompLet x (LowOpLoad pos et) cont'
 
 lowerCompPrimitive :: Hint -> Primitive -> WithEnv LowComp
-lowerCompPrimitive _ codeOp =
+lowerCompPrimitive m codeOp =
   case codeOp of
     PrimitiveUnaryOp op v ->
       lowerCompUnaryOp op v
@@ -180,6 +180,11 @@ lowerCompPrimitive _ codeOp =
           (castPtrThen >=> castValThen) $
             LowCompCont (LowOpStore valueLowType valVar ptrVar) $
               LowCompReturn (LowValueInt 0)
+        DerangementCreateArray elemType -> do
+          let arrayType = AggPtrTypeArray (length args) elemType
+          let argTypeList = zip args (repeat elemType)
+          resName <- newNameWith' "result"
+          storeContent m resName arrayType argTypeList (LowCompReturn (LowValueLocal resName))
 
 lowerCompUnaryOp :: UnaryOp -> ValuePlus -> WithEnv LowComp
 lowerCompUnaryOp op d = do

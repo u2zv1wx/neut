@@ -358,6 +358,9 @@ interpretDerangement tree =
     (_, TreeNode [(_, TreeLeaf "load"), t]) -> do
       t' <- interpretLowType t
       return $ DerangementLoad t'
+    (_, TreeNode [(_, TreeLeaf "create-array"), t]) -> do
+      t' <- interpretLowType t
+      return $ DerangementCreateArray t'
     (_, TreeNode [(_, TreeLeaf "syscall"), (mInt, TreeLeaf intStr)]) ->
       case readMaybe (T.unpack intStr) of
         Just i ->
