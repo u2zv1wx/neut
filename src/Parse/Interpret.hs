@@ -339,14 +339,12 @@ asExploitArg :: TreePlus -> WithEnv ExploitArgKind
 asExploitArg tree =
   case tree of
     (m, TreeLeaf x)
-      | x == "arg-immediate" ->
-        return ExploitArgKindImm
-      | x == "arg-struct" ->
-        return ExploitArgKindStruct
-      | x == "arg-array" ->
-        return ExploitArgKindArray
+      | x == "linear" ->
+        return ExploitArgKindLinear
+      | x == "affine" ->
+        return ExploitArgKindAffine
       | otherwise ->
-        raiseSyntaxError m "arg-immediate | arg-struct | arg-array"
+        raiseSyntaxError m "linear | affine"
     (m, _) ->
       raiseSyntaxError m "LEAF"
 

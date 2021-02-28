@@ -21,6 +21,7 @@ import qualified Data.IntMap as IntMap
 import Data.List (nubBy)
 import Data.Log
 import Data.LowType
+import Data.Maybe (catMaybes)
 import Data.Namespace
 import Data.Primitive
 import Data.Term
@@ -73,12 +74,12 @@ clarify' tenv term =
       let (es, ks, ts) = unzip3 ekts
       xs <- mapM (const $ newNameWith' "sys") es
       let xts = zipWith (\x t -> (fst t, x, t)) xs ts
-      (borrowedVarList, args, headerList) <- computeHeader (zip xts ks)
+      let borrowedVarList = catMaybes $ map takeIffLinear (zip xts ks)
+      let xsAsVars = map (\(mx, x, _) -> (mx, ValueUpsilon x)) xts
       resultVarName <- newNameWith' "result"
       tuple <- constructResultTuple tenv m borrowedVarList (m, resultVarName, resultType)
-      let call = (m, CompPrimitive (PrimitiveExploit expKind args))
-      let body = iterativeApp headerList (m, CompUpElim resultVarName call tuple)
-      cls <- retClosure tenv Nothing [] m xts body
+      let lamBody = (m, CompUpElim resultVarName (m, CompPrimitive (PrimitiveExploit expKind xsAsVars)) tuple)
+      cls <- retClosure tenv Nothing [] m xts lamBody
       es' <- mapM (clarifyPlus tenv) es
       callClosure m cls es'
 
@@ -166,50 +167,13 @@ clarifyBinaryOp tenv name op m = do
     _ ->
       raiseCritical m $ "the arity of " <> name <> " is wrong"
 
-computeHeader :: [(IdentPlus, ExploitArgKind)] -> WithEnv ([IdentPlus], [ValuePlus], [CompPlus -> CompPlus])
-computeHeader xtks = do
-  (xss, dss, headerList) <- unzip3 <$> mapM (\(xt, k) -> computeHeader' xt k) xtks
-  return (concat xss, concat dss, headerList)
-
-computeHeader' :: IdentPlus -> ExploitArgKind -> WithEnv ([IdentPlus], [ValuePlus], CompPlus -> CompPlus) -- ([borrow], arg-to-exploit, ADD_HEADER_TO_CONTINUATION)
-computeHeader' (m, x, t) k =
+takeIffLinear :: (IdentPlus, ExploitArgKind) -> Maybe IdentPlus
+takeIffLinear (xt, k) =
   case k of
-    ExploitArgKindImm ->
-      return ([], [(m, ValueUpsilon x)], id)
-    ExploitArgKindStruct -> do
-      (structVarName, structVar) <- newValueUpsilonWith m "struct"
-      return
-        ( [(m, structVarName, t)],
-          [structVar],
-          \cont ->
-            (m, CompUpElim structVarName (m, CompUpIntro (m, ValueUpsilon x)) cont)
-        )
-    ExploitArgKindArray -> do
-      arrayVarName <- newNameWith' "array"
-      (arrayTypeName, arrayType) <- newValueUpsilonWith m "array-type"
-      (arrayInnerName, arrayInner) <- newValueUpsilonWith m "array-inner"
-      (arrayInnerTmpName, arrayInnerTmp) <- newValueUpsilonWith m "array-tmp"
-      return
-        ( [(m, arrayVarName, t)],
-          [arrayInnerTmp],
-          \cont ->
-            ( m,
-              CompSigmaElim
-                [arrayTypeName, arrayInnerName]
-                (m, ValueUpsilon x)
-                ( m,
-                  CompUpElim
-                    arrayInnerTmpName
-                    (m {metaIsReducible = False}, CompUpIntro arrayInner)
-                    ( m,
-                      CompUpElim
-                        arrayVarName
-                        (m, CompUpIntro (m, ValueSigmaIntro [arrayType, arrayInnerTmp]))
-                        cont
-                    )
-                )
-            )
-        )
+    ExploitArgKindAffine ->
+      Nothing
+    ExploitArgKindLinear ->
+      Just xt
 
 -- generate tuple like (borrowed-1, ..., borrowed-n, result)
 constructResultTuple ::
@@ -383,11 +347,3 @@ lookupTypeEnv m (I (name, x)) tenv =
     Nothing ->
       raiseCritical m $
         "the variable `" <> name <> "` is not found in the type environment."
-
-iterativeApp :: [a -> a] -> a -> a
-iterativeApp functionList x =
-  case functionList of
-    [] ->
-      x
-    f : fs ->
-      f (iterativeApp fs x)

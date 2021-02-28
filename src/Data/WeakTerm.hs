@@ -363,12 +363,10 @@ showCase c =
 showExploitArgKind :: ExploitArgKind -> T.Text
 showExploitArgKind k =
   case k of
-    ExploitArgKindImm ->
-      "immediate"
-    ExploitArgKindArray ->
-      "array"
-    ExploitArgKindStruct ->
-      "struct"
+    ExploitArgKindLinear ->
+      "linear"
+    ExploitArgKindAffine ->
+      "affine"
 
 showItems :: [T.Text] -> T.Text
 showItems =

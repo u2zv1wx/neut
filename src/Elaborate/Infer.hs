@@ -314,10 +314,10 @@ takeBorrowedTypes tks =
       []
     ((t, k) : rest) ->
       case k of
-        ExploitArgKindImm ->
-          takeBorrowedTypes rest
-        _ ->
+        ExploitArgKindLinear ->
           t : takeBorrowedTypes rest
+        ExploitArgKindAffine ->
+          takeBorrowedTypes rest
 
 weakTermSigma :: Hint -> [WeakIdentPlus] -> WithEnv WeakTermPlus
 weakTermSigma m xts = do
