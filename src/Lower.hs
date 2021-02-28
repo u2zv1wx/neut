@@ -36,7 +36,7 @@ lowerComp term =
       lowerValueLet' (zip xs ds) castThenCall
     (_, CompSigmaElim xs v e) -> do
       let basePtrType = LowTypePtr $ LowTypeArray (length xs) voidPtr -- base pointer type  ([(length xs) x ARRAY_ELEM_TYPE])
-      let idxList = map (\i -> (LowValueInt i, i32)) [0 ..]
+      let idxList = map (\i -> (LowValueInt i, LowTypeInt 32)) [0 ..]
       ys <- mapM newNameWith xs
       let xts' = zip xs (repeat voidPtr)
       loadContent v basePtrType (zip idxList (zip ys xts')) e
@@ -413,7 +413,7 @@ storeContent' bp bt values cont =
       castThen $
         LowCompLet
           locName
-          (LowOpGetElementPtr (bp, bt) [(LowValueInt 0, i32), (LowValueInt i, it)])
+          (LowOpGetElementPtr (bp, bt) [(LowValueInt 0, LowTypeInt 32), (LowValueInt i, it)])
           $ LowCompCont (LowOpStore et cast loc) cont'
 
 storeContent'' :: Ident -> LowType -> SizeInfo -> Int -> LowComp -> WithEnv LowComp
@@ -424,7 +424,7 @@ storeContent'' reg elemType sizeInfo len cont = do
       c
       ( LowOpGetElementPtr
           (LowValueNull, LowTypePtr elemType)
-          [(LowValueInt (toInteger len), i64)]
+          [(LowValueInt (toInteger len), LowTypeInt 64)]
       )
       $ LowCompLet reg (LowOpAlloc cVar sizeInfo) cont
 
@@ -449,14 +449,6 @@ newValueLocal' :: Maybe T.Text -> WithEnv (Ident, LowValue)
 newValueLocal' mName = do
   x <- newNameWith'' mName
   return (x, LowValueLocal x)
-
-i64 :: LowType
-i64 =
-  LowTypeInt 64
-
-i32 :: LowType
-i32 =
-  LowTypeInt 32
 
 newNameWith'' :: Maybe T.Text -> WithEnv Ident
 newNameWith'' mName =
