@@ -311,40 +311,48 @@ retrieveCompileTimeVarValue m var =
 autoQuote :: TreePlus -> WithEnv TreePlus
 autoQuote tree = do
   nenv <- gets topMetaNameEnv
-  return $ autoQuote' nenv tree
+  autoQuote' nenv tree
 
-autoQuote' :: Map.HashMap T.Text Ident -> TreePlus -> TreePlus
+autoQuote' :: Map.HashMap T.Text Ident -> TreePlus -> WithEnv TreePlus
 autoQuote' nenv tree =
   case tree of
     (_, TreeLeaf _) ->
-      tree
+      return tree
     (m, TreeNode ts) -> do
-      let modifier = if isSpecialForm nenv tree then quoteData else unquoteCode
-      let ts' = map (modifier nenv . autoQuote' nenv) ts
-      (m, TreeNode ts')
+      b <- isSpecialForm nenv tree
+      let modifier = if b then quoteData else unquoteCode
+      ts' <- mapM (autoQuote' nenv) ts
+      ts'' <- mapM (modifier nenv) ts'
+      return (m, TreeNode ts'')
 
-quoteData :: Map.HashMap T.Text Ident -> TreePlus -> TreePlus
-quoteData nenv tree@(m, _) =
-  if isSpecialForm nenv tree
-    then tree
-    else (m, TreeNode [(m, TreeLeaf "quasiquote"), tree])
+quoteData :: Map.HashMap T.Text Ident -> TreePlus -> WithEnv TreePlus
+quoteData nenv tree@(m, _) = do
+  b <- isSpecialForm nenv tree
+  if b
+    then return tree
+    else return (m, TreeNode [(m, TreeLeaf "quasiquote"), tree])
 
-unquoteCode :: Map.HashMap T.Text Ident -> TreePlus -> TreePlus
-unquoteCode nenv tree@(m, _) =
-  if isSpecialForm nenv tree
-    then (m, TreeNode [(m, TreeLeaf "quasiunquote"), tree])
-    else tree
+unquoteCode :: Map.HashMap T.Text Ident -> TreePlus -> WithEnv TreePlus
+unquoteCode nenv tree@(m, _) = do
+  b <- isSpecialForm nenv tree
+  if b
+    then return (m, TreeNode [(m, TreeLeaf "quasiunquote"), tree])
+    else return tree
 
--- fixme: ここでprefixもチェックする必要がある
-isSpecialForm :: Map.HashMap T.Text Ident -> TreePlus -> Bool
-isSpecialForm nenv tree =
+isSpecialForm :: Map.HashMap T.Text Ident -> TreePlus -> WithEnv Bool
+isSpecialForm nenv tree = do
   case tree of
-    (_, TreeLeaf x) ->
-      Map.member x nenv
-    (_, TreeNode ((_, TreeLeaf x) : _)) ->
-      Map.member x nenv
+    (m, TreeLeaf x) -> do
+      my <- resolveSymbol (asMetaVar m nenv) x
+      case my of
+        Just _ ->
+          return True
+        _ ->
+          return False
+    (_, TreeNode (leaf@(_, TreeLeaf _) : _)) ->
+      isSpecialForm nenv leaf
     _ ->
-      False
+      return False
 
 insEnumEnv :: Hint -> T.Text -> [(T.Text, Int)] -> WithEnv ()
 insEnumEnv m name xis = do
