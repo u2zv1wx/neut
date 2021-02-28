@@ -138,6 +138,7 @@ interpret inputTree =
         "exploit"
           | (expKind : resultType : eks) <- rest -> do
             expKind' <- interpretExploitKind expKind
+            checkExploitArity m expKind' eks
             resultType' <- interpret resultType
             eks' <- mapM interpretExploitItem eks
             let (es, ks) = unzip eks'
@@ -391,3 +392,19 @@ interpretLowType tree =
       return $ LowTypeStruct ts'
     _ ->
       raiseSyntaxError (fst tree) "INT_TYPE | FLOAT_TYPE | (pointer TREE) | (array INT TREE) | (struct TREE*)"
+
+checkExploitArity :: Hint -> ExploitKind -> [TreePlus] -> WithEnv ()
+checkExploitArity m k args =
+  case k of
+    ExploitKindLoad _
+      | length args == 1 ->
+        return ()
+      | otherwise ->
+        raiseError m $ "the arity of `load` is 2, but found " <> T.pack (show (length args + 1)) <> " arguments"
+    ExploitKindStore _
+      | length args == 2 ->
+        return ()
+      | otherwise ->
+        raiseError m $ "the arity of `store` is 3, but found " <> T.pack (show (length args + 1)) <> " arguments"
+    _ ->
+      return ()
