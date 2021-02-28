@@ -339,57 +339,57 @@ binaryOpToDomCod binaryOp =
     BinaryOpXor t ->
       (t, t)
     BinaryOpICmpEQ t ->
-      (t, LowTypeBool)
+      (t, LowTypeInt 1)
     BinaryOpICmpNE t ->
-      (t, LowTypeBool)
+      (t, LowTypeInt 1)
     BinaryOpICmpUGT t ->
-      (t, LowTypeBool)
+      (t, LowTypeInt 1)
     BinaryOpICmpUGE t ->
-      (t, LowTypeBool)
+      (t, LowTypeInt 1)
     BinaryOpICmpULT t ->
-      (t, LowTypeBool)
+      (t, LowTypeInt 1)
     BinaryOpICmpULE t ->
-      (t, LowTypeBool)
+      (t, LowTypeInt 1)
     BinaryOpICmpSGT t ->
-      (t, LowTypeBool)
+      (t, LowTypeInt 1)
     BinaryOpICmpSGE t ->
-      (t, LowTypeBool)
+      (t, LowTypeInt 1)
     BinaryOpICmpSLT t ->
-      (t, LowTypeBool)
+      (t, LowTypeInt 1)
     BinaryOpICmpSLE t ->
-      (t, LowTypeBool)
+      (t, LowTypeInt 1)
     BinaryOpFCmpFALSE t ->
-      (t, LowTypeBool)
+      (t, LowTypeInt 1)
     BinaryOpFCmpOEQ t ->
-      (t, LowTypeBool)
+      (t, LowTypeInt 1)
     BinaryOpFCmpOGT t ->
-      (t, LowTypeBool)
+      (t, LowTypeInt 1)
     BinaryOpFCmpOGE t ->
-      (t, LowTypeBool)
+      (t, LowTypeInt 1)
     BinaryOpFCmpOLT t ->
-      (t, LowTypeBool)
+      (t, LowTypeInt 1)
     BinaryOpFCmpOLE t ->
-      (t, LowTypeBool)
+      (t, LowTypeInt 1)
     BinaryOpFCmpONE t ->
-      (t, LowTypeBool)
+      (t, LowTypeInt 1)
     BinaryOpFCmpORD t ->
-      (t, LowTypeBool)
+      (t, LowTypeInt 1)
     BinaryOpFCmpUEQ t ->
-      (t, LowTypeBool)
+      (t, LowTypeInt 1)
     BinaryOpFCmpUGT t ->
-      (t, LowTypeBool)
+      (t, LowTypeInt 1)
     BinaryOpFCmpUGE t ->
-      (t, LowTypeBool)
+      (t, LowTypeInt 1)
     BinaryOpFCmpULT t ->
-      (t, LowTypeBool)
+      (t, LowTypeInt 1)
     BinaryOpFCmpULE t ->
-      (t, LowTypeBool)
+      (t, LowTypeInt 1)
     BinaryOpFCmpUNE t ->
-      (t, LowTypeBool)
+      (t, LowTypeInt 1)
     BinaryOpFCmpUNO t ->
-      (t, LowTypeBool)
+      (t, LowTypeInt 1)
     BinaryOpFCmpTRUE t ->
-      (t, LowTypeBool)
+      (t, LowTypeInt 1)
 
 {-# INLINE breakOnMaybe #-}
 breakOnMaybe :: T.Text -> T.Text -> Maybe (T.Text, T.Text)

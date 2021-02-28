@@ -219,7 +219,5 @@ lowTypeToType m lowType =
       return (m, TermConst (showIntSize s))
     LowTypeFloat s ->
       return (m, TermConst (showFloatSize s))
-    LowTypeBool ->
-      return (m, TermEnum "bool")
     _ ->
       raiseCritical m "invalid argument passed to lowTypeToType"

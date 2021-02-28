@@ -207,8 +207,6 @@ llvmCast mName v lowType =
   case lowType of
     LowTypeInt _ ->
       llvmCastInt mName v lowType
-    LowTypeBool ->
-      llvmCastInt mName v (LowTypeInt 1)
     LowTypeFloat i ->
       llvmCastFloat mName v i
     _ -> do
@@ -260,8 +258,6 @@ llvmUncast mName result lowType =
   case lowType of
     LowTypeInt _ ->
       llvmUncastInt mName result lowType
-    LowTypeBool ->
-      llvmUncastInt mName result (LowTypeInt 1)
     LowTypeFloat i ->
       llvmUncastFloat mName result i
     _ -> do

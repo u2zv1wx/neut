@@ -6,7 +6,6 @@ import Text.Read hiding (get)
 
 data LowType
   = LowTypeInt IntSize
-  | LowTypeBool -- synonym for i1
   | LowTypeFloat FloatSize
   | LowTypeFunctionPtr [LowType] LowType
   | LowTypeStruct [LowType]
