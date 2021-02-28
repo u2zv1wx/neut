@@ -347,3 +347,18 @@ lookupTypeEnv m (I (name, x)) tenv =
     Nothing ->
       raiseCritical m $
         "the variable `" <> name <> "` is not found in the type environment."
+
+termSigmaIntro :: Hint -> [IdentPlus] -> WithEnv TermPlus
+termSigmaIntro m xts = do
+  z <- newNameWith' "internal.sigma-tau-tuple"
+  let vz = (m, TermUpsilon z)
+  k <- newNameWith'' "sigma"
+  let args = map (\(mx, x, _) -> (mx, TermUpsilon x)) xts
+  return
+    ( m,
+      TermPiIntro
+        [ (m, z, (m, TermTau)),
+          (m, k, (m, TermPi xts vz))
+        ]
+        (m, TermPiElim (m, TermUpsilon k) args)
+    )

@@ -28,12 +28,7 @@ import Text.Read (readMaybe)
 preprocess :: Path Abs File -> WithEnv [TreePlus]
 preprocess mainFilePath = do
   pushTrace mainFilePath
-  out <- visit mainFilePath
-  -- forM_ out $ \k -> do
-  --   p $ T.unpack $ showAsSExp k
-  -- p "quitting."
-  -- _ <- liftIO $ exitWith ExitSuccess
-  return out
+  visit mainFilePath
 
 visit :: Path Abs File -> WithEnv [TreePlus]
 visit path = do

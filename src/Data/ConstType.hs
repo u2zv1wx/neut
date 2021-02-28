@@ -44,18 +44,3 @@ binaryOpToType m op = do
   x2 <- newNameWith'' "_"
   let xts = [(m, x1, dom'), (m, x2, dom')]
   return (m, TermPi xts cod')
-
-termSigmaIntro :: Hint -> [IdentPlus] -> WithEnv TermPlus
-termSigmaIntro m xts = do
-  z <- newNameWith' "internal.sigma-tau-tuple"
-  let vz = (m, TermUpsilon z)
-  k <- newNameWith'' "sigma"
-  let args = map (\(mx, x, _) -> (mx, TermUpsilon x)) xts
-  return
-    ( m,
-      TermPiIntro
-        [ (m, z, (m, TermTau)),
-          (m, k, (m, TermPi xts vz))
-        ]
-        (m, TermPiElim (m, TermUpsilon k) args)
-    )
