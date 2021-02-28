@@ -181,17 +181,6 @@ lowerCompPrimitive m codeOp =
           (castPtrThen >=> castValThen) $
             LowCompCont (LowOpStore valueLowType valVar ptrVar) $
               LowCompReturn (LowValueInt 0)
-        DerangementGetElementPtr baseType resultType -> do
-          let ptr = args !! 0
-          let indexList = tail args
-          (indexVarList, castIndexThen) <- lowerCastIndexList indexList
-          resName <- newNameWith' "result"
-          (ptrVar, castPtrThen) <- llvmCast (Just $ takeBaseName ptr) ptr (LowTypePtr baseType)
-          uncast <- llvmUncast (Just $ asText resName) (LowValueLocal resName) (LowTypePtr resultType)
-          let its = map (\x -> (x, LowTypeInt 32)) indexVarList
-          (castPtrThen >=> castIndexThen) $
-            LowCompLet resName (LowOpGetElementPtr (ptrVar, (LowTypePtr baseType)) its) $
-              uncast
         DerangementCreateArray elemType -> do
           let arrayType = AggPtrTypeArray (length args) elemType
           let argTypeList = zip args (repeat elemType)
@@ -202,16 +191,6 @@ lowerCompPrimitive m codeOp =
           let argTypeList = zip args elemTypeList
           resName <- newNameWith' "result"
           storeContent m resName structType argTypeList (LowCompReturn (LowValueLocal resName))
-
-lowerCastIndexList :: [ValuePlus] -> WithEnv ([LowValue], LowComp -> WithEnv LowComp)
-lowerCastIndexList binder =
-  case binder of
-    [] ->
-      return ([], return)
-    d : rest -> do
-      (vs, restCastThen) <- lowerCastIndexList rest
-      (v, castThen) <- llvmCast (Just $ takeBaseName d) d (LowTypeInt 32)
-      return (v : vs, castThen >=> restCastThen)
 
 lowerCompUnaryOp :: UnaryOp -> ValuePlus -> WithEnv LowComp
 lowerCompUnaryOp op d = do
