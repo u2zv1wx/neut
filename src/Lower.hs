@@ -185,6 +185,11 @@ lowerCompPrimitive m codeOp =
           let argTypeList = zip args (repeat elemType)
           resName <- newNameWith' "result"
           storeContent m resName arrayType argTypeList (LowCompReturn (LowValueLocal resName))
+        DerangementCreateStruct elemTypeList -> do
+          let structType = AggPtrTypeStruct elemTypeList
+          let argTypeList = zip args elemTypeList
+          resName <- newNameWith' "result"
+          storeContent m resName structType argTypeList (LowCompReturn (LowValueLocal resName))
 
 lowerCompUnaryOp :: UnaryOp -> ValuePlus -> WithEnv LowComp
 lowerCompUnaryOp op d = do

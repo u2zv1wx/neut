@@ -10,6 +10,7 @@ data Derangement
   | DerangementLoad LowType
   | DerangementStore LowType
   | DerangementCreateArray LowType
+  | DerangementCreateStruct [LowType]
   deriving (Show, Eq)
 
 data DerangementArg

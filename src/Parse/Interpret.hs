@@ -361,6 +361,9 @@ interpretDerangement tree =
     (_, TreeNode [(_, TreeLeaf "create-array"), t]) -> do
       t' <- interpretLowType t
       return $ DerangementCreateArray t'
+    (_, TreeNode ((_, TreeLeaf "create-array") : ts)) -> do
+      ts' <- mapM interpretLowType ts
+      return $ DerangementCreateStruct ts'
     (_, TreeNode [(_, TreeLeaf "syscall"), (mInt, TreeLeaf intStr)]) ->
       case readMaybe (T.unpack intStr) of
         Just i ->
@@ -409,5 +412,10 @@ checkDerangementArity m k args =
         return ()
       | otherwise ->
         raiseError m $ "the arity of `store` is 3, but found " <> T.pack (show (length args + 1)) <> " arguments"
+    DerangementCreateStruct ts
+      | length args == length ts ->
+        return ()
+      | otherwise ->
+        raiseError m $ "this `create-struct` expects " <> T.pack (show (length ts)) <> " value(s), but found " <> T.pack (show (length args))
     _ ->
       return ()
