@@ -1,7 +1,5 @@
 module Parse.Rule
   ( parseData,
-    asData,
-    generateProjections,
   )
 where
 
@@ -79,51 +77,6 @@ parseConnective' inputTree =
       return (m, name, xts', rules')
     _ ->
       raiseSyntaxError (fst inputTree) "(LEAF (TREE ... TREE) ...)"
-
-toDataInfo :: TreePlus -> WithEnv (WeakTextPlus, [WeakIdentPlus])
-toDataInfo ts = do
-  connectiveList <- parseConnective' ts
-  fs <- formationRuleOf connectiveList
-  at <- ruleAsWeakTextPlus fs
-  bts <- toInternalRuleList connectiveList
-  case bts of
-    [(_, "new", (_, WeakTermPi xts _))] ->
-      return (at, xts)
-    _ ->
-      undefined
-
-generateProjections :: TreePlus -> WithEnv [WeakStmt]
-generateProjections t = do
-  ((ma, a, ta), bts) <- toDataInfo t
-  (xts, _) <- separatePi ta
-  h <- newNameWith'' "_"
-  let dom = (ma, h, (ma, WeakTermPiElim (ma, WeakTermUpsilon $ asIdent a) (map toVar' xts)))
-  forM bts $ \(mb, b, tb) ->
-    WeakStmtLet mb
-      <$> discernIdentPlus
-        ( mb,
-          asIdent (a <> nsSep <> asText b),
-          (mb, WeakTermPi (xts ++ [dom]) tb)
-        )
-      <*> discern
-        ( mb,
-          WeakTermPiIntro
-            (xts ++ [dom])
-            ( mb,
-              WeakTermPiElim
-                (mb, WeakTermUpsilon $ asIdent (a <> nsSep <> "case"))
-                $ tb : map toVar' (xts ++ [dom]) ++ [(mb, WeakTermPiIntro bts (mb, WeakTermUpsilon b))]
-            )
-        )
-
-separatePi :: WeakTermPlus -> WithEnv ([WeakIdentPlus], WeakTermPlus)
-separatePi e =
-  case e of
-    (_, WeakTermPi xts cod) ->
-      return (xts, cod)
-    _ -> do
-      p' e
-      raiseSyntaxError (fst e) "(pi (TREE ... TREE) TREE)"
 
 parseRule :: TreePlus -> WithEnv Rule
 parseRule inputTree =
@@ -247,40 +200,3 @@ toInternalRuleList (_, _, _, rules) =
 toVar' :: WeakIdentPlus -> WeakTermPlus
 toVar' (m, x, _) =
   (m, WeakTermUpsilon x)
-
-toApp :: Hint -> TreePlus -> [TreePlus] -> WithEnv TreePlus
-toApp m a xts = do
-  argList <- mapM extractArg xts
-  return (m, TreeNode (a : argList))
-
-asData :: Hint -> [TreePlus] -> WithEnv TreePlus
-asData m ts =
-  case ts of
-    (a : (_, TreeNode xts) : rules) -> do
-      app <- toApp m a xts
-      return
-        ( m,
-          TreeNode
-            [ a,
-              (m, TreeNode xts),
-              ( m,
-                TreeNode
-                  [ (m, TreeLeaf "new"),
-                    (m, TreeNode rules),
-                    app
-                  ]
-              )
-            ]
-        )
-    _ ->
-      raiseSyntaxError m "(LEAF (TREE ... TREE) ...)"
-
-extractArg :: TreePlus -> WithEnv TreePlus
-extractArg tree =
-  case tree of
-    (m, TreeLeaf x) ->
-      return (m, TreeLeaf x)
-    (_, TreeNode [(m, TreeLeaf x), _]) ->
-      return (m, TreeLeaf x)
-    t ->
-      raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"

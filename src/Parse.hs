@@ -52,15 +52,6 @@ parse stmtTreeList =
                 stmtList1 <- parseData m rest
                 stmtList2 <- parse restStmtList
                 return $ stmtList1 ++ stmtList2
-            "record"
-              | (_, TreeLeaf _) : (_, TreeNode _) : _ <- rest -> do
-                rest' <- asData m rest
-                stmtList1 <- parseData m [rest']
-                stmtList2 <- generateProjections rest'
-                stmtList3 <- parse restStmtList
-                return $ stmtList1 ++ stmtList2 ++ stmtList3
-              | otherwise ->
-                raiseSyntaxError m "(record name (TREE ... TREE) TREE ... TREE)"
             --
             -- namespace-related statements
             --

@@ -114,12 +114,12 @@ toTree term =
       let args = map (\i -> (m, TreeLeaf $ asText' i)) $ xs ++ [rest]
       (m, TreeNode [(m, TreeLeaf "fix-meta-variadic"), (m, TreeLeaf (asText' f)), (m, TreeNode args), e'])
     (m, MetaTermLeaf x) ->
-      (m, TreeNode [(m, TreeLeaf "leaf"), (m, TreeLeaf x)])
-    -- (m, TreeLeaf x)
+      -- (m, TreeNode [(m, TreeLeaf "leaf"), (m, TreeLeaf x)])
+      (m, TreeLeaf x)
     (m, MetaTermNode es) -> do
       let es' = map toTree es
-      (m, TreeNode ((m, TreeLeaf "node") : es'))
-    -- (m, TreeNode es')
+      -- (m, TreeNode ((m, TreeLeaf "node") : es'))
+      (m, TreeNode es')
     (m, MetaTermConst c) ->
       (m, TreeLeaf c)
     (m, MetaTermInt64 i) ->
