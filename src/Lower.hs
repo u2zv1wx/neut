@@ -351,12 +351,19 @@ constructSwitch switch =
       code' <- lowerComp code
       return $ Just (code', [])
     (EnumCaseLabel l, code@(m, _)) : rest -> do
-      i <- fromInteger <$> enumValueToInteger m l
+      i <- enumValueToInteger m l
+      constructSwitch $ (EnumCaseInteger (toInteger i), code) : rest
+    -- code' <- lowerComp code
+    -- mSwitch <- constructSwitch rest
+    -- return $ do
+    --   (defaultCase, caseList) <- mSwitch
+    --   return (defaultCase, (i, code') : caseList)
+    (EnumCaseInteger i, code) : rest -> do
       code' <- lowerComp code
       mSwitch <- constructSwitch rest
       return $ do
         (defaultCase, caseList) <- mSwitch
-        return (defaultCase, (i, code') : caseList)
+        return (defaultCase, (fromInteger i, code') : caseList)
     (EnumCaseDefault, code) : _ -> do
       code' <- lowerComp code
       return $ Just (code', [])
@@ -456,9 +463,9 @@ newNameWith'' mName =
     Just name ->
       newNameWith' name
 
-enumValueToInteger :: Hint -> T.Text -> WithEnv Integer
+enumValueToInteger :: Hint -> T.Text -> WithEnv Int
 enumValueToInteger m l =
-  toInteger <$> getEnumNum m l
+  getEnumNum m l
 
 getEnumNum :: Hint -> T.Text -> WithEnv Int
 getEnumNum m label = do

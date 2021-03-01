@@ -394,6 +394,8 @@ showCase c =
   case c of
     EnumCaseLabel l ->
       l
+    EnumCaseInteger i ->
+      T.pack (show i)
     EnumCaseDefault ->
       "default"
 

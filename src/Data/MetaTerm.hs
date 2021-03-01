@@ -139,6 +139,8 @@ toTreeEnumCase (m, v) =
   case v of
     EnumCaseLabel l ->
       (m, TreeLeaf l)
+    EnumCaseInteger i ->
+      (m, TreeLeaf (T.pack (show i)))
     EnumCaseDefault ->
       (m, TreeLeaf "default")
 

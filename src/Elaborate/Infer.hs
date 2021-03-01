@@ -238,6 +238,9 @@ inferEnumCase ctx weakCase =
     (m, EnumCaseLabel name) -> do
       k <- lookupKind m name
       return (weakCase, (m, WeakTermEnum k))
+    (m, EnumCaseInteger i) -> do
+      h <- newTypeAsterInCtx ctx m
+      return ((m, EnumCaseInteger i), h)
     (m, EnumCaseDefault) -> do
       h <- newTypeAsterInCtx ctx m
       return ((m, EnumCaseDefault), h)

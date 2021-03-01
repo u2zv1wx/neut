@@ -152,14 +152,19 @@ elaborate' term =
       es' <- mapM elaborate' es
       t' <- reduceTermPlus <$> elaborate' t
       case t' of
+        (_, TermConst intStr)
+          | Just intSize <- asLowInt intStr -> do
+            checkExaustiveness m (2 ^ intSize) (map snd ls)
+            return (m, TermEnumElim (e', t') (zip ls es'))
         (_, TermEnum x) -> do
-          caseCheckEnumIdent m x $ map snd ls
+          enumSet <- lookupEnumSet m x
+          checkExaustiveness m (toInteger $ length enumSet) $ map snd ls
           return (m, TermEnumElim (e', t') (zip ls es'))
         _ ->
           raiseError m $
             "the type of `"
               <> toText (weaken e')
-              <> "` must be an enum type, but is:\n"
+              <> "` must be an enum type or an integer type, but is:\n"
               <> toText (weaken t')
     (m, WeakTermQuestion e t) -> do
       e' <- elaborate' e
@@ -178,13 +183,12 @@ elaboratePlus (m, x, t) = do
   t' <- elaborate' t
   return (m, x, t')
 
-caseCheckEnumIdent :: Hint -> T.Text -> [EnumCase] -> WithEnv ()
-caseCheckEnumIdent m x ls = do
-  es <- lookupEnumSet m x
-  let len = length (nub ls)
-  if length es <= len || EnumCaseDefault `elem` ls
+checkExaustiveness :: Hint -> Integer -> [EnumCase] -> WithEnv ()
+checkExaustiveness m size caseList = do
+  let len = toInteger $ length (nub caseList)
+  if size <= len || EnumCaseDefault `elem` caseList
     then return ()
-    else raiseError m "non-exhaustive pattern"
+    else raiseError m "found a non-exhaustive pattern"
 
 lookupEnumSet :: Hint -> T.Text -> WithEnv [T.Text]
 lookupEnumSet m name = do
