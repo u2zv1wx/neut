@@ -111,10 +111,8 @@ nubFVS =
 
 clarifyConst :: TypeEnv -> Hint -> T.Text -> WithEnv CompPlus
 clarifyConst tenv m x
-  | Just op <- asUnaryOpMaybe x =
-    clarifyUnaryOp tenv x op m
-  | Just op <- asBinaryOpMaybe x =
-    clarifyBinaryOp tenv x op m
+  | Just op <- asPrimOpMaybe x =
+    clarifyPrimOp tenv x op m
   | Just _ <- asLowTypeMaybe x =
     returnCartesianImmediate m
   | x == nsOS <> "file-descriptor" =
@@ -141,26 +139,14 @@ clarifyCast tenv m = do
   let u = (m, TermTau)
   clarify' tenv (m, TermPiIntro [(m, a, u), (m, b, u), (m, z, varA)] (m, TermUpsilon z))
 
-clarifyUnaryOp :: TypeEnv -> T.Text -> UnaryOp -> Hint -> WithEnv CompPlus
-clarifyUnaryOp tenv name op m = do
+clarifyPrimOp :: TypeEnv -> T.Text -> PrimOp -> Hint -> WithEnv CompPlus
+clarifyPrimOp tenv name op m = do
   t <- lookupConstTypeEnv m name
   let t' = reduceTermPlus t
   case t' of
-    (_, TermPi [(mx, x, tx)] _) -> do
-      let varX = (mx, ValueUpsilon x)
-      retClosure tenv Nothing [] m [(mx, x, tx)] (m, CompPrimitive (PrimitiveUnaryOp op varX))
-    _ ->
-      raiseCritical m $ "the arity of " <> name <> " is wrong"
-
-clarifyBinaryOp :: TypeEnv -> T.Text -> BinaryOp -> Hint -> WithEnv CompPlus
-clarifyBinaryOp tenv name op m = do
-  t <- lookupConstTypeEnv m name
-  let t' = reduceTermPlus t
-  case t' of
-    (_, TermPi [(mx, x, tx), (my, y, ty)] _) -> do
-      let varX = (mx, ValueUpsilon x)
-      let varY = (my, ValueUpsilon y)
-      retClosure tenv Nothing [] m [(mx, x, tx), (my, y, ty)] (m, CompPrimitive (PrimitiveBinaryOp op varX varY))
+    (_, TermPi mxts _) -> do
+      let varList = map (\(mx, x, _) -> (mx, ValueUpsilon x)) mxts
+      retClosure tenv Nothing [] m mxts (m, CompPrimitive (PrimitivePrimOp op varList))
     _ ->
       raiseCritical m $ "the arity of " <> name <> " is wrong"
 

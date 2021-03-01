@@ -64,10 +64,8 @@ infer' ctx term =
       -- i64, f16, etc.
       | Just _ <- asLowTypeMaybe x ->
         return ((m, WeakTermConst x), (m, WeakTermTau))
-      | Just op <- asUnaryOpMaybe x ->
-        inferExternal m x (unaryOpToType m op)
-      | Just op <- asBinaryOpMaybe x ->
-        inferExternal m x (binaryOpToType m op)
+      | Just op <- asPrimOpMaybe x ->
+        inferExternal m x (primOpToType m op)
       | otherwise -> do
         t <- lookupConstTypeEnv m x
         return ((m, WeakTermConst x), (m, snd $ weaken t))

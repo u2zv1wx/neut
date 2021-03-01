@@ -13,33 +13,21 @@ lookupConstTypeEnv :: Hint -> T.Text -> WithEnv TermPlus
 lookupConstTypeEnv m x
   | Just _ <- asLowTypeMaybe x =
     return (m, TermTau)
-  | Just op <- asUnaryOpMaybe x =
-    unaryOpToType m op
-  | Just op <- asBinaryOpMaybe x =
-    binaryOpToType m op
+  | Just op <- asPrimOpMaybe x =
+    primOpToType m op
   | otherwise = do
     ctenv <- gets constTypeEnv
     case Map.lookup x ctenv of
-      Just t -> return t
+      Just t ->
+        return t
       Nothing ->
         raiseCritical m $
           "the constant `" <> x <> "` is not found in the type environment."
 
-unaryOpToType :: Hint -> UnaryOp -> WithEnv TermPlus
-unaryOpToType m op = do
-  let (dom, cod) = unaryOpToDomCod op
-  dom' <- lowTypeToType m dom
+primOpToType :: Hint -> PrimOp -> WithEnv TermPlus
+primOpToType m (PrimOp _ domList cod) = do
+  domList' <- mapM (lowTypeToType m) domList
   cod' <- lowTypeToType m cod
-  x <- newNameWith'' "_"
-  let xts = [(m, x, dom')]
-  return (m, TermPi xts cod')
-
-binaryOpToType :: Hint -> BinaryOp -> WithEnv TermPlus
-binaryOpToType m op = do
-  let (dom, cod) = binaryOpToDomCod op
-  dom' <- lowTypeToType m dom
-  cod' <- lowTypeToType m cod
-  x1 <- newNameWith'' "_"
-  x2 <- newNameWith'' "_"
-  let xts = [(m, x1, dom'), (m, x2, dom')]
+  xs <- mapM (const (newNameWith'' "_")) domList'
+  let xts = zipWith (\x t -> (m, x, t)) xs domList'
   return (m, TermPi xts cod')

@@ -128,11 +128,11 @@ emitLowOp llvmOp =
             showIndex is
           ]
     LowOpBitcast d fromType toType ->
-      emitLowCompConvOp "bitcast" d fromType toType
+      emitConvOp "bitcast" d fromType toType
     LowOpIntToPointer d fromType toType ->
-      emitLowCompConvOp "inttoptr" d fromType toType
+      emitConvOp "inttoptr" d fromType toType
     LowOpPointerToInt d fromType toType ->
-      emitLowCompConvOp "ptrtoint" d fromType toType
+      emitConvOp "ptrtoint" d fromType toType
     LowOpLoad d lowType ->
       return $
         unwordsL
@@ -159,114 +159,19 @@ emitLowOp llvmOp =
         else return $ unwordsL ["call fastcc", "i8*", "@free(i8* " <> showLowValue d <> ")"]
     LowOpSyscall num ds ->
       emitSyscallOp num ds
-    LowOpUnaryOp (UnaryOpFNeg t) d ->
-      emitUnaryOp t "fneg" d
-    LowOpUnaryOp (UnaryOpTrunc t1 t2) d ->
-      emitLowCompConvOp "trunc" d t1 t2
-    LowOpUnaryOp (UnaryOpFpTrunc t1 t2) d ->
-      emitLowCompConvOp "fptrunc" d t1 t2
-    LowOpUnaryOp (UnaryOpZext t1 t2) d ->
-      emitLowCompConvOp "zext" d t1 t2
-    LowOpUnaryOp (UnaryOpSext t1 t2) d ->
-      emitLowCompConvOp "sext" d t1 t2
-    LowOpUnaryOp (UnaryOpFpExt t1 t2) d ->
-      emitLowCompConvOp "fpext" d t1 t2
-    LowOpUnaryOp (UnaryOpUF t1 t2) d ->
-      emitLowCompConvOp "uitofp" d t1 t2
-    LowOpUnaryOp (UnaryOpSF t1 t2) d ->
-      emitLowCompConvOp "sitofp" d t1 t2
-    LowOpUnaryOp (UnaryOpFU t1 t2) d ->
-      emitLowCompConvOp "fptoui" d t1 t2
-    LowOpUnaryOp (UnaryOpFS t1 t2) d ->
-      emitLowCompConvOp "fptosi" d t1 t2
-    LowOpBinaryOp (BinaryOpAdd t) d1 d2 ->
-      emitBinaryOp t "add" d1 d2
-    LowOpBinaryOp (BinaryOpFAdd t) d1 d2 ->
-      emitBinaryOp t "fadd" d1 d2
-    LowOpBinaryOp (BinaryOpSub t) d1 d2 ->
-      emitBinaryOp t "sub" d1 d2
-    LowOpBinaryOp (BinaryOpFSub t) d1 d2 ->
-      emitBinaryOp t "fsub" d1 d2
-    LowOpBinaryOp (BinaryOpMul t) d1 d2 ->
-      emitBinaryOp t "mul" d1 d2
-    LowOpBinaryOp (BinaryOpFMul t) d1 d2 ->
-      emitBinaryOp t "fmul" d1 d2
-    LowOpBinaryOp (BinaryOpSDiv t) d1 d2 ->
-      emitBinaryOp t "sdiv" d1 d2
-    LowOpBinaryOp (BinaryOpUDiv t) d1 d2 ->
-      emitBinaryOp t "udiv" d1 d2
-    LowOpBinaryOp (BinaryOpFDiv t) d1 d2 ->
-      emitBinaryOp t "fdiv" d1 d2
-    LowOpBinaryOp (BinaryOpSRem t) d1 d2 ->
-      emitBinaryOp t "srem" d1 d2
-    LowOpBinaryOp (BinaryOpURem t) d1 d2 ->
-      emitBinaryOp t "urem" d1 d2
-    LowOpBinaryOp (BinaryOpFRem t) d1 d2 ->
-      emitBinaryOp t "frem" d1 d2
-    LowOpBinaryOp (BinaryOpShl t) d1 d2 ->
-      emitBinaryOp t "shl" d1 d2
-    LowOpBinaryOp (BinaryOpLshr t) d1 d2 ->
-      emitBinaryOp t "lshr" d1 d2
-    LowOpBinaryOp (BinaryOpAshr t) d1 d2 ->
-      emitBinaryOp t "ashr" d1 d2
-    LowOpBinaryOp (BinaryOpAnd t) d1 d2 ->
-      emitBinaryOp t "and" d1 d2
-    LowOpBinaryOp (BinaryOpOr t) d1 d2 ->
-      emitBinaryOp t "or" d1 d2
-    LowOpBinaryOp (BinaryOpXor t) d1 d2 ->
-      emitBinaryOp t "xor" d1 d2
-    LowOpBinaryOp (BinaryOpICmpEQ t) d1 d2 ->
-      emitBinaryOp t "icmp eq" d1 d2
-    LowOpBinaryOp (BinaryOpICmpNE t) d1 d2 ->
-      emitBinaryOp t "icmp ne" d1 d2
-    LowOpBinaryOp (BinaryOpICmpUGT t) d1 d2 ->
-      emitBinaryOp t "icmp ugt" d1 d2
-    LowOpBinaryOp (BinaryOpICmpUGE t) d1 d2 ->
-      emitBinaryOp t "icmp uge" d1 d2
-    LowOpBinaryOp (BinaryOpICmpULT t) d1 d2 ->
-      emitBinaryOp t "icmp ult" d1 d2
-    LowOpBinaryOp (BinaryOpICmpULE t) d1 d2 ->
-      emitBinaryOp t "icmp ule" d1 d2
-    LowOpBinaryOp (BinaryOpICmpSGT t) d1 d2 ->
-      emitBinaryOp t "icmp sgt" d1 d2
-    LowOpBinaryOp (BinaryOpICmpSGE t) d1 d2 ->
-      emitBinaryOp t "icmp sge" d1 d2
-    LowOpBinaryOp (BinaryOpICmpSLT t) d1 d2 ->
-      emitBinaryOp t "icmp slt" d1 d2
-    LowOpBinaryOp (BinaryOpICmpSLE t) d1 d2 ->
-      emitBinaryOp t "icmp sle" d1 d2
-    LowOpBinaryOp (BinaryOpFCmpFALSE t) d1 d2 ->
-      emitBinaryOp t "fcmp false" d1 d2
-    LowOpBinaryOp (BinaryOpFCmpOEQ t) d1 d2 ->
-      emitBinaryOp t "fcmp oeq" d1 d2
-    LowOpBinaryOp (BinaryOpFCmpOGT t) d1 d2 ->
-      emitBinaryOp t "fcmp ogt" d1 d2
-    LowOpBinaryOp (BinaryOpFCmpOGE t) d1 d2 ->
-      emitBinaryOp t "fcmp oge" d1 d2
-    LowOpBinaryOp (BinaryOpFCmpOLT t) d1 d2 ->
-      emitBinaryOp t "fcmp olt" d1 d2
-    LowOpBinaryOp (BinaryOpFCmpOLE t) d1 d2 ->
-      emitBinaryOp t "fcmp ole" d1 d2
-    LowOpBinaryOp (BinaryOpFCmpONE t) d1 d2 ->
-      emitBinaryOp t "fcmp one" d1 d2
-    LowOpBinaryOp (BinaryOpFCmpORD t) d1 d2 ->
-      emitBinaryOp t "fcmp ord" d1 d2
-    LowOpBinaryOp (BinaryOpFCmpUEQ t) d1 d2 ->
-      emitBinaryOp t "fcmp ueq" d1 d2
-    LowOpBinaryOp (BinaryOpFCmpUGT t) d1 d2 ->
-      emitBinaryOp t "fcmp ugt" d1 d2
-    LowOpBinaryOp (BinaryOpFCmpUGE t) d1 d2 ->
-      emitBinaryOp t "fcmp uge" d1 d2
-    LowOpBinaryOp (BinaryOpFCmpULT t) d1 d2 ->
-      emitBinaryOp t "fcmp ult" d1 d2
-    LowOpBinaryOp (BinaryOpFCmpULE t) d1 d2 ->
-      emitBinaryOp t "fcmp ule" d1 d2
-    LowOpBinaryOp (BinaryOpFCmpUNE t) d1 d2 ->
-      emitBinaryOp t "fcmp une" d1 d2
-    LowOpBinaryOp (BinaryOpFCmpUNO t) d1 d2 ->
-      emitBinaryOp t "fcmp uno" d1 d2
-    LowOpBinaryOp (BinaryOpFCmpTRUE t) d1 d2 ->
-      emitBinaryOp t "fcmp true" d1 d2
+    LowOpPrimOp (PrimOp op domList cod) args -> do
+      let op' = TE.encodeUtf8Builder op
+      case (S.member op unaryOpSet, S.member op convOpSet, S.member op binaryOpSet, S.member op cmpOpSet) of
+        (True, _, _, _) ->
+          emitUnaryOp (domList !! 0) op' (args !! 0)
+        (_, True, _, _) ->
+          emitConvOp op' (args !! 0) (domList !! 0) cod
+        (_, _, True, _) ->
+          emitBinaryOp (domList !! 0) op' (args !! 0) (args !! 1)
+        (_, _, _, True) ->
+          emitBinaryOp (domList !! 0) op' (args !! 0) (args !! 1)
+        _ ->
+          raiseCritical' $ "unknown primitive: " <> op
 
 emitUnaryOp :: LowType -> Builder -> LowValue -> WithEnv Builder
 emitUnaryOp t inst d =
@@ -277,8 +182,8 @@ emitBinaryOp t inst d1 d2 =
   return $
     unwordsL [inst, showLowType t, showLowValue d1 <> ",", showLowValue d2]
 
-emitLowCompConvOp :: Builder -> LowValue -> LowType -> LowType -> WithEnv Builder
-emitLowCompConvOp cast d dom cod =
+emitConvOp :: Builder -> LowValue -> LowType -> LowType -> WithEnv Builder
+emitConvOp cast d dom cod =
   return $
     unwordsL [cast, showLowType dom, showLowValue d, "to", showLowType cod]
 

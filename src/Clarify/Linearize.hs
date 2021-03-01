@@ -198,13 +198,9 @@ distinguishComp zs term =
 distinguishPrimitive :: [Ident] -> Primitive -> WithEnv (NameMap, Primitive)
 distinguishPrimitive zs term =
   case term of
-    PrimitiveUnaryOp op d -> do
-      (vs, d') <- distinguishValue zs d
-      return (vs, PrimitiveUnaryOp op d')
-    PrimitiveBinaryOp op d1 d2 -> do
-      (vs1, d1') <- distinguishValue zs d1
-      (vs2, d2') <- distinguishValue zs d2
-      return (merge [vs1, vs2], PrimitiveBinaryOp op d1' d2')
+    PrimitivePrimOp op ds -> do
+      (vss, ds') <- unzip <$> mapM (distinguishValue zs) ds
+      return (merge vss, PrimitivePrimOp op ds')
     PrimitiveDerangement k ds -> do
       (vss, ds') <- unzip <$> mapM (distinguishValue zs) ds
       return (merge vss, PrimitiveDerangement k ds')

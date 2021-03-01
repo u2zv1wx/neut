@@ -39,8 +39,7 @@ data LowOp
   | LowOpStore LowType LowValue LowValue
   | LowOpAlloc LowValue SizeInfo
   | LowOpFree LowValue SizeInfo Int -- (var, size-of-var, name-of-free)   (name-of-free is only for optimization)
-  | LowOpUnaryOp UnaryOp LowValue
-  | LowOpBinaryOp BinaryOp LowValue LowValue
+  | LowOpPrimOp PrimOp [LowValue]
   | LowOpSyscall
       Integer -- syscall number
       [LowValue] -- arguments
@@ -98,13 +97,9 @@ substLowOp sub llvmOp =
     LowOpFree d sizeInfo i -> do
       let d' = substLowValue sub d
       LowOpFree d' sizeInfo i
-    LowOpUnaryOp op d -> do
-      let d' = substLowValue sub d
-      LowOpUnaryOp op d'
-    LowOpBinaryOp op d1 d2 -> do
-      let d1' = substLowValue sub d1
-      let d2' = substLowValue sub d2
-      LowOpBinaryOp op d1' d2'
+    LowOpPrimOp op ds -> do
+      let ds' = map (substLowValue sub) ds
+      LowOpPrimOp op ds'
     LowOpSyscall i ds -> do
       let ds' = map (substLowValue sub) ds
       LowOpSyscall i ds'

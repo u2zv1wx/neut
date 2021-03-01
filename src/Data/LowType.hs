@@ -1,5 +1,6 @@
 module Data.LowType where
 
+import qualified Data.Set as S
 import qualified Data.Text as T
 import Text.Read hiding (get)
 
@@ -21,65 +22,9 @@ data FloatSize
   | FloatSize64
   deriving (Eq, Ord, Show)
 
-data UnaryOp
-  = UnaryOpFNeg LowType
-  | UnaryOpTrunc LowType LowType
-  | UnaryOpZext LowType LowType
-  | UnaryOpSext LowType LowType
-  | UnaryOpFpTrunc LowType LowType
-  | UnaryOpFpExt LowType LowType
-  | UnaryOpFU LowType LowType
-  | UnaryOpFS LowType LowType
-  | UnaryOpUF LowType LowType
-  | UnaryOpSF LowType LowType
-  deriving (Eq, Show)
-
-data BinaryOp
-  = BinaryOpAdd LowType -- (X, X) -> X
-  | BinaryOpFAdd LowType -- (X, X) -> X
-  | BinaryOpSub LowType -- (X, X) -> X
-  | BinaryOpFSub LowType -- (X, X) -> X
-  | BinaryOpMul LowType -- (X, X) -> X
-  | BinaryOpFMul LowType -- (X, X) -> X
-  | BinaryOpUDiv LowType -- (X, X) -> X
-  | BinaryOpSDiv LowType -- (X, X) -> X
-  | BinaryOpFDiv LowType -- (X, X) -> X
-  | BinaryOpURem LowType -- (X, X) -> X
-  | BinaryOpSRem LowType -- (X, X) -> X
-  | BinaryOpFRem LowType
-  | BinaryOpShl LowType -- (X, X) -> X
-  | BinaryOpLshr LowType -- (X, X) -> X
-  | BinaryOpAshr LowType -- (X, X) -> X
-  | BinaryOpAnd LowType -- (X, X) -> X
-  | BinaryOpOr LowType -- (X, X) -> X
-  | BinaryOpXor LowType -- (X, X) -> X
-  | BinaryOpICmpEQ LowType -- (X, X) -> bool
-  | BinaryOpICmpNE LowType -- (X, X) -> bool
-  | BinaryOpICmpUGT LowType -- (X, X) -> bool
-  | BinaryOpICmpUGE LowType -- (X, X) -> bool
-  | BinaryOpICmpULT LowType -- (X, X) -> bool
-  | BinaryOpICmpULE LowType -- (X, X) -> bool
-  | BinaryOpICmpSGT LowType -- (X, X) -> bool
-  | BinaryOpICmpSGE LowType -- (X, X) -> bool
-  | BinaryOpICmpSLT LowType -- (X, X) -> bool
-  | BinaryOpICmpSLE LowType -- (X, X) -> bool
-  | BinaryOpFCmpFALSE LowType -- (X, X) -> bool
-  | BinaryOpFCmpOEQ LowType -- (X, X) -> bool
-  | BinaryOpFCmpOGT LowType -- (X, X) -> bool
-  | BinaryOpFCmpOGE LowType -- (X, X) -> bool
-  | BinaryOpFCmpOLT LowType -- (X, X) -> bool
-  | BinaryOpFCmpOLE LowType -- (X, X) -> bool
-  | BinaryOpFCmpONE LowType -- (X, X) -> bool
-  | BinaryOpFCmpORD LowType -- (X, X) -> bool
-  | BinaryOpFCmpUEQ LowType -- (X, X) -> bool
-  | BinaryOpFCmpUGT LowType -- (X, X) -> bool
-  | BinaryOpFCmpUGE LowType -- (X, X) -> bool
-  | BinaryOpFCmpULT LowType -- (X, X) -> bool
-  | BinaryOpFCmpULE LowType -- (X, X) -> bool
-  | BinaryOpFCmpUNE LowType -- (X, X) -> bool
-  | BinaryOpFCmpUNO LowType -- (X, X) -> bool
-  | BinaryOpFCmpTRUE LowType -- (X, X) -> bool
-  deriving (Eq, Show)
+data PrimOp
+  = PrimOp T.Text [LowType] LowType
+  deriving (Show, Eq)
 
 -- a `derangement` handles an extra-linguistic feature
 data Derangement
@@ -138,332 +83,131 @@ asLowFloat s =
         _ ->
           Nothing
 
--- fneg-f16, uitofp-u32-f64, etc.
--- <OP_NAME_IN_LLVM>-<TYPE-1>-(...)-<TYPE-N>
-asUnaryOpMaybe :: T.Text -> Maybe UnaryOp
-asUnaryOpMaybe name
+asPrimOpMaybe :: T.Text -> Maybe PrimOp
+asPrimOpMaybe name
   | Just ("fneg", typeStr) <- breakOnMaybe "-" name,
     Just lowType@(LowTypeFloat _) <- asLowTypeMaybe typeStr =
-    Just $ UnaryOpFNeg lowType
+    Just $ PrimOp "fneg" [lowType] lowType
   | Just (convOpStr, rest) <- breakOnMaybe "-" name,
     Just (domTypeStr, codTypeStr) <- breakOnMaybe "-" rest,
     Just domType <- asLowTypeMaybe domTypeStr,
     Just codType <- asLowTypeMaybe codTypeStr,
-    Just op <- asConvOpMaybe domType codType convOpStr =
-    Just op
-  | otherwise =
-    Nothing
-
-unaryOpToDomCod :: UnaryOp -> (LowType, LowType)
-unaryOpToDomCod unaryOp =
-  case unaryOp of
-    UnaryOpFNeg t ->
-      (t, t)
-    UnaryOpTrunc dom cod ->
-      (dom, cod)
-    UnaryOpZext dom cod ->
-      (dom, cod)
-    UnaryOpSext dom cod ->
-      (dom, cod)
-    UnaryOpFpTrunc dom cod ->
-      (dom, cod)
-    UnaryOpFpExt dom cod ->
-      (dom, cod)
-    UnaryOpFU dom cod ->
-      (dom, cod)
-    UnaryOpFS dom cod ->
-      (dom, cod)
-    UnaryOpUF dom cod ->
-      (dom, cod)
-    UnaryOpSF dom cod ->
-      (dom, cod)
-
-asConvOpMaybe :: LowType -> LowType -> T.Text -> Maybe UnaryOp
-asConvOpMaybe domType codType name =
-  case name of
-    "trunc"
-      | LowTypeInt i1 <- domType,
-        LowTypeInt i2 <- codType,
-        i1 > i2 ->
-        Just $ UnaryOpTrunc domType codType
-    "zext"
-      | LowTypeInt i1 <- domType,
-        LowTypeInt i2 <- codType,
-        i1 < i2 ->
-        Just $ UnaryOpZext domType codType
-    "sext"
-      | LowTypeInt i1 <- domType,
-        LowTypeInt i2 <- codType,
-        i1 < i2 ->
-        Just $ UnaryOpSext domType codType
-    "fptrunc"
-      | LowTypeFloat size1 <- domType,
-        LowTypeFloat size2 <- codType,
-        sizeAsInt size1 > sizeAsInt size2 ->
-        Just $ UnaryOpFpTrunc domType codType
-    "fpext"
-      | LowTypeFloat size1 <- domType,
-        LowTypeFloat size2 <- codType,
-        sizeAsInt size1 < sizeAsInt size2 ->
-        Just $ UnaryOpFpExt domType codType
-    "fptoui"
-      | LowTypeFloat _ <- domType,
-        LowTypeInt _ <- codType ->
-        Just $ UnaryOpFU domType codType
-    "fptosi"
-      | LowTypeFloat _ <- domType,
-        LowTypeInt _ <- codType ->
-        Just $ UnaryOpFS domType codType
-    "uitofp"
-      | LowTypeInt _ <- domType,
-        LowTypeFloat _ <- codType ->
-        Just $ UnaryOpUF domType codType
-    "sitofp"
-      | LowTypeInt _ <- domType,
-        LowTypeFloat _ <- codType ->
-        Just $ UnaryOpSF domType codType
-    _ ->
-      Nothing
-
--- add-i8, lt-u32, etc.
-asBinaryOpMaybe :: T.Text -> Maybe BinaryOp
-asBinaryOpMaybe name
+    isValidConvOp convOpStr domType codType =
+    Just $ PrimOp convOpStr [domType] codType
   | Just (opStr, rest) <- breakOnMaybe "-" name =
     case opStr of
       "icmp"
         | Just (condStr, typeStr) <- breakOnMaybe "-" rest,
           Just lowType@(LowTypeInt _) <- asLowTypeMaybe typeStr,
-          Just f <- asICmpMaybe condStr ->
-          Just $ f lowType
+          asLowICmpMaybe condStr ->
+          Just $ PrimOp (opStr <> " " <> condStr) [lowType, lowType] (LowTypeInt 1)
       "fcmp"
         | Just (condStr, typeStr) <- breakOnMaybe "-" rest,
           Just lowType@(LowTypeFloat _) <- asLowTypeMaybe typeStr,
-          Just f <- asFCmpMaybe condStr ->
-          Just $ f lowType
+          asLowFCmpMaybe condStr ->
+          Just $ PrimOp (opStr <> " " <> condStr) [lowType, lowType] (LowTypeInt 1)
       _
         | Just lowType <- asLowTypeMaybe rest,
-          Just f <- asBinaryOpMaybe' opStr lowType ->
-          Just $ f lowType
+          asLowBinaryOpMaybe' opStr lowType ->
+          Just $ PrimOp opStr [lowType, lowType] lowType
       _ ->
         Nothing
   | otherwise =
     Nothing
 
-asBinaryOpMaybe' :: T.Text -> LowType -> Maybe (LowType -> BinaryOp)
-asBinaryOpMaybe' name lowType =
-  case name of
-    "add"
-      | LowTypeInt _ <- lowType ->
-        Just BinaryOpAdd
-    "fadd"
-      | LowTypeFloat _ <- lowType ->
-        Just BinaryOpFAdd
-    "sub"
-      | LowTypeInt _ <- lowType ->
-        Just BinaryOpSub
-    "fsub"
-      | LowTypeFloat _ <- lowType ->
-        Just BinaryOpFSub
-    "mul"
-      | LowTypeInt _ <- lowType ->
-        Just BinaryOpMul
-    "fmul"
-      | LowTypeFloat _ <- lowType ->
-        Just BinaryOpFMul
-    "udiv"
-      | LowTypeInt _ <- lowType ->
-        Just BinaryOpUDiv
-    "sdiv"
-      | LowTypeInt _ <- lowType ->
-        Just BinaryOpSDiv
-    "fdiv"
-      | LowTypeFloat _ <- lowType ->
-        Just BinaryOpFDiv
-    "urem"
-      | LowTypeInt _ <- lowType ->
-        Just BinaryOpURem
-    "srem"
-      | LowTypeInt _ <- lowType ->
-        Just BinaryOpSRem
-    "frem"
-      | LowTypeFloat _ <- lowType ->
-        Just BinaryOpFRem
-    "shl"
-      | LowTypeInt _ <- lowType ->
-        Just BinaryOpShl
-    "lshr"
-      | LowTypeInt _ <- lowType ->
-        Just BinaryOpLshr
-    "ashr"
-      | LowTypeInt _ <- lowType ->
-        Just BinaryOpAshr
-    "and"
-      | LowTypeInt _ <- lowType ->
-        Just BinaryOpAnd
-    "or"
-      | LowTypeInt _ <- lowType ->
-        Just BinaryOpOr
-    "xor"
-      | LowTypeInt _ <- lowType ->
-        Just BinaryOpXor
-    _ ->
-      Nothing
+unaryOpSet :: S.Set T.Text
+unaryOpSet =
+  S.fromList ["fneg"]
 
-asICmpMaybe :: T.Text -> Maybe (LowType -> BinaryOp)
-asICmpMaybe name =
-  case name of
-    "eq" ->
-      Just BinaryOpICmpEQ
-    "ne" ->
-      Just BinaryOpICmpNE
-    "ugt" ->
-      Just BinaryOpICmpUGT
-    "uge" ->
-      Just BinaryOpICmpUGE
-    "ult" ->
-      Just BinaryOpICmpULT
-    "ule" ->
-      Just BinaryOpICmpULE
-    "sgt" ->
-      Just BinaryOpICmpSGT
-    "sge" ->
-      Just BinaryOpICmpSGE
-    "slt" ->
-      Just BinaryOpICmpSLT
-    "sle" ->
-      Just BinaryOpICmpSLE
-    _ ->
-      Nothing
+convOpSet :: S.Set T.Text
+convOpSet =
+  S.fromList ["trunc", "zext", "sext", "fptrunc", "fpext", "fptoui", "fptosi", "uitofp", "sitofp"]
 
-asFCmpMaybe :: T.Text -> Maybe (LowType -> BinaryOp)
-asFCmpMaybe name =
-  case name of
-    "false" ->
-      Just BinaryOpFCmpFALSE
-    "oeq" ->
-      Just BinaryOpFCmpOEQ
-    "ogt" ->
-      Just BinaryOpFCmpOGT
-    "oge" ->
-      Just BinaryOpFCmpOGE
-    "olt" ->
-      Just BinaryOpFCmpOLT
-    "ole" ->
-      Just BinaryOpFCmpOLE
-    "one" ->
-      Just BinaryOpFCmpONE
-    "ord" ->
-      Just BinaryOpFCmpORD
-    "ueq" ->
-      Just BinaryOpFCmpUEQ
-    "ugt" ->
-      Just BinaryOpFCmpUGT
-    "uge" ->
-      Just BinaryOpFCmpUGE
-    "ult" ->
-      Just BinaryOpFCmpULT
-    "ule" ->
-      Just BinaryOpFCmpULE
-    "une" ->
-      Just BinaryOpFCmpUNE
-    "uno" ->
-      Just BinaryOpFCmpUNO
-    "true" ->
-      Just BinaryOpFCmpTRUE
-    _ ->
-      Nothing
+cmpOpSet :: S.Set T.Text
+cmpOpSet = do
+  let s1 = S.map ("icmp " <>) $ intCmpOpSet
+  let s2 = S.map ("fcmp " <>) $ floatCmpOpSet
+  S.union s1 s2
 
-binaryOpToDomCod :: BinaryOp -> (LowType, LowType)
-binaryOpToDomCod binaryOp =
-  case binaryOp of
-    BinaryOpAdd t ->
-      (t, t)
-    BinaryOpFAdd t ->
-      (t, t)
-    BinaryOpSub t ->
-      (t, t)
-    BinaryOpFSub t ->
-      (t, t)
-    BinaryOpMul t ->
-      (t, t)
-    BinaryOpFMul t ->
-      (t, t)
-    BinaryOpUDiv t ->
-      (t, t)
-    BinaryOpSDiv t ->
-      (t, t)
-    BinaryOpFDiv t ->
-      (t, t)
-    BinaryOpURem t ->
-      (t, t)
-    BinaryOpSRem t ->
-      (t, t)
-    BinaryOpFRem t ->
-      (t, t)
-    BinaryOpShl t ->
-      (t, t)
-    BinaryOpLshr t ->
-      (t, t)
-    BinaryOpAshr t ->
-      (t, t)
-    BinaryOpAnd t ->
-      (t, t)
-    BinaryOpOr t ->
-      (t, t)
-    BinaryOpXor t ->
-      (t, t)
-    BinaryOpICmpEQ t ->
-      (t, LowTypeInt 1)
-    BinaryOpICmpNE t ->
-      (t, LowTypeInt 1)
-    BinaryOpICmpUGT t ->
-      (t, LowTypeInt 1)
-    BinaryOpICmpUGE t ->
-      (t, LowTypeInt 1)
-    BinaryOpICmpULT t ->
-      (t, LowTypeInt 1)
-    BinaryOpICmpULE t ->
-      (t, LowTypeInt 1)
-    BinaryOpICmpSGT t ->
-      (t, LowTypeInt 1)
-    BinaryOpICmpSGE t ->
-      (t, LowTypeInt 1)
-    BinaryOpICmpSLT t ->
-      (t, LowTypeInt 1)
-    BinaryOpICmpSLE t ->
-      (t, LowTypeInt 1)
-    BinaryOpFCmpFALSE t ->
-      (t, LowTypeInt 1)
-    BinaryOpFCmpOEQ t ->
-      (t, LowTypeInt 1)
-    BinaryOpFCmpOGT t ->
-      (t, LowTypeInt 1)
-    BinaryOpFCmpOGE t ->
-      (t, LowTypeInt 1)
-    BinaryOpFCmpOLT t ->
-      (t, LowTypeInt 1)
-    BinaryOpFCmpOLE t ->
-      (t, LowTypeInt 1)
-    BinaryOpFCmpONE t ->
-      (t, LowTypeInt 1)
-    BinaryOpFCmpORD t ->
-      (t, LowTypeInt 1)
-    BinaryOpFCmpUEQ t ->
-      (t, LowTypeInt 1)
-    BinaryOpFCmpUGT t ->
-      (t, LowTypeInt 1)
-    BinaryOpFCmpUGE t ->
-      (t, LowTypeInt 1)
-    BinaryOpFCmpULT t ->
-      (t, LowTypeInt 1)
-    BinaryOpFCmpULE t ->
-      (t, LowTypeInt 1)
-    BinaryOpFCmpUNE t ->
-      (t, LowTypeInt 1)
-    BinaryOpFCmpUNO t ->
-      (t, LowTypeInt 1)
-    BinaryOpFCmpTRUE t ->
-      (t, LowTypeInt 1)
+binaryOpSet :: S.Set T.Text
+binaryOpSet =
+  S.union intBinaryOpSet floatBinaryOpSet
+
+intCmpOpSet :: S.Set T.Text
+intCmpOpSet =
+  S.fromList ["eq", "ne", "ugt", "uge", "ult", "ule", "sgt", "sge", "slt", "sle"]
+
+floatCmpOpSet :: S.Set T.Text
+floatCmpOpSet =
+  S.fromList ["false", "oeq", "ogt", "oge", "olt", "ole", "one", "ord", "ueq", "ugt", "uge", "ult", "ule", "une", "uno", "true"]
+
+intBinaryOpSet :: S.Set T.Text
+intBinaryOpSet =
+  S.fromList ["add", "sub", "mul", "udiv", "sdiv", "urem", "srem", "shl", "lshr", "ashr", "and", "or", "xor"]
+
+floatBinaryOpSet :: S.Set T.Text
+floatBinaryOpSet =
+  S.fromList ["fadd", "fsub", "fmul", "fdiv", "frem", "srem", "shl", "lshr", "ashr", "and", "or", "xor"]
+
+isValidConvOp :: T.Text -> LowType -> LowType -> Bool
+isValidConvOp name domType codType =
+  case name of
+    "trunc"
+      | LowTypeInt i1 <- domType,
+        LowTypeInt i2 <- codType ->
+        i1 > i2
+    "zext"
+      | LowTypeInt i1 <- domType,
+        LowTypeInt i2 <- codType ->
+        i1 < i2
+    "sext"
+      | LowTypeInt i1 <- domType,
+        LowTypeInt i2 <- codType ->
+        i1 < i2
+    "fptrunc"
+      | LowTypeFloat size1 <- domType,
+        LowTypeFloat size2 <- codType ->
+        sizeAsInt size1 > sizeAsInt size2
+    "fpext"
+      | LowTypeFloat size1 <- domType,
+        LowTypeFloat size2 <- codType ->
+        sizeAsInt size1 < sizeAsInt size2
+    "fptoui"
+      | LowTypeFloat _ <- domType,
+        LowTypeInt _ <- codType ->
+        True
+    "fptosi"
+      | LowTypeFloat _ <- domType,
+        LowTypeInt _ <- codType ->
+        True
+    "uitofp"
+      | LowTypeInt _ <- domType,
+        LowTypeFloat _ <- codType ->
+        True
+    "sitofp"
+      | LowTypeInt _ <- domType,
+        LowTypeFloat _ <- codType ->
+        True
+    _ ->
+      False
+
+asLowBinaryOpMaybe' :: T.Text -> LowType -> Bool
+asLowBinaryOpMaybe' name lowType =
+  case lowType of
+    LowTypeInt _ ->
+      S.member name intBinaryOpSet
+    LowTypeFloat _ ->
+      S.member name floatBinaryOpSet
+    _ ->
+      False
+
+asLowICmpMaybe :: T.Text -> Bool
+asLowICmpMaybe name =
+  S.member name intCmpOpSet
+
+asLowFCmpMaybe :: T.Text -> Bool
+asLowFCmpMaybe name =
+  S.member name floatCmpOpSet
 
 {-# INLINE breakOnMaybe #-}
 breakOnMaybe :: T.Text -> T.Text -> Maybe (T.Text, T.Text)

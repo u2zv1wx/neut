@@ -147,10 +147,8 @@ loadContent' bp bt values cont =
 lowerCompPrimitive :: Hint -> Primitive -> WithEnv LowComp
 lowerCompPrimitive m codeOp =
   case codeOp of
-    PrimitiveUnaryOp op v ->
-      lowerCompUnaryOp op v
-    PrimitiveBinaryOp op v1 v2 ->
-      lowerCompBinaryOp op v1 v2
+    PrimitivePrimOp op vs ->
+      lowerCompPrimOp op vs
     PrimitiveDerangement expKind args -> do
       case expKind of
         DerangementSyscall i -> do
@@ -193,22 +191,22 @@ lowerCompPrimitive m codeOp =
           resName <- newNameWith' "result"
           storeContent m resName structType argTypeList (LowCompReturn (LowValueLocal resName))
 
-lowerCompUnaryOp :: UnaryOp -> ValuePlus -> WithEnv LowComp
-lowerCompUnaryOp op d = do
-  let (domType, codType) = unaryOpToDomCod op
-  (x, castThen) <- llvmCast (Just "unary-op") d domType
-  result <- newNameWith' "unary-op-result"
-  uncast <- llvmUncast (Just $ asText result) (LowValueLocal result) codType
-  castThen $ LowCompLet result (LowOpUnaryOp op x) uncast
+lowerCompPrimOp :: PrimOp -> [ValuePlus] -> WithEnv LowComp
+lowerCompPrimOp op@(PrimOp _ domList cod) vs = do
+  (argVarList, castArgsThen) <- llvmCastPrimArgs $ zip vs domList
+  result <- newNameWith' "prim-op-result"
+  uncast <- llvmUncast (Just $ asText result) (LowValueLocal result) cod
+  castArgsThen $ LowCompLet result (LowOpPrimOp op argVarList) uncast
 
-lowerCompBinaryOp :: BinaryOp -> ValuePlus -> ValuePlus -> WithEnv LowComp
-lowerCompBinaryOp op v1 v2 = do
-  let (domType, codType) = binaryOpToDomCod op
-  (x1, cast1then) <- llvmCast (Just "binary-op-fst") v1 domType
-  (x2, cast2then) <- llvmCast (Just "binary-op-snd") v2 domType
-  result <- newNameWith' "binary-op-result"
-  uncast <- llvmUncast (Just $ asText result) (LowValueLocal result) codType
-  (cast1then >=> cast2then) $ LowCompLet result (LowOpBinaryOp op x1 x2) uncast
+llvmCastPrimArgs :: [(ValuePlus, LowType)] -> WithEnv ([LowValue], LowComp -> WithEnv LowComp)
+llvmCastPrimArgs dts =
+  case dts of
+    [] ->
+      return ([], return)
+    ((d, t) : rest) -> do
+      (argVarList, cont) <- llvmCastPrimArgs rest
+      (argVar, castThen) <- llvmCast (Just "prim-op") d t
+      return (argVar : argVarList, castThen >=> cont)
 
 llvmCast ::
   Maybe T.Text ->

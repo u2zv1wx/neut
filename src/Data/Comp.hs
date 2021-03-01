@@ -25,8 +25,7 @@ data Comp
   deriving (Show)
 
 data Primitive
-  = PrimitiveUnaryOp UnaryOp ValuePlus
-  | PrimitiveBinaryOp BinaryOp ValuePlus ValuePlus
+  = PrimitivePrimOp PrimOp [ValuePlus]
   | PrimitiveDerangement Derangement [ValuePlus]
   deriving (Show)
 
@@ -104,13 +103,9 @@ substCompPlus sub term =
 substPrimitive :: SubstValuePlus -> Primitive -> Primitive
 substPrimitive sub c =
   case c of
-    PrimitiveUnaryOp a v -> do
-      let v' = substValuePlus sub v
-      PrimitiveUnaryOp a v'
-    PrimitiveBinaryOp a v1 v2 -> do
-      let v1' = substValuePlus sub v1
-      let v2' = substValuePlus sub v2
-      PrimitiveBinaryOp a v1' v2'
+    PrimitivePrimOp op vs -> do
+      let vs' = map (substValuePlus sub) vs
+      PrimitivePrimOp op vs'
     PrimitiveDerangement expKind ds -> do
       let ds' = map (substValuePlus sub) ds
       PrimitiveDerangement expKind ds'
