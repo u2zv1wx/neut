@@ -162,7 +162,7 @@ asWeakConstant m name
     return $ Just (m, WeakTermConst name)
   | Just (LowTypeFloat _) <- asLowTypeMaybe name =
     return $ Just (m, WeakTermConst name)
-  | Just _ <- asPrimOpMaybe name =
+  | Just _ <- asPrimOp name =
     return $ Just (m, WeakTermConst name)
   | otherwise = do
     set <- gets constantSet

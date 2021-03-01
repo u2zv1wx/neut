@@ -111,7 +111,7 @@ nubFVS =
 
 clarifyConst :: TypeEnv -> Hint -> T.Text -> WithEnv CompPlus
 clarifyConst tenv m x
-  | Just op <- asPrimOpMaybe x =
+  | Just op <- asPrimOp x =
     clarifyPrimOp tenv x op m
   | Just _ <- asLowTypeMaybe x =
     returnCartesianImmediate m

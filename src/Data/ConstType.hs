@@ -13,7 +13,7 @@ lookupConstTypeEnv :: Hint -> T.Text -> WithEnv TermPlus
 lookupConstTypeEnv m x
   | Just _ <- asLowTypeMaybe x =
     return (m, TermTau)
-  | Just op <- asPrimOpMaybe x =
+  | Just op <- asPrimOp x =
     primOpToType m op
   | otherwise = do
     ctenv <- gets constTypeEnv

@@ -96,7 +96,7 @@ isValueConst :: T.Text -> Bool
 isValueConst x
   | Just _ <- asLowTypeMaybe x =
     True
-  | Just _ <- asPrimOpMaybe x =
+  | Just _ <- asPrimOp x =
     True
   | x == "os" <> nsSep <> "stdin" =
     True

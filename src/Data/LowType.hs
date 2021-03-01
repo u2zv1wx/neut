@@ -83,8 +83,8 @@ asLowFloat s =
         _ ->
           Nothing
 
-asPrimOpMaybe :: T.Text -> Maybe PrimOp
-asPrimOpMaybe name
+asPrimOp :: T.Text -> Maybe PrimOp
+asPrimOp name
   | Just ("fneg", typeStr) <- breakOnMaybe "-" name,
     Just lowType@(LowTypeFloat _) <- asLowTypeMaybe typeStr =
     Just $ PrimOp "fneg" [lowType] lowType
