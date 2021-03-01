@@ -95,12 +95,12 @@ interpretCode tree =
               return (m, MetaTermNode rest')
             "quote"
               | [e] <- rest -> do
-                interpretData 1 e
+                interpretData e
               | otherwise ->
                 raiseSyntaxError m "(quote TREE)"
             "unquote"
-              | [_] <- rest -> do
-                raiseSyntaxError m "found a unquote not inside a quote"
+              | [_] <- rest ->
+                raiseError m "found an unquote when parsing given AST as code"
               | otherwise ->
                 raiseSyntaxError m "(unquote TREE)"
             "begin-meta" -> do
@@ -116,30 +116,25 @@ interpretCode tree =
         leaf : rest ->
           interpretAux m leaf rest
 
-interpretData :: Int -> TreePlus -> WithEnv MetaTermPlus
-interpretData level tree = do
+interpretData :: TreePlus -> WithEnv MetaTermPlus
+interpretData tree = do
   case tree of
     (m, TreeLeaf atom) ->
       return (m, MetaTermLeaf atom)
     (m, TreeNode treeList) ->
       case treeList of
         (_, TreeLeaf "quote") : rest
-          | [e] <- rest -> do
-            e' <- interpretData (level + 1) e
-            return (m, MetaTermNode [(m, MetaTermLeaf "quote"), e'])
+          | [_] <- rest ->
+            raiseError m "found a quote when parsing given AST as data"
           | otherwise ->
             raiseSyntaxError m "(quote TREE)"
         (_, TreeLeaf "unquote") : rest
           | [e] <- rest -> do
-            if level == 1
-              then interpretCode e
-              else do
-                e' <- interpretData (level - 1) e
-                return (m, MetaTermNode [(m, MetaTermLeaf "unquote"), e'])
+            interpretCode e
           | otherwise ->
             raiseSyntaxError m "(unquote TREE)"
         _ -> do
-          treeList' <- mapM (interpretData level) treeList
+          treeList' <- mapM interpretData treeList
           return (m, MetaTermNode treeList')
 
 interpretAux :: Hint -> TreePlus -> [TreePlus] -> WithEnv MetaTermPlus
