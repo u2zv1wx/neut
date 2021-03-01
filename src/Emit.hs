@@ -13,12 +13,12 @@ import Data.Log
 import Data.LowComp
 import Data.LowType
 import qualified Data.Map as Map
-import Data.Platform
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Numeric.Half
 import Reduce.LowComp
+import qualified System.Info as System
 
 emit :: LowComp -> WithEnv Builder
 emit mainTerm = do
@@ -285,20 +285,21 @@ emitLowCompConvOp cast d dom cod =
 emitSyscallOp :: Integer -> [LowValue] -> WithEnv Builder
 emitSyscallOp num ds = do
   regList <- getRegList
-  currentArch <- getArch
-  case currentArch of
-    Arch64 -> do
+  case System.arch of
+    "x86_64" -> do
       let args = (LowValueInt num, LowTypeInt 64) : zip ds (repeat voidPtr)
       let argStr = "(" <> showIndex args <> ")"
       let regStr = "\"=r" <> showRegList (take (length args) regList) <> "\""
       return $
         unwordsL ["call fastcc i8* asm sideeffect \"syscall\",", regStr, argStr]
-    ArchAArch64 -> do
+    "aarch64" -> do
       let args = (LowValueInt num, LowTypeInt 64) : zip ds (repeat voidPtr)
       let argStr = "(" <> showIndex args <> ")"
       let regStr = "\"=r" <> showRegList (take (length args) regList) <> "\""
       return $
         unwordsL ["call fastcc i8* asm sideeffect \"svc 0\",", regStr, argStr]
+    targetArch ->
+      raiseCritical' $ "unsupported target arch: " <> T.pack (show targetArch)
 
 emitOp :: Builder -> WithEnv [Builder]
 emitOp s =
@@ -395,17 +396,15 @@ showLowTypeAsIfNonPtr lowType =
 
 getRegList :: WithEnv [Builder]
 getRegList = do
-  targetOS <- getOS
-  targetArch <- getArch
-  case (targetOS, targetArch) of
-    (OSLinux, Arch64) ->
+  case (System.os, System.arch) of
+    ("linux", "x86_64") ->
       return ["rax", "rdi", "rsi", "rdx", "rcx", "r8", "r9"]
-    (OSLinux, ArchAArch64) ->
+    ("linux", "aarch64") ->
       return ["x8", "x0", "x1", "x2", "x3", "x4", "x5"]
-    (OSDarwin, Arch64) ->
+    ("darwin", "x86_64") ->
       return ["rax", "rdi", "rsi", "rdx", "r10", "r8", "r9"]
-    (OSDarwin, ArchAArch64) ->
-      raiseError' $ "unsupported target: " <> showOS targetOS <> " (" <> showArch targetArch <> ")"
+    (targetOS, targetArch) ->
+      raiseError' $ "unsupported target: " <> T.pack targetOS <> " (" <> T.pack targetArch <> ")"
 
 showLowType :: LowType -> Builder
 showLowType lowType =

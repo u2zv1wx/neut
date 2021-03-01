@@ -9,7 +9,6 @@ import Data.List (find)
 import Data.Log
 import Data.MetaTerm
 import Data.Namespace
-import Data.Platform
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import Data.Tree
@@ -21,6 +20,7 @@ import Preprocess.Interpret
 import Preprocess.Tokenize
 import Reduce.MetaTerm
 import System.Exit
+import qualified System.Info as System
 import System.Process hiding (env)
 import Text.Read (readMaybe)
 
@@ -296,9 +296,9 @@ retrieveCompileTimeVarValue :: Hint -> T.Text -> WithEnv T.Text
 retrieveCompileTimeVarValue m var =
   case var of
     "OS" ->
-      showOS <$> getOS
+      return $ T.pack $ System.os
     "architecture" ->
-      showArch <$> getArch
+      return $ T.pack $ System.arch
     _ ->
       raiseError m $ "no such compile-time variable defined: " <> var
 

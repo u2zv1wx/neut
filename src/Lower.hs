@@ -440,8 +440,6 @@ toFunPtrType :: [a] -> LowType
 toFunPtrType xs =
   LowTypePointer (LowTypeFunction (map (const voidPtr) xs) voidPtr)
 
--- LowTypeFunctionPtr (map (const voidPtr) xs) voidPtr
-
 newValueLocal :: T.Text -> WithEnv (Ident, LowValue)
 newValueLocal name = do
   x <- newNameWith' name
