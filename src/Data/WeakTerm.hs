@@ -23,7 +23,7 @@ data WeakTerm
   | WeakTermEnumElim (WeakTermPlus, WeakTermPlus) [(EnumCasePlus, WeakTermPlus)]
   | WeakTermQuestion WeakTermPlus WeakTermPlus -- e : t (output the type `t` as note)
   | WeakTermDerangement Derangement WeakTermPlus [(WeakTermPlus, DerangementArg, WeakTermPlus)] -- (derangement NUM result-type arg-1 ... arg-n)
-  deriving (Show, Eq)
+  deriving (Show)
 
 type WeakTermPlus =
   (Hint, WeakTerm)

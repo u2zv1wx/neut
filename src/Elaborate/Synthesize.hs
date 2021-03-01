@@ -8,7 +8,7 @@ import Control.Monad.State.Lazy
 import Data.Basic
 import Data.Env
 import qualified Data.IntMap as IntMap
-import Data.List (nub, sortOn)
+import Data.List (sortOn)
 import Data.Log
 import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
@@ -174,7 +174,7 @@ takeByCount idxList xs =
 throwTypeErrors :: WithEnv ()
 throwTypeErrors = do
   q <- gets constraintQueue
-  let pcs = sortOn fst $ nub $ setupPosInfo $ Q.toList q
+  let pcs = sortOn fst $ setupPosInfo $ Q.toList q
   errorList <- constructErrors [] pcs
   throw $ Error errorList
 

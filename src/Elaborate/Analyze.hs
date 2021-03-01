@@ -38,8 +38,10 @@ simp' constraintList =
       return ()
     (c : cs) ->
       case c of
-        ((_, e1), (_, e2))
-          | e1 == e2 ->
+        ((_, WeakTermTau), (_, WeakTermTau)) ->
+          simp cs
+        ((_, WeakTermUpsilon x1), (_, WeakTermUpsilon x2))
+          | x1 == x2 ->
             simp cs
         (e1@(m1, WeakTermPi xts1 cod1), e2@(m2, WeakTermPi xts2 cod2)) ->
           if length xts1 /= length xts2
@@ -62,12 +64,21 @@ simp' constraintList =
             yt2 <- asWeakIdentPlus m2 e2
             simpBinder (xt1 : xts1 ++ [yt1]) (xt2 : xts2 ++ [yt2])
             simp cs
+        ((_, WeakTermConst l1), (_, WeakTermConst l2))
+          | l1 == l2 ->
+            simp cs
         ((_, WeakTermInt t1 l1), (_, WeakTermInt t2 l2))
           | l1 == l2 ->
             simp $ (t1, t2) : cs
         ((_, WeakTermFloat t1 l1), (_, WeakTermFloat t2 l2))
           | l1 == l2 ->
             simp $ (t1, t2) : cs
+        ((_, WeakTermEnum l1), (_, WeakTermEnum l2))
+          | l1 == l2 ->
+            simp cs
+        ((_, WeakTermEnumIntro l1), (_, WeakTermEnumIntro l2))
+          | l1 == l2 ->
+            simp cs
         ((_, WeakTermQuestion e1 t1), (_, WeakTermQuestion e2 t2)) ->
           simp $ (e1, e2) : (t1, t2) : cs
         ((_, WeakTermDerangement i1 t1 ekts1), (_, WeakTermDerangement i2 t2 ekts2))
