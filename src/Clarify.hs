@@ -12,7 +12,6 @@ import Clarify.Utility
 import Control.Monad.State.Lazy
 import Data.Basic
 import Data.Comp
-import Data.ConstType
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import qualified Data.IntMap as IntMap
@@ -23,7 +22,6 @@ import Data.Maybe (catMaybes)
 import Data.Namespace
 import Data.Term
 import qualified Data.Text as T
-import Reduce.Term
 
 clarify :: TermPlus -> WithEnv CompPlus
 clarify =
@@ -112,7 +110,7 @@ nubFVS =
 clarifyConst :: TypeEnv -> Hint -> T.Text -> WithEnv CompPlus
 clarifyConst tenv m x
   | Just op <- asPrimOp x =
-    clarifyPrimOp tenv x op m
+    clarifyPrimOp tenv op m
   | Just _ <- asLowTypeMaybe x =
     returnCartesianImmediate m
   | x == nsOS <> "file-descriptor" =
@@ -139,16 +137,12 @@ clarifyCast tenv m = do
   let u = (m, TermTau)
   clarify' tenv (m, TermPiIntro [(m, a, u), (m, b, u), (m, z, varA)] (m, TermUpsilon z))
 
-clarifyPrimOp :: TypeEnv -> T.Text -> PrimOp -> Hint -> WithEnv CompPlus
-clarifyPrimOp tenv name op m = do
-  t <- lookupConstTypeEnv m name
-  let t' = reduceTermPlus t
-  case t' of
-    (_, TermPi mxts _) -> do
-      let varList = map (\(mx, x, _) -> (mx, ValueUpsilon x)) mxts
-      retClosure tenv Nothing [] m mxts (m, CompPrimitive (PrimitivePrimOp op varList))
-    _ ->
-      raiseCritical m $ "the arity of " <> name <> " is wrong"
+clarifyPrimOp :: TypeEnv -> PrimOp -> Hint -> WithEnv CompPlus
+clarifyPrimOp tenv op@(PrimOp _ domList _) m = do
+  argTypeList <- mapM (lowTypeToType m) domList
+  (xs, varList) <- unzip <$> mapM (const (newValueUpsilonWith m "prim")) domList
+  let mxts = zipWith (\x t -> (m, x, t)) xs argTypeList
+  retClosure tenv Nothing [] m mxts (m, CompPrimitive (PrimitivePrimOp op varList))
 
 takeIffLinear :: (IdentPlus, DerangementArg) -> Maybe IdentPlus
 takeIffLinear (xt, k) =

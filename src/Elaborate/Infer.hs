@@ -10,7 +10,6 @@ where
 
 import Control.Monad.State.Lazy
 import Data.Basic
-import Data.ConstType
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import qualified Data.IntMap as IntMap
@@ -319,3 +318,26 @@ weakTermSigma m xts = do
   let vz = (m, WeakTermUpsilon z)
   k <- newNameWith'' "sigma"
   return (m, WeakTermPi [(m, z, (m, WeakTermTau)), (m, k, (m, WeakTermPi xts vz))] vz)
+
+lookupConstTypeEnv :: Hint -> T.Text -> WithEnv TermPlus
+lookupConstTypeEnv m x
+  | Just _ <- asLowTypeMaybe x =
+    return (m, TermTau)
+  | Just op <- asPrimOp x =
+    primOpToType m op
+  | otherwise = do
+    ctenv <- gets constTypeEnv
+    case Map.lookup x ctenv of
+      Just t ->
+        return t
+      Nothing ->
+        raiseCritical m $
+          "the constant `" <> x <> "` is not found in the type environment."
+
+primOpToType :: Hint -> PrimOp -> WithEnv TermPlus
+primOpToType m (PrimOp _ domList cod) = do
+  domList' <- mapM (lowTypeToType m) domList
+  cod' <- lowTypeToType m cod
+  xs <- mapM (const (newNameWith'' "_")) domList'
+  let xts = zipWith (\x t -> (m, x, t)) xs domList'
+  return (m, TermPi xts cod')
