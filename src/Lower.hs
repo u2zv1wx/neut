@@ -347,26 +347,20 @@ constructSwitch switch =
   case switch of
     [] ->
       return Nothing
-    [(EnumCaseLabel _, code)] -> do
+    (EnumCaseDefault, code) : _ -> do
       code' <- lowerComp code
       return $ Just (code', [])
+    [(_, code)] -> do
+      constructSwitch [(EnumCaseDefault, code)]
     (EnumCaseLabel l, code@(m, _)) : rest -> do
       i <- enumValueToInteger m l
       constructSwitch $ (EnumCaseInteger (toInteger i), code) : rest
-    -- code' <- lowerComp code
-    -- mSwitch <- constructSwitch rest
-    -- return $ do
-    --   (defaultCase, caseList) <- mSwitch
-    --   return (defaultCase, (i, code') : caseList)
     (EnumCaseInteger i, code) : rest -> do
       code' <- lowerComp code
       mSwitch <- constructSwitch rest
       return $ do
         (defaultCase, caseList) <- mSwitch
         return (defaultCase, (fromInteger i, code') : caseList)
-    (EnumCaseDefault, code) : _ -> do
-      code' <- lowerComp code
-      return $ Just (code', [])
 
 data AggPtrType
   = AggPtrTypeArray Int LowType

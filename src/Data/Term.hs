@@ -212,7 +212,8 @@ lowTypeToType :: (MonadThrow m) => Hint -> LowType -> m TermPlus
 lowTypeToType m lowType =
   case lowType of
     LowTypeInt s ->
-      return (m, TermConst (showIntSize s))
+      -- return (m, TermConst (showIntSize s))
+      return (m, TermEnum (showIntSize s))
     LowTypeFloat s ->
       return (m, TermConst (showFloatSize s))
     _ ->

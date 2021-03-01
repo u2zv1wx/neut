@@ -61,8 +61,12 @@ infer' ctx term =
       return (app, higherApp)
     (m, WeakTermConst x)
       -- i64, f16, etc.
-      | Just _ <- asLowTypeMaybe x ->
+      | Just _ <- asLowInt x ->
+        return ((m, WeakTermEnum x), (m, WeakTermTau))
+      | Just _ <- asLowFloat x ->
         return ((m, WeakTermConst x), (m, WeakTermTau))
+      -- | Just _ <- asLowTypeMaybe x ->
+      --   return ((m, WeakTermConst x), (m, WeakTermTau))
       | Just op <- asPrimOp x ->
         inferExternal m x (primOpToType m op)
       | otherwise -> do

@@ -121,7 +121,7 @@ elaborate' term =
     (m, WeakTermInt t x) -> do
       t' <- reduceTermPlus <$> elaborate' t
       case t' of
-        (_, TermConst intTypeStr)
+        (_, TermEnum intTypeStr)
           | Just (LowTypeInt size) <- asLowTypeMaybe intTypeStr ->
             return (m, TermInt size x)
         _ ->
@@ -152,13 +152,8 @@ elaborate' term =
       es' <- mapM elaborate' es
       t' <- reduceTermPlus <$> elaborate' t
       case t' of
-        (_, TermConst intStr)
-          | Just intSize <- asLowInt intStr -> do
-            checkExaustiveness m (2 ^ intSize) (map snd ls)
-            return (m, TermEnumElim (e', t') (zip ls es'))
         (_, TermEnum x) -> do
-          enumSet <- lookupEnumSet m x
-          checkExaustiveness m (toInteger $ length enumSet) $ map snd ls
+          checkSwitchExaustiveness m x (map snd ls)
           return (m, TermEnumElim (e', t') (zip ls es'))
         _ ->
           raiseError m $
@@ -183,12 +178,18 @@ elaboratePlus (m, x, t) = do
   t' <- elaborate' t
   return (m, x, t')
 
-checkExaustiveness :: Hint -> Integer -> [EnumCase] -> WithEnv ()
-checkExaustiveness m size caseList = do
-  let len = toInteger $ length (nub caseList)
-  if size <= len || EnumCaseDefault `elem` caseList
-    then return ()
-    else raiseError m "found a non-exhaustive pattern"
+checkSwitchExaustiveness :: Hint -> T.Text -> [EnumCase] -> WithEnv ()
+checkSwitchExaustiveness m x caseList = do
+  let b = EnumCaseDefault `elem` caseList
+  case asLowInt x of
+    Just _ ->
+      when (not b) $
+        raiseError m "this integer-switch is ill-constructed in that it does not contain `default`"
+    Nothing -> do
+      enumSet <- lookupEnumSet m x
+      let len = toInteger $ length (nub caseList)
+      when (not ((toInteger (length enumSet)) <= len || b)) $
+        raiseError m "this switch here is ill-constructed in that it is not exhaustive"
 
 lookupEnumSet :: Hint -> T.Text -> WithEnv [T.Text]
 lookupEnumSet m name = do
