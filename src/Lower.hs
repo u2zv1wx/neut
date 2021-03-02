@@ -417,15 +417,17 @@ storeContent' bp bt values cont =
 
 storeContent'' :: Ident -> LowType -> SizeInfo -> Int -> LowComp -> WithEnv LowComp
 storeContent'' reg elemType sizeInfo len cont = do
+  (tmp, tmpVar) <- newValueLocal $ "sizeof-" <> asText reg
   (c, cVar) <- newValueLocal $ "sizeof-" <> asText reg
+  uncastThenAllocThenCont <- llvmUncastLet c tmpVar (LowTypePointer elemType) (LowCompLet reg (LowOpAlloc cVar sizeInfo) cont)
   return $
     LowCompLet
-      c
+      tmp
       ( LowOpGetElementPtr
           (LowValueNull, LowTypePointer elemType)
           [(LowValueInt (toInteger len), LowTypeInt 64)]
       )
-      $ LowCompLet reg (LowOpAlloc cVar sizeInfo) cont
+      uncastThenAllocThenCont
 
 indexTypeOf :: LowType -> LowType
 indexTypeOf lowType =
