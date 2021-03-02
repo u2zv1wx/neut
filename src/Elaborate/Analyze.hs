@@ -149,6 +149,18 @@ simp' constraintList =
                 (_, Just (StuckPiElimUpsilon x2 mx2 mess2))
                   | Just (mBody, body) <- IntMap.lookup (asInt x2) sub ->
                     simp $ (e1, toPiElim (supHint mx2 mBody, body) mess2) : cs
+                (Just (StuckPiElimFix (_, f1, _, _, _) mess1), Just (StuckPiElimFix (_, f2, _, _, _) mess2))
+                  | f1 == f2,
+                    Just pairList <- asPairList (map snd mess1) (map snd mess2) -> do
+                    simp $ pairList ++ cs
+                (Just (StuckPiElimFix (mFix1, f1, xts1, body1, self1) mess1), _) -> do
+                  let s = IntMap.fromList [(asInt f1, self1)]
+                  let lam = (mFix1, WeakTermPiIntro xts1 (substWeakTermPlus s body1))
+                  simp $ (toPiElim lam mess1, e2) : cs
+                (_, Just (StuckPiElimFix (mFix2, f2, xts2, body2, self2) mess2)) -> do
+                  let s = IntMap.fromList [(asInt f2, self2)]
+                  let lam = (mFix2, WeakTermPiIntro xts2 (substWeakTermPlus s body2))
+                  simp $ (e1, toPiElim lam mess2) : cs
                 (Just (StuckPiElimAsterStrict h1 ies1), _)
                   | xs1 <- concatMap getVarList ies1,
                     occurCheck h1 zs2,
