@@ -1,5 +1,5 @@
-#+TITLE: Neut
-Neut is a dependently-typed programming language based on [[https://ncatlab.org/nlab/show/calculus+of+constructions][the Calculus of Constructions (CoC)]]. The interesting point is that this language determines how to allocate/deallocate memory at compile-time, without extra annotations to the type system. In other words, Neut in its source language is the ordinary lambda-calculus after all (imagine something like Haskell, OCaml, Idris, Coq, Agda, or Lean), and at the same time it handles memory without using, for example:
+#+TITLE: neut
+neut is a dependently-typed programming language based on [[https://ncatlab.org/nlab/show/calculus+of+constructions][the Calculus of Constructions (CoC)]]. The interesting point is that this language determines how to allocate/deallocate memory at compile-time, without extra annotations to the type system. In other words, neut in its source language is the ordinary lambda-calculus after all (imagine something like Haskell, OCaml, Idris, Coq, Agda, or Lean), and at the same time it handles memory without using, for example:
 
 - explicit malloc/free,
 - garbage collection,
@@ -9,7 +9,7 @@ Theoretically, this is made possible by translating the source language into a d
 
 Practically, this means that you can write your program in the ordinary lambda-calculus without any extra restrictions or annotations, and at the same time are allowed to control how resources are used in the program. If you want an ordinary-lambda-calculus based programming language with a human-predictable semantics (including its memory management), this might be for you.
 
-Here I briefly summarize the basic properties of Neut before diving into the details:
+Here I briefly summarize the basic properties of neut before diving into the details:
 
 - A compiled language
 - The output is [[https://llvm.org/docs/LangRef.html][LLVM IR]] / assembly / executable binary (the last two are via clang)
@@ -76,7 +76,7 @@ What follows in this section is a very quick explanation of the language. For mo
 
 ** Proof-Theoretic Memory Management
 *** Basics
-Let's see how Neut manages resources. The following code prints the string "a" for the 3 times:
+Let's see how neut manages resources. The following code prints the string "a" for the 3 times:
 #+BEGIN_SRC neut
 ; download the core library
 (ensure core/0.1.0.0
@@ -295,7 +295,7 @@ Thus the answer to the question is: Polymorphic functions can copy/discard its p
 - Closures can be copied/discarded since they know how to copy/discard itself
 - Polymorphic function can copy/discard its polymorphic arguments thanks to the information provided by its type argument
 
-This is the basic behavior of Neut's proof-theoretic memory management. As you might already be aware, this naive copying/discarding can result in an inefficient object code. We often use a variable more than once, as in the example of =str=:
+This is the basic behavior of neut's proof-theoretic memory management. As you might already be aware, this naive copying/discarding can result in an inefficient object code. We often use a variable more than once, as in the example of =str=:
 #+BEGIN_SRC neut
 (with identity.bind
   (let str "a")
@@ -364,7 +364,7 @@ let _ := string.print &str;
 unit
 #+END_SRC
 
-And this is the notation that is implemented in Neut. Indeed, the following is a valid code of Neut:
+And this is the notation that is implemented in neut. Indeed, the following is a valid code of neut:
 #+BEGIN_SRC neut
 (ensure core/0.1.0.0
   "https://github.com/u2zv1wx/neut-core/raw/master/release/0.1.0.0.tar.gz")
@@ -391,7 +391,7 @@ Or,
   (let _ (string.print &str))
   (string.print str)) ; ~> (unit, "a")
 #+END_SRC
-This notation is "borrowing" in Neut. Note that borrowing in Neut is nothing but a syntactic translation. Borrowing has nothing to do with, for example, the type system, or the operational semantics, of Neut. Indeed, this syntactic translation is processed at the stage of parsing in the compiler.
+This notation is "borrowing" in neut. Note that borrowing in neut is nothing but a syntactic translation. Borrowing has nothing to do with, for example, the type system, or the operational semantics, of neut. Indeed, this syntactic translation is processed at the stage of parsing in the compiler.
 
 Let's see how the resulting LLVM IR changes. Is it faster now? We can compile the code above by running =$ neut build --no-alloc-cancellation --emit llvm filename.neut=. The output is schematically as follows:
 #+BEGIN_SRC llvm
@@ -447,10 +447,10 @@ _main:                                  ## @main
 #+END_SRC
 In short: the resulting code is faster in that it is free from the redundant copying operations we saw in the first example.
 
-This is how Neut controls resources efficiently, without modifying the type system of the source language.
+This is how neut controls resources efficiently, without modifying the type system of the source language.
 
 ** Automatic Optimization via malloc/free Cancellation
-Neut's static memory management enables not only the "manual" optimization we have just seen, but also another "automatic" optimization. Remember the first example:
+neut's static memory management enables not only the "manual" optimization we have just seen, but also another "automatic" optimization. Remember the first example:
 #+BEGIN_SRC neut
 (with identity.bind
   (let str "a")
@@ -521,7 +521,7 @@ define i64 @main() {
 Although the compiler can cancel memory allocations/deallocations, it cannot cancel their accompanying initialization processes (at least for now). If you do need performance, you need to write code in the linear/borrowing style.
 
 ** Summary
-- Neut statically determines malloc/free at compile-time via type information
+- neut statically determines malloc/free at compile-time via type information
 - The content of a variable is
   - discarded if and only if the variable isn't used at all
   - untouched if and only if the variable is used exactly once (i.e. used linearly)
@@ -557,11 +557,11 @@ To uninstall, you just have to remove the binary =~/.local/bin/neut= and the dir
 As for editor support, you can currently try [[https://github.com/u2zv1wx/neut-mode][neut-mode]] and [[https://github.com/u2zv1wx/flycheck-neut][flycheck-neut]] if you're using Emacs. The former package is for syntax highlighting, and the latter one for linting.
 
 * Highly-Accelerated Tutorial
-You can find a detailed description of the syntax, the logic, and the semantics of Neut in the succeeding sections. Those should suffice to read/write a program of Neut. Having said that though, some might prefer learning from actual source code after taking a brief look at this and that basic stuff. So here I introduce you some necessities that would be required to understand - or guess the meaning of - a program of Neut.
+You can find a detailed description of the syntax, the logic, and the semantics of neut in the succeeding sections. Those should suffice to read/write a program of neut. Having said that though, some might prefer learning from actual source code after taking a brief look at this and that basic stuff. So here I introduce you some necessities that would be required to understand - or guess the meaning of - a program of neut.
 
-Let's start. Notes on programs. (0) A program of Neut is a list of statements, processed one by one. (1) [[#ensure][ensure]] and [[#include][include]] are the ones that use codes written in other files. I recommend you to read the linked notes; both of them are not so long. (2) [[#useunuse][use/unuse]] and [[#sectionend][section/end]] are the ones that handle namespace. Again I recommend you to read them.
+Let's start. Notes on programs. (0) A program of neut is a list of statements, processed one by one. (1) [[#ensure][ensure]] and [[#include][include]] are the ones that use codes written in other files. I recommend you to read the linked notes; both of them are not so long. (2) [[#useunuse][use/unuse]] and [[#sectionend][section/end]] are the ones that handle namespace. Again I recommend you to read them.
 
-Next. Notes on terms. (0) Note that what follows presupposes the =notation.neut= in [[https://github.com/u2zv1wx/neut-core][the core library]]; Some of these won't work without including the file. (1) =tau= is the type of types. (2) =Π= is the universal quantification. Note that =Π (x : A). B= is the same as the arrow type =A -> B= if =x ∉ freevar(B)=. Also note that a lambda-abstraction in Neut is n-ary; =(λ ((x A) (y B)) e)= is not the same as =(λ ((x A)) (λ ((y B)) e))=. (3) If you want to create a tuple, you can use =(sigma-introduction e1 ... en)= or =(tuple e1 ... en)=. You can destruct a tuple by =(sigma-elimination (x1 ... xn) e cont)=. (4) You can write =(question e)= or =?x= when you want the compiler to show the type of =e= or =x=. (5) You can write =*= to have the compiler infer the specified part. For example, assuming =(define id ((a tau) (x a)) x)=, you can write =(id * bool.true)= instead of =(id bool bool.true)=. (6) You will notice that =(witness t e)= is used here and there. This is a notation defined by =(notation (witness t e) ((λ ((x t)) x) e))=; A notation that tells the compiler that the term of =e= is =t=.
+Next. Notes on terms. (0) Note that what follows presupposes the =notation.neut= in [[https://github.com/u2zv1wx/neut-core][the core library]]; Some of these won't work without including the file. (1) =tau= is the type of types. (2) =Π= is the universal quantification. Note that =Π (x : A). B= is the same as the arrow type =A -> B= if =x ∉ freevar(B)=. Also note that a lambda-abstraction in neut is n-ary; =(λ ((x A) (y B)) e)= is not the same as =(λ ((x A)) (λ ((y B)) e))=. (3) If you want to create a tuple, you can use =(sigma-introduction e1 ... en)= or =(tuple e1 ... en)=. You can destruct a tuple by =(sigma-elimination (x1 ... xn) e cont)=. (4) You can write =(question e)= or =?x= when you want the compiler to show the type of =e= or =x=. (5) You can write =*= to have the compiler infer the specified part. For example, assuming =(define id ((a tau) (x a)) x)=, you can write =(id * bool.true)= instead of =(id bool bool.true)=. (6) You will notice that =(witness t e)= is used here and there. This is a notation defined by =(notation (witness t e) ((λ ((x t)) x) e))=; A notation that tells the compiler that the term of =e= is =t=.
 
 Next. Notes on primitives: (0) The following primitive types are available: =i1=, =i2=, =i3=, ..., =i64=. These are the same as the corresponding integer types in LLVM. (1) You can also use =f16=, =f32=, and =f64=. These are LLVM's =half=, =float=, and =double=, respectively. (2) You will soon come to want primitive instructions - like =add=, =mul=, or =xor= - that can operate on terms of these types. You can find information on them [[#primitives][in this section]]. (3) In the section you can also find notes on unsafe casting, array accessing, and syscall. I think these should also count as necessities. (4) When you use an effectful primitive like =os.write= in a type, the behavior of the resulting executable is undefined.
 
@@ -572,7 +572,7 @@ Now I think you are basically ready to, for example, start reading [[https://git
 That pretty much should do it. I hope you enjoy this language.
 
 * Syntax and Semantics of Statements
-A program of Neut is a list of statements. Each statement is one of the following statements described in this section.
+A program of neut is a list of statements. Each statement is one of the following statements described in this section.
 
 Please note that the descriptions in the followings are not that formal yet.
 
@@ -897,7 +897,7 @@ The =notation= statement registers a notation (macro).
 =(notation FROM TO)= modifies the state of the compiler so that the mapping =FROM ~> TO= is recognized as a notation (macro). This affects the result of macro expansion in the succeeding code.
 
 *** Notes on Macro Expansion
-Macro-expansion in Neut is a process of applying *step-expansion* recursively.
+Macro-expansion in neut is a process of applying *step-expansion* recursively.
 
 I believe this step-expansion process is best explained by example. Consider we have defined a notation as follows:
 #+BEGIN_SRC text
@@ -1375,7 +1375,7 @@ LEAF_PLUS ::= LEAF | (LEAF TREE)
 *** Notes
 Every tail call is optimized into a loop.
 
-The logic of Neut doesn't adopt the universe hierarchy, and thus inconsistent. This means that the Z combinator can be written in the source language as an ordinary term. In other words, from the viewpoint of expressive power, =fix= is simply redundant. The existence of =fix= is just for optimization purpose.
+The logic of neut doesn't adopt the universe hierarchy, and thus inconsistent. This means that the Z combinator can be written in the source language as an ordinary term. In other words, from the viewpoint of expressive power, =fix= is simply redundant. The existence of =fix= is just for optimization purpose.
 
 # (By the way, can it be said that the weakly-normalizing fragment of CoC-without-universe-hierarchy (CoC-) is consistent? If it is true, it seems to me that we can prove a theorem by taking a proof term of CoC- and check if it halts by trying to reduce the term into its normal form; Or just a delusion?)
 
@@ -1431,7 +1431,7 @@ well-formed(Γ)     {`l` is an integer}     {i{n} is a valid integer type}
 *** Semantics
 The terms of an integer type don't have any operational semantics by themselves.
 *** Notes
-The =int= type in Neut is the same as the one of LLVM, restricted into =i1=, =i2=, ..., =i64=.
+The =int= type in neut is the same as the one of LLVM, restricted into =i1=, =i2=, ..., =i64=.
 
 Every integer of type =i{n}= is interpreted modulo =2^n=, just as in the same way of LLVM. For example, =(i2 10)= is the same as =(i2 6)=, =(i2 2)=, =(i2 -2)=, or =(i2 -6)=, since all of these are equivalent modulo =2^2=.
 
@@ -1465,7 +1465,7 @@ well-formed(Γ)     {`l` is a float}      {f{n} is a valid float type}
 *** Semantics
 The terms of a float type don't have any operational semantics by themselves.
 *** Notes
-The =float= type in Neut is the same as the one of LLVM. Specifically, LLVM's =half= corresponds to Neut's =f16=, =float= to =f32=, and =double= to =f64=.
+The =float= type in neut is the same as the one of LLVM. Specifically, LLVM's =half= corresponds to neut's =f16=, =float= to =f32=, and =double= to =f64=.
 
 An float without explicit type information is overloaded; it's type is firstly set to be unknown, and then inferred.
 
@@ -1650,7 +1650,7 @@ well-formed(Γ)    {Every `ki` in {`k1`, ..., `kn`} is either an integer type or
       xn := en}
 #+END_SRC
 *** Notes
-Note that an element of a struct type in Neut is restricted into an integer or a float. This means, among others, that you can't write a struct that contains another struct, or a memory region. This might get in the way when you implement an interface of a syscall; You might want to use the constant =unsafe.cast= in that case, or "flatten" the struct.
+Note that an element of a struct type in neut is restricted into an integer or a float. This means, among others, that you can't write a struct that contains another struct, or a memory region. This might get in the way when you implement an interface of a syscall; You might want to use the constant =unsafe.cast= in that case, or "flatten" the struct.
 
 The memory layout of a struct is the same as the one of LLVM; For example, a struct of type =(struct i8 f16 i32)= is aligned as in a struct of type ={i8, f16, f32}= in LLVM.
 
@@ -1958,9 +1958,9 @@ The =e= in =(let x e)= is automatically surrounded by =with=.
 
 * Primitives
 ** LLVM-Based Primitives
-Neut currently supports the following LLVM instructions: =fneg, add, fadd, sub, fsub, mul, fmul, udiv, sdiv, fdiv, urem, srem, frem, shl, lshr, ashr, and, or, xor, trunc, zext, sext, fptrunc, fpext, fptoui, fptosi, uitofp, sitofp, icmp, fcmp=.
+neut currently supports the following LLVM instructions: =fneg, add, fadd, sub, fsub, mul, fmul, udiv, sdiv, fdiv, urem, srem, frem, shl, lshr, ashr, and, or, xor, trunc, zext, sext, fptrunc, fpext, fptoui, fptosi, uitofp, sitofp, icmp, fcmp=.
 
-Each instruction is "separated" according to its type. Let us take the instruction =fneg= for example. This instruction can be applied to =half=, =float=, and =double= in LLVM. Thus, Neut has the following three constants as primitives: =fneg-f16, fneg-f32, fneg-f64=. For the instruction =add=, the constants =add-i1, add-i2, ..., add-i64= is available.
+Each instruction is "separated" according to its type. Let us take the instruction =fneg= for example. This instruction can be applied to =half=, =float=, and =double= in LLVM. Thus, neut has the following three constants as primitives: =fneg-f16, fneg-f32, fneg-f64=. For the instruction =add=, the constants =add-i1, add-i2, ..., add-i64= is available.
 
 The instructions with two type arguments like =fptosi= is named as =fptosi-f64-i32, fptosi-f32-i1, fptosi-f16-i5=, etc.
 
@@ -1969,9 +1969,9 @@ As for the comparison operators =icmp= and =fcmp=, the names are of the form ={i
 The semantics of these instructions is as specified in the [[https://llvm.org/docs/LangRef.html][LLVM Language Reference Manual]].
 
 ** Syscalls
-Neut supports syscalls, although its current support is far from complete. As you can see in =core/VERSION/constant/{linux, darwin}.neut=, only basic syscalls like =read, write, exit, open, close= are supported. This is not something that is caused by theoretical difficulties; Rather, this is simply because of my limited resource of time.
+neut supports syscalls, although its current support is far from complete. As you can see in =core/VERSION/constant/{linux, darwin}.neut=, only basic syscalls like =read, write, exit, open, close= are supported. This is not something that is caused by theoretical difficulties; Rather, this is simply because of my limited resource of time.
 
-It would be worth noting that a syscall can't produce/consume a resource. For example, the syscall =write= is declared to have the following type in Neut:
+It would be worth noting that a syscall can't produce/consume a resource. For example, the syscall =write= is declared to have the following type in neut:
 #+BEGIN_SRC neut
 (constant os.write
   (Π
@@ -1985,7 +1985,7 @@ Compare the type above with the C signature of =write=:
 #+BEGIN_SRC c
 ssize_t write(int fildes, const void *buf, size_t nbyte);
 #+END_SRC
-Ignoring the =(len i64)= part that is necessary to receive an array of arbitrary length, the crucial difference here is the types of the codomains. While the latter one returns ordinary =ssize_t= (integer), the former one also returns the original array. This is because the syscall =write= doesn't consume (i.e. deallocate) given string. If =write= in Neut didn't return the original string, the string would be never freed in the succeeding program, causing space leak.
+Ignoring the =(len i64)= part that is necessary to receive an array of arbitrary length, the crucial difference here is the types of the codomains. While the latter one returns ordinary =ssize_t= (integer), the former one also returns the original array. This is because the syscall =write= doesn't consume (i.e. deallocate) given string. If =write= in neut didn't return the original string, the string would be never freed in the succeeding program, causing space leak.
 
 Regarding macOS: You may note that the "syscalls" are lowered to some external interface functions on macOS. This is because macOS doesn't support a direct use of a syscall; Indeed, for example, if we were to use the syscall =fork= directly (0x2000002), a succeeding =malloc= causes a fatal error, saying something like =mach_vm_map(size=1048576) failed (error code=268435459)=.
 
@@ -2007,7 +2007,7 @@ syscall-os.write A out buf nbyte :=
 #+END_SRC
 
 ** Array Indexing
-Neut offers a family of constants that allows us to access an element of an array. The names of these constants are of the form ={LOWTYPE}.array-access=, where the ={LOWTYPE}= is either =i{n}= or =f{n}=. For example, =i8.array-access= can be used for indexing of an array of type =(array N i8)=.
+neut offers a family of constants that allows us to access an element of an array. The names of these constants are of the form ={LOWTYPE}.array-access=, where the ={LOWTYPE}= is either =i{n}= or =f{n}=. For example, =i8.array-access= can be used for indexing of an array of type =(array N i8)=.
 
 The types of these accesser are of the following form:
 #+BEGIN_SRC neut
@@ -2037,7 +2037,7 @@ The constant =unsafe.cast : Pi (A : tau, B : tau, x : A). B= is available (assum
 ~> e
 #+END_SRC
 
-You can easily break the resource management system of Neut using this constant. Consider the following example:
+You can easily break the resource management system of neut using this constant. Consider the following example:
 #+BEGIN_SRC neut
 (ensure core/0.1.0.0
   "https://github.com/u2zv1wx/neut-core/raw/master/release/0.1.0.0.tar.gz")
