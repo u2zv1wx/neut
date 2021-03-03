@@ -177,7 +177,7 @@ metaTreeConstants =
       ("leaf-mul", [ArgLeaf, ArgLeaf]),
       ("leaf-uncons", [ArgLeaf]),
       ("string-to-u8-list", [ArgLeaf]),
-      ("new-symbol", []),
+      ("new-symbol", [ArgLeaf]),
       ("nth", [ArgInt, ArgNode]),
       ("tail", [ArgNode])
     ]

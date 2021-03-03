@@ -140,8 +140,25 @@ interpretData tree = do
 interpretAux :: Hint -> TreePlus -> [TreePlus] -> WithEnv MetaTermPlus
 interpretAux m f args = do
   f' <- interpretCode f
-  args' <- mapM interpretCode args
-  return (m, MetaTermImpElim f' args')
+  (xts, args') <- interpretArg args
+  if null xts
+    then return (m, MetaTermImpElim f' args')
+    else return (m, MetaTermImpIntro xts Nothing (m, MetaTermImpElim f' args'))
+
+interpretArg :: [TreePlus] -> WithEnv ([Ident], [MetaTermPlus])
+interpretArg es =
+  case es of
+    [] ->
+      return ([], [])
+    tree : treeList -> do
+      (xts, args) <- interpretArg treeList
+      case tree of
+        (m, TreeLeaf "_") -> do
+          h <- asIdent <$> newTextWith "_"
+          return (h : xts, (m, MetaTermVar h) : args)
+        _ -> do
+          e <- interpretCode tree
+          return (xts, e : args)
 
 interpretIdent :: TreePlus -> WithEnv Ident
 interpretIdent tree =

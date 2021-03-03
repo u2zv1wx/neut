@@ -128,9 +128,9 @@ reduceConstApp m c es =
           _ ->
             raiseError mNode "the constant `tail` cannot be applied to nil"
     "new-symbol"
-      | [] <- es -> do
+      | [(_, MetaTermLeaf s)] <- es -> do
         i <- newCount
-        return (m, MetaTermLeaf ("#" <> T.pack (show i)))
+        return (m, MetaTermLeaf (s <> "#" <> T.pack (show i)))
     "nth"
       | [(_, MetaTermInt64 i), (_, MetaTermNode ts)] <- es -> do
         if 0 <= i && i < fromIntegral (length ts)
