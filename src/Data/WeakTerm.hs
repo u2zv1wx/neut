@@ -45,7 +45,6 @@ type IdentDef =
 
 data WeakStmt
   = WeakStmtLet Hint WeakIdentPlus WeakTermPlus
-  | WeakStmtLetBypass Hint WeakIdentPlus WeakTermPlus
   | WeakStmtConstDecl WeakTextPlus
   deriving (Show)
 

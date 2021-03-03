@@ -37,9 +37,6 @@ elaborateStmt stmt =
       t' <- inferType t
       insConstraintEnv te t'
       elaborateLet m mx x t' e' cont
-    WeakStmtLetBypass m (mx, x, t) e : cont -> do
-      t' <- inferType t
-      elaborateLet m mx x t' e cont
     WeakStmtConstDecl (_, c, t) : cont -> do
       t' <- inferType t
       analyze >> synthesize >> refine >> cleanup

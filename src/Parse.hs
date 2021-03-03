@@ -14,7 +14,6 @@ import Data.Tree
 import Data.WeakTerm
 import Parse.Discern
 import Parse.Interpret
-import Parse.Rule
 
 parse :: [TreePlus] -> WithEnv [WeakStmt]
 parse stmtTreeList =
@@ -23,7 +22,7 @@ parse stmtTreeList =
       return []
     headStmt : restStmtList -> do
       case headStmt of
-        (m, TreeNode (leaf@(_, TreeLeaf headAtom) : rest)) ->
+        (m, TreeNode ((_, TreeLeaf headAtom) : rest)) ->
           case headAtom of
             --
             -- basic statements
@@ -45,13 +44,6 @@ parse stmtTreeList =
                 return $ WeakStmtConstDecl (m, name', t') : defList
               | otherwise ->
                 raiseSyntaxError m "(declare-constant LEAF TREE)"
-            "data"
-              | name@(mFun, TreeLeaf _) : xts@(_, TreeNode _) : es' <- rest ->
-                parse $ (m, TreeNode [leaf, (mFun, TreeNode (name : xts : es'))]) : restStmtList
-              | otherwise -> do
-                stmtList1 <- parseData m rest
-                stmtList2 <- parse restStmtList
-                return $ stmtList1 ++ stmtList2
             --
             -- namespace-related statements
             --
