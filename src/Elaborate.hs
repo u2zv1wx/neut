@@ -158,6 +158,17 @@ elaborate' term =
               <> toText (weaken e')
               <> "` must be an enum type or an integer type, but is:\n"
               <> toText (weaken t')
+    (m, WeakTermTensor ts) -> do
+      ts' <- mapM elaborate' ts
+      return (m, TermTensor ts')
+    (m, WeakTermTensorIntro es) -> do
+      es' <- mapM elaborate' es
+      return (m, TermTensorIntro es')
+    (m, WeakTermTensorElim xts e1 e2) -> do
+      xts' <- mapM elaboratePlus xts
+      e1' <- elaborate' e1
+      e2' <- elaborate' e2
+      return (m, TermTensorElim xts' e1' e2')
     (m, WeakTermQuestion e t) -> do
       e' <- elaborate' e
       t' <- elaborate' t

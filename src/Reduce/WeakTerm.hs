@@ -60,6 +60,25 @@ reduceWeakTermPlus term =
                 Nothing -> (m, WeakTermEnumElim (e', t') les')
         _ ->
           (m, WeakTermEnumElim (e', t') les')
+    (m, WeakTermTensor ts) -> do
+      let ts' = map reduceWeakTermPlus ts
+      (m, WeakTermTensor ts')
+    (m, WeakTermTensorIntro es) -> do
+      let es' = map reduceWeakTermPlus es
+      (m, WeakTermTensorIntro es')
+    (m, WeakTermTensorElim xts e1 e2) -> do
+      let e1' = reduceWeakTermPlus e1
+      case e1' of
+        (_, WeakTermTensorIntro es)
+          | length es == length xts -> do
+            let xs = map (\(_, x, _) -> asInt x) xts
+            let sub = IntMap.fromList $ zip xs es
+            reduceWeakTermPlus $ substWeakTermPlus sub e2
+        _ -> do
+          let e2' = reduceWeakTermPlus e2
+          let (ms, xs, ts) = unzip3 xts
+          let ts' = map reduceWeakTermPlus ts
+          (m, WeakTermTensorElim (zip3 ms xs ts') e1' e2')
     (_, WeakTermQuestion e _) ->
       reduceWeakTermPlus e
     (m, WeakTermDerangement i t ekts) -> do

@@ -58,6 +58,25 @@ reduceTermPlus term =
           let es' = map reduceTermPlus es
           let les' = zip ls es'
           (m, TermEnumElim (e', t') les')
+    (m, TermTensor ts) -> do
+      let ts' = map reduceTermPlus ts
+      (m, TermTensor ts')
+    (m, TermTensorIntro es) -> do
+      let es' = map reduceTermPlus es
+      (m, TermTensorIntro es')
+    (m, TermTensorElim xts e1 e2) -> do
+      let e1' = reduceTermPlus e1
+      case e1' of
+        (_, TermTensorIntro es)
+          | length es == length xts -> do
+            let xs = map (\(_, x, _) -> asInt x) xts
+            let sub = IntMap.fromList $ zip xs es
+            reduceTermPlus $ substTermPlus sub e2
+        _ -> do
+          let e2' = reduceTermPlus e2
+          let (ms, xs, ts) = unzip3 xts
+          let ts' = map reduceTermPlus ts
+          (m, TermTensorElim (zip3 ms xs ts') e1' e2')
     (m, TermDerangement i t ekts) -> do
       let (es, ks, ts) = unzip3 ekts
       let es' = map reduceTermPlus es

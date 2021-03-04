@@ -79,6 +79,12 @@ simp' constraintList =
         ((_, WeakTermEnumIntro l1), (_, WeakTermEnumIntro l2))
           | l1 == l2 ->
             simp cs
+        ((_, WeakTermTensor ts1), (_, WeakTermTensor ts2))
+          | length ts1 == length ts2 ->
+            simp $ zip ts1 ts2 ++ cs
+        ((_, WeakTermTensorIntro es1), (_, WeakTermTensorIntro es2))
+          | length es1 == length es2 ->
+            simp $ zip es1 es2 ++ cs
         ((_, WeakTermQuestion e1 t1), (_, WeakTermQuestion e2 t2)) ->
           simp $ (e1, e2) : (t1, t2) : cs
         ((_, WeakTermDerangement i1 t1 ekts1), (_, WeakTermDerangement i2 t2 ekts2))

@@ -21,6 +21,9 @@ data WeakTerm
   | WeakTermEnum T.Text
   | WeakTermEnumIntro T.Text
   | WeakTermEnumElim (WeakTermPlus, WeakTermPlus) [(EnumCasePlus, WeakTermPlus)]
+  | WeakTermTensor [WeakTermPlus]
+  | WeakTermTensorIntro [WeakTermPlus]
+  | WeakTermTensorElim [WeakIdentPlus] WeakTermPlus WeakTermPlus
   | WeakTermQuestion WeakTermPlus WeakTermPlus -- e : t (output the type `t` as note)
   | WeakTermDerangement Derangement WeakTermPlus [(WeakTermPlus, DerangementArg, WeakTermPlus)] -- (derangement NUM result-type arg-1 ... arg-n)
   deriving (Show)
@@ -135,6 +138,14 @@ varWeakTermPlus term =
       let ys = varWeakTermPlus e
       let zs = S.unions $ map (varWeakTermPlus . snd) les
       S.unions [xs, ys, zs]
+    (_, WeakTermTensor ts) ->
+      S.unions $ map varWeakTermPlus ts
+    (_, WeakTermTensorIntro es) ->
+      S.unions $ map varWeakTermPlus es
+    (_, WeakTermTensorElim xts e1 e2) -> do
+      let xs = varWeakTermPlus e1
+      let ys = varWeakTermPlus' xts [e2]
+      S.unions [xs, ys]
     (_, WeakTermQuestion e t) -> do
       let set1 = varWeakTermPlus e
       let set2 = varWeakTermPlus t
@@ -189,6 +200,14 @@ asterWeakTermPlus term =
       let set2 = asterWeakTermPlus t
       let set3 = S.unions $ map (\(_, body) -> asterWeakTermPlus body) les
       S.unions [set1, set2, set3]
+    (_, WeakTermTensor ts) ->
+      S.unions $ map asterWeakTermPlus ts
+    (_, WeakTermTensorIntro es) ->
+      S.unions $ map asterWeakTermPlus es
+    (_, WeakTermTensorElim xts e1 e2) -> do
+      let xs = asterWeakTermPlus e1
+      let ys = asterWeakTermPlus' xts [e2]
+      S.unions [xs, ys]
     (_, WeakTermQuestion e t) -> do
       let set1 = asterWeakTermPlus e
       let set2 = asterWeakTermPlus t
@@ -257,6 +276,16 @@ substWeakTermPlus sub term =
       let (caseList, es) = unzip branchList
       let es' = map (substWeakTermPlus sub) es
       (m, WeakTermEnumElim (e', t') (zip caseList es'))
+    (m, WeakTermTensor ts) -> do
+      let ts' = map (substWeakTermPlus sub) ts
+      (m, WeakTermTensor ts')
+    (m, WeakTermTensorIntro es) -> do
+      let es' = map (substWeakTermPlus sub) es
+      (m, WeakTermTensorIntro es')
+    (m, WeakTermTensorElim xts e1 e2) -> do
+      let e1' = substWeakTermPlus sub e1
+      let (xts', e2') = substWeakTermPlus'' sub xts e2
+      (m, WeakTermTensorElim xts' e1' e2')
     (m, WeakTermQuestion e t) -> do
       let e' = substWeakTermPlus sub e
       let t' = substWeakTermPlus sub t
@@ -352,6 +381,14 @@ toText term =
       let (mls, es) = unzip mles
       let les = zip (map snd mls) es
       showCons ["switch", toText e, showItems (map showClause les)]
+    (_, WeakTermTensor ts) -> do
+      let ts' = map toText ts
+      showCons $ "tensor" : ts'
+    (_, WeakTermTensorIntro es) -> do
+      let es' = map toText es
+      showCons $ "tensor-introduction" : es'
+    (_, WeakTermTensorElim xts e1 e2) -> do
+      showCons ["tensor-elimination", inParen (showTypeArgs xts), toText e1, toText e2]
     (_, WeakTermQuestion e _) ->
       toText e
     (_, WeakTermDerangement i resultType ekts) -> do

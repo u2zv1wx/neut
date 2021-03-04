@@ -65,6 +65,16 @@ clarify' tenv term =
       es' <- (mapM (clarify' tenv) >=> alignFVS tenv m fvs) es
       (y, e', yVar) <- clarifyPlus tenv e
       return $ bindLet [(y, e')] (m, CompEnumElim yVar (zip (map snd cs) es'))
+    (m, TermTensor {}) ->
+      returnCartesianImmediate m -- `tensor`s must be used linearly
+    (m, TermTensorIntro es) -> do
+      (zs, es', xs) <- unzip3 <$> mapM (clarifyPlus tenv) es
+      return $ bindLet (zip zs es') (m, CompUpIntro (m, ValueSigmaIntro xs))
+    (m, TermTensorElim xts e1 e2) -> do
+      (zName, e1', z) <- clarifyPlus tenv e1
+      let (_, xs, _) = unzip3 xts
+      e2' <- clarify' (insTypeEnv xts tenv) e2
+      return $ bindLet [(zName, e1')] (m, CompSigmaElim xs z e2')
     (m, TermDerangement expKind resultType ekts) -> do
       let (es, ks, ts) = unzip3 ekts
       xs <- mapM (const $ newNameWith' "sys") es
@@ -289,6 +299,14 @@ chainOf tenv term =
       let es = map snd les
       xs2 <- concat <$> mapM (chainOf tenv) es
       return $ xs0 ++ xs1 ++ xs2
+    (_, TermTensor ts) ->
+      concat <$> mapM (chainOf tenv) ts
+    (_, TermTensorIntro es) ->
+      concat <$> mapM (chainOf tenv) es
+    (_, TermTensorElim xts e1 e2) -> do
+      xs1 <- chainOf tenv e1
+      xs2 <- chainOf' tenv xts [e2]
+      return $ xs1 ++ xs2
     (_, TermDerangement _ _ ekts) -> do
       let (es, _, ts) = unzip3 ekts
       concat <$> mapM (chainOf tenv) (es ++ ts)

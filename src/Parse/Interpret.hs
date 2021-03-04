@@ -118,6 +118,19 @@ interpret inputTree =
             return (m, WeakTermEnumElim (e', h) cs')
           | otherwise ->
             raiseSyntaxError m "(enum-elimination TREE TREE*)"
+        "tensor" -> do
+          ts <- mapM interpret rest
+          return (m, WeakTermTensor ts)
+        "tensor-introduction" -> do
+          es <- mapM interpret rest
+          return (m, WeakTermTensorIntro es)
+        "tensor-elimination"
+          | [(_, TreeNode xts), e1, e2] <- rest -> do
+            e1' <- interpret e1
+            (xts', e2') <- interpretBinder xts e2
+            return (m, WeakTermTensorElim xts' e1' e2')
+          | otherwise ->
+            raiseSyntaxError m "(tensor-elimination (TREE*) TREE TREE)"
         "question"
           | [e] <- rest -> do
             e' <- interpret e

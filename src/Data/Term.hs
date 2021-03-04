@@ -23,6 +23,9 @@ data Term
   | TermEnum T.Text
   | TermEnumIntro T.Text
   | TermEnumElim (TermPlus, TermPlus) [(EnumCasePlus, TermPlus)]
+  | TermTensor [TermPlus]
+  | TermTensorIntro [TermPlus]
+  | TermTensorElim [IdentPlus] TermPlus TermPlus
   | TermDerangement Derangement TermPlus [(TermPlus, DerangementArg, TermPlus)]
   deriving (Show)
 
@@ -80,6 +83,14 @@ varTermPlus term =
       let ys = varTermPlus e
       let zs = S.unions $ map (varTermPlus . snd) les
       S.unions [xs, ys, zs]
+    (_, TermTensor ts) ->
+      S.unions $ map varTermPlus ts
+    (_, TermTensorIntro es) ->
+      S.unions $ map varTermPlus es
+    (_, TermTensorElim xts e1 e2) -> do
+      let xs = varTermPlus e1
+      let ys = varTermPlus' xts [e2]
+      S.unions [xs, ys]
     (_, TermDerangement _ _ ekts) -> do
       let (es, _, ts) = unzip3 ekts
       S.unions $ map varTermPlus (es ++ ts)
@@ -132,6 +143,16 @@ substTermPlus sub term =
       let (caseList, es) = unzip branchList
       let es' = map (substTermPlus sub) es
       (m, TermEnumElim (e', t') (zip caseList es'))
+    (m, TermTensor ts) -> do
+      let ts' = map (substTermPlus sub) ts
+      (m, TermTensor ts')
+    (m, TermTensorIntro es) -> do
+      let es' = map (substTermPlus sub) es
+      (m, TermTensorIntro es')
+    (m, TermTensorElim xts e1 e2) -> do
+      let e1' = substTermPlus sub e1
+      let (xts', e2') = substTermPlus'' sub xts e2
+      (m, TermTensorElim xts' e1' e2')
     (m, TermDerangement i resultLowType ekts) -> do
       let (es, ks, ts) = unzip3 ekts
       let es' = map (substTermPlus sub) es
@@ -196,6 +217,17 @@ weaken term =
       let (caseList, es) = unzip branchList
       let es' = map weaken es
       (m, WeakTermEnumElim (e', t') (zip caseList es'))
+    (m, TermTensor ts) -> do
+      let ts' = map weaken ts
+      (m, WeakTermTensor ts')
+    (m, TermTensorIntro es) -> do
+      let es' = map weaken es
+      (m, WeakTermTensorIntro es')
+    (m, TermTensorElim xts e1 e2) -> do
+      let xts' = weakenArgs xts
+      let e1' = weaken e1
+      let e2' = weaken e2
+      (m, WeakTermTensorElim xts' e1' e2')
     (m, TermDerangement i resultType ekts) -> do
       let (es, ks, ts) = unzip3 ekts
       let es' = map weaken es
