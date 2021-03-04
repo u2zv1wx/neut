@@ -49,8 +49,6 @@ parse stmtTreeList =
                 name' <- withSectionPrefix name
                 discarder' <- interpret discarder >>= discern
                 copier' <- interpret copier >>= discern
-                ensureClosedness discarder'
-                ensureClosedness copier'
                 insertConstant m name'
                 defList <- parse restStmtList
                 return $ WeakStmtResourceType m name' discarder' copier' : defList
@@ -104,13 +102,3 @@ insertConstant m x = do
   if S.member x cset
     then raiseError m $ "the constant `" <> x <> "` is already defined"
     else modify (\env -> env {constantSet = S.insert x (constantSet env)})
-
-showFreeVariables :: S.Set Ident -> T.Text
-showFreeVariables s =
-  T.intercalate ", " $ map asText $ S.toList s
-
-ensureClosedness :: WeakTermPlus -> WithEnv ()
-ensureClosedness e = do
-  let varSet = varWeakTermPlus e
-  when (not (S.null varSet)) $
-    raiseError (fst e) $ "the term here must be closed, but actually contains: " <> showFreeVariables varSet

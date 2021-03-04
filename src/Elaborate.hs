@@ -53,8 +53,11 @@ elaborateStmt stmt =
       insConstraintEnv tDiscarder (m, WeakTermPi [(m, h, tPtr)] (m, WeakTermTensor []))
       insConstraintEnv tCopier (m, WeakTermPi [(m, h, tPtr)] (m, WeakTermTensor [tPtr, tPtr]))
       analyze >> synthesize >> refine >> cleanup
-      discarder'' <- reduceTermPlus <$> elaborate' discarder'
-      copier'' <- reduceTermPlus <$> elaborate' copier'
+      sub <- gets substEnv
+      discarder'' <- reduceTermPlus <$> elaborate' (substWeakTermPlus sub discarder')
+      copier'' <- reduceTermPlus <$> elaborate' (substWeakTermPlus sub copier')
+      ensureClosedness discarder''
+      ensureClosedness copier''
       modify (\env -> env {resTypeEnv = Map.insert name (discarder'', copier'') (resTypeEnv env)})
       elaborateStmt cont
 
@@ -225,3 +228,13 @@ lookupEnumSet m name = do
 insConstTypeEnv :: T.Text -> TermPlus -> WithEnv ()
 insConstTypeEnv x t =
   modify (\e -> e {constTypeEnv = Map.insert x t (constTypeEnv e)})
+
+showFreeVariables :: S.Set Ident -> T.Text
+showFreeVariables s =
+  T.intercalate ", " $ map asText $ S.toList s
+
+ensureClosedness :: TermPlus -> WithEnv ()
+ensureClosedness e = do
+  let varSet = varTermPlus e
+  when (not (S.null varSet)) $
+    raiseError (fst e) $ "the term here must be closed, but actually contains: " <> showFreeVariables varSet

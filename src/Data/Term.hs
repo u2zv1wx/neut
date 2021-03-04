@@ -49,13 +49,13 @@ asUpsilon term =
     _ ->
       Nothing
 
-varTermPlus :: TermPlus -> S.Set Int
+varTermPlus :: TermPlus -> S.Set Ident
 varTermPlus term =
   case term of
     (_, TermTau) ->
       S.empty
     (_, TermUpsilon x) ->
-      S.singleton (asInt x)
+      S.singleton x
     (_, TermPi xts t) ->
       varTermPlus' xts [t]
     (_, TermPiIntro xts e) ->
@@ -66,7 +66,7 @@ varTermPlus term =
       S.union xs1 xs2
     (_, TermFix (_, x, t) xts e) -> do
       let set1 = varTermPlus t
-      let set2 = S.filter (/= asInt x) (varTermPlus' xts [e])
+      let set2 = S.filter (/= x) (varTermPlus' xts [e])
       S.union set1 set2
     (_, TermConst _) ->
       S.empty
@@ -95,7 +95,7 @@ varTermPlus term =
       let (es, _, ts) = unzip3 ekts
       S.unions $ map varTermPlus (es ++ ts)
 
-varTermPlus' :: [IdentPlus] -> [TermPlus] -> S.Set Int
+varTermPlus' :: [IdentPlus] -> [TermPlus] -> S.Set Ident
 varTermPlus' binder es =
   case binder of
     [] ->
@@ -103,7 +103,7 @@ varTermPlus' binder es =
     ((_, x, t) : xts) -> do
       let set1 = varTermPlus t
       let set2 = varTermPlus' xts es
-      S.union set1 $ S.filter (/= asInt x) set2
+      S.union set1 $ S.filter (/= x) set2
 
 substTermPlus :: SubstTerm -> TermPlus -> TermPlus
 substTermPlus sub term =

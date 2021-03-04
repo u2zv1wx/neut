@@ -118,33 +118,33 @@ nubFVS =
   nubBy (\(_, x, _) (_, y, _) -> x == y)
 
 clarifyConst :: TypeEnv -> Hint -> T.Text -> WithEnv CompPlus
-clarifyConst tenv m x
-  | Just op <- asPrimOp x =
+clarifyConst tenv m constName
+  | Just op <- asPrimOp constName =
     clarifyPrimOp tenv op m
-  | Just _ <- asLowTypeMaybe x =
+  | Just _ <- asLowTypeMaybe constName =
     returnCartesianImmediate m
-  | x == nsOS <> "file-descriptor" =
+  | constName == nsOS <> "file-descriptor" =
     returnCartesianImmediate m
-  | x == nsOS <> "stdin" =
+  | constName == nsOS <> "stdin" =
     clarify' tenv (m, TermInt 64 0)
-  | x == nsOS <> "stdout" =
+  | constName == nsOS <> "stdout" =
     clarify' tenv (m, TermInt 64 1)
-  | x == nsOS <> "stderr" =
+  | constName == nsOS <> "stderr" =
     clarify' tenv (m, TermInt 64 2)
-  | x == nsUnsafe <> "pointer" =
+  | constName == nsUnsafe <> "pointer" =
     returnCartesianImmediate m
-  | x == nsUnsafe <> "cast" =
+  | constName == nsUnsafe <> "cast" =
     clarifyCast tenv m
   | otherwise = do
     renv <- gets resTypeEnv
-    case Map.lookup x renv of
+    case Map.lookup constName renv of
       Nothing ->
-        return (m, CompUpIntro (m, ValueConst x))
+        return (m, CompUpIntro (m, ValueConst constName))
       Just (discarder, copier) -> do
-        v <- tryCache m x $ do
+        v <- tryCache m constName $ do
           discarder' <- toSwitcherBranch m tenv discarder
           copier' <- toSwitcherBranch m tenv copier
-          registerSwitcher m x discarder' copier'
+          registerSwitcher m constName discarder' copier'
         return (m, CompUpIntro v)
 
 clarifyCast :: TypeEnv -> Hint -> WithEnv CompPlus

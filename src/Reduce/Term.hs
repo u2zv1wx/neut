@@ -40,7 +40,7 @@ reduceTermPlus term =
           (m, app)
     (m, TermFix (mx, x, t) xts e) -> do
       let lam@(_, TermPiIntro xts' e') = reduceTermPlus (m, TermPiIntro xts e)
-      if asInt x `S.notMember` varTermPlus e'
+      if x `S.notMember` varTermPlus e'
         then lam
         else (m, TermFix (mx, x, reduceTermPlus t) xts' e')
     (m, TermEnumElim (e, t) les) -> do
