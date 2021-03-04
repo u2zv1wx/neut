@@ -48,7 +48,6 @@ elaborateStmt stmt =
       insConstTypeEnv name (m, TermTau)
       (discarder', tDiscarder) <- infer discarder
       (copier', tCopier) <- infer copier
-      -- let tRes = (m, WeakTermConst name)
       let tPtr = (m, WeakTermConst (nsUnsafe <> "pointer"))
       h <- newNameWith' "res"
       insConstraintEnv tDiscarder (m, WeakTermPi [(m, h, tPtr)] (m, WeakTermTensor []))

@@ -145,8 +145,6 @@ clarifyConst tenv m x
           discarder' <- toSwitcherBranch m tenv discarder
           copier' <- toSwitcherBranch m tenv copier
           registerSwitcher m x discarder' copier'
-        -- (args, e) <- makeSwitcher m discarder' copier'
-        -- insCompEnv x False args e
         return (m, CompUpIntro v)
 
 clarifyCast :: TypeEnv -> Hint -> WithEnv CompPlus

@@ -20,17 +20,11 @@ cartesianSigma ::
 cartesianSigma mName m mxts =
   case mName of
     Nothing -> do
-      i <- newCount
-      let h = "sigma-" <> T.pack (show i)
+      h <- newTextWith "sigma"
       registerSwitcher m h (affineSigma m mxts) (relevantSigma m mxts)
       return (m, ValueConst h)
     Just name ->
       tryCache m name $ registerSwitcher m name (affineSigma m mxts) (relevantSigma m mxts)
-
--- insCompEnv h False args e
--- (args, e) <- makeSwitcher m (affineSigma m mxts) (relevantSigma m mxts)
--- (args, e) <- makeSwitcher m (affineSigma m mxts) (relevantSigma m mxts)
--- insCompEnv name False args e
 
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
 -- affineSigma NAME LOC [(x1, t1), ..., (xn, tn)]   ~>
