@@ -135,8 +135,19 @@ clarifyConst tenv m x
     returnCartesianImmediate m
   | x == nsUnsafe <> "cast" =
     clarifyCast tenv m
-  | otherwise =
-    return (m, CompUpIntro (m, ValueConst x))
+  | otherwise = do
+    renv <- gets resTypeEnv
+    case Map.lookup x renv of
+      Nothing ->
+        return (m, CompUpIntro (m, ValueConst x))
+      Just (discarder, copier) -> do
+        v <- tryCache m x $ do
+          discarder' <- toSwitcherBranch m tenv discarder
+          copier' <- toSwitcherBranch m tenv copier
+          registerSwitcher m x discarder' copier'
+        -- (args, e) <- makeSwitcher m discarder' copier'
+        -- insCompEnv x False args e
+        return (m, CompUpIntro v)
 
 clarifyCast :: TypeEnv -> Hint -> WithEnv CompPlus
 clarifyCast tenv m = do
@@ -357,3 +368,9 @@ termSigmaIntro m xts = do
         ]
         (m, TermPiElim (m, TermUpsilon k) args)
     )
+
+toSwitcherBranch :: Hint -> TypeEnv -> TermPlus -> WithEnv (ValuePlus -> WithEnv CompPlus)
+toSwitcherBranch m tenv d = do
+  d' <- clarify' tenv d
+  (varName, var) <- newValueUpsilonWith m "res"
+  return $ \val -> callClosure m d' [(varName, (m, CompUpIntro val), var)]

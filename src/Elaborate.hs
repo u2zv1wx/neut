@@ -11,6 +11,7 @@ import qualified Data.IntMap as IntMap
 import Data.List (nub)
 import Data.Log
 import Data.LowType
+import Data.Namespace
 import qualified Data.Set as S
 import Data.Term
 import qualified Data.Text as T
@@ -42,6 +43,20 @@ elaborateStmt stmt =
       analyze >> synthesize >> refine >> cleanup
       t'' <- reduceTermPlus <$> elaborate' t'
       insConstTypeEnv c t''
+      elaborateStmt cont
+    WeakStmtResourceType m name discarder copier : cont -> do
+      insConstTypeEnv name (m, TermTau)
+      (discarder', tDiscarder) <- infer discarder
+      (copier', tCopier) <- infer copier
+      -- let tRes = (m, WeakTermConst name)
+      let tPtr = (m, WeakTermConst (nsUnsafe <> "pointer"))
+      h <- newNameWith' "res"
+      insConstraintEnv tDiscarder (m, WeakTermPi [(m, h, tPtr)] (m, WeakTermTensor []))
+      insConstraintEnv tCopier (m, WeakTermPi [(m, h, tPtr)] (m, WeakTermTensor [tPtr, tPtr]))
+      analyze >> synthesize >> refine >> cleanup
+      discarder'' <- reduceTermPlus <$> elaborate' discarder'
+      copier'' <- reduceTermPlus <$> elaborate' copier'
+      modify (\env -> env {resTypeEnv = Map.insert name (discarder'', copier'') (resTypeEnv env)})
       elaborateStmt cont
 
 elaborateLet ::

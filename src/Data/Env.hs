@@ -59,6 +59,7 @@ data Env = Env
     constraintQueue :: ConstraintQueue,
     substEnv :: IntMap.IntMap WeakTermPlus,
     opaqueEnv :: S.Set Ident,
+    resTypeEnv :: Map.HashMap T.Text (TermPlus, TermPlus),
     --
     -- clarify
     --
@@ -92,6 +93,7 @@ initialEnv =
       sectionEnv = [],
       weakTypeEnv = IntMap.empty,
       typeEnv = IntMap.empty,
+      resTypeEnv = Map.empty,
       constTypeEnv = Map.empty,
       codeEnv = Map.empty,
       lowCompEnv = Map.empty,

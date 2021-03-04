@@ -86,11 +86,19 @@ makeSwitcher m compAff compRel = do
       )
     )
 
+registerSwitcher ::
+  Hint ->
+  T.Text ->
+  (ValuePlus -> WithEnv CompPlus) ->
+  (ValuePlus -> WithEnv CompPlus) ->
+  WithEnv ()
+registerSwitcher m name aff rel = do
+  (args, e) <- makeSwitcher m aff rel
+  insCompEnv name False args e
+
 cartesianImmediate :: Hint -> WithEnv ValuePlus
 cartesianImmediate m =
-  tryCache m cartImmName $ do
-    (args, e) <- makeSwitcher m affineImmediate relevantImmediate
-    insCompEnv cartImmName False args e
+  tryCache m cartImmName $ registerSwitcher m cartImmName affineImmediate relevantImmediate
 
 affineImmediate :: ValuePlus -> WithEnv CompPlus
 affineImmediate (m, _) =

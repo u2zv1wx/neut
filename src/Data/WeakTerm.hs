@@ -49,6 +49,7 @@ type IdentDef =
 data WeakStmt
   = WeakStmtLet Hint WeakIdentPlus WeakTermPlus
   | WeakStmtConstDecl WeakTextPlus
+  | WeakStmtResourceType Hint T.Text WeakTermPlus WeakTermPlus
   deriving (Show)
 
 type ConstraintQueue =
