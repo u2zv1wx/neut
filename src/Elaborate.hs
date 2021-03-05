@@ -46,16 +46,16 @@ elaborateStmt stmt =
       elaborateStmt cont
     WeakStmtResourceType m name discarder copier : cont -> do
       insConstTypeEnv name (m, TermTau)
-      (discarder', tDiscarder) <- infer discarder
-      (copier', tCopier) <- infer copier
+      sub <- gets substEnv
+      (discarder', tDiscarder) <- infer (substWeakTermPlus sub discarder)
+      (copier', tCopier) <- infer (substWeakTermPlus sub copier)
       let tPtr = (m, WeakTermConst (nsUnsafe <> "pointer"))
       h <- newNameWith' "res"
       insConstraintEnv tDiscarder (m, WeakTermPi [(m, h, tPtr)] (m, WeakTermTensor []))
       insConstraintEnv tCopier (m, WeakTermPi [(m, h, tPtr)] (m, WeakTermTensor [tPtr, tPtr]))
       analyze >> synthesize >> refine >> cleanup
-      sub <- gets substEnv
-      discarder'' <- reduceTermPlus <$> elaborate' (substWeakTermPlus sub discarder')
-      copier'' <- reduceTermPlus <$> elaborate' (substWeakTermPlus sub copier')
+      discarder'' <- reduceTermPlus <$> elaborate' discarder'
+      copier'' <- reduceTermPlus <$> elaborate' copier'
       ensureClosedness discarder''
       ensureClosedness copier''
       modify (\env -> env {resTypeEnv = Map.insert name (discarder'', copier'') (resTypeEnv env)})
