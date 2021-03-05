@@ -360,8 +360,6 @@ asDerangementArg tree =
 interpretDerangement :: TreePlus -> WithEnv Derangement
 interpretDerangement tree =
   case tree of
-    (_, TreeLeaf "memcpy") ->
-      return DerangementMemCpy
     (_, TreeNode [(_, TreeLeaf "store"), t]) -> do
       t' <- interpretLowType t
       return $ DerangementStore t'
@@ -427,10 +425,5 @@ checkDerangementArity m k args =
         return ()
       | otherwise ->
         raiseError m $ "this `create-struct` expects " <> T.pack (show (length ts)) <> " value(s), but found " <> T.pack (show (length args))
-    DerangementMemCpy
-      | length args == 4 ->
-        return ()
-      | otherwise ->
-        raiseError m $ "the arity of `memcpy` is 5, but found " <> T.pack (show (length args + 1)) <> " arguments"
     _ ->
       return ()

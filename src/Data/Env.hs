@@ -100,8 +100,7 @@ initialEnv =
       declEnv =
         Map.fromList
           [ ("malloc", ([voidPtr], voidPtr)),
-            ("free", ([voidPtr], voidPtr)),
-            ("llvm.memcpy.p0i8.p0i8.i64", ([voidPtr, voidPtr, LowTypeInt 64, LowTypeInt 1], LowTypeVoid))
+            ("free", ([voidPtr], voidPtr))
           ],
       constraintEnv = [],
       constraintQueue = Q.empty,

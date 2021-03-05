@@ -300,8 +300,6 @@ showLowTypeAsIfNonPtr lowType =
       "[" <> intDec i <> " x " <> s <> "]"
     LowTypePointer t ->
       showLowType t
-    LowTypeVoid ->
-      "void"
 
 getRegList :: WithEnv [Builder]
 getRegList = do
@@ -335,8 +333,6 @@ showLowType lowType =
       "[" <> intDec i <> " x " <> s <> "]"
     LowTypePointer t ->
       showLowType t <> "*"
-    LowTypeVoid ->
-      "void"
 
 showLowValue :: LowValue -> Builder
 showLowValue llvmValue =

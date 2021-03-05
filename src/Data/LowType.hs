@@ -11,7 +11,6 @@ data LowType
   | LowTypeArray Int LowType -- [n x LOWTYPE]
   | LowTypeStruct [LowType]
   | LowTypeFunction [LowType] LowType
-  | LowTypeVoid
   deriving (Eq, Ord, Show)
 
 type IntSize =
@@ -35,7 +34,6 @@ data Derangement
   | DerangementStore LowType
   | DerangementCreateArray LowType
   | DerangementCreateStruct [LowType]
-  | DerangementMemCpy
   deriving (Show, Eq)
 
 data DerangementArg
