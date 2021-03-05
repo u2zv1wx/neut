@@ -41,6 +41,11 @@ type IdentPlus =
 type TypeEnv =
   IntMap.IntMap TermPlus
 
+data Stmt
+  = StmtLet Hint IdentPlus TermPlus
+  | StmtResourceType Hint T.Text TermPlus TermPlus
+  deriving (Show)
+
 asUpsilon :: TermPlus -> Maybe Ident
 asUpsilon term =
   case term of

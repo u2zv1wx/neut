@@ -45,7 +45,7 @@ withHeader nm x t e =
       raiseCritical' $ "impossible. x: " <> asText' x
     Just [z] ->
       withHeaderLinear z x e
-    Just (z1 : z2 : zs) ->
+    Just (z1 : z2 : zs) -> do
       withHeaderRelevant x t z1 z2 zs e
 
 -- withHeaderAffine x t e ~>

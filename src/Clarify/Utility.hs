@@ -8,6 +8,7 @@ import qualified Data.HashMap.Lazy as Map
 import Data.Namespace
 import Data.Term
 import qualified Data.Text as T
+import Reduce.Comp
 
 type Context = [(Ident, TermPlus)]
 
@@ -110,7 +111,8 @@ relevantImmediate argVar@(m, _) =
 
 insCompEnv :: T.Text -> Bool -> [Ident] -> CompPlus -> WithEnv ()
 insCompEnv name isFixed args e = do
-  let def = Definition (IsFixed isFixed) args e
+  e' <- reduceCompPlus e
+  let def = Definition (IsFixed isFixed) args e'
   modify (\env -> env {codeEnv = Map.insert name def (codeEnv env)})
 
 {-# INLINE boolTrue #-}

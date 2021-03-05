@@ -59,7 +59,6 @@ data Env = Env
     constraintQueue :: ConstraintQueue,
     substEnv :: IntMap.IntMap WeakTermPlus,
     opaqueEnv :: S.Set Ident,
-    resTypeEnv :: Map.HashMap T.Text (TermPlus, TermPlus),
     --
     -- clarify
     --
@@ -93,7 +92,6 @@ initialEnv =
       sectionEnv = [],
       weakTypeEnv = IntMap.empty,
       typeEnv = IntMap.empty,
-      resTypeEnv = Map.empty,
       constTypeEnv = Map.empty,
       codeEnv = Map.empty,
       lowCompEnv = Map.empty,
@@ -157,6 +155,12 @@ newTextWith :: T.Text -> WithEnv T.Text
 newTextWith s = do
   i <- newCount
   return $ "(" <> s <> "-" <> T.pack (show i) <> ")"
+
+{-# INLINE newTextWith' #-}
+newTextWith' :: T.Text -> WithEnv T.Text
+newTextWith' s = do
+  i <- newCount
+  return $ s <> "_" <> T.pack (show i)
 
 {-# INLINE newAster #-}
 newAster :: Hint -> WithEnv WeakTermPlus

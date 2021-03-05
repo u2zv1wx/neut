@@ -20,7 +20,8 @@ cartesianSigma ::
 cartesianSigma mName m mxts =
   case mName of
     Nothing -> do
-      h <- newTextWith "sigma"
+      h <- newTextWith' "sigma"
+      -- h <- newTextWith "sigma"
       registerSwitcher m h (affineSigma m mxts) (relevantSigma m mxts)
       return (m, ValueConst h)
     Just name ->

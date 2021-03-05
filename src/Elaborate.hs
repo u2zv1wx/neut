@@ -22,28 +22,26 @@ import Elaborate.Synthesize
 import Reduce.Term
 import Reduce.WeakTerm
 
-elaborate :: [WeakStmt] -> WithEnv TermPlus
+elaborate :: [WeakStmt] -> WithEnv [Stmt]
 elaborate ss =
-  reduceTermPlus <$> elaborateStmt ss
+  elaborateStmt' ss
 
-elaborateStmt :: [WeakStmt] -> WithEnv TermPlus
-elaborateStmt stmt =
+elaborateStmt' :: [WeakStmt] -> WithEnv [Stmt]
+elaborateStmt' stmt =
   case stmt of
     [] -> do
-      ph <- gets phase
-      m <- newHint ph 1 1 <$> getCurrentFilePath
-      return (m, TermInt 64 0)
+      return []
     WeakStmtLet m (mx, x, t) e : cont -> do
       (e', te) <- infer e
       t' <- inferType t
       insConstraintEnv te t'
-      elaborateLet m mx x t' e' cont
+      elaborateLet' m mx x t' e' cont
     WeakStmtConstDecl (_, c, t) : cont -> do
       t' <- inferType t
       analyze >> synthesize >> refine >> cleanup
       t'' <- reduceTermPlus <$> elaborate' t'
       insConstTypeEnv c t''
-      elaborateStmt cont
+      elaborateStmt' cont
     WeakStmtResourceType m name discarder copier : cont -> do
       insConstTypeEnv name (m, TermTau)
       sub <- gets substEnv
@@ -56,20 +54,18 @@ elaborateStmt stmt =
       analyze >> synthesize >> refine >> cleanup
       discarder'' <- reduceTermPlus <$> elaborate' discarder'
       copier'' <- reduceTermPlus <$> elaborate' copier'
-      ensureClosedness discarder''
-      ensureClosedness copier''
-      modify (\env -> env {resTypeEnv = Map.insert name (discarder'', copier'') (resTypeEnv env)})
-      elaborateStmt cont
+      cont' <- elaborateStmt' cont
+      return $ StmtResourceType m name discarder'' copier'' : cont'
 
-elaborateLet ::
+elaborateLet' ::
   Hint ->
   Hint ->
   Ident ->
   WeakTermPlus ->
   WeakTermPlus ->
   [WeakStmt] ->
-  WithEnv TermPlus
-elaborateLet m mx x t e cont = do
+  WithEnv [Stmt]
+elaborateLet' m mx x t e cont = do
   analyze >> synthesize >> refine >> cleanup
   e' <- reduceTermPlus <$> elaborate' e
   t' <- reduceTermPlus <$> elaborate' t
@@ -77,8 +73,8 @@ elaborateLet m mx x t e cont = do
   if metaIsReducible m
     then modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e') (substEnv env)})
     else modify (\env -> env {opaqueEnv = S.insert x (opaqueEnv env)})
-  cont' <- elaborateStmt cont
-  return (m, TermPiElim (m, TermPiIntro [(mx, x, t')] cont') [e'])
+  cont' <- elaborateStmt' cont
+  return $ StmtLet m (mx, x, t') e' : cont'
 
 cleanup :: WithEnv ()
 cleanup =
@@ -228,13 +224,3 @@ lookupEnumSet m name = do
 insConstTypeEnv :: T.Text -> TermPlus -> WithEnv ()
 insConstTypeEnv x t =
   modify (\e -> e {constTypeEnv = Map.insert x t (constTypeEnv e)})
-
-showFreeVariables :: S.Set Ident -> T.Text
-showFreeVariables s =
-  T.intercalate ", " $ map asText $ S.toList s
-
-ensureClosedness :: TermPlus -> WithEnv ()
-ensureClosedness e = do
-  let varSet = varTermPlus e
-  when (not (S.null varSet)) $
-    raiseError (fst e) $ "the term here must be closed, but actually contains: " <> showFreeVariables varSet

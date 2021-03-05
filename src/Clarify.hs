@@ -22,33 +22,58 @@ import Data.Maybe (catMaybes)
 import Data.Namespace
 import Data.Term
 import qualified Data.Text as T
+import Reduce.Comp
 
-clarify :: TermPlus -> WithEnv CompPlus
-clarify =
-  clarify' IntMap.empty
+clarify :: [Stmt] -> WithEnv CompPlus
+clarify ss = do
+  e <- clarifyStmt IntMap.empty ss
+  reduceCompPlus e
 
-clarify' :: TypeEnv -> TermPlus -> WithEnv CompPlus
-clarify' tenv term =
+clarifyStmt :: TypeEnv -> [Stmt] -> WithEnv CompPlus
+clarifyStmt tenv ss =
+  case ss of
+    [] -> do
+      ph <- gets phase
+      m <- newHint ph 1 1 <$> getCurrentFilePath
+      return (m, CompUpIntro (m, ValueInt 64 0))
+    StmtLet m (mx, x, t) e : cont -> do
+      e' <- clarifyTerm tenv e
+      insCompEnv (asText x <> "_" <> T.pack (show (asInt x))) False [] e'
+      let app = (m, CompPiElimDownElim (m, ValueConst $ asText x <> "_" <> T.pack (show (asInt x))) [])
+      cont' <- clarifyStmt (insTypeEnv [(mx, x, t)] tenv) cont
+      holeVarName <- newNameWith' "hole"
+      return (m, CompUpElim holeVarName app cont')
+    StmtResourceType m name discarder copier : cont -> do
+      discarder' <- toSwitcherBranch m tenv discarder
+      copier' <- toSwitcherBranch m tenv copier
+      registerSwitcher m name discarder' copier'
+      clarifyStmt tenv cont
+
+clarifyTerm :: TypeEnv -> TermPlus -> WithEnv CompPlus
+clarifyTerm tenv term =
   case term of
     (m, TermTau) ->
       returnCartesianImmediate m
-    (m, TermUpsilon x) ->
-      return (m, CompUpIntro (m, ValueUpsilon x))
+    (m, TermUpsilon x) -> do
+      senv <- gets substEnv
+      if not $ IntMap.member (asInt x) senv
+        then return (m, CompUpIntro (m, ValueUpsilon x))
+        else return (m, CompPiElimDownElim (m, ValueConst $ asText x <> "_" <> T.pack (show (asInt x))) [])
     (m, TermPi {}) ->
       returnClosureType m
     (m, TermPiIntro mxts e) -> do
       fvs <- nubFVS <$> chainOf tenv term
-      e' <- clarify' (insTypeEnv mxts tenv) e
-      retClosure tenv Nothing fvs m mxts e'
+      e' <- clarifyTerm (insTypeEnv mxts tenv) e
+      retClosure tenv Nothing False fvs m mxts e'
     (m, TermPiElim e es) -> do
       es' <- mapM (clarifyPlus tenv) es
-      e' <- clarify' tenv e
+      e' <- clarifyTerm tenv e
       callClosure m e' es'
     (m, TermFix (_, x, t) mxts e) -> do
       let tenv' = IntMap.insert (asInt x) t tenv
-      e' <- clarify' (insTypeEnv mxts tenv') e
+      e' <- clarifyTerm (insTypeEnv mxts tenv') e
       fvs <- nubFVS <$> chainOf tenv term
-      retClosure tenv (Just x) fvs m mxts e'
+      retClosure tenv (Just x) True fvs m mxts e'
     (m, TermConst x) ->
       clarifyConst tenv m x
     (m, TermInt size l) ->
@@ -62,7 +87,7 @@ clarify' tenv term =
     (m, TermEnumElim (e, _) bs) -> do
       let (cs, es) = unzip bs
       fvs <- constructEnumFVS tenv es
-      es' <- (mapM (clarify' tenv) >=> alignFVS tenv m fvs) es
+      es' <- (mapM (clarifyTerm tenv) >=> alignFVS tenv m fvs) es
       (y, e', yVar) <- clarifyPlus tenv e
       return $ bindLet [(y, e')] (m, CompEnumElim yVar (zip (map snd cs) es'))
     (m, TermTensor {}) ->
@@ -73,7 +98,7 @@ clarify' tenv term =
     (m, TermTensorElim xts e1 e2) -> do
       (zName, e1', z) <- clarifyPlus tenv e1
       let (_, xs, _) = unzip3 xts
-      e2' <- clarify' (insTypeEnv xts tenv) e2
+      e2' <- clarifyTerm (insTypeEnv xts tenv) e2
       return $ bindLet [(zName, e1')] (m, CompSigmaElim xs z e2')
     (m, TermDerangement expKind resultType ekts) -> do
       let (es, ks, ts) = unzip3 ekts
@@ -84,13 +109,13 @@ clarify' tenv term =
       resultVarName <- newNameWith' "result"
       tuple <- constructResultTuple tenv m borrowedVarList (m, resultVarName, resultType)
       let lamBody = (m, CompUpElim resultVarName (m, CompPrimitive (PrimitiveDerangement expKind xsAsVars)) tuple)
-      cls <- retClosure tenv Nothing [] m xts lamBody
+      cls <- retClosure tenv Nothing False [] m xts lamBody
       es' <- mapM (clarifyPlus tenv) es
       callClosure m cls es'
 
 clarifyPlus :: TypeEnv -> TermPlus -> WithEnv (Ident, CompPlus, ValuePlus)
 clarifyPlus tenv e@(m, _) = do
-  e' <- clarify' tenv e
+  e' <- clarifyTerm tenv e
   (varName, var) <- newValueUpsilonWith m "var"
   return (varName, e', var)
 
@@ -100,7 +125,7 @@ clarifyBinder tenv binder =
     [] ->
       return []
     ((m, x, t) : xts) -> do
-      t' <- clarify' tenv t
+      t' <- clarifyTerm tenv t
       xts' <- clarifyBinder (IntMap.insert (asInt x) t tenv) xts
       return $ (m, x, t') : xts'
 
@@ -110,7 +135,7 @@ constructEnumFVS tenv es =
 
 alignFVS :: TypeEnv -> Hint -> [IdentPlus] -> [CompPlus] -> WithEnv [CompPlus]
 alignFVS tenv m fvs es = do
-  es' <- mapM (retClosure tenv Nothing fvs m []) es
+  es' <- mapM (retClosure tenv Nothing False fvs m []) es
   mapM (\cls -> callClosure m cls []) es'
 
 nubFVS :: [IdentPlus] -> [IdentPlus]
@@ -126,26 +151,20 @@ clarifyConst tenv m constName
   | constName == nsOS <> "file-descriptor" =
     returnCartesianImmediate m
   | constName == nsOS <> "stdin" =
-    clarify' tenv (m, TermInt 64 0)
+    clarifyTerm tenv (m, TermInt 64 0)
   | constName == nsOS <> "stdout" =
-    clarify' tenv (m, TermInt 64 1)
+    clarifyTerm tenv (m, TermInt 64 1)
   | constName == nsOS <> "stderr" =
-    clarify' tenv (m, TermInt 64 2)
+    clarifyTerm tenv (m, TermInt 64 2)
   | constName == nsUnsafe <> "pointer" =
     returnCartesianImmediate m
   | constName == nsUnsafe <> "cast" =
     clarifyCast tenv m
   | otherwise = do
-    renv <- gets resTypeEnv
-    case Map.lookup constName renv of
-      Nothing ->
-        return (m, CompUpIntro (m, ValueConst constName))
-      Just (discarder, copier) -> do
-        v <- tryCache m constName $ do
-          discarder' <- toSwitcherBranch m tenv discarder
-          copier' <- toSwitcherBranch m tenv copier
-          registerSwitcher m constName discarder' copier'
-        return (m, CompUpIntro v)
+    cenv <- gets codeEnv
+    if Map.member constName cenv
+      then return (m, CompUpIntro (m, ValueConst constName))
+      else raiseError m $ "undefined constant: " <> constName
 
 clarifyCast :: TypeEnv -> Hint -> WithEnv CompPlus
 clarifyCast tenv m = do
@@ -154,14 +173,14 @@ clarifyCast tenv m = do
   z <- newNameWith' "z"
   let varA = (m, TermUpsilon a)
   let u = (m, TermTau)
-  clarify' tenv (m, TermPiIntro [(m, a, u), (m, b, u), (m, z, varA)] (m, TermUpsilon z))
+  clarifyTerm tenv (m, TermPiIntro [(m, a, u), (m, b, u), (m, z, varA)] (m, TermUpsilon z))
 
 clarifyPrimOp :: TypeEnv -> PrimOp -> Hint -> WithEnv CompPlus
 clarifyPrimOp tenv op@(PrimOp _ domList _) m = do
   argTypeList <- mapM (lowTypeToType m) domList
   (xs, varList) <- unzip <$> mapM (const (newValueUpsilonWith m "prim")) domList
   let mxts = zipWith (\x t -> (m, x, t)) xs argTypeList
-  retClosure tenv Nothing [] m mxts (m, CompPrimitive (PrimitivePrimOp op varList))
+  retClosure tenv Nothing False [] m mxts (m, CompPrimitive (PrimitivePrimOp op varList))
 
 takeIffLinear :: (IdentPlus, DerangementArg) -> Maybe IdentPlus
 takeIffLinear (xt, k) =
@@ -185,16 +204,17 @@ constructResultTuple tenv m borrowedVarTypeList result@(_, resultVarName, _) =
       let tupleTypeInfo = borrowedVarTypeList ++ [result]
       tuple <- termSigmaIntro m tupleTypeInfo
       let tenv' = insTypeEnv tupleTypeInfo tenv
-      clarify' tenv' tuple
+      clarifyTerm tenv' tuple
 
 makeClosure ::
   Maybe Ident ->
+  Bool -> -- is fixed or not
   [(Hint, Ident, CompPlus)] -> -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
   Hint -> -- meta of lambda
   [(Hint, Ident, CompPlus)] -> -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
   CompPlus -> -- the `e` in `lam (x1, ..., xn). e`
   WithEnv ValuePlus
-makeClosure mName mxts2 m mxts1 e = do
+makeClosure mName isFixed mxts2 m mxts1 e = do
   let xts1 = dropFst mxts1
   let xts2 = dropFst mxts2
   envExp <- cartesianSigma Nothing m $ map Right xts2
@@ -204,12 +224,12 @@ makeClosure mName mxts2 m mxts1 e = do
     Nothing -> do
       i <- newCount
       let name = "thunk-" <> T.pack (show i)
-      registerIfNecessary m name False xts1 xts2 e
+      registerIfNecessary m name isFixed xts1 xts2 e
       return (m, ValueSigmaIntro [envExp, fvEnv, (m, ValueConst name)])
     Just name -> do
-      let cls = (m, ValueSigmaIntro [envExp, fvEnv, (m, ValueConst $ asText'' name)])
+      let cls = (m, ValueSigmaIntro [envExp, fvEnv, (m, ValueConst $ asText name <> "_" <> T.pack (show (asInt name)))])
       let e' = substCompPlus (IntMap.fromList [(asInt name, cls)]) e
-      registerIfNecessary m (asText'' name) True xts1 xts2 e'
+      registerIfNecessary m (asText name <> "_" <> T.pack (show (asInt name))) isFixed xts1 xts2 e'
       return cls
 
 registerIfNecessary ::
@@ -232,26 +252,28 @@ registerIfNecessary m name isFixed xts1 xts2 e = do
 makeClosure' ::
   TypeEnv ->
   Maybe Ident -> -- the name of newly created closure
+  Bool -> -- is fixed or not
   [IdentPlus] -> -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
   Hint -> -- meta of lambda
   [IdentPlus] -> -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
   CompPlus -> -- the `e` in `lam (x1, ..., xn). e`
   WithEnv ValuePlus
-makeClosure' tenv mName fvs m xts e = do
+makeClosure' tenv mName isFixed fvs m xts e = do
   fvs' <- clarifyBinder tenv fvs
   xts' <- clarifyBinder tenv xts
-  makeClosure mName fvs' m xts' e
+  makeClosure mName isFixed fvs' m xts' e
 
 retClosure ::
   TypeEnv ->
   Maybe Ident -> -- the name of newly created closure
+  Bool -> -- is fixed or not
   [IdentPlus] -> -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
   Hint -> -- meta of lambda
   [IdentPlus] -> -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
   CompPlus -> -- the `e` in `lam (x1, ..., xn). e`
   WithEnv CompPlus
-retClosure tenv mName fvs m xts e = do
-  cls <- makeClosure' tenv mName fvs m xts e
+retClosure tenv mName isFixed fvs m xts e = do
+  cls <- makeClosure' tenv mName isFixed fvs m xts e
   return (m, CompUpIntro cls)
 
 callClosure :: Hint -> CompPlus -> [(Ident, CompPlus, ValuePlus)] -> WithEnv CompPlus
@@ -279,7 +301,10 @@ chainOf tenv term =
     (m, TermUpsilon x) -> do
       t <- lookupTypeEnv m x tenv
       xts <- chainOf tenv t
-      return $ xts ++ [(m, x, t)]
+      senv <- gets substEnv
+      if not $ IntMap.member (asInt x) senv
+        then return $ xts ++ [(m, x, t)]
+        else return $ xts
     (_, TermPi {}) ->
       return []
     (_, TermPiIntro xts e) ->
@@ -369,6 +394,6 @@ termSigmaIntro m xts = do
 
 toSwitcherBranch :: Hint -> TypeEnv -> TermPlus -> WithEnv (ValuePlus -> WithEnv CompPlus)
 toSwitcherBranch m tenv d = do
-  d' <- clarify' tenv d
+  d' <- clarifyTerm tenv d
   (varName, var) <- newValueUpsilonWith m "res"
   return $ \val -> callClosure m d' [(varName, (m, CompUpIntro val), var)]

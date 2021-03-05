@@ -12,11 +12,10 @@ import Data.Log
 import Data.LowComp
 import Data.LowType
 import qualified Data.Text as T
-import Reduce.Comp
 
 lower :: CompPlus -> WithEnv LowComp
 lower mainTerm@(m, _) = do
-  mainTerm'' <- reduceCompPlus mainTerm >>= lowerComp
+  mainTerm'' <- lowerComp mainTerm
   -- the result of "main" must be i64, not i8*
   (result, resultVar) <- newValueUpsilonWith m "result"
   (cast, castThen) <- llvmCast (Just "cast") resultVar (LowTypeInt 64)
@@ -313,7 +312,7 @@ lowerValueLet x lowerValue cont =
         Just (Definition _ args e)
           | not (Map.member y lenv) -> do
             insLowCompEnv y args LowCompUnreachable
-            llvm <- reduceCompPlus e >>= lowerComp
+            llvm <- lowerComp e
             insLowCompEnv y args llvm
             llvmUncastLet x (LowValueGlobal y) (toFunPtrType args) cont
           | otherwise ->
@@ -386,8 +385,6 @@ storeContent m reg aggPtrType dts cont = do
   (cast, castThen) <- llvmCast (Just $ asText reg) (m, ValueUpsilon reg) lowType
   storeThenCont <- storeContent' cast lowType (zip [0 ..] dts) cont
   castThenStoreThenCont <- castThen storeThenCont
-  -- Use getelementptr to realize `sizeof`. More info:
-  --   http://nondot.org/sabre/LowCompNotes/SizeOf-OffsetOf-VariableSizedStructs.txt
   case aggPtrType of
     AggPtrTypeStruct ts ->
       storeContent'' reg (LowTypeStruct ts) lowType 1 castThenStoreThenCont
