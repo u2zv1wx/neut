@@ -157,6 +157,8 @@ emitLowOp llvmOp =
       if S.member j nenv
         then return "bitcast i8* null to i8*" -- nop
         else return $ unwordsL ["call fastcc", "i8*", "@free(i8* " <> showLowValue d <> ")"]
+    LowOpMemCpy dest src len isVolatile -> do
+      return $ unwordsL ["call void", "@llvm.memcpy.p0i8.p0i8.i64(i8* " <> showLowValue dest <> ", i8* " <> showLowValue src <> ", i64 " <> showLowValue len <> ", i1 " <> showLowValue isVolatile <> ")"]
     LowOpSyscall num ds ->
       emitSyscallOp num ds
     LowOpPrimOp (PrimOp op domList cod) args -> do
@@ -298,6 +300,8 @@ showLowTypeAsIfNonPtr lowType =
       "[" <> intDec i <> " x " <> s <> "]"
     LowTypePointer t ->
       showLowType t
+    LowTypeVoid ->
+      "void"
 
 getRegList :: WithEnv [Builder]
 getRegList = do
@@ -331,6 +335,8 @@ showLowType lowType =
       "[" <> intDec i <> " x " <> s <> "]"
     LowTypePointer t ->
       showLowType t <> "*"
+    LowTypeVoid ->
+      "void"
 
 showLowValue :: LowValue -> Builder
 showLowValue llvmValue =

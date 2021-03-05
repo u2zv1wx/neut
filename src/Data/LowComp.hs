@@ -40,6 +40,7 @@ data LowOp
   | LowOpAlloc LowValue SizeInfo
   | LowOpFree LowValue SizeInfo Int -- (var, size-of-var, name-of-free)   (name-of-free is only for optimization)
   | LowOpPrimOp PrimOp [LowValue]
+  | LowOpMemCpy LowValue LowValue LowValue LowValue
   | LowOpSyscall
       Integer -- syscall number
       [LowValue] -- arguments
@@ -97,6 +98,12 @@ substLowOp sub llvmOp =
     LowOpFree d sizeInfo i -> do
       let d' = substLowValue sub d
       LowOpFree d' sizeInfo i
+    LowOpMemCpy dest src len isVol -> do
+      let dest' = substLowValue sub dest
+      let src' = substLowValue sub src
+      let len' = substLowValue sub len
+      let isVol' = substLowValue sub isVol
+      LowOpMemCpy dest' src' len' isVol'
     LowOpPrimOp op ds -> do
       let ds' = map (substLowValue sub) ds
       LowOpPrimOp op ds'

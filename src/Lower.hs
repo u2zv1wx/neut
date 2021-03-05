@@ -190,6 +190,20 @@ lowerCompPrimitive m codeOp =
           let argTypeList = zip args elemTypeList
           resName <- newNameWith' "result"
           storeContent m resName structType argTypeList (LowCompReturn (LowValueLocal resName))
+        DerangementMemCpy -> do
+          let dest = args !! 0
+          let src = args !! 1
+          let size = args !! 2
+          let isVolatile = args !! 3
+          (destVarName, destVar) <- newValueLocal "dest"
+          (srcVarName, srcVar) <- newValueLocal "src"
+          (sizeVar, castSizeThen) <- llvmCast (Just $ takeBaseName size) size (LowTypeInt 64)
+          (volVar, castVolThen) <- llvmCast (Just $ takeBaseName isVolatile) isVolatile (LowTypeInt 1)
+          (lowerValueLet' [(destVarName, dest), (srcVarName, src)] >=> castVolThen >=> castSizeThen) $
+            LowCompCont (LowOpMemCpy destVar srcVar sizeVar volVar) $
+              LowCompReturn (LowValueInt 0)
+
+-- lowerCompPrimitive m (PrimitiveDerangement (DerangementExternal "llvm.memcpy.p0i8.p0i8.i64") args)
 
 lowerCompPrimOp :: PrimOp -> [ValuePlus] -> WithEnv LowComp
 lowerCompPrimOp op@(PrimOp _ domList cod) vs = do
