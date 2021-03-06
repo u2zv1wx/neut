@@ -136,6 +136,9 @@ reduceConstApp m c es =
         if 0 <= i && i < fromIntegral (length ts)
           then return $ ts !! (fromIntegral i)
           else raiseError m "index out of range"
+    "node-length"
+      | [(_, MetaTermNode ts)] <- es -> do
+        return (m, MetaTermLeaf (T.pack (show (length ts))))
     "string-to-u8-list"
       | [(mStr, MetaTermLeaf atom)] <- es -> do
         case readMaybe (T.unpack atom) of
