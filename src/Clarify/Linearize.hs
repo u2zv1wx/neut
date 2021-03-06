@@ -7,7 +7,6 @@ import Clarify.Utility
 import Data.Basic
 import Data.Comp
 import Data.Env
-import qualified Data.IntMap as IntMap
 
 type LinearChain = [(Ident, (Ident, Ident))]
 

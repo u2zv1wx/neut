@@ -6,11 +6,7 @@ import Data.Comp
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import Data.Namespace
-import Data.Term
 import qualified Data.Text as T
-import Reduce.Comp
-
-type Context = [(Ident, TermPlus)]
 
 toApp :: T.Text -> Hint -> Ident -> CompPlus -> WithEnv CompPlus
 toApp switcher m x t = do
@@ -49,18 +45,9 @@ bindLet binder cont =
     (x, e) : xes ->
       (fst e, CompUpElim x e $ bindLet xes cont)
 
-returnCartesianImmediate :: Hint -> WithEnv CompPlus
-returnCartesianImmediate m = do
-  v <- cartesianImmediate m
-  return (m, CompUpIntro v)
-
 switch :: CompPlus -> CompPlus -> [(EnumCase, CompPlus)]
 switch e1 e2 =
   [(EnumCaseLabel boolFalse, e1), (EnumCaseDefault, e2)]
-
-cartImmName :: T.Text
-cartImmName =
-  "cartesian-immediate"
 
 tryCache :: Hint -> T.Text -> WithEnv () -> WithEnv ValuePlus
 tryCache m key doInsertion = do
@@ -97,22 +84,9 @@ registerSwitcher m name aff rel = do
   (args, e) <- makeSwitcher m aff rel
   insCompEnv name False args e
 
-cartesianImmediate :: Hint -> WithEnv ValuePlus
-cartesianImmediate m =
-  tryCache m cartImmName $ registerSwitcher m cartImmName affineImmediate relevantImmediate
-
-affineImmediate :: ValuePlus -> WithEnv CompPlus
-affineImmediate (m, _) =
-  return (m, CompUpIntro (m, ValueSigmaIntro []))
-
-relevantImmediate :: ValuePlus -> WithEnv CompPlus
-relevantImmediate argVar@(m, _) =
-  return (m, CompUpIntro (m, ValueSigmaIntro [argVar, argVar]))
-
 insCompEnv :: T.Text -> Bool -> [Ident] -> CompPlus -> WithEnv ()
 insCompEnv name isFixed args e = do
-  e' <- reduceCompPlus e
-  let def = Definition (IsFixed isFixed) args e'
+  let def = Definition (IsFixed isFixed) args e
   modify (\env -> env {codeEnv = Map.insert name def (codeEnv env)})
 
 {-# INLINE boolTrue #-}

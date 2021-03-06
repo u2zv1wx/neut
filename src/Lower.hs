@@ -178,7 +178,7 @@ lowerCompPrimitive m codeOp =
           (valVar, castValThen) <- llvmCast (Just $ takeBaseName val) val valueLowType
           (castPtrThen >=> castValThen) $
             LowCompCont (LowOpStore valueLowType valVar ptrVar) $
-              LowCompReturn (LowValueInt 0)
+              LowCompReturn LowValueNull
         DerangementCreateArray elemType -> do
           let arrayType = AggPtrTypeArray (length args) elemType
           let argTypeList = zip args (repeat elemType)

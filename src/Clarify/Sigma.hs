@@ -1,6 +1,7 @@
 module Clarify.Sigma
-  ( cartesianSigma,
-    returnClosureType,
+  ( returnImmediateS4,
+    sigmaS4,
+    returnClosureS4,
   )
 where
 
@@ -12,23 +13,38 @@ import Data.Comp
 import Data.Env
 import qualified Data.Text as T
 
-cartesianSigma ::
+immediateName :: T.Text
+immediateName =
+  "cartesian-immediate"
+
+returnImmediateS4 :: Hint -> WithEnv CompPlus
+returnImmediateS4 m = do
+  v <- immediateS4 m
+  return (m, CompUpIntro v)
+
+immediateS4 :: Hint -> WithEnv ValuePlus
+immediateS4 m = do
+  let immediateT _ = return (m, CompUpIntro (m, ValueSigmaIntro []))
+  let immediate4 arg = return (m, CompUpIntro (m, ValueSigmaIntro [arg, arg]))
+  tryCache m immediateName $ registerSwitcher m immediateName immediateT immediate4
+
+sigmaS4 ::
   Maybe T.Text ->
   Hint ->
   [Either CompPlus (Ident, CompPlus)] ->
   WithEnv ValuePlus
-cartesianSigma mName m mxts =
+sigmaS4 mName m mxts =
   case mName of
     Nothing -> do
       h <- newTextWith' "sigma"
       -- h <- newTextWith "sigma"
-      registerSwitcher m h (affineSigma m mxts) (relevantSigma m mxts)
+      registerSwitcher m h (sigmaT m mxts) (sigma4 m mxts)
       return (m, ValueConst h)
     Just name ->
-      tryCache m name $ registerSwitcher m name (affineSigma m mxts) (relevantSigma m mxts)
+      tryCache m name $ registerSwitcher m name (sigmaT m mxts) (sigma4 m mxts)
 
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
--- affineSigma NAME LOC [(x1, t1), ..., (xn, tn)]   ~>
+-- sigmaT NAME LOC [(x1, t1), ..., (xn, tn)]   ~>
 --   update CompEnv with NAME ~> (thunk LAM), where LAM is:
 --   lam z.
 --     let (x1, ..., xn) := z in
@@ -42,12 +58,12 @@ cartesianSigma mName m mxts =
 --       fn @ (0, xn) in              ---  APP-n     ---        ---
 --     return ()                                     ---        ---
 --
-affineSigma ::
+sigmaT ::
   Hint ->
   [Either CompPlus (Ident, CompPlus)] ->
   ValuePlus ->
   WithEnv CompPlus
-affineSigma m mxts argVar = do
+sigmaT m mxts argVar = do
   xts <- mapM supplyName mxts
   -- as == [APP-1, ..., APP-n]   (`a` here stands for `app`)
   as <- forM xts $ \(x, t) -> toAffineApp m x t
@@ -57,7 +73,7 @@ affineSigma m mxts argVar = do
   return (m, CompSigmaElim (map fst xts) argVar body')
 
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
--- relevantSigma NAME LOC [(x1, t1), ..., (xn, tn)]   ~>
+-- sigma4 NAME LOC [(x1, t1), ..., (xn, tn)]   ~>
 --   update CompEnv with NAME ~> (thunk LAM), where LAM is:
 --   lam z.
 --     let (x1, ..., xn) := z in
@@ -73,12 +89,12 @@ affineSigma m mxts argVar = do
 --     ...                                       ---  TRANSPOSED-PAIR  ---       ---
 --     let (pn1, pn2) := pair-n in               ---                   ---       ---
 --     return ((p11, ..., pn1), (p12, ..., pn2)) ---                   ---       ---
-relevantSigma ::
+sigma4 ::
   Hint ->
   [Either CompPlus (Ident, CompPlus)] ->
   ValuePlus ->
   WithEnv CompPlus
-relevantSigma m mxts argVar = do
+sigma4 m mxts argVar = do
   xts <- mapM supplyName mxts
   -- as == [APP-1, ..., APP-n]
   as <- forM xts $ \(x, t) -> toRelevantApp m x t
@@ -131,17 +147,13 @@ supplyName mName =
       x <- newNameWith' "unused-sigarg"
       return (x, t)
 
-cartClsName :: T.Text
-cartClsName =
-  "cartesian-closure"
-
-returnClosureType :: Hint -> WithEnv CompPlus
-returnClosureType m = do
+returnClosureS4 :: Hint -> WithEnv CompPlus
+returnClosureS4 m = do
   (env, envVar) <- newValueUpsilonWith m "env"
-  retImmType <- returnCartesianImmediate m
+  retImmS4 <- returnImmediateS4 m
   t <-
-    cartesianSigma
-      (Just cartClsName)
+    sigmaS4
+      (Just "cartesian-closure")
       m
-      [Right (env, retImmType), Left (m, CompUpIntro envVar), Left retImmType]
+      [Right (env, retImmS4), Left (m, CompUpIntro envVar), Left retImmS4]
   return (m, CompUpIntro t)
