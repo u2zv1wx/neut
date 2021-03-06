@@ -3,7 +3,6 @@ module Data.Comp where
 import Data.Basic
 import qualified Data.IntMap as IntMap
 import Data.LowType
-import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 
 data Value
