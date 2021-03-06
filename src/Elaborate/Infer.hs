@@ -14,6 +14,7 @@ import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import qualified Data.IntMap as IntMap
 import Data.Log
+import Reduce.WeakTerm
 import Data.LowType
 import Data.Term
 import qualified Data.Text as T
@@ -135,10 +136,11 @@ inferArgs m args1 args2 cod =
     ((e, t) : ets, (_, x, tx) : xts) -> do
       insConstraintEnv t tx
       let sub = IntMap.singleton (asInt x) e
-      let (xts', cod') = substWeakTermPlus'' sub xts cod
+      (xts', cod') <- substWeakTermPlus'' sub IntMap.empty xts cod
       inferArgs m ets xts' cod'
     _ ->
       raiseCritical m "invalid argument passed to inferArgs"
+
 
 inferExternal :: Hint -> T.Text -> WithEnv TermPlus -> WithEnv (WeakTermPlus, WeakTermPlus)
 inferExternal m x comp = do

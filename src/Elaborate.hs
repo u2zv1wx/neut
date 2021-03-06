@@ -38,20 +38,20 @@ elaborateStmt' stmt =
       elaborateLet' m mx x t' e' cont
     WeakStmtConstDecl (_, c, t) : cont -> do
       t' <- inferType t
-      analyze >> synthesize >> refine >> cleanup
+      analyze >> synthesize >> cleanup
       t'' <- reduceTermPlus <$> elaborate' t'
       insConstTypeEnv c t''
       elaborateStmt' cont
     WeakStmtResourceType m name discarder copier : cont -> do
       insConstTypeEnv name (m, TermTau)
       sub <- gets substEnv
-      (discarder', tDiscarder) <- infer (substWeakTermPlus sub discarder)
-      (copier', tCopier) <- infer (substWeakTermPlus sub copier)
+      (discarder', tDiscarder) <- substWeakTermPlus sub discarder >>= infer
+      (copier', tCopier) <- substWeakTermPlus sub copier >>= infer
       let tPtr = (m, WeakTermConst (nsUnsafe <> "pointer"))
       h <- newNameWith' "res"
       insConstraintEnv tDiscarder (m, WeakTermPi [(m, h, tPtr)] (m, WeakTermTensor []))
       insConstraintEnv tCopier (m, WeakTermPi [(m, h, tPtr)] (m, WeakTermTensor [tPtr, tPtr]))
-      analyze >> synthesize >> refine >> cleanup
+      analyze >> synthesize >> cleanup
       discarder'' <- reduceTermPlus <$> elaborate' discarder'
       copier'' <- reduceTermPlus <$> elaborate' copier'
       cont' <- elaborateStmt' cont
@@ -66,7 +66,7 @@ elaborateLet' ::
   [WeakStmt] ->
   WithEnv [Stmt]
 elaborateLet' m mx x t e cont = do
-  analyze >> synthesize >> refine >> cleanup
+  analyze >> synthesize >> cleanup
   e' <- reduceTermPlus <$> elaborate' e
   t' <- reduceTermPlus <$> elaborate' t
   insWeakTypeEnv x $ weaken t'
@@ -79,10 +79,6 @@ elaborateLet' m mx x t e cont = do
 cleanup :: WithEnv ()
 cleanup =
   modify (\env -> env {constraintEnv = []})
-
-refine :: WithEnv ()
-refine =
-  modify (\env -> env {substEnv = IntMap.map reduceWeakTermPlus (substEnv env)})
 
 elaborate' :: WeakTermPlus -> WithEnv TermPlus
 elaborate' term =
@@ -112,9 +108,9 @@ elaborate' term =
           | length xts == length es -> do
             let xs = map (\(_, y, _) -> asInt y) xts
             let s = IntMap.fromList $ zip xs es
-            elaborate' $ substWeakTermPlus s e
+            substWeakTermPlus s e >>= elaborate'
         Just e ->
-          elaborate' $ reduceWeakTermPlus (m, WeakTermPiElim e es)
+          reduceWeakTermPlus (m, WeakTermPiElim e es) >>= elaborate'
     (m, WeakTermPiElim e es) -> do
       e' <- elaborate' e
       es' <- mapM elaborate' es

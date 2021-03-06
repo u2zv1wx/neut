@@ -15,6 +15,7 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.WeakTerm
 import Elaborate.Analyze
+import Reduce.WeakTerm
 
 -- Given a queue of constraints (easier ones comes earlier), try to synthesize
 -- all of them using heuristics.
@@ -38,8 +39,8 @@ synthesize = do
 resolveStuck :: WeakTermPlus -> WeakTermPlus -> Int -> WeakTermPlus -> WithEnv ()
 resolveStuck e1 e2 h e = do
   let s = IntMap.singleton h e
-  let e1' = substWeakTermPlus s e1
-  let e2' = substWeakTermPlus s e2
+  e1' <- substWeakTermPlus s e1
+  e2' <- substWeakTermPlus s e2
   deleteMin
   simp [(e1', e2')]
   synthesize
