@@ -5,7 +5,6 @@ import Data.Basic
 import qualified Data.IntMap as IntMap
 import Data.Log
 import Data.LowType
-import Data.Maybe (fromMaybe)
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.WeakTerm
@@ -110,81 +109,6 @@ varTermPlus' binder es =
       let set2 = varTermPlus' xts es
       S.union set1 $ S.filter (/= x) set2
 
-substTermPlus :: SubstTerm -> TermPlus -> TermPlus
-substTermPlus sub term =
-  case term of
-    (m, TermTau) ->
-      (m, TermTau)
-    (m, TermUpsilon x) ->
-      fromMaybe (m, TermUpsilon x) (IntMap.lookup (asInt x) sub)
-    (m, TermPi xts t) -> do
-      let (xts', t') = substTermPlus'' sub xts t
-      (m, TermPi xts' t')
-    (m, TermPiIntro xts body) -> do
-      let (xts', body') = substTermPlus'' sub xts body
-      (m, TermPiIntro xts' body')
-    (m, TermPiElim e es) -> do
-      let e' = substTermPlus sub e
-      let es' = map (substTermPlus sub) es
-      (m, TermPiElim e' es')
-    (m, TermFix (mx, x, t) xts e) -> do
-      let t' = substTermPlus sub t
-      let sub' = IntMap.delete (asInt x) sub
-      let (xts', e') = substTermPlus'' sub' xts e
-      (m, TermFix (mx, x, t') xts' e')
-    (_, TermConst _) ->
-      term
-    (_, TermInt _ _) ->
-      term
-    (_, TermFloat _ _) ->
-      term
-    (m, TermEnum x) ->
-      (m, TermEnum x)
-    (m, TermEnumIntro l) ->
-      (m, TermEnumIntro l)
-    (m, TermEnumElim (e, t) branchList) -> do
-      let t' = substTermPlus sub t
-      let e' = substTermPlus sub e
-      let (caseList, es) = unzip branchList
-      let es' = map (substTermPlus sub) es
-      (m, TermEnumElim (e', t') (zip caseList es'))
-    (m, TermTensor ts) -> do
-      let ts' = map (substTermPlus sub) ts
-      (m, TermTensor ts')
-    (m, TermTensorIntro es) -> do
-      let es' = map (substTermPlus sub) es
-      (m, TermTensorIntro es')
-    (m, TermTensorElim xts e1 e2) -> do
-      let e1' = substTermPlus sub e1
-      let (xts', e2') = substTermPlus'' sub xts e2
-      (m, TermTensorElim xts' e1' e2')
-    (m, TermDerangement i resultLowType ekts) -> do
-      let (es, ks, ts) = unzip3 ekts
-      let es' = map (substTermPlus sub) es
-      let ts' = map (substTermPlus sub) ts
-      (m, TermDerangement i resultLowType (zip3 es' ks ts'))
-
-substTermPlus' :: SubstTerm -> [IdentPlus] -> [IdentPlus]
-substTermPlus' sub binder =
-  case binder of
-    [] ->
-      []
-    (m, x, t) : xts -> do
-      let sub' = IntMap.delete (asInt x) sub
-      let xts' = substTermPlus' sub' xts
-      let t' = substTermPlus sub t
-      (m, x, t') : xts'
-
-substTermPlus'' :: SubstTerm -> [IdentPlus] -> TermPlus -> ([IdentPlus], TermPlus)
-substTermPlus'' sub binder e =
-  case binder of
-    [] ->
-      ([], substTermPlus sub e)
-    (mx, x, t) : xts -> do
-      let sub' = IntMap.delete (asInt x) sub
-      let (xts', e') = substTermPlus'' sub' xts e
-      ((mx, x, substTermPlus sub t) : xts', e')
-
 weaken :: TermPlus -> WeakTermPlus
 weaken term =
   case term of
@@ -249,7 +173,6 @@ lowTypeToType :: (MonadThrow m) => Hint -> LowType -> m TermPlus
 lowTypeToType m lowType =
   case lowType of
     LowTypeInt s ->
-      -- return (m, TermConst (showIntSize s))
       return (m, TermEnum (showIntSize s))
     LowTypeFloat s ->
       return (m, TermConst (showFloatSize s))

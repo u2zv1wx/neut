@@ -39,7 +39,7 @@ elaborateStmt' stmt =
     WeakStmtConstDecl (_, c, t) : cont -> do
       t' <- inferType t
       analyze >> synthesize >> cleanup
-      t'' <- reduceTermPlus <$> elaborate' t'
+      t'' <- elaborate' t' >>= reduceTermPlus
       insConstTypeEnv c t''
       elaborateStmt' cont
     WeakStmtResourceType m name discarder copier : cont -> do
@@ -52,8 +52,8 @@ elaborateStmt' stmt =
       insConstraintEnv tDiscarder (m, WeakTermPi [(m, h, tPtr)] (m, WeakTermTensor []))
       insConstraintEnv tCopier (m, WeakTermPi [(m, h, tPtr)] (m, WeakTermTensor [tPtr, tPtr]))
       analyze >> synthesize >> cleanup
-      discarder'' <- reduceTermPlus <$> elaborate' discarder'
-      copier'' <- reduceTermPlus <$> elaborate' copier'
+      discarder'' <- elaborate' discarder' >>= reduceTermPlus
+      copier'' <- elaborate' copier' >>= reduceTermPlus
       cont' <- elaborateStmt' cont
       return $ StmtResourceType m name discarder'' copier'' : cont'
 
@@ -67,8 +67,8 @@ elaborateLet' ::
   WithEnv [Stmt]
 elaborateLet' m mx x t e cont = do
   analyze >> synthesize >> cleanup
-  e' <- reduceTermPlus <$> elaborate' e
-  t' <- reduceTermPlus <$> elaborate' t
+  e' <- elaborate' e >>= reduceTermPlus
+  t' <- elaborate' t >>= reduceTermPlus
   insWeakTypeEnv x $ weaken t'
   if metaIsReducible m
     then modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e') (substEnv env)})
@@ -125,7 +125,7 @@ elaborate' term =
     (m, WeakTermConst x) ->
       return (m, TermConst x)
     (m, WeakTermInt t x) -> do
-      t' <- reduceTermPlus <$> elaborate' t
+      t' <- elaborate' t >>= reduceTermPlus
       case t' of
         (_, TermEnum intTypeStr)
           | Just (LowTypeInt size) <- asLowTypeMaybe intTypeStr ->
@@ -137,7 +137,7 @@ elaborate' term =
               <> "` is an integer, but its type is: "
               <> toText (weaken t')
     (m, WeakTermFloat t x) -> do
-      t' <- reduceTermPlus <$> elaborate' t
+      t' <- elaborate' t >>= reduceTermPlus
       case t' of
         (_, TermConst floatTypeStr)
           | Just (LowTypeFloat size) <- asLowTypeMaybe floatTypeStr ->
@@ -156,7 +156,7 @@ elaborate' term =
       e' <- elaborate' e
       let (ls, es) = unzip les
       es' <- mapM elaborate' es
-      t' <- reduceTermPlus <$> elaborate' t
+      t' <- elaborate' t >>= reduceTermPlus
       case t' of
         (_, TermEnum x) -> do
           checkSwitchExaustiveness m x (map snd ls)
@@ -187,7 +187,7 @@ elaborate' term =
       resultType' <- elaborate' resultType
       let (es, ks, ts) = unzip3 ekts
       es' <- mapM elaborate' es
-      ts' <- map reduceTermPlus <$> mapM elaborate' ts
+      ts' <- mapM (elaborate' >=> reduceTermPlus) ts
       return (m, TermDerangement i resultType' (zip3 es' ks ts'))
 
 elaboratePlus :: (Hint, a, WeakTermPlus) -> WithEnv (Hint, a, TermPlus)
