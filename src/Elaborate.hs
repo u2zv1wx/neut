@@ -70,9 +70,7 @@ elaborateLet' m mx x t e cont = do
   e' <- elaborate' e >>= reduceTermPlus
   t' <- elaborate' t >>= reduceTermPlus
   insWeakTypeEnv x $ weaken t'
-  if metaIsReducible m
-    then modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e') (substEnv env)})
-    else modify (\env -> env {opaqueEnv = S.insert x (opaqueEnv env)})
+  modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e') (substEnv env)})
   cont' <- elaborateStmt' cont
   return $ StmtLet m (mx, x, t') e' : cont'
 

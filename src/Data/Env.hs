@@ -58,7 +58,7 @@ data Env = Env
     constraintEnv :: [PreConstraint],
     constraintQueue :: ConstraintQueue,
     substEnv :: IntMap.IntMap WeakTermPlus,
-    opaqueEnv :: S.Set Ident,
+    -- opaqueEnv :: S.Set Ident,
     --
     -- clarify
     --
@@ -103,7 +103,7 @@ initialEnv =
       constraintEnv = [],
       constraintQueue = Q.empty,
       substEnv = IntMap.empty,
-      opaqueEnv = S.empty,
+      -- opaqueEnv = S.empty,
       nopFreeSet = S.empty
     }
 

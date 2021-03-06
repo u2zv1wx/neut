@@ -26,8 +26,7 @@ type Loc =
 
 data Hint = Hint
   { metaFileName :: Path Abs File,
-    metaLocation :: Loc,
-    metaIsReducible :: Bool
+    metaLocation :: Loc
   }
 
 type PosInfo =
@@ -106,8 +105,7 @@ supHint :: Hint -> Hint -> Hint
 supHint m1 m2 =
   Hint
     { metaFileName = supFileName m1 m2,
-      metaLocation = supLocation m1 m2,
-      metaIsReducible = metaIsReducible m1 && metaIsReducible m2
+      metaLocation = supLocation m1 m2
     }
 
 supFileName :: Hint -> Hint -> Path Abs File
@@ -126,8 +124,7 @@ newHint :: Int -> Int -> Int -> Path Abs File -> Hint
 newHint p l c path =
   Hint
     { metaFileName = path,
-      metaLocation = (p, l, c),
-      metaIsReducible = True
+      metaLocation = (p, l, c)
     }
 
 getPosInfo :: Hint -> PosInfo

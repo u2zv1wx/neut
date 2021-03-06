@@ -30,9 +30,8 @@ reduceWeakTermPlus term =
       es' <- mapM reduceWeakTermPlus es
       let app = WeakTermPiElim e' es'
       case e' of
-        (mLam, WeakTermPiIntro xts body)
-          | length xts == length es',
-            metaIsReducible mLam -> do
+        (_, WeakTermPiIntro xts body)
+          | length xts == length es' -> do
             let xs = map (\(_, x, _) -> asInt x) xts
             let sub = IntMap.fromList $ zip xs es'
             substWeakTermPlus' sub IntMap.empty body >>= reduceWeakTermPlus

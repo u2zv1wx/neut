@@ -103,11 +103,9 @@ simp' constraintList =
           let m = supHint m1 m2
           let zs1 = asterWeakTermPlus e1
           let zs2 = asterWeakTermPlus e2
-          -- list of stuck reasons (fmvs: free meta-variables)
-          let fmvs = S.union zs1 zs2
-          oenv <- gets opaqueEnv
-          let fvs1 = S.difference (varWeakTermPlus e1) oenv
-          let fvs2 = S.difference (varWeakTermPlus e2) oenv
+          let fmvs = S.union zs1 zs2 -- list of stuck reasons (fmvs: free meta-variables)
+          let fvs1 = varWeakTermPlus e1
+          let fvs2 = varWeakTermPlus e2
           case lookupAny (S.toList fmvs) sub of
             Just (h, e) -> do
               let s = IntMap.singleton h e
@@ -159,20 +157,20 @@ simp' constraintList =
                 (_, Just (StuckPiElimUpsilon x2 mx2 mess2))
                   | Just (mBody, body) <- IntMap.lookup (asInt x2) sub ->
                     simp $ (e1, toPiElim (supHint mx2 mBody, body) mess2) : cs
-                (Just (StuckPiElimFix (_, f1, _, _, _) mess1), Just (StuckPiElimFix (_, f2, _, _, _) mess2))
-                  | f1 == f2,
-                    Just pairList <- asPairList (map snd mess1) (map snd mess2) -> do
-                    simp $ pairList ++ cs
-                (Just (StuckPiElimFix (mFix1, f1, xts1, body1, self1) mess1), _) -> do
-                  let s = IntMap.fromList [(asInt f1, self1)]
-                  body1' <- substWeakTermPlus s body1
-                  let lam = (mFix1, WeakTermPiIntro xts1 body1')
-                  simp $ (toPiElim lam mess1, e2) : cs
-                (_, Just (StuckPiElimFix (mFix2, f2, xts2, body2, self2) mess2)) -> do
-                  let s = IntMap.fromList [(asInt f2, self2)]
-                  body2' <- substWeakTermPlus s body2
-                  let lam = (mFix2, WeakTermPiIntro xts2 body2')
-                  simp $ (e1, toPiElim lam mess2) : cs
+                -- (Just (StuckPiElimFix (_, f1, _, _, _) mess1), Just (StuckPiElimFix (_, f2, _, _, _) mess2))
+                --   | f1 == f2,
+                --     Just pairList <- asPairList (map snd mess1) (map snd mess2) -> do
+                --     simp $ pairList ++ cs
+                -- (Just (StuckPiElimFix (mFix1, f1, xts1, body1, self1) mess1), _) -> do
+                --   let s = IntMap.fromList [(asInt f1, self1)]
+                --   body1' <- substWeakTermPlus s body1
+                --   let lam = (mFix1, WeakTermPiIntro xts1 body1')
+                --   simp $ (toPiElim lam mess1, e2) : cs
+                -- (_, Just (StuckPiElimFix (mFix2, f2, xts2, body2, self2) mess2)) -> do
+                --   let s = IntMap.fromList [(asInt f2, self2)]
+                --   body2' <- substWeakTermPlus s body2
+                --   let lam = (mFix2, WeakTermPiIntro xts2 body2')
+                --   simp $ (e1, toPiElim lam mess2) : cs
                 (Just (StuckPiElimAsterStrict h1 ies1), _)
                   | xs1 <- concatMap getVarList ies1,
                     occurCheck h1 zs2,
@@ -238,7 +236,6 @@ simpPattern ::
 simpPattern i ies1 _ e2 fvs2 cs = do
   xss <- mapM (toVarList fvs2) ies1
   let lam = bindFormalArgs e2 xss
-  -- p $ "resolve: " <> T.unpack (asText' h1) <> " ~> " <> T.unpack (toText lam)
   modify (\env -> env {substEnv = IntMap.insert i lam (substEnv env)})
   visit i
   simp cs

@@ -149,12 +149,6 @@ interpret inputTree =
             return (m, WeakTermDerangement derangement' resultType' (zip3 es ks hs))
           | otherwise ->
             raiseSyntaxError m "(derangement LEAF TREE TREE*)"
-        "irreducible"
-          | [e] <- rest -> do
-            e' <- interpret e
-            return ((fst e') {metaIsReducible = False}, snd e')
-          | otherwise ->
-            raiseSyntaxError m "(irreducible TREE)"
         _
           | [(_, TreeLeaf value)] <- rest,
             Just (intSize, v) <- readValueInt headAtom value ->

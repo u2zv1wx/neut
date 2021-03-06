@@ -34,9 +34,8 @@ reduceTermPlus term =
       let app = TermPiElim e' es'
       let valueCond = and $ map isValue es
       case e' of
-        (mLam, TermPiIntro xts body)
+        (_, TermPiIntro xts body)
           | length xts == length es',
-            metaIsReducible mLam,
             valueCond -> do
             let xs = map (\(_, x, _) -> asInt x) xts
             let sub = IntMap.fromList $ zip xs es'
