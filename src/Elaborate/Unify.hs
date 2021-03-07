@@ -127,11 +127,6 @@ simp' constraintList =
               let e1' = (m, snd e1)
               let e2' = (m, snd e2)
               case (asStuckedTerm e1, asStuckedTerm e2) of
-                (Just (StuckPiElimUpsilon x1 _ mess1), Just (StuckPiElimUpsilon x2 _ mess2))
-                  | x1 == x2,
-                    Nothing <- IntMap.lookup (asInt x1) sub,
-                    Just pairList <- asPairList (map snd mess1) (map snd mess2) ->
-                    simp $ pairList ++ cs
                 (Just (StuckPiElimAster h1 ies1), _)
                   | xs1 <- concatMap getVarList ies1,
                     occurCheck h1 fmvs2,
@@ -158,6 +153,11 @@ simp' constraintList =
                     zs <- includeCheck xs2 fvs1,
                     Just _ <- lookupAll zs sub ->
                     simp' $ (e2', e1') : cs
+                (Just (StuckPiElimUpsilon x1 _ mess1), Just (StuckPiElimUpsilon x2 _ mess2))
+                  | x1 == x2,
+                    Nothing <- IntMap.lookup (asInt x1) sub,
+                    Just pairList <- asPairList (map snd mess1) (map snd mess2) ->
+                    simp $ pairList ++ cs
                 (Just (StuckPiElimUpsilon x1 mx1 mess1), _)
                   | Just (mBody, body) <- IntMap.lookup (asInt x1) sub ->
                     simp $ (toPiElim (supHint mx1 mBody, body) mess1, e2) : cs
