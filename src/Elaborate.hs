@@ -16,9 +16,8 @@ import qualified Data.Set as S
 import Data.Term
 import qualified Data.Text as T
 import Data.WeakTerm
-import Elaborate.Analyze
 import Elaborate.Infer
-import Elaborate.Synthesize
+import Elaborate.Unify
 import Reduce.Term
 import Reduce.WeakTerm
 
@@ -35,10 +34,16 @@ elaborateStmt' stmt =
       (e', te) <- infer e
       t' <- inferType t
       insConstraintEnv te t'
-      elaborateLet' m mx x t' e' cont
+      unify
+      e'' <- elaborate' e' >>= reduceTermPlus
+      t'' <- elaborate' t' >>= reduceTermPlus
+      insWeakTypeEnv x $ weaken t''
+      modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e'') (substEnv env)})
+      cont' <- elaborateStmt' cont
+      return $ StmtLet m (mx, x, t'') e'' : cont'
     WeakStmtConstDecl (_, c, t) : cont -> do
       t' <- inferType t
-      analyze >> synthesize >> cleanup
+      unify
       t'' <- elaborate' t' >>= reduceTermPlus
       insConstTypeEnv c t''
       elaborateStmt' cont
@@ -51,32 +56,11 @@ elaborateStmt' stmt =
       h <- newNameWith' "res"
       insConstraintEnv tDiscarder (m, WeakTermPi [(m, h, tPtr)] (m, WeakTermTensor []))
       insConstraintEnv tCopier (m, WeakTermPi [(m, h, tPtr)] (m, WeakTermTensor [tPtr, tPtr]))
-      analyze >> synthesize >> cleanup
+      unify
       discarder'' <- elaborate' discarder' >>= reduceTermPlus
       copier'' <- elaborate' copier' >>= reduceTermPlus
       cont' <- elaborateStmt' cont
       return $ StmtResourceType m name discarder'' copier'' : cont'
-
-elaborateLet' ::
-  Hint ->
-  Hint ->
-  Ident ->
-  WeakTermPlus ->
-  WeakTermPlus ->
-  [WeakStmt] ->
-  WithEnv [Stmt]
-elaborateLet' m mx x t e cont = do
-  analyze >> synthesize >> cleanup
-  e' <- elaborate' e >>= reduceTermPlus
-  t' <- elaborate' t >>= reduceTermPlus
-  insWeakTypeEnv x $ weaken t'
-  modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e') (substEnv env)})
-  cont' <- elaborateStmt' cont
-  return $ StmtLet m (mx, x, t') e' : cont'
-
-cleanup :: WithEnv ()
-cleanup =
-  modify (\env -> env {constraintEnv = []})
 
 elaborate' :: WeakTermPlus -> WithEnv TermPlus
 elaborate' term =

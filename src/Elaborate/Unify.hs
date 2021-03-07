@@ -1,19 +1,18 @@
-module Elaborate.Analyze
-  ( analyze,
-    simp,
-    toVarList,
-    bindFormalArgs,
-    lookupAny,
+module Elaborate.Unify
+  ( unify,
   )
 where
 
+import Control.Exception.Safe
 import Control.Monad.State.Lazy
 import Data.Basic
 import Data.Env
 import qualified Data.IntMap as IntMap
+import Data.List (partition, sortOn)
+import Data.Log
 import Data.Maybe
-import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
+import qualified Data.Text as T
 import Data.WeakTerm
 import Elaborate.Infer
 import Reduce.WeakTerm
@@ -21,11 +20,34 @@ import Reduce.WeakTerm
 data Stuck
   = StuckPiElimUpsilon Ident Hint [(Hint, [WeakTermPlus])]
   | StuckPiElimAster Int [[WeakTermPlus]]
-  | StuckPiElimAsterStrict Int [[WeakTermPlus]]
+
+unify :: WithEnv ()
+unify =
+  analyze >> synthesize
 
 analyze :: WithEnv ()
-analyze =
-  gets constraintEnv >>= simp
+analyze = do
+  cs <- gets constraintEnv
+  modify (\env -> env {constraintEnv = []})
+  simp cs
+
+synthesize :: WithEnv ()
+synthesize = do
+  cs <- gets suspendedConstraintEnv
+  sub <- gets substEnv
+  case cs of
+    [] ->
+      return ()
+    (hs, (e1, e2)) : rest
+      | Just (h, e) <- lookupAny (S.toList hs) sub -> do
+        modify (\env -> env {suspendedConstraintEnv = rest})
+        let s = IntMap.singleton h e
+        e1' <- substWeakTermPlus s e1
+        e2' <- substWeakTermPlus s e2
+        simp [(e1', e2')]
+        synthesize
+      | otherwise ->
+        throwTypeErrors
 
 simp :: [PreConstraint] -> WithEnv ()
 simp cs =
@@ -45,16 +67,14 @@ simp' constraintList =
   case constraintList of
     [] ->
       return ()
-    (c : cs) ->
+    c : cs ->
       case c of
-        (e1@(m1, WeakTermPi xts1 cod1), e2@(m2, WeakTermPi xts2 cod2)) ->
-          if length xts1 /= length xts2
-            then insConstraintQueue $ Enriched (e1, e2) S.empty ConstraintOther
-            else do
-              xt1 <- asWeakIdentPlus m1 cod1
-              xt2 <- asWeakIdentPlus m2 cod2
-              simpBinder (xts1 ++ [xt1]) (xts2 ++ [xt2])
-              simp cs
+        ((m1, WeakTermPi xts1 cod1), (m2, WeakTermPi xts2 cod2))
+          | length xts1 == length xts2 -> do
+            xt1 <- asWeakIdentPlus m1 cod1
+            xt2 <- asWeakIdentPlus m2 cod2
+            simpBinder (xts1 ++ [xt1]) (xts2 ++ [xt2])
+            simp cs
         ((m1, WeakTermPiIntro xts1 e1), (m2, WeakTermPiIntro xts2 e2))
           | length xts1 == length xts2 -> do
             xt1 <- asWeakIdentPlus m1 e1
@@ -90,15 +110,13 @@ simp' constraintList =
             ks1 == ks2 -> do
             simp $ (t1, t2) : zip es1 es2 ++ zip ts1 ts2 ++ cs
         (e1@(m1, _), e2@(m2, _)) -> do
-          let ms1 = asStuckedTerm e1
-          let ms2 = asStuckedTerm e2
           sub <- gets substEnv
           let m = supHint m1 m2
-          let zs1 = asterWeakTermPlus e1
-          let zs2 = asterWeakTermPlus e2
-          let fmvs = S.union zs1 zs2 -- (fmvs: free meta-variables)
           let fvs1 = varWeakTermPlus e1
           let fvs2 = varWeakTermPlus e2
+          let fmvs1 = asterWeakTermPlus e1
+          let fmvs2 = asterWeakTermPlus e2
+          let fmvs = S.union fmvs1 fmvs2 -- fmvs: free meta-variables
           case lookupAny (S.toList fmvs) sub of
             Just (h, e) -> do
               let s = IntMap.singleton h e
@@ -108,15 +126,15 @@ simp' constraintList =
             Nothing -> do
               let e1' = (m, snd e1)
               let e2' = (m, snd e2)
-              case (ms1, ms2) of
+              case (asStuckedTerm e1, asStuckedTerm e2) of
                 (Just (StuckPiElimUpsilon x1 _ mess1), Just (StuckPiElimUpsilon x2 _ mess2))
                   | x1 == x2,
                     Nothing <- IntMap.lookup (asInt x1) sub,
                     Just pairList <- asPairList (map snd mess1) (map snd mess2) ->
                     simp $ pairList ++ cs
-                (Just (StuckPiElimAsterStrict h1 ies1), _)
+                (Just (StuckPiElimAster h1 ies1), _)
                   | xs1 <- concatMap getVarList ies1,
-                    occurCheck h1 zs2,
+                    occurCheck h1 fmvs2,
                     isLinear $ filter (`S.member` fvs2) xs1,
                     zs <- includeCheck xs1 fvs2,
                     Just es <- lookupAll zs sub ->
@@ -125,15 +143,17 @@ simp' constraintList =
                         xss <- mapM (toVarList fvs2) ies1
                         let lam = bindFormalArgs e2' xss
                         modify (\env -> env {substEnv = IntMap.insert h1 lam (substEnv env)})
-                        visit h1
-                        simp cs
+                        sus <- gets suspendedConstraintEnv
+                        let (sus1, sus2) = partition (\(hs, _) -> S.member h1 hs) sus
+                        modify (\env -> env {suspendedConstraintEnv = sus2})
+                        simp $ map snd sus1 ++ cs
                       _ -> do
                         let s = IntMap.fromList $ zip (map asInt zs) es
                         e2'' <- substWeakTermPlus s e2'
                         simp $ (e1', e2'') : cs
-                (_, Just (StuckPiElimAsterStrict h2 ies2))
+                (_, Just (StuckPiElimAster h2 ies2))
                   | xs2 <- concatMap getVarList ies2,
-                    occurCheck h2 zs1,
+                    occurCheck h2 fmvs1,
                     isLinear $ filter (`S.member` fvs1) xs2,
                     zs <- includeCheck xs2 fvs1,
                     Just _ <- lookupAll zs sub ->
@@ -144,38 +164,8 @@ simp' constraintList =
                 (_, Just (StuckPiElimUpsilon x2 _ _))
                   | Just _ <- IntMap.lookup (asInt x2) sub ->
                     simp' $ (e2', e1') : cs
-                (Just (StuckPiElimAsterStrict h1 ies1), _)
-                  | xs1 <- concatMap getVarList ies1,
-                    occurCheck h1 zs2,
-                    zs <- includeCheck xs1 fvs2,
-                    Just es <- lookupAll zs sub ->
-                    case es of
-                      [] -> do
-                        insConstraintQueue $ Enriched (e1', e2') fmvs (ConstraintQuasiPattern h1 ies1 e2')
-                        simp cs
-                      _ -> do
-                        let s = IntMap.fromList $ zip (map asInt zs) es
-                        e2'' <- substWeakTermPlus s e2'
-                        simp $ (e1', e2'') : cs
-                (_, Just (StuckPiElimAsterStrict h2 ies2))
-                  | xs2 <- concatMap getVarList ies2,
-                    occurCheck h2 zs1,
-                    zs <- includeCheck xs2 fvs1,
-                    Just _ <- lookupAll zs sub ->
-                    simp' $ (e2', e1') : cs
-                (Just (StuckPiElimAster h1 ies1), _)
-                  | xs1 <- concatMap getVarList ies1,
-                    occurCheck h1 zs2,
-                    [] <- includeCheck xs1 fvs2 -> do
-                    insConstraintQueue $ Enriched (e1', e2') fmvs (ConstraintFlexRigid h1 ies1 e2')
-                    simp cs
-                (_, Just (StuckPiElimAster h2 ies2))
-                  | xs2 <- concatMap getVarList ies2,
-                    occurCheck h2 zs1,
-                    [] <- includeCheck xs2 fvs1 ->
-                    simp' $ (e2', e1') : cs
                 _ -> do
-                  insConstraintQueue $ Enriched (e1, e2) fmvs ConstraintOther
+                  modify (\env -> env {suspendedConstraintEnv = (fmvs, (e1, e2)) : suspendedConstraintEnv env})
                   simp cs
 
 simpBinder :: [WeakIdentPlus] -> [WeakIdentPlus] -> WithEnv ()
@@ -222,20 +212,15 @@ asStuckedTerm term =
     (m, WeakTermUpsilon x) ->
       Just $ StuckPiElimUpsilon x m []
     (_, WeakTermAster h) ->
-      Just $ StuckPiElimAsterStrict h []
+      Just $ StuckPiElimAster h []
     (m, WeakTermPiElim e es) ->
       case asStuckedTerm e of
-        Just (StuckPiElimAster h iess) ->
-          Just $ StuckPiElimAster h (iess ++ [es])
-        Just (StuckPiElimAsterStrict h iexss) ->
-          case mapM asUpsilon es of
-            Just _ ->
-              Just $ StuckPiElimAsterStrict h $ iexss ++ [es]
-            Nothing ->
-              Just $ StuckPiElimAster h $ iexss ++ [es]
+        Just (StuckPiElimAster h iexss)
+          | Just _ <- mapM asUpsilon es ->
+            Just $ StuckPiElimAster h $ iexss ++ [es]
         Just (StuckPiElimUpsilon x mx ess) ->
           Just $ StuckPiElimUpsilon x mx $ ess ++ [(m, es)]
-        Nothing ->
+        _ ->
           Nothing
     _ ->
       Nothing
@@ -259,17 +244,6 @@ toPiElim e args =
       e
     (m, es) : ess ->
       toPiElim (m, WeakTermPiElim e es) ess
-
-insConstraintQueue :: EnrichedConstraint -> WithEnv ()
-insConstraintQueue c =
-  modify (\env -> env {constraintQueue = Q.insert c (constraintQueue env)})
-
-visit :: Int -> WithEnv ()
-visit h = do
-  q <- gets constraintQueue
-  let (q1, q2) = Q.partition (\(Enriched _ hs _) -> h `S.member` hs) q
-  modify (\env -> env {constraintQueue = q2})
-  simp $ map (\(Enriched c _ _) -> c) $ Q.toList q1
 
 toVarList :: S.Set Ident -> [WeakTermPlus] -> WithEnv [WeakIdentPlus]
 toVarList =
@@ -324,6 +298,7 @@ lookupAll is sub =
       vs <- lookupAll js sub
       return $ v : vs
 
+-- term equality up to alpha-equivalence
 isEq :: WeakTermPlus -> WeakTermPlus -> WithEnv Bool
 isEq l r =
   case (l, r) of
@@ -409,3 +384,41 @@ isEq'' sub xts1 cod1 xts2 cod2 =
       return $ b1 && b2
     _ ->
       return False
+
+throwTypeErrors :: WithEnv ()
+throwTypeErrors = do
+  q <- gets suspendedConstraintEnv
+  let pcs = sortOn fst $ setupPosInfo q
+  errorList <- constructErrors [] pcs
+  throw $ Error errorList
+
+setupPosInfo :: [SuspendedConstraint] -> [(PosInfo, PreConstraint)]
+setupPosInfo constraintList =
+  case constraintList of
+    [] ->
+      []
+    (_, (e1, e2)) : cs -> do
+      let pos1 = getPosInfo $ metaOf e1
+      let pos2 = getPosInfo $ metaOf e2
+      case snd pos1 `compare` snd pos2 of
+        LT ->
+          (pos2, (e2, e1)) : setupPosInfo cs
+        _ ->
+          (pos1, (e1, e2)) : setupPosInfo cs
+
+constructErrors :: [PosInfo] -> [(PosInfo, PreConstraint)] -> WithEnv [Log]
+constructErrors ps info =
+  case info of
+    [] ->
+      return []
+    (pos, (e1, e2)) : pcs -> do
+      let msg = constructErrorMsg e1 e2
+      as <- constructErrors (pos : ps) pcs
+      return $ logError pos msg : as
+
+constructErrorMsg :: WeakTermPlus -> WeakTermPlus -> T.Text
+constructErrorMsg e1 e2 =
+  "couldn't verify the definitional equality of the following two terms:\n- "
+    <> toText e1
+    <> "\n- "
+    <> toText e2
