@@ -14,10 +14,14 @@ import qualified Data.IntMap as IntMap
 import Data.Maybe
 import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
-import qualified Data.Text as T
 import Data.WeakTerm
 import Elaborate.Infer
 import Reduce.WeakTerm
+
+data Stuck
+  = StuckPiElimUpsilon Ident Hint [(Hint, [WeakTermPlus])]
+  | StuckPiElimAster Int [[WeakTermPlus]]
+  | StuckPiElimAsterStrict Int [[WeakTermPlus]]
 
 analyze :: WithEnv ()
 analyze =
@@ -40,10 +44,8 @@ simp' constraintList =
       return ()
     (c : cs) ->
       case c of
-        ((_, WeakTermTau), (_, WeakTermTau)) ->
-          simp cs
-        ((_, WeakTermUpsilon x1), (_, WeakTermUpsilon x2))
-          | x1 == x2 ->
+        (e1, e2)
+          | e1 == e2 ->
             simp cs
         (e1@(m1, WeakTermPi xts1 cod1), e2@(m2, WeakTermPi xts2 cod2)) ->
           if length xts1 /= length xts2
@@ -66,21 +68,12 @@ simp' constraintList =
             yt2 <- asWeakIdentPlus m2 e2
             simpBinder (xt1 : xts1 ++ [yt1]) (xt2 : xts2 ++ [yt2])
             simp cs
-        ((_, WeakTermConst l1), (_, WeakTermConst l2))
-          | l1 == l2 ->
-            simp cs
         ((_, WeakTermInt t1 l1), (_, WeakTermInt t2 l2))
           | l1 == l2 ->
             simp $ (t1, t2) : cs
         ((_, WeakTermFloat t1 l1), (_, WeakTermFloat t2 l2))
           | l1 == l2 ->
             simp $ (t1, t2) : cs
-        ((_, WeakTermEnum l1), (_, WeakTermEnum l2))
-          | l1 == l2 ->
-            simp cs
-        ((_, WeakTermEnumIntro l1), (_, WeakTermEnumIntro l2))
-          | l1 == l2 ->
-            simp cs
         ((_, WeakTermTensor ts1), (_, WeakTermTensor ts2))
           | length ts1 == length ts2 ->
             simp $ zip ts1 ts2 ++ cs
@@ -103,7 +96,7 @@ simp' constraintList =
           let m = supHint m1 m2
           let zs1 = asterWeakTermPlus e1
           let zs2 = asterWeakTermPlus e2
-          let fmvs = S.union zs1 zs2 -- list of stuck reasons (fmvs: free meta-variables)
+          let fmvs = S.union zs1 zs2 -- (fmvs: free meta-variables)
           let fvs1 = varWeakTermPlus e1
           let fvs2 = varWeakTermPlus e2
           case lookupAny (S.toList fmvs) sub of
@@ -121,10 +114,6 @@ simp' constraintList =
                     Nothing <- IntMap.lookup (asInt x1) sub,
                     Just pairList <- asPairList (map snd mess1) (map snd mess2) ->
                     simp $ pairList ++ cs
-                (Just (StuckPiElimConst x1 _ mess1), Just (StuckPiElimConst x2 _ mess2))
-                  | x1 == x2,
-                    Just pairList <- asPairList (map snd mess1) (map snd mess2) ->
-                    simp $ pairList ++ cs
                 (Just (StuckPiElimAsterStrict h1 ies1), _)
                   | xs1 <- concatMap getVarList ies1,
                     occurCheck h1 zs2,
@@ -132,8 +121,12 @@ simp' constraintList =
                     zs <- includeCheck xs1 fvs2,
                     Just es <- lookupAll zs sub ->
                     case es of
-                      [] ->
-                        simpPattern h1 ies1 e1' e2' fvs2 cs
+                      [] -> do
+                        xss <- mapM (toVarList fvs2) ies1
+                        let lam = bindFormalArgs e2' xss
+                        modify (\env -> env {substEnv = IntMap.insert h1 lam (substEnv env)})
+                        visit h1
+                        simp cs
                       _ -> do
                         let s = IntMap.fromList $ zip (map asInt zs) es
                         e2'' <- substWeakTermPlus s e2'
@@ -143,42 +136,23 @@ simp' constraintList =
                     occurCheck h2 zs1,
                     isLinear $ filter (`S.member` fvs1) xs2,
                     zs <- includeCheck xs2 fvs1,
-                    Just es <- lookupAll zs sub ->
-                    case es of
-                      [] ->
-                        simpPattern h2 ies2 e2' e1' fvs1 cs
-                      _ -> do
-                        let s = IntMap.fromList $ zip (map asInt zs) es
-                        e1'' <- substWeakTermPlus s e1'
-                        simp $ (e1'', e2') : cs
+                    Just _ <- lookupAll zs sub ->
+                    simp' $ (e2', e1') : cs
                 (Just (StuckPiElimUpsilon x1 mx1 mess1), _)
                   | Just (mBody, body) <- IntMap.lookup (asInt x1) sub ->
                     simp $ (toPiElim (supHint mx1 mBody, body) mess1, e2) : cs
-                (_, Just (StuckPiElimUpsilon x2 mx2 mess2))
-                  | Just (mBody, body) <- IntMap.lookup (asInt x2) sub ->
-                    simp $ (e1, toPiElim (supHint mx2 mBody, body) mess2) : cs
-                -- (Just (StuckPiElimFix (_, f1, _, _, _) mess1), Just (StuckPiElimFix (_, f2, _, _, _) mess2))
-                --   | f1 == f2,
-                --     Just pairList <- asPairList (map snd mess1) (map snd mess2) -> do
-                --     simp $ pairList ++ cs
-                -- (Just (StuckPiElimFix (mFix1, f1, xts1, body1, self1) mess1), _) -> do
-                --   let s = IntMap.fromList [(asInt f1, self1)]
-                --   body1' <- substWeakTermPlus s body1
-                --   let lam = (mFix1, WeakTermPiIntro xts1 body1')
-                --   simp $ (toPiElim lam mess1, e2) : cs
-                -- (_, Just (StuckPiElimFix (mFix2, f2, xts2, body2, self2) mess2)) -> do
-                --   let s = IntMap.fromList [(asInt f2, self2)]
-                --   body2' <- substWeakTermPlus s body2
-                --   let lam = (mFix2, WeakTermPiIntro xts2 body2')
-                --   simp $ (e1, toPiElim lam mess2) : cs
+                (_, Just (StuckPiElimUpsilon x2 _ _))
+                  | Just _ <- IntMap.lookup (asInt x2) sub ->
+                    simp' $ (e2', e1') : cs
                 (Just (StuckPiElimAsterStrict h1 ies1), _)
                   | xs1 <- concatMap getVarList ies1,
                     occurCheck h1 zs2,
                     zs <- includeCheck xs1 fvs2,
                     Just es <- lookupAll zs sub ->
                     case es of
-                      [] ->
-                        simpQuasiPattern h1 ies1 e1' e2' fmvs cs
+                      [] -> do
+                        insConstraintQueue $ Enriched (e1', e2') fmvs (ConstraintQuasiPattern h1 ies1 e2')
+                        simp cs
                       _ -> do
                         let s = IntMap.fromList $ zip (map asInt zs) es
                         e2'' <- substWeakTermPlus s e2'
@@ -187,24 +161,19 @@ simp' constraintList =
                   | xs2 <- concatMap getVarList ies2,
                     occurCheck h2 zs1,
                     zs <- includeCheck xs2 fvs1,
-                    Just es <- lookupAll zs sub ->
-                    case es of
-                      [] ->
-                        simpQuasiPattern h2 ies2 e2' e1' fmvs cs
-                      _ -> do
-                        let s = IntMap.fromList $ zip (map asInt zs) es
-                        e1'' <- substWeakTermPlus s e1'
-                        simp $ (e1'', e2') : cs
+                    Just _ <- lookupAll zs sub ->
+                    simp' $ (e2', e1') : cs
                 (Just (StuckPiElimAster h1 ies1), _)
                   | xs1 <- concatMap getVarList ies1,
                     occurCheck h1 zs2,
-                    [] <- includeCheck xs1 fvs2 ->
-                    simpFlexRigid h1 ies1 e1' e2' fmvs cs
+                    [] <- includeCheck xs1 fvs2 -> do
+                    insConstraintQueue $ Enriched (e1', e2') fmvs (ConstraintFlexRigid h1 ies1 e2')
+                    simp cs
                 (_, Just (StuckPiElimAster h2 ies2))
                   | xs2 <- concatMap getVarList ies2,
                     occurCheck h2 zs1,
                     [] <- includeCheck xs2 fvs1 ->
-                    simpFlexRigid h2 ies2 e2' e1' fmvs cs
+                    simp' $ (e2', e1') : cs
                 _ -> do
                   insConstraintQueue $ Enriched (e1, e2) fmvs ConstraintOther
                   simp cs
@@ -224,45 +193,6 @@ simpBinder' sub args1 args2 =
       simpBinder' sub' xts1 xts2
     _ ->
       return ()
-
-simpPattern ::
-  Int ->
-  [[WeakTermPlus]] ->
-  WeakTermPlus ->
-  WeakTermPlus ->
-  S.Set Ident ->
-  [PreConstraint] ->
-  WithEnv ()
-simpPattern i ies1 _ e2 fvs2 cs = do
-  xss <- mapM (toVarList fvs2) ies1
-  let lam = bindFormalArgs e2 xss
-  modify (\env -> env {substEnv = IntMap.insert i lam (substEnv env)})
-  visit i
-  simp cs
-
-simpQuasiPattern ::
-  Int ->
-  [[WeakTermPlus]] ->
-  WeakTermPlus ->
-  WeakTermPlus ->
-  S.Set Int ->
-  [PreConstraint] ->
-  WithEnv ()
-simpQuasiPattern h1 ies1 e1 e2 fmvs cs = do
-  insConstraintQueue $ Enriched (e1, e2) fmvs (ConstraintQuasiPattern h1 ies1 e2)
-  simp cs
-
-simpFlexRigid ::
-  Int ->
-  [[WeakTermPlus]] ->
-  WeakTermPlus ->
-  WeakTermPlus ->
-  S.Set Int ->
-  [PreConstraint] ->
-  WithEnv ()
-simpFlexRigid h1 ies1 e1 e2 fmvs cs = do
-  insConstraintQueue $ Enriched (e1, e2) fmvs (ConstraintFlexRigid h1 ies1 e2)
-  simp cs
 
 asWeakIdentPlus :: Hint -> WeakTermPlus -> WithEnv WeakIdentPlus
 asWeakIdentPlus m t = do
@@ -286,13 +216,6 @@ asPairList list1 list2 =
     _ ->
       Nothing
 
-data Stuck
-  = StuckPiElimUpsilon Ident Hint [(Hint, [WeakTermPlus])]
-  | StuckPiElimAster Int [[WeakTermPlus]]
-  | StuckPiElimAsterStrict Int [[WeakTermPlus]]
-  | StuckPiElimFix FixInfo [(Hint, [WeakTermPlus])]
-  | StuckPiElimConst T.Text Hint [(Hint, [WeakTermPlus])]
-
 asStuckedTerm :: WeakTermPlus -> Maybe Stuck
 asStuckedTerm term =
   case term of
@@ -300,10 +223,6 @@ asStuckedTerm term =
       Just $ StuckPiElimUpsilon x m []
     (_, WeakTermAster h) ->
       Just $ StuckPiElimAsterStrict h []
-    (m, WeakTermConst x) ->
-      Just $ StuckPiElimConst x m []
-    (mi, WeakTermFix (_, x, _) xts body) ->
-      Just $ StuckPiElimFix (mi, x, xts, body, term) []
     (m, WeakTermPiElim e es) ->
       case asStuckedTerm e of
         Just (StuckPiElimAster h iess) ->
@@ -314,10 +233,6 @@ asStuckedTerm term =
               Just $ StuckPiElimAsterStrict h $ iexss ++ [es]
             Nothing ->
               Just $ StuckPiElimAster h $ iexss ++ [es]
-        Just (StuckPiElimFix mu ess) ->
-          Just $ StuckPiElimFix mu $ ess ++ [(m, es)]
-        Just (StuckPiElimConst x mx ess) ->
-          Just $ StuckPiElimConst x mx $ ess ++ [(m, es)]
         Just (StuckPiElimUpsilon x mx ess) ->
           Just $ StuckPiElimUpsilon x mx $ ess ++ [(m, es)]
         Nothing ->

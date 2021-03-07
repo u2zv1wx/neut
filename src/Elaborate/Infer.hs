@@ -14,11 +14,11 @@ import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import qualified Data.IntMap as IntMap
 import Data.Log
-import Reduce.WeakTerm
 import Data.LowType
 import Data.Term
 import qualified Data.Text as T
 import Data.WeakTerm
+import Reduce.WeakTerm
 
 type Context = [WeakIdentPlus]
 
@@ -66,8 +66,6 @@ infer' ctx term =
         return ((m, WeakTermEnum x), (m, WeakTermTau))
       | Just _ <- asLowFloat x ->
         return ((m, WeakTermConst x), (m, WeakTermTau))
-      -- | Just _ <- asLowTypeMaybe x ->
-      --   return ((m, WeakTermConst x), (m, WeakTermTau))
       | Just op <- asPrimOp x ->
         inferExternal m x (primOpToType m op)
       | otherwise -> do
@@ -140,7 +138,6 @@ inferArgs m args1 args2 cod =
       inferArgs m ets xts' cod'
     _ ->
       raiseCritical m "invalid argument passed to inferArgs"
-
 
 inferExternal :: Hint -> T.Text -> WithEnv TermPlus -> WithEnv (WeakTermPlus, WeakTermPlus)
 inferExternal m x comp = do

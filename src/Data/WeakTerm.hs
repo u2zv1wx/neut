@@ -26,7 +26,7 @@ data WeakTerm
   | WeakTermTensorElim [WeakIdentPlus] WeakTermPlus WeakTermPlus
   | WeakTermQuestion WeakTermPlus WeakTermPlus -- e : t (output the type `t` as note)
   | WeakTermDerangement Derangement WeakTermPlus [(WeakTermPlus, DerangementArg, WeakTermPlus)] -- (derangement NUM result-type arg-1 ... arg-n)
-  deriving (Show)
+  deriving (Show, Eq)
 
 type WeakTermPlus =
   (Hint, WeakTerm)
@@ -57,9 +57,6 @@ type ConstraintQueue =
 
 type PreConstraint =
   (WeakTermPlus, WeakTermPlus)
-
-type FixInfo =
-  (Hint, Ident, [WeakIdentPlus], WeakTermPlus, WeakTermPlus)
 
 data Constraint
   = ConstraintAnalyzable
