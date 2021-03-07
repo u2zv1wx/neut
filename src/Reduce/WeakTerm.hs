@@ -100,7 +100,9 @@ substWeakTermPlus ::
   WeakTermPlus ->
   WithEnv WeakTermPlus
 substWeakTermPlus sub term =
-  substWeakTermPlus' sub IntMap.empty term
+  if IntMap.null sub
+    then return term
+    else substWeakTermPlus' sub IntMap.empty term
 
 substWeakTermPlus' ::
   SubstWeakTerm ->

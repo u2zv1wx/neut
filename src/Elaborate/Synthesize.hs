@@ -29,9 +29,9 @@ synthesize = do
     Just (Enriched (e1, e2) hs _)
       | Just (h, e) <- lookupAny (S.toList hs) sub ->
         resolveStuck e1 e2 h e
-    Just (Enriched _ _ (ConstraintQuasiPattern m ess e)) ->
+    Just (Enriched _ _ (ConstraintQuasiPattern m ess e)) -> do
       resolvePiElim m ess e
-    Just (Enriched _ _ (ConstraintFlexRigid m ess e)) ->
+    Just (Enriched _ _ (ConstraintFlexRigid m ess e)) -> do
       resolvePiElim m ess e
     _ ->
       throwTypeErrors

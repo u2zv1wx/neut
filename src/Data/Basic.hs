@@ -32,18 +32,9 @@ data Hint = Hint
 type PosInfo =
   (Path Abs File, Loc)
 
--- required to derive the eqality on WeakTerm
-instance Eq Hint where
-  _ == _ =
-    True
-
 instance Show Hint where
   show _ =
     "_"
-
-instance Ord Hint where
-  compare _ _ =
-    EQ
 
 data EnumCase
   = EnumCaseLabel T.Text

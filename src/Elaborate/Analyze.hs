@@ -35,7 +35,10 @@ simp cs =
     ((e1, e2) : rest) -> do
       e1' <- reduceWeakTermPlus e1
       e2' <- reduceWeakTermPlus e2
-      simp' $ (e1', e2') : rest
+      b <- isEq e1' e2'
+      if b
+        then simp rest
+        else simp' $ (e1', e2') : rest
 
 simp' :: [PreConstraint] -> WithEnv ()
 simp' constraintList =
@@ -44,9 +47,6 @@ simp' constraintList =
       return ()
     (c : cs) ->
       case c of
-        (e1, e2)
-          | e1 == e2 ->
-            simp cs
         (e1@(m1, WeakTermPi xts1 cod1), e2@(m2, WeakTermPi xts2 cod2)) ->
           if length xts1 /= length xts2
             then insConstraintQueue $ Enriched (e1, e2) S.empty ConstraintOther
@@ -323,3 +323,89 @@ lookupAll is sub =
       v <- IntMap.lookup (asInt j) sub
       vs <- lookupAll js sub
       return $ v : vs
+
+isEq :: WeakTermPlus -> WeakTermPlus -> WithEnv Bool
+isEq l r =
+  case (l, r) of
+    ((_, WeakTermTau), (_, WeakTermTau)) ->
+      return True
+    ((_, WeakTermUpsilon x1), (_, WeakTermUpsilon x2)) ->
+      return $ x1 == x2
+    ((_, WeakTermPi xts1 cod1), (_, WeakTermPi xts2 cod2)) -> do
+      isEq' xts1 cod1 xts2 cod2
+    ((_, WeakTermPiIntro xts1 e1), (_, WeakTermPiIntro xts2 e2)) ->
+      isEq' xts1 e1 xts2 e2
+    ((_, WeakTermPiElim e1 es1), (_, WeakTermPiElim e2 es2)) -> do
+      b1 <- isEq e1 e2
+      b2 <- and <$> zipWithM isEq es1 es2
+      return $ b1 && b2
+    ((_, WeakTermFix self1 xts1 e1), (_, WeakTermFix self2 xts2 e2)) ->
+      isEq' (self1 : xts1) e1 (self2 : xts2) e2
+    ((_, WeakTermAster h1), (_, WeakTermAster h2)) ->
+      return $ h1 == h2
+    ((_, WeakTermConst a1), (_, WeakTermConst a2)) ->
+      return $ a1 == a2
+    ((_, WeakTermInt t1 i1), (_, WeakTermInt t2 i2)) -> do
+      b <- isEq t1 t2
+      return $ b && i1 == i2
+    ((_, WeakTermFloat t1 f1), (_, WeakTermFloat t2 f2)) -> do
+      b <- isEq t1 t2
+      return $ b && f1 == f2
+    ((_, WeakTermEnum a1), (_, WeakTermEnum a2)) ->
+      return $ a1 == a2
+    ((_, WeakTermEnumIntro a1), (_, WeakTermEnumIntro a2)) ->
+      return $ a1 == a2
+    ((_, WeakTermEnumElim (e1, t1) caseList1), (_, WeakTermEnumElim (e2, t2) caseList2))
+      | length caseList1 == length caseList2 -> do
+        b1 <- isEq e1 e2
+        b2 <- isEq t1 t2
+        let (cs1, es1) = unzip caseList1
+        let (cs2, es2) = unzip caseList2
+        let b3 = map snd cs1 == map snd cs2
+        b4 <- and <$> zipWithM isEq es1 es2
+        return $ b1 && b2 && b3 && b4
+    ((_, WeakTermTensor ts1), (_, WeakTermTensor ts2))
+      | length ts1 == length ts2 ->
+        and <$> zipWithM isEq ts1 ts2
+    ((_, WeakTermTensorIntro es1), (_, WeakTermTensorIntro es2))
+      | length es1 == length es2 ->
+        and <$> zipWithM isEq es1 es2
+    ((_, WeakTermTensorElim xts1 e11 e12), (_, WeakTermTensorElim xts2 e21 e22)) -> do
+      b1 <- isEq e11 e21
+      b2 <- isEq' xts1 e12 xts2 e22
+      return $ b1 && b2
+    ((_, WeakTermQuestion e1 t1), (_, WeakTermQuestion e2 t2)) -> do
+      b1 <- isEq e1 e2
+      b2 <- isEq t1 t2
+      return $ b1 && b2
+    ((_, WeakTermDerangement d1 e1 args1), (_, WeakTermDerangement d2 e2 args2))
+      | length args1 == length args2 -> do
+        let b1 = d1 == d2
+        b2 <- isEq e1 e2
+        let (es1, ks1, ts1) = unzip3 args1
+        let (es2, ks2, ts2) = unzip3 args2
+        b3 <- and <$> zipWithM isEq es1 es2
+        let b4 = ks1 == ks2
+        b5 <- and <$> zipWithM isEq ts1 ts2
+        return $ b1 && b2 && b3 && b4 && b5
+    _ ->
+      return False
+
+isEq' :: [WeakIdentPlus] -> WeakTermPlus -> [WeakIdentPlus] -> WeakTermPlus -> WithEnv Bool
+isEq' =
+  isEq'' IntMap.empty
+
+isEq'' :: SubstWeakTerm -> [WeakIdentPlus] -> WeakTermPlus -> [WeakIdentPlus] -> WeakTermPlus -> WithEnv Bool
+isEq'' sub xts1 cod1 xts2 cod2 =
+  case (xts1, xts2) of
+    ([], []) -> do
+      cod2' <- substWeakTermPlus sub cod2
+      isEq cod1 cod2'
+    (((m1, x1, t1) : rest1), ((_, x2, t2) : rest2)) -> do
+      t2' <- substWeakTermPlus sub t2
+      b1 <- isEq t1 t2'
+      let sub' = IntMap.insert (asInt x2) (m1, WeakTermUpsilon x1) sub
+      b2 <- isEq'' sub' rest1 cod1 rest2 cod2
+      return $ b1 && b2
+    _ ->
+      return False

@@ -26,7 +26,7 @@ data WeakTerm
   | WeakTermTensorElim [WeakIdentPlus] WeakTermPlus WeakTermPlus
   | WeakTermQuestion WeakTermPlus WeakTermPlus -- e : t (output the type `t` as note)
   | WeakTermDerangement Derangement WeakTermPlus [(WeakTermPlus, DerangementArg, WeakTermPlus)] -- (derangement NUM result-type arg-1 ... arg-n)
-  deriving (Show, Eq)
+  deriving (Show)
 
 type WeakTermPlus =
   (Hint, WeakTerm)
@@ -261,11 +261,11 @@ toText term =
           "*"
         _ ->
           showCons $ map toText $ e : es
-    (_, WeakTermFix (_, x, _) _ _) -> do
-      asText x
-    -- (_, WeakTermFix (_, x, _) xts e) -> do
-    --   let argStr = inParen $ showItems $ map showArg xts
-    --   showCons ["fix", showVariable x, argStr, toText e]
+    -- (_, WeakTermFix (_, x, _) _ _) -> do
+    --   asText x
+    (_, WeakTermFix (_, x, _) xts e) -> do
+      let argStr = inParen $ showItems $ map showArg xts
+      showCons ["fix", showVariable x, argStr, toText e]
     (_, WeakTermConst x) ->
       x
     (_, WeakTermAster _) ->
