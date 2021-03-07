@@ -133,9 +133,37 @@ interpretData tree = do
             interpretCode e
           | otherwise ->
             raiseSyntaxError m "(unquote TREE)"
-        _ -> do
-          treeList' <- mapM interpretData treeList
-          return (m, MetaTermNode treeList')
+        _
+          | containsSpliceArg treeList -> do
+            args <- interpretSpliceArg treeList
+            return (m, MetaTermImpElim (m, MetaTermVar $ asIdent "list-meta") args)
+          | otherwise -> do
+            treeList' <- mapM interpretData treeList
+            return (m, MetaTermNode treeList')
+
+containsSpliceArg :: [TreePlus] -> Bool
+containsSpliceArg ts =
+  case ts of
+    [] ->
+      False
+    (_, TreeNode [(_, TreeLeaf "splice"), _]) : _ ->
+      True
+    _ : rest ->
+      containsSpliceArg rest
+
+interpretSpliceArg :: [TreePlus] -> WithEnv [MetaTermPlus]
+interpretSpliceArg ts =
+  case ts of
+    [] ->
+      return []
+    (_, TreeNode [(_, TreeLeaf "splice"), t]) : rest -> do
+      t' <- interpretData t
+      rest' <- interpretSpliceArg rest
+      return $ t' : rest'
+    t : rest -> do
+      t' <- interpretData t
+      rest' <- interpretSpliceArg rest
+      return $ (fst t', MetaTermNode [t']) : rest'
 
 interpretAux :: Hint -> TreePlus -> [TreePlus] -> WithEnv MetaTermPlus
 interpretAux m f args = do
