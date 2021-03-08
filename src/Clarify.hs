@@ -19,7 +19,6 @@ import Data.List (nubBy)
 import Data.Log
 import Data.LowType
 import Data.Maybe (catMaybes)
-import Data.Namespace
 import Data.Term
 import qualified Data.Text as T
 import Reduce.Comp
@@ -147,32 +146,11 @@ clarifyConst tenv m constName
     clarifyPrimOp tenv op m
   | Just _ <- asLowTypeMaybe constName =
     returnImmediateS4 m
-  | constName == nsOS <> "file-descriptor" =
-    returnImmediateS4 m
-  | constName == nsOS <> "stdin" =
-    clarifyTerm tenv (m, TermInt 64 0)
-  | constName == nsOS <> "stdout" =
-    clarifyTerm tenv (m, TermInt 64 1)
-  | constName == nsOS <> "stderr" =
-    clarifyTerm tenv (m, TermInt 64 2)
-  | constName == nsUnsafe <> "pointer" =
-    returnImmediateS4 m
-  | constName == nsUnsafe <> "cast" =
-    clarifyCast tenv m
   | otherwise = do
     cenv <- gets codeEnv
     if Map.member constName cenv
       then return (m, CompUpIntro (m, ValueConst constName))
       else raiseError m $ "undefined constant: " <> constName
-
-clarifyCast :: TypeEnv -> Hint -> WithEnv CompPlus
-clarifyCast tenv m = do
-  a <- newNameWith' "t1"
-  b <- newNameWith' "t2"
-  z <- newNameWith' "z"
-  let varA = (m, TermUpsilon a)
-  let u = (m, TermTau)
-  clarifyTerm tenv (m, TermPiIntro [(m, a, u), (m, b, u), (m, z, varA)] (m, TermUpsilon z))
 
 clarifyPrimOp :: TypeEnv -> PrimOp -> Hint -> WithEnv CompPlus
 clarifyPrimOp tenv op@(PrimOp _ domList _) m = do

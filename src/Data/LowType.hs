@@ -34,6 +34,7 @@ data Derangement
   | DerangementStore LowType
   | DerangementCreateArray LowType
   | DerangementCreateStruct [LowType]
+  | DerangementNop
   deriving (Show, Eq)
 
 data DerangementArg

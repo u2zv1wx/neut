@@ -351,6 +351,8 @@ asDerangementArg tree =
 interpretDerangement :: TreePlus -> WithEnv Derangement
 interpretDerangement tree =
   case tree of
+    (_, TreeLeaf "nop") ->
+      return DerangementNop
     (_, TreeNode [(_, TreeLeaf "store"), t]) -> do
       t' <- interpretLowType t
       return $ DerangementStore t'
@@ -360,7 +362,7 @@ interpretDerangement tree =
     (_, TreeNode [(_, TreeLeaf "create-array"), t]) -> do
       t' <- interpretLowType t
       return $ DerangementCreateArray t'
-    (_, TreeNode ((_, TreeLeaf "create-array") : ts)) -> do
+    (_, TreeNode ((_, TreeLeaf "create-struct") : ts)) -> do
       ts' <- mapM interpretLowType ts
       return $ DerangementCreateStruct ts'
     (_, TreeNode [(_, TreeLeaf "syscall"), (mInt, TreeLeaf intStr)]) ->
@@ -372,7 +374,7 @@ interpretDerangement tree =
     (_, TreeNode [(_, TreeLeaf "external"), (_, TreeLeaf s)]) ->
       return $ DerangementExternal s
     _ ->
-      raiseSyntaxError (fst tree) "(syscall LEAF) | (exteral LEAF) | (load TREE) | (store TREE)"
+      raiseSyntaxError (fst tree) "nop | (syscall LEAF) | (exteral LEAF) | (load TREE) | (store TREE) | (create-array TREE) | (create-struct TREE*)"
 
 interpretLowType :: TreePlus -> WithEnv LowType
 interpretLowType tree =
@@ -401,6 +403,11 @@ interpretLowType tree =
 checkDerangementArity :: Hint -> Derangement -> [TreePlus] -> WithEnv ()
 checkDerangementArity m k args =
   case k of
+    DerangementNop
+      | length args == 1 ->
+        return ()
+      | otherwise ->
+        raiseError m $ "the arity of `nop` is 2, but found " <> T.pack (show (length args + 1)) <> " arguments"
     DerangementLoad _
       | length args == 1 ->
         return ()
