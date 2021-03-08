@@ -37,15 +37,6 @@ parse stmtTreeList =
                 return $ WeakStmtLet m xt' e' : defList
               | otherwise ->
                 raiseSyntaxError m "(let LEAF TREE TREE) | (let TREE TREE)"
-            "declare-constant"
-              | [(_, TreeLeaf name), t] <- rest -> do
-                t' <- interpret t >>= discern
-                name' <- withSectionPrefix name
-                insertConstant m name'
-                defList <- parse restStmtList
-                return $ WeakStmtConstDecl (m, name', t') : defList
-              | otherwise ->
-                raiseSyntaxError m "(declare-constant LEAF TREE)"
             "declare-enum"
               | (_, TreeLeaf name) : ts <- rest -> do
                 xis <- interpretEnumItem m name ts

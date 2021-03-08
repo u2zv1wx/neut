@@ -41,12 +41,6 @@ elaborateStmt' stmt =
       modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e'') (substEnv env)})
       cont' <- elaborateStmt' cont
       return $ StmtLet m (mx, x, t'') e'' : cont'
-    WeakStmtConstDecl (_, c, t) : cont -> do
-      t' <- inferType t
-      unify
-      t'' <- elaborate' t' >>= reduceTermPlus
-      insConstTypeEnv c t''
-      elaborateStmt' cont
     WeakStmtResourceType m name discarder copier : cont -> do
       insConstTypeEnv name (m, TermTau)
       sub <- gets substEnv
