@@ -1,6 +1,5 @@
 module Preprocess.Discern
   ( discernMetaTerm,
-    discernEnumCase,
   )
 where
 
@@ -25,9 +24,8 @@ discernMetaTerm' nenv term =
   case term of
     (m, MetaTermVar (I (s, _))) ->
       tryCand (resolveSymbol (asMetaVar m nenv) s) $
-        tryCand (resolveSymbol (asMetaEnumValue m) s) $
-          tryCand (resolveSymbol (asMetaConstant m) s) $
-            raiseError m $ "undefined meta-variable: " <> s
+        tryCand (resolveSymbol (asMetaConstant m) s) $
+          raiseError m $ "undefined meta-variable: " <> s
     (m, MetaTermImpIntro xs mf e) -> do
       (xs', mf', e') <- discernBinder nenv xs mf e
       return (m, MetaTermImpIntro xs' mf' e')
@@ -45,18 +43,13 @@ discernMetaTerm' nenv term =
       return (m, MetaTermNode es')
     (_, MetaTermConst _) ->
       return term
-    (_, MetaTermInt64 _) ->
+    (_, MetaTermInteger _) ->
       return term
-    (_, MetaTermEnumIntro _) ->
-      return term
-    (m, MetaTermEnumElim (e, i) caseList) -> do
-      e' <- discernMetaTerm' nenv e
-      caseList' <-
-        forM caseList $ \((mCase, l), body) -> do
-          l' <- discernEnumCase mCase l
-          body' <- discernMetaTerm' nenv body
-          return ((mCase, l'), body')
-      return (m, MetaTermEnumElim (e', i) caseList')
+    (m, MetaTermIf cond onTrue onFalse) -> do
+      cond' <- discernMetaTerm' nenv cond
+      onTrue' <- discernMetaTerm' nenv onTrue
+      onFalse' <- discernMetaTerm' nenv onFalse
+      return (m, MetaTermIf cond' onTrue' onFalse')
 
 discernBinder ::
   NameEnv ->
@@ -79,18 +72,3 @@ discernBinder nenv binder mf e =
       x' <- newNameWith x
       (xs', mf', e') <- discernBinder (Map.insert (asText x) x' nenv) xs mf e
       return (x' : xs', mf', e')
-
-discernEnumCase :: Hint -> EnumCase -> WithEnv EnumCase
-discernEnumCase m weakCase =
-  case weakCase of
-    EnumCaseLabel l -> do
-      ml <- resolveSymbol asEnumCase l
-      case ml of
-        Just l' ->
-          return l'
-        Nothing -> do
-          e <- gets enumEnv
-          p' e
-          raiseError m $ "no such enum-value is defined: " <> l
-    _ ->
-      return weakCase

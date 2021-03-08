@@ -5,7 +5,6 @@ import Data.Basic
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import qualified Data.IntMap as IntMap
-import Data.List (find)
 import Data.Log
 import Data.MetaTerm
 import Data.Namespace
@@ -98,13 +97,6 @@ preprocess' stmtList = do
                 preprocess' $ defFix : restStmtList
               | otherwise ->
                 raiseSyntaxError m "(define-macro-variadic LEAF TREE TREE)"
-            "declare-enum"
-              | (_, TreeLeaf name) : ts <- rest -> do
-                xis <- interpretEnumItem m name ts
-                insEnumEnv m name xis
-                preprocess' restStmtList
-              | otherwise ->
-                raiseSyntaxError m "(declare-enum LEAF TREE ... TREE)"
             --
             -- file-related statements
             --
@@ -351,24 +343,6 @@ isSpecialForm nenv tree = do
       isSpecialForm nenv leaf
     _ ->
       return False
-
-insEnumEnv :: Hint -> T.Text -> [(T.Text, Int)] -> WithEnv ()
-insEnumEnv m name xis = do
-  eenv <- gets enumEnv
-  let definedEnums = Map.keys eenv ++ map fst (concat (Map.elems eenv))
-  case find (`elem` definedEnums) $ name : map fst xis of
-    Just x ->
-      raiseError m $ "the constant `" <> x <> "` is already defined [ENUM]"
-    _ -> do
-      let (xs, is) = unzip xis
-      let rev = Map.fromList $ zip xs (zip (repeat name) is)
-      modify
-        ( \e ->
-            e
-              { enumEnv = Map.insert name xis (enumEnv e),
-                revEnumEnv = rev `Map.union` revEnumEnv e
-              }
-        )
 
 generateLastStmtList :: T.Text -> (Env -> [T.Text]) -> WithEnv [TreePlus]
 generateLastStmtList atom accessor = do

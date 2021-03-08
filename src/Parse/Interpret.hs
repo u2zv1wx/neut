@@ -1,8 +1,7 @@
 module Parse.Interpret
   ( interpret,
-    interpretWeakIdentPlus,
     interpretIdentPlus,
-    interpretFix,
+    interpretEnumItem,
   )
 where
 
@@ -10,6 +9,8 @@ import Data.Basic
 import Data.Env
 import Data.Log
 import Data.LowType
+import Data.Maybe (fromMaybe)
+import Data.Namespace
 import qualified Data.Text as T
 import Data.Tree
 import Data.WeakTerm
@@ -421,3 +422,42 @@ checkDerangementArity m k args =
         raiseError m $ "this `create-struct` expects " <> T.pack (show (length ts)) <> " value(s), but found " <> T.pack (show (length args))
     _ ->
       return ()
+
+interpretEnumItem :: Hint -> T.Text -> [TreePlus] -> WithEnv [(T.Text, Int)]
+interpretEnumItem m name ts = do
+  xis <- interpretEnumItem' name $ reverse ts
+  if isLinear (map snd xis)
+    then return $ reverse xis
+    else raiseError m "found a collision of discriminant"
+
+interpretEnumItem' :: T.Text -> [TreePlus] -> WithEnv [(T.Text, Int)]
+interpretEnumItem' name treeList =
+  case treeList of
+    [] ->
+      return []
+    [t] -> do
+      (s, mj) <- interpretEnumItem'' t
+      return [(name <> nsSep <> s, fromMaybe 0 mj)]
+    (t : ts) -> do
+      ts' <- interpretEnumItem' name ts
+      (s, mj) <- interpretEnumItem'' t
+      return $ (name <> nsSep <> s, fromMaybe (1 + headDiscriminantOf ts') mj) : ts'
+
+interpretEnumItem'' :: TreePlus -> WithEnv (T.Text, Maybe Int)
+interpretEnumItem'' tree =
+  case tree of
+    (_, TreeLeaf s) ->
+      return (s, Nothing)
+    (_, TreeNode [(_, TreeLeaf s), (_, TreeLeaf i)])
+      | Just i' <- readMaybe $ T.unpack i ->
+        return (s, Just i')
+    t ->
+      raiseSyntaxError (fst t) "LEAF | (LEAF LEAF)"
+
+headDiscriminantOf :: [(T.Text, Int)] -> Int
+headDiscriminantOf labelNumList =
+  case labelNumList of
+    [] ->
+      0
+    ((_, i) : _) ->
+      i

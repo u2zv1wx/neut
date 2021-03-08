@@ -13,7 +13,6 @@ import Data.Log
 import Data.Namespace
 import qualified Data.Text as T
 import Data.WeakTerm
-import Preprocess.Discern
 
 type NameEnv = Map.HashMap T.Text Ident
 
@@ -132,3 +131,18 @@ discernFix ::
 discernFix nenv self binder e = do
   (binder', e') <- discernBinder nenv (self : binder) e
   return (head binder', tail binder', e')
+
+discernEnumCase :: Hint -> EnumCase -> WithEnv EnumCase
+discernEnumCase m weakCase =
+  case weakCase of
+    EnumCaseLabel l -> do
+      ml <- resolveSymbol asEnumCase l
+      case ml of
+        Just l' ->
+          return l'
+        Nothing -> do
+          e <- gets enumEnv
+          p' e
+          raiseError m $ "no such enum-value is defined: " <> l
+    _ ->
+      return weakCase

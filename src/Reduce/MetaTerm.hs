@@ -6,7 +6,6 @@ import Control.Monad.State.Lazy hiding (get)
 import Data.Basic
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
-import Data.Int
 import qualified Data.IntMap as IntMap
 import Data.Log
 import Data.Maybe (catMaybes)
@@ -31,18 +30,13 @@ reduceMetaTerm term =
           reduceConstApp m c es'
         _ -> do
           raiseError m $ "the term \n  " <> showAsSExp (toTree e') <> "\ncannot be applied to:\n  " <> T.intercalate "\n" (map (showAsSExp . toTree) es')
-    (m, MetaTermEnumElim (e, _) caseList) -> do
-      e' <- reduceMetaTerm e
-      let caseList' = map (\(c, body) -> (snd c, body)) caseList
-      case e' of
-        (_, MetaTermEnumIntro l) ->
-          case lookup (EnumCaseLabel l) caseList' of
-            Just body ->
-              reduceMetaTerm body
-            Nothing ->
-              raiseError m "found an ill-typed switch"
-        _ -> do
-          raiseError m "found an ill-typed switch"
+    (_, MetaTermIf cond onTrue onFalse) -> do
+      cond' <- reduceMetaTerm cond
+      case cond' of
+        (_, MetaTermNode []) ->
+          reduceMetaTerm onFalse
+        _ ->
+          reduceMetaTerm onTrue
     (m, MetaTermNode es) -> do
       es' <- mapM reduceMetaTerm es
       return (m, MetaTermNode es')
@@ -83,20 +77,10 @@ raiseArityMismatch m expected found = do
 reduceConstApp :: Hint -> T.Text -> [MetaTermPlus] -> WithEnv MetaTermPlus
 reduceConstApp m c es =
   case c of
-    "cons"
-      | [t, (_, MetaTermNode ts)] <- es ->
-        return (m, MetaTermNode (t : ts))
     "dump"
       | [arg] <- es -> do
         liftIO $ putStrLn $ T.unpack $ showAsSExp $ toTree arg
-        return (m, MetaTermEnumIntro "top.unit")
-    "head"
-      | [(mNode, MetaTermNode ts)] <- es ->
-        case ts of
-          h : _ ->
-            return h
-          _ ->
-            raiseError mNode "the constant `head` cannot be applied to nil"
+        return (m, MetaTermLeaf "true")
     "is-nil"
       | [(_, MetaTermNode ts)] <- es ->
         return $ liftBool (null ts) m
@@ -110,36 +94,17 @@ reduceConstApp m c es =
         return $ liftBool False mLeaf
       | [(mNode, MetaTermNode _)] <- es ->
         return $ liftBool True mNode
-    "leaf-mul"
-      | [(mLeaf, MetaTermLeaf s1), (_, MetaTermLeaf s2)] <- es ->
-        return (mLeaf, MetaTermLeaf (s1 <> s2))
-    "leaf-equal"
+    "leaf.equal"
       | [(_, MetaTermLeaf s1), (_, MetaTermLeaf s2)] <- es ->
         return $ liftBool (s1 == s2) m
-    "leaf-uncons"
-      | [(mLeaf, MetaTermLeaf s)] <- es,
-        Just (ch, rest) <- T.uncons s -> do
-        return (mLeaf, MetaTermNode [(mLeaf, MetaTermLeaf (T.singleton ch)), (mLeaf, MetaTermLeaf rest)])
-    "tail"
-      | [(mNode, MetaTermNode ts)] <- es ->
-        case ts of
-          (_ : rest) ->
-            return (mNode, MetaTermNode rest)
-          _ ->
-            raiseError mNode "the constant `tail` cannot be applied to nil"
-    "new-symbol"
+    "leaf.mul"
+      | [(mLeaf, MetaTermLeaf s1), (_, MetaTermLeaf s2)] <- es ->
+        return (mLeaf, MetaTermLeaf (s1 <> s2))
+    "leaf.new-symbol"
       | [(_, MetaTermLeaf s)] <- es -> do
         i <- newCount
         return (m, MetaTermLeaf (s <> "#" <> T.pack (show i)))
-    "nth"
-      | [(_, MetaTermInt64 i), (_, MetaTermNode ts)] <- es -> do
-        if 0 <= i && i < fromIntegral (length ts)
-          then return $ ts !! (fromIntegral i)
-          else raiseError m "index out of range"
-    "node-length"
-      | [(_, MetaTermNode ts)] <- es -> do
-        return (m, MetaTermLeaf (T.pack (show (length ts))))
-    "string-to-u8-list"
+    "leaf.string-to-u8-list"
       | [(mStr, MetaTermLeaf atom)] <- es -> do
         case readMaybe (T.unpack atom) of
           Just str -> do
@@ -148,12 +113,41 @@ reduceConstApp m c es =
             return (m, MetaTermNode (map (\i -> (mStr, MetaTermLeaf (T.pack (show i)))) u8s))
           Nothing ->
             raiseError mStr "the argument of `string-to-u8-list` must be a string"
+    "leaf.uncons"
+      | [(mLeaf, MetaTermLeaf s)] <- es,
+        Just (ch, rest) <- T.uncons s -> do
+        return (mLeaf, MetaTermNode [(mLeaf, MetaTermLeaf (T.singleton ch)), (mLeaf, MetaTermLeaf rest)])
+    "node.cons"
+      | [t, (_, MetaTermNode ts)] <- es ->
+        return (m, MetaTermNode (t : ts))
+    "node.head"
+      | [(mNode, MetaTermNode ts)] <- es ->
+        case ts of
+          h : _ ->
+            return h
+          _ ->
+            raiseError mNode "the constant `head` cannot be applied to nil"
+    "node.length"
+      | [(_, MetaTermNode ts)] <- es -> do
+        return (m, MetaTermLeaf (T.pack (show (length ts))))
+    "node.nth"
+      | [(_, MetaTermInteger i), (_, MetaTermNode ts)] <- es -> do
+        if 0 <= i && i < fromIntegral (length ts)
+          then return $ ts !! (fromIntegral i)
+          else raiseError m "index out of range"
+    "node.tail"
+      | [(mNode, MetaTermNode ts)] <- es ->
+        case ts of
+          (_ : rest) ->
+            return (mNode, MetaTermNode rest)
+          _ ->
+            raiseError mNode "the constant `tail` cannot be applied to nil"
     _
       | Just op <- toArithOp c,
-        [(_, MetaTermInt64 i1), (_, MetaTermInt64 i2)] <- es ->
-        return (m, MetaTermInt64 (op i1 i2))
+        [(_, MetaTermInteger i1), (_, MetaTermInteger i2)] <- es ->
+        return (m, MetaTermInteger (op i1 i2))
       | Just op <- toCmpOp c,
-        [(_, MetaTermInt64 i1), (_, MetaTermInt64 i2)] <- es ->
+        [(_, MetaTermInteger i1), (_, MetaTermInteger i2)] <- es ->
         return $ liftBool (op i1 i2) m
       | otherwise -> do
         raiseConstAppError m c es
@@ -182,10 +176,8 @@ toArgForm e =
       ArgLeaf
     (_, MetaTermNode _) ->
       ArgNode
-    (_, MetaTermInt64 _) ->
+    (_, MetaTermInteger _) ->
       ArgInt
-    (_, MetaTermEnumIntro _) ->
-      ArgEnum
     (_, _) ->
       ArgLam
 
@@ -196,14 +188,14 @@ matchTree argForm t =
       Nothing
     (ArgNode, (_, MetaTermNode _)) ->
       Nothing
-    (ArgInt, (_, MetaTermInt64 _)) ->
+    (ArgInt, (_, MetaTermInteger _)) ->
       Nothing
     (ArgAny, _) ->
       Nothing
     (a, e) ->
       Just (a, e)
 
-toArithOp :: T.Text -> Maybe (Int64 -> Int64 -> Int64)
+toArithOp :: T.Text -> Maybe (Integer -> Integer -> Integer)
 toArithOp opStr =
   case opStr of
     "int-add" ->
@@ -217,7 +209,7 @@ toArithOp opStr =
     _ ->
       Nothing
 
-toCmpOp :: T.Text -> Maybe (Int64 -> Int64 -> Bool)
+toCmpOp :: T.Text -> Maybe (Integer -> Integer -> Bool)
 toCmpOp opStr =
   case opStr of
     "int-gt" ->
@@ -236,5 +228,5 @@ toCmpOp opStr =
 liftBool :: Bool -> Hint -> MetaTermPlus
 liftBool b m =
   if b
-    then (m, MetaTermEnumIntro "bool.true")
-    else (m, MetaTermEnumIntro "bool.false")
+    then (m, MetaTermLeaf "true")
+    else (m, MetaTermNode [])

@@ -6,6 +6,8 @@ where
 import Control.Monad.State.Lazy hiding (get)
 import Data.Basic
 import Data.Env
+import qualified Data.HashMap.Lazy as Map
+import Data.List (find)
 import Data.Log
 import Data.Namespace
 import qualified Data.Set as S
@@ -44,6 +46,13 @@ parse stmtTreeList =
                 return $ WeakStmtConstDecl (m, name', t') : defList
               | otherwise ->
                 raiseSyntaxError m "(declare-constant LEAF TREE)"
+            "declare-enum"
+              | (_, TreeLeaf name) : ts <- rest -> do
+                xis <- interpretEnumItem m name ts
+                insEnumEnv m name xis
+                parse restStmtList
+              | otherwise ->
+                raiseSyntaxError m "(declare-enum LEAF TREE ... TREE)"
             "define-resource-type"
               | [(_, TreeLeaf name), discarder, copier] <- rest -> do
                 name' <- withSectionPrefix name
@@ -102,3 +111,21 @@ insertConstant m x = do
   if S.member x cset
     then raiseError m $ "the constant `" <> x <> "` is already defined"
     else modify (\env -> env {constantSet = S.insert x (constantSet env)})
+
+insEnumEnv :: Hint -> T.Text -> [(T.Text, Int)] -> WithEnv ()
+insEnumEnv m name xis = do
+  eenv <- gets enumEnv
+  let definedEnums = Map.keys eenv ++ map fst (concat (Map.elems eenv))
+  case find (`elem` definedEnums) $ name : map fst xis of
+    Just x ->
+      raiseError m $ "the constant `" <> x <> "` is already defined [ENUM]"
+    _ -> do
+      let (xs, is) = unzip xis
+      let rev = Map.fromList $ zip xs (zip (repeat name) is)
+      modify
+        ( \e ->
+            e
+              { enumEnv = Map.insert name xis (enumEnv e),
+                revEnumEnv = rev `Map.union` revEnumEnv e
+              }
+        )

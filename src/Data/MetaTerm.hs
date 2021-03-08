@@ -2,7 +2,6 @@ module Data.MetaTerm where
 
 import Data.Basic
 import qualified Data.HashMap.Lazy as Map
-import Data.Int
 import qualified Data.IntMap as IntMap
 import Data.Maybe (catMaybes)
 import qualified Data.Text as T
@@ -17,9 +16,8 @@ data MetaTerm
   | MetaTermLeaf T.Text
   | MetaTermNode [MetaTermPlus]
   | MetaTermConst T.Text
-  | MetaTermInt64 Int64
-  | MetaTermEnumIntro T.Text
-  | MetaTermEnumElim (MetaTermPlus, Ident) [(EnumCasePlus, MetaTermPlus)]
+  | MetaTermInteger Integer
+  | MetaTermIf MetaTermPlus MetaTermPlus MetaTermPlus
   deriving (Show)
 
 type MetaTermPlus =
@@ -28,12 +26,10 @@ type MetaTermPlus =
 type SubstMetaTerm =
   IntMap.IntMap MetaTermPlus
 
--- これをmetaconstantsの中で使って引数の形を指定する
 data Arg
   = ArgLeaf
   | ArgNode
   | ArgInt
-  | ArgEnum
   | ArgLam
   | ArgAny
   deriving (Ord, Eq, Show)
@@ -74,15 +70,13 @@ substMetaTerm sub term =
       (m, MetaTermNode es')
     (_, MetaTermConst _) ->
       term
-    (_, MetaTermInt64 _) ->
+    (_, MetaTermInteger _) ->
       term
-    (_, MetaTermEnumIntro _) ->
-      term
-    (m, MetaTermEnumElim (e, i) ces) -> do
-      let e' = substMetaTerm sub e
-      let (cs, es) = unzip ces
-      let es' = map (substMetaTerm sub) es
-      (m, MetaTermEnumElim (e', i) (zip cs es'))
+    (m, MetaTermIf cond onTrue onFalse) -> do
+      let cond' = substMetaTerm sub cond
+      let onTrue' = substMetaTerm sub onTrue
+      let onFalse' = substMetaTerm sub onFalse
+      (m, MetaTermIf cond' onTrue' onFalse')
 
 showMetaTerm :: MetaTermPlus -> T.Text
 showMetaTerm e =
@@ -122,17 +116,13 @@ toTree term =
       (m, TreeNode es')
     (m, MetaTermConst c) ->
       (m, TreeLeaf c)
-    (m, MetaTermInt64 i) ->
+    (m, MetaTermInteger i) ->
       (m, TreeLeaf $ T.pack $ show i)
-    (m, MetaTermEnumIntro a) ->
-      (m, TreeLeaf a)
-    (m, MetaTermEnumElim (e, _) caseList) -> do
-      let e' = toTree e
-      let (cs, bodyList) = unzip caseList
-      let cs' = map toTreeEnumCase cs
-      let bodyList' = map toTree bodyList
-      let caseList' = map (\(c, body) -> (m, TreeNode [c, body])) $ zip cs' bodyList'
-      (m, TreeNode [(m, TreeLeaf "switch-meta"), e', (m, TreeNode caseList')])
+    (m, MetaTermIf cond onTrue onFalse) -> do
+      let cond' = toTree cond
+      let onTrue' = toTree onTrue
+      let onFalse' = toTree onFalse
+      (m, TreeNode [(m, TreeLeaf "if-meta"), cond', onTrue', onFalse'])
 
 toTreeEnumCase :: EnumCasePlus -> TreePlus
 toTreeEnumCase (m, v) =
@@ -153,8 +143,6 @@ showArgForm arg =
       "node"
     ArgInt ->
       "int"
-    ArgEnum ->
-      "enum"
     ArgLam ->
       "lambda-term"
     ArgAny ->
@@ -167,20 +155,20 @@ metaConstants =
 metaTreeConstants :: Map.HashMap T.Text [Arg]
 metaTreeConstants =
   Map.fromList
-    [ ("cons", [ArgAny, ArgNode]),
-      ("dump", [ArgAny]),
-      ("head", [ArgNode]),
+    [ ("dump", [ArgAny]),
       ("is-leaf", [ArgAny]),
       ("is-nil", [ArgNode]),
       ("is-node", [ArgAny]),
-      ("leaf-equal", [ArgLeaf, ArgLeaf]),
-      ("leaf-mul", [ArgLeaf, ArgLeaf]),
-      ("leaf-uncons", [ArgLeaf]),
-      ("node-length", [ArgNode]),
-      ("string-to-u8-list", [ArgLeaf]),
-      ("new-symbol", [ArgLeaf]),
-      ("nth", [ArgInt, ArgNode]),
-      ("tail", [ArgNode])
+      ("leaf.equal", [ArgLeaf, ArgLeaf]),
+      ("leaf.mul", [ArgLeaf, ArgLeaf]),
+      ("leaf.new-symbol", [ArgLeaf]),
+      ("leaf.string-to-u8-list", [ArgLeaf]),
+      ("leaf.uncons", [ArgLeaf]),
+      ("node.cons", [ArgAny, ArgNode]),
+      ("node.head", [ArgNode]),
+      ("node.length", [ArgNode]),
+      ("node.nth", [ArgInt, ArgNode]),
+      ("node.tail", [ArgNode])
     ]
 
 metaArithConstants :: Map.HashMap T.Text [Arg]

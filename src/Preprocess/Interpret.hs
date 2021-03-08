@@ -1,16 +1,12 @@
 module Preprocess.Interpret
   ( interpretCode,
-    interpretEnumItem,
-    interpretEnumCase,
   )
 where
 
 import Data.Basic
 import Data.Env
 import Data.Log
-import Data.Maybe (fromMaybe)
 import Data.MetaTerm
-import Data.Namespace
 import qualified Data.Text as T
 import Data.Tree
 import Text.Read (readMaybe)
@@ -20,7 +16,7 @@ interpretCode tree =
   case tree of
     (m, TreeLeaf atom)
       | Just i <- readMaybe $ T.unpack atom ->
-        return (m, MetaTermInt64 i)
+        return (m, MetaTermInteger i)
       | otherwise ->
         return (m, MetaTermVar $ asIdent atom)
     (m, TreeNode treeList) ->
@@ -64,25 +60,12 @@ interpretCode tree =
                 return (m, MetaTermFix (asIdent f) xs' (Just rest') e')
               | otherwise ->
                 raiseSyntaxError m "(fix-meta-variadic LEAF (LEAF LEAF*) TREE)"
-            "switch-meta"
-              | e : cs <- rest -> do
-                e' <- interpretCode e
-                cs' <- mapM interpretEnumClause cs
-                i <- newNameWith' "switch"
-                return (m, MetaTermEnumElim (e', i) cs')
-              | otherwise ->
-                raiseSyntaxError m "(switch-meta TREE TREE*)"
             "if-meta"
               | [cond, onTrue, onFalse] <- rest -> do
-                interpretCode
-                  ( m,
-                    TreeNode
-                      [ (m, TreeLeaf "switch-meta"),
-                        cond,
-                        (m, TreeNode [(m, TreeLeaf "bool.true"), onTrue]),
-                        (m, TreeNode [(m, TreeLeaf "bool.false"), onFalse])
-                      ]
-                  )
+                cond' <- interpretCode cond
+                onTrue' <- interpretCode onTrue
+                onFalse' <- interpretCode onFalse
+                return (m, MetaTermIf cond' onTrue' onFalse')
               | otherwise ->
                 raiseSyntaxError m "(if-meta TREE TREE TREE)"
             "leaf"
@@ -195,67 +178,6 @@ interpretIdent tree =
       return $ asIdent x
     t ->
       raiseSyntaxError (fst t) "LEAF"
-
-interpretEnumItem :: Hint -> T.Text -> [TreePlus] -> WithEnv [(T.Text, Int)]
-interpretEnumItem m name ts = do
-  xis <- interpretEnumItem' name $ reverse ts
-  if isLinear (map snd xis)
-    then return $ reverse xis
-    else raiseError m "found a collision of discriminant"
-
-interpretEnumItem' :: T.Text -> [TreePlus] -> WithEnv [(T.Text, Int)]
-interpretEnumItem' name treeList =
-  case treeList of
-    [] ->
-      return []
-    [t] -> do
-      (s, mj) <- interpretEnumItem'' t
-      return [(name <> nsSep <> s, fromMaybe 0 mj)]
-    (t : ts) -> do
-      ts' <- interpretEnumItem' name ts
-      (s, mj) <- interpretEnumItem'' t
-      return $ (name <> nsSep <> s, fromMaybe (1 + headDiscriminantOf ts') mj) : ts'
-
-interpretEnumItem'' :: TreePlus -> WithEnv (T.Text, Maybe Int)
-interpretEnumItem'' tree =
-  case tree of
-    (_, TreeLeaf s) ->
-      return (s, Nothing)
-    (_, TreeNode [(_, TreeLeaf s), (_, TreeLeaf i)])
-      | Just i' <- readMaybe $ T.unpack i ->
-        return (s, Just i')
-    t ->
-      raiseSyntaxError (fst t) "LEAF | (LEAF LEAF)"
-
-headDiscriminantOf :: [(T.Text, Int)] -> Int
-headDiscriminantOf labelNumList =
-  case labelNumList of
-    [] ->
-      0
-    ((_, i) : _) ->
-      i
-
-interpretEnumClause :: TreePlus -> WithEnv (EnumCasePlus, MetaTermPlus)
-interpretEnumClause tree =
-  case tree of
-    (_, TreeNode [c, e]) -> do
-      c' <- interpretEnumCase c
-      e' <- interpretCode e
-      return (c', e')
-    e ->
-      raiseSyntaxError (fst e) "(TREE TREE)"
-
-interpretEnumCase :: TreePlus -> WithEnv EnumCasePlus
-interpretEnumCase tree =
-  case tree of
-    (m, TreeNode [(_, TreeLeaf "enum-introduction"), (_, TreeLeaf l)]) ->
-      return (m, EnumCaseLabel l)
-    (m, TreeLeaf "default") ->
-      return (m, EnumCaseDefault)
-    (m, TreeLeaf l) ->
-      return (m, EnumCaseLabel l)
-    (m, _) ->
-      raiseSyntaxError m "default | LEAF"
 
 interpretWith :: TreePlus -> WithEnv MetaTermPlus
 interpretWith tree =

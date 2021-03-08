@@ -100,7 +100,9 @@ handleEnd m s cont = do
 resolveSymbol :: (T.Text -> WithEnv (Maybe b)) -> T.Text -> WithEnv (Maybe b)
 resolveSymbol predicate name = do
   penv <- gets prefixEnv
-  takeFirst predicate $ name : (map (\prefix -> prefix <> nsSep <> name) penv)
+  takeFirst predicate $ (map (\prefix -> prefix <> nsSep <> name) penv) ++ [name]
+
+-- takeFirst predicate $ name : (map (\prefix -> prefix <> nsSep <> name) penv)
 
 takeFirst :: (a -> WithEnv (Maybe b)) -> [a] -> WithEnv (Maybe b)
 takeFirst predicate candidateList =
@@ -133,10 +135,6 @@ findThenModify info name f = do
   if name `Map.member` env
     then return $ Just $ f name
     else return Nothing
-
-asMetaEnumValue :: Hint -> T.Text -> WithEnv (Maybe MetaTermPlus)
-asMetaEnumValue m name = do
-  findThenModify revEnumEnv name (\x -> (m, MetaTermEnumIntro x))
 
 asWeakEnumValue :: Hint -> T.Text -> WithEnv (Maybe WeakTermPlus)
 asWeakEnumValue m name = do
