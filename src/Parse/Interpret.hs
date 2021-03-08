@@ -313,11 +313,7 @@ interpretEnumCase tree =
     (m, TreeLeaf "default") ->
       return (m, EnumCaseDefault)
     (m, TreeLeaf l) ->
-      case readMaybe (T.unpack l) of
-        Just i ->
-          return (m, EnumCaseInteger i)
-        Nothing ->
-          return (m, EnumCaseLabel l)
+      return (m, EnumCaseLabel l)
     (m, _) ->
       raiseSyntaxError m "default | LEAF"
 

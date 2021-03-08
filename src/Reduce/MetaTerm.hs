@@ -77,34 +77,34 @@ raiseArityMismatch m expected found = do
 reduceConstApp :: Hint -> T.Text -> [MetaTermPlus] -> WithEnv MetaTermPlus
 reduceConstApp m c es =
   case c of
-    "dump"
+    "meta.dump"
       | [arg] <- es -> do
         liftIO $ putStrLn $ T.unpack $ showAsSExp $ toTree arg
         return (m, MetaTermLeaf "true")
-    "is-nil"
+    "meta.is-nil"
       | [(_, MetaTermNode ts)] <- es ->
         return $ liftBool (null ts) m
-    "is-leaf"
+    "meta.is-leaf"
       | [(mLeaf, MetaTermLeaf _)] <- es ->
         return $ liftBool True mLeaf
       | [(mNode, MetaTermNode _)] <- es ->
         return $ liftBool False mNode
-    "is-node"
+    "meta.is-node"
       | [(mLeaf, MetaTermLeaf _)] <- es ->
         return $ liftBool False mLeaf
       | [(mNode, MetaTermNode _)] <- es ->
         return $ liftBool True mNode
-    "leaf.equal"
+    "meta.leaf.equal"
       | [(_, MetaTermLeaf s1), (_, MetaTermLeaf s2)] <- es ->
         return $ liftBool (s1 == s2) m
-    "leaf.mul"
+    "meta.leaf.mul"
       | [(mLeaf, MetaTermLeaf s1), (_, MetaTermLeaf s2)] <- es ->
         return (mLeaf, MetaTermLeaf (s1 <> s2))
-    "leaf.new-symbol"
+    "meta.leaf.new-symbol"
       | [(_, MetaTermLeaf s)] <- es -> do
         i <- newCount
         return (m, MetaTermLeaf (s <> "#" <> T.pack (show i)))
-    "leaf.string-to-u8-list"
+    "meta.leaf.string-to-u8-list"
       | [(mStr, MetaTermLeaf atom)] <- es -> do
         case readMaybe (T.unpack atom) of
           Just str -> do
@@ -113,29 +113,21 @@ reduceConstApp m c es =
             return (m, MetaTermNode (map (\i -> (mStr, MetaTermLeaf (T.pack (show i)))) u8s))
           Nothing ->
             raiseError mStr "the argument of `string-to-u8-list` must be a string"
-    "leaf.uncons"
+    "meta.leaf.uncons"
       | [(mLeaf, MetaTermLeaf s)] <- es,
         Just (ch, rest) <- T.uncons s -> do
         return (mLeaf, MetaTermNode [(mLeaf, MetaTermLeaf (T.singleton ch)), (mLeaf, MetaTermLeaf rest)])
-    "node.cons"
+    "meta.node.cons"
       | [t, (_, MetaTermNode ts)] <- es ->
         return (m, MetaTermNode (t : ts))
-    "node.head"
+    "meta.node.head"
       | [(mNode, MetaTermNode ts)] <- es ->
         case ts of
           h : _ ->
             return h
           _ ->
             raiseError mNode "the constant `head` cannot be applied to nil"
-    "node.length"
-      | [(_, MetaTermNode ts)] <- es -> do
-        return (m, MetaTermLeaf (T.pack (show (length ts))))
-    "node.nth"
-      | [(_, MetaTermInteger i), (_, MetaTermNode ts)] <- es -> do
-        if 0 <= i && i < fromIntegral (length ts)
-          then return $ ts !! (fromIntegral i)
-          else raiseError m "index out of range"
-    "node.tail"
+    "meta.node.tail"
       | [(mNode, MetaTermNode ts)] <- es ->
         case ts of
           (_ : rest) ->
@@ -198,13 +190,13 @@ matchTree argForm t =
 toArithOp :: T.Text -> Maybe (Integer -> Integer -> Integer)
 toArithOp opStr =
   case opStr of
-    "int-add" ->
+    "meta.int.add" ->
       Just (+)
-    "int-sub" ->
+    "meta.int.sub" ->
       Just (-)
-    "int-mul" ->
+    "meta.int.mul" ->
       Just (*)
-    "int-div" ->
+    "meta.int.div" ->
       Just div
     _ ->
       Nothing
@@ -212,15 +204,15 @@ toArithOp opStr =
 toCmpOp :: T.Text -> Maybe (Integer -> Integer -> Bool)
 toCmpOp opStr =
   case opStr of
-    "int-gt" ->
+    "meta.int.gt" ->
       Just (>)
-    "int-ge" ->
+    "meta.int.ge" ->
       Just (>=)
-    "int-lt" ->
+    "meta.int.lt" ->
       Just (<)
-    "int-le" ->
+    "meta.int.le" ->
       Just (<=)
-    "int-eq" ->
+    "meta.int.eq" ->
       Just (==)
     _ ->
       Nothing

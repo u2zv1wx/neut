@@ -71,6 +71,8 @@ interpretCode tree =
             "leaf"
               | [(_, TreeLeaf x)] <- rest -> do
                 return (m, MetaTermLeaf x)
+              | [] <- rest -> do
+                return (m, MetaTermLeaf "") -- the unit element of the free monoid
               | otherwise ->
                 raiseSyntaxError m "(leaf TREE)"
             "node" -> do
@@ -119,7 +121,7 @@ interpretData tree = do
         _
           | containsSpliceArg treeList -> do
             args <- interpretSpliceArg treeList
-            return (m, MetaTermImpElim (m, MetaTermVar $ asIdent "list-meta") args)
+            return (m, MetaTermImpElim (m, MetaTermVar $ asIdent "meta.node.list") args)
           | otherwise -> do
             treeList' <- mapM interpretData treeList
             return (m, MetaTermNode treeList')

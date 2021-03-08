@@ -124,16 +124,6 @@ toTree term =
       let onFalse' = toTree onFalse
       (m, TreeNode [(m, TreeLeaf "if-meta"), cond', onTrue', onFalse'])
 
-toTreeEnumCase :: EnumCasePlus -> TreePlus
-toTreeEnumCase (m, v) =
-  case v of
-    EnumCaseLabel l ->
-      (m, TreeLeaf l)
-    EnumCaseInteger i ->
-      (m, TreeLeaf (T.pack (show i)))
-    EnumCaseDefault ->
-      (m, TreeLeaf "default")
-
 showArgForm :: Arg -> T.Text
 showArgForm arg =
   case arg of
@@ -155,37 +145,35 @@ metaConstants =
 metaTreeConstants :: Map.HashMap T.Text [Arg]
 metaTreeConstants =
   Map.fromList
-    [ ("dump", [ArgAny]),
-      ("is-leaf", [ArgAny]),
-      ("is-nil", [ArgNode]),
-      ("is-node", [ArgAny]),
-      ("leaf.equal", [ArgLeaf, ArgLeaf]),
-      ("leaf.mul", [ArgLeaf, ArgLeaf]),
-      ("leaf.new-symbol", [ArgLeaf]),
-      ("leaf.string-to-u8-list", [ArgLeaf]),
-      ("leaf.uncons", [ArgLeaf]),
-      ("node.cons", [ArgAny, ArgNode]),
-      ("node.head", [ArgNode]),
-      ("node.length", [ArgNode]),
-      ("node.nth", [ArgInt, ArgNode]),
-      ("node.tail", [ArgNode])
+    [ ("meta.dump", [ArgAny]),
+      ("meta.is-leaf", [ArgAny]),
+      ("meta.is-nil", [ArgNode]),
+      ("meta.is-node", [ArgAny]),
+      ("meta.leaf.equal", [ArgLeaf, ArgLeaf]),
+      ("meta.leaf.mul", [ArgLeaf, ArgLeaf]),
+      ("meta.leaf.new-symbol", [ArgLeaf]),
+      ("meta.leaf.string-to-u8-list", [ArgLeaf]),
+      ("meta.leaf.uncons", [ArgLeaf]),
+      ("meta.node.cons", [ArgAny, ArgNode]),
+      ("meta.node.head", [ArgNode]),
+      ("meta.node.tail", [ArgNode])
     ]
 
 metaArithConstants :: Map.HashMap T.Text [Arg]
 metaArithConstants =
   Map.fromList
-    [ ("int-add", [ArgInt, ArgInt]),
-      ("int-sub", [ArgInt, ArgInt]),
-      ("int-mul", [ArgInt, ArgInt]),
-      ("int-div", [ArgInt, ArgInt])
+    [ ("meta.int.add", [ArgInt, ArgInt]),
+      ("meta.int.sub", [ArgInt, ArgInt]),
+      ("meta.int.mul", [ArgInt, ArgInt]),
+      ("meta.int.div", [ArgInt, ArgInt])
     ]
 
 metaCmpConstants :: Map.HashMap T.Text [Arg]
 metaCmpConstants =
   Map.fromList
-    [ ("int-gt", [ArgInt, ArgInt]),
-      ("int-ge", [ArgInt, ArgInt]),
-      ("int-lt", [ArgInt, ArgInt]),
-      ("int-le", [ArgInt, ArgInt]),
-      ("int-eq", [ArgInt, ArgInt])
+    [ ("meta.int.gt", [ArgInt, ArgInt]),
+      ("meta.int.ge", [ArgInt, ArgInt]),
+      ("meta.int.lt", [ArgInt, ArgInt]),
+      ("meta.int.le", [ArgInt, ArgInt]),
+      ("meta.int.eq", [ArgInt, ArgInt])
     ]

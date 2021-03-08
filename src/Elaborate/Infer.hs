@@ -63,7 +63,8 @@ infer' ctx term =
     (m, WeakTermConst x)
       -- i64, f16, etc.
       | Just _ <- asLowInt x ->
-        return ((m, WeakTermEnum x), (m, WeakTermTau))
+        -- return ((m, WeakTermEnum x), (m, WeakTermTau))
+        return ((m, WeakTermConst x), (m, WeakTermTau))
       | Just _ <- asLowFloat x ->
         return ((m, WeakTermConst x), (m, WeakTermTau))
       | Just op <- asPrimOp x ->
@@ -253,9 +254,6 @@ inferEnumCase ctx weakCase =
     (m, EnumCaseLabel name) -> do
       k <- lookupKind m name
       return (weakCase, (m, WeakTermEnum k))
-    (m, EnumCaseInteger i) -> do
-      h <- newTypeAsterInCtx ctx m
-      return ((m, EnumCaseInteger i), h)
     (m, EnumCaseDefault) -> do
       h <- newTypeAsterInCtx ctx m
       return ((m, EnumCaseDefault), h)

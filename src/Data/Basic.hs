@@ -38,7 +38,6 @@ instance Show Hint where
 
 data EnumCase
   = EnumCaseLabel T.Text
-  | EnumCaseInteger Integer
   | EnumCaseDefault
   deriving (Show, Eq, Ord)
 

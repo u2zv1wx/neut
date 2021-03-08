@@ -109,7 +109,7 @@ elaborate' term =
     (m, WeakTermInt t x) -> do
       t' <- elaborate' t >>= reduceTermPlus
       case t' of
-        (_, TermEnum intTypeStr)
+        (_, TermConst intTypeStr)
           | Just (LowTypeInt size) <- asLowTypeMaybe intTypeStr ->
             return (m, TermInt size x)
         _ ->
@@ -147,7 +147,7 @@ elaborate' term =
           raiseError m $
             "the type of `"
               <> toText (weaken e')
-              <> "` must be an enum type or an integer type, but is:\n"
+              <> "` must be an enum type, but is:\n"
               <> toText (weaken t')
     (m, WeakTermTensor ts) -> do
       ts' <- mapM elaborate' ts
