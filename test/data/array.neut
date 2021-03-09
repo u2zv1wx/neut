@@ -1,31 +1,36 @@
 (include "../header.neut")
 
 ; empty array
+; (define _
+;   (array-introduction i64))
 (define _
-  (array-introduction i64))
+  (unsafe.create-raw-array i64))
 
-(define _
-  (array-introduction i8 1 2 3 2 1 2 4))
+; (define _
+;   (array-introduction i8 1 2 3 2 1 2 4))
 
 (define xs
-  (array-introduction i64 1 2 -30 20))
+  (unsafe.create-raw-array i64 1 2 -30 20))
+
+; (define xs
+;   (array-introduction i64 1 2 -30 20))
 
 ; float array
-(define _
-  (array-introduction f16 3.28 2.14 2.0 9.82))
+; (define _
+;   (array-introduction f16 3.28 2.14 2.0 9.82))
 
-(define _
-  (array-introduction f32 3.28 2.14))
+; (define _
+;   (array-introduction f32 3.28 2.14))
 
-(define _
-  (array-introduction f64 3.28 2.14 3.14159))
+; (define _
+;   (array-introduction f64 3.28 2.14 3.14159))
 
-(define k
-  (array-elimination i64 (a b c d) xs
-    (i64.add a (i64.add b (i64.add c d)))))
+; (define k
+;   (array-elimination i64 (a b c d) xs
+;     (i64.add a (i64.add b (i64.add c d)))))
 
-(reduce
-  (i64.print k))
+; (reduce
+;   (i64.print k))
 
 (define l
   (with identity.bind

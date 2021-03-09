@@ -1,6 +1,6 @@
 (include "../header.neut")
 
-(record my-record ((a tau))
+(define-codata my-record ((a tau))
   (item-1
     a)
   (item-2
@@ -19,4 +19,4 @@
 
 (reduce (i64.print (my-record.item-2 i64 item)))
 
-(record empty-record ())
+(define-codata empty-record ())

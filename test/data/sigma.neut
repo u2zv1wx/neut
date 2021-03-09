@@ -6,7 +6,7 @@
 ; nullary sigma-elim
 (reduce
   (sigma-elimination () a0
-    (string.print "0")))
+    (safe-string.print-literal "0")))
 
 ; unary sigma-intro
 (define a1
@@ -19,7 +19,8 @@
 
 ; binary sigma-intro without dependence
 (define a2
-  (tuple (i64 2) (i64 2)))
+  (witness (product i64 i64)
+    (tuple (i64 2) (i64 2))))
 
 ; binary sigma-elim without dependence
 (reduce

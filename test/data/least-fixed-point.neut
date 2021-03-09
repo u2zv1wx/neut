@@ -1,54 +1,53 @@
 (include "../header.neut")
 
-(data µ ((f (hom tau tau)))
-  (lan
-    ((b tau)
-     (_ (f b))
-     (_ (hom b (µ f))))
-    (µ f)))
+(section hidden)
 
-; F (µ F) -> µF
-(define µ.in
+(define-data mu ((f (hom tau tau)))
+  (lan
+    (b tau)
+    (_ (f b))
+    (_ (hom b (mu f)))))
+
+; F (mu F) -> muF
+(define mu.in
   ((f (hom tau tau))
-   (x (f (µ f))))
-  (witness (µ f)
-    (µ.lan
+   (x (f (mu f))))
+  (witness (mu f)
+    (mu.lan
       f
-      (µ f)
+      (mu f)
       x
       (λ (y)
         y))))
 
-; µ F -> F (µ F)
-(define µ.out
+; mu F -> F (mu F)
+(define mu.out
   ((f (hom tau tau))
    (F (functor f))
-   (x (µ f)))
-  (witness (f (µ f))
-    (µ.case (f (µ f)) f x
+   (x (mu f)))
+  (witness (f (mu f))
+    (mu.case (f (mu f)) f x
       (λ (b v k)
         ((functor.map f F)
           b
-          (µ f)
+          (mu f)
           k
           v)))))
 
-(data list-f ((a tau) (r tau))
-  (nil ()
-    (list-f a r))
-  (cons ((_ a) (_ r))
-    (list-f a r)))
+(define-data list-f ((a tau) (r tau))
+  (nil)
+  (cons (_ a) (_ r)))
 
 (define list ((a tau))
-  (µ (list-f a _)))
+  (mu (list-f a _)))
 
 (define list.nil ((a tau))
   (witness (list a)
-    (µ.in (list-f a _) (list-f.nil a (list a)))))
+    (mu.in (list-f a _) (list-f.nil a (list a)))))
 
 (define list.cons ((a tau) (x a) (xs (list a)))
   (witness (list a)
-    (µ.in (list-f a _) (list-f.cons a (list a) x xs))))
+    (mu.in (list-f a _) (list-f.cons a (list a) x xs))))
 
 (define list-f.map ((a tau))
   (witness (functor-type (list-f a _))
@@ -76,13 +75,13 @@
       i64
       a
       (list a)
-      (µ.out (list-f a _) (list-f.as-functor a) xs)
+      (mu.out (list-f a _) (list-f.as-functor a) xs)
       (λ ()
         0)
       (λ (y ys)
         (add-i64 1 (my-length a ys))))))
 
 (define xs
-  (list.cons i64 0 (list.cons * 1 (list.cons * 2 (list.nil *)))))
+  (list.cons i64 0 (list.cons i64 1 (list.cons i64 2 (list.nil i64)))))
 
 (reduce (i64.print (my-length i64 xs)))

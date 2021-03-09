@@ -19,6 +19,7 @@ import Reduce.WeakTerm
 
 data Stuck
   = StuckPiElimUpsilon Ident Hint [(Hint, [WeakTermPlus])]
+  | StuckPiElimFix Ident Hint [(Hint, [WeakTermPlus])]
   | StuckPiElimAster Int [[WeakTermPlus]]
 
 unify :: WithEnv ()
@@ -46,7 +47,8 @@ synthesize = do
         e2' <- substWeakTermPlus s e2
         simp [(e1', e2')]
         synthesize
-      | otherwise ->
+      | otherwise -> do
+        p' cs
         throwTypeErrors
 
 simp :: [PreConstraint] -> WithEnv ()
@@ -164,6 +166,11 @@ simp' constraintList =
                 (_, Just (StuckPiElimUpsilon x2 _ _))
                   | Just _ <- IntMap.lookup (asInt x2) sub ->
                     simp' $ (e2', e1') : cs
+                (Just (StuckPiElimFix x1 _ mess1), Just (StuckPiElimFix x2 _ mess2))
+                  | x1 == x2,
+                    Nothing <- IntMap.lookup (asInt x1) sub,
+                    Just pairList <- asPairList (map snd mess1) (map snd mess2) ->
+                    simp $ pairList ++ cs
                 _ -> do
                   modify (\env -> env {suspendedConstraintEnv = (fmvs, (e1, e2)) : suspendedConstraintEnv env})
                   simp cs
@@ -211,6 +218,8 @@ asStuckedTerm term =
   case term of
     (m, WeakTermUpsilon x) ->
       Just $ StuckPiElimUpsilon x m []
+    (m, WeakTermFix (_, f, _) _ _) ->
+      Just $ StuckPiElimFix f m []
     (_, WeakTermAster h) ->
       Just $ StuckPiElimAster h []
     (m, WeakTermPiElim e es) ->
@@ -220,6 +229,8 @@ asStuckedTerm term =
             Just $ StuckPiElimAster h $ iexss ++ [es]
         Just (StuckPiElimUpsilon x mx ess) ->
           Just $ StuckPiElimUpsilon x mx $ ess ++ [(m, es)]
+        Just (StuckPiElimFix f mf ess) ->
+          Just $ StuckPiElimFix f mf $ ess ++ [(m, es)]
         _ ->
           Nothing
     _ ->

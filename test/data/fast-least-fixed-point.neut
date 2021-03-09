@@ -1,47 +1,45 @@
 (include "../header.neut")
 
-(define µ
+(section hidden)
+
+(define mu
   ((f (hom tau tau)))
   (Π
     ((F (hom (hom tau tau) tau))
      (_ (Π ((b tau) (_ (f b))) (F f))))
     (F f)))
 
-(define µ.in
+(define mu.in
   ((f (hom tau tau))
-   (x (f (µ f))))
-  (witness (µ f)
-    (unsafe.cast (f (µ f)) (µ f) x)))
+   (x (f (mu f))))
+  (witness (mu f)
+    (unsafe.cast (f (mu f)) (mu f) x)))
 
-(define µ.out
+(define mu.out
   ((f (hom tau tau))
-   (x (µ f)))
-  (witness (f (µ f))
-    (unsafe.cast (µ f) (f (µ f)) x)))
+   (x (mu f)))
+  (witness (f (mu f))
+    (unsafe.cast (mu f) (f (mu f)) x)))
 
-(data list-f
-  ((a tau)
-   (r tau))
-  (nil ()
-    (list-f a r))
-  (cons ((_ a) (_ r))
-    (list-f a r)))
+(define-data list-f ((a tau) (r tau))
+  (nil)
+  (cons (_ a) (_ r)))
 
 (define list
   ((a tau))
-  (µ (list-f a _)))
+  (mu (list-f a _)))
 
 (define list.nil
   ((a tau))
   (witness (list a)
-    (µ.in (list-f a _) (list-f.nil a (list a)))))
+    (mu.in (list-f a _) (list-f.nil a (list a)))))
 
 (define list.cons
   ((a tau)
    (x a)
    (xs (list a)))
   (witness (list a)
-    (µ.in (list-f a _) (list-f.cons a (list a) x xs))))
+    (mu.in (list-f a _) (list-f.cons a (list a) x xs))))
 
 (define length
   ((a tau)
@@ -51,7 +49,7 @@
       i64
       a
       (list a)
-      (µ.out (list-f a _) xs)
+      (mu.out (list-f a _) xs)
       (λ ()
         0)
       (λ (y ys)
