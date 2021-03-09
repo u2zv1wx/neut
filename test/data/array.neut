@@ -1,44 +1,38 @@
 (include "../header.neut")
 
 ; empty array
-; (define _
-;   (array-introduction i64))
 (define _
   (unsafe.create-raw-array i64))
-
-; (define _
-;   (array-introduction i8 1 2 3 2 1 2 4))
 
 (define xs
   (unsafe.create-raw-array i64 1 2 -30 20))
 
-; (define xs
-;   (array-introduction i64 1 2 -30 20))
-
 ; float array
-; (define _
-;   (array-introduction f16 3.28 2.14 2.0 9.82))
+(define _
+  (unsafe.create-raw-array f16 3.28 2.14 2.0 -9.82))
 
-; (define _
-;   (array-introduction f32 3.28 2.14))
+(define _
+  (unsafe.create-raw-array f32 3.28 2.14 2.0 -9.82))
 
-; (define _
-;   (array-introduction f64 3.28 2.14 3.14159))
+(define _
+  (unsafe.create-raw-array f64 3.28 2.14 2.0 -9.82))
 
-; (define k
-;   (array-elimination i64 (a b c d) xs
-;     (i64.add a (i64.add b (i64.add c d)))))
+(use unsafe)
 
-; (reduce
-;   (i64.print k))
+(define i64.array-access ((xs unsafe.pointer) (i i64))
+  (unsafe.load-with-offset i64 xs (mul-i64 8 i)))
 
 (define l
   (with identity.bind
-    (let a (i64.array-access 0 * &xs))
-    (let b (i64.array-access 1 4 &xs))
-    (let c (i64.array-access 2 4 &xs))
-    (let d (i64.array-access 3 * &xs))
-    (i64.add a (i64.add b (i64.add c d)))))
+    (let a (i64.array-access xs 0))
+    (let b (i64.array-access xs 1))
+    (let c (i64.array-access xs 2))
+    (let d (i64.array-access xs 3))
+    ; (let a (i64.array-access 0 * &xs))
+    ; (let b (i64.array-access 1 4 &xs))
+    ; (let c (i64.array-access 2 4 &xs))
+    ; (let d (i64.array-access 3 * &xs))q
+    (add-i64 a (add-i64 b (add-i64 c d)))))
 
 (reduce
   (i64.print l))
