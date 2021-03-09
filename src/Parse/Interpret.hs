@@ -153,7 +153,7 @@ interpret inputTree =
         _
           | [(_, TreeLeaf value)] <- rest,
             Just (intSize, v) <- readValueInt headAtom value ->
-            return (m, WeakTermInt (m, WeakTermEnum (showIntSize intSize)) v)
+            return (m, WeakTermInt (m, WeakTermConst (showIntSize intSize)) v)
           | otherwise ->
             interpretAux m $ leaf : rest
     (m, TreeNode es) ->

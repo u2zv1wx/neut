@@ -97,6 +97,9 @@ reduceConstApp m c es =
     "meta.leaf.equal"
       | [(_, MetaTermLeaf s1), (_, MetaTermLeaf s2)] <- es ->
         return $ liftBool (s1 == s2) m
+    "meta.leaf.from-int"
+      | [(mInt, MetaTermInteger x)] <- es ->
+        return (mInt, MetaTermLeaf (T.pack (show x)))
     "meta.leaf.mul"
       | [(mLeaf, MetaTermLeaf s1), (_, MetaTermLeaf s2)] <- es ->
         return (mLeaf, MetaTermLeaf (s1 <> s2))

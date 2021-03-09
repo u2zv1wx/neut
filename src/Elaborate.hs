@@ -46,7 +46,7 @@ elaborateStmt' stmt =
       sub <- gets substEnv
       (discarder', tDiscarder) <- substWeakTermPlus sub discarder >>= infer
       (copier', tCopier) <- substWeakTermPlus sub copier >>= infer
-      let tPtr = (m, WeakTermConst (nsUnsafe <> "pointer"))
+      let tPtr = (m, WeakTermEnum (nsUnsafe <> "pointer"))
       h <- newNameWith' "res"
       insConstraintEnv tDiscarder (m, WeakTermPi [(m, h, tPtr)] (m, WeakTermTensor []))
       insConstraintEnv tCopier (m, WeakTermPi [(m, h, tPtr)] (m, WeakTermTensor [tPtr, tPtr]))

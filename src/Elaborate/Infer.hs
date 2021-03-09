@@ -15,6 +15,7 @@ import qualified Data.HashMap.Lazy as Map
 import qualified Data.IntMap as IntMap
 import Data.Log
 import Data.LowType
+import qualified Data.Set as S
 import Data.Term
 import qualified Data.Text as T
 import Data.WeakTerm
@@ -351,9 +352,14 @@ lookupConstTypeEnv m x
           "the constant `" <> x <> "` is not found in the type environment."
 
 primOpToType :: Hint -> PrimOp -> WithEnv TermPlus
-primOpToType m (PrimOp _ domList cod) = do
+primOpToType m (PrimOp op domList cod) = do
   domList' <- mapM (lowTypeToType m) domList
-  cod' <- lowTypeToType m cod
   xs <- mapM (const (newNameWith'' "_")) domList'
   let xts = zipWith (\x t -> (m, x, t)) xs domList'
-  return (m, TermPi xts cod')
+  if S.member op cmpOpSet
+    then do
+      let cod' = (m, TermEnum "bool")
+      return (m, TermPi xts cod')
+    else do
+      cod' <- lowTypeToType m cod
+      return (m, TermPi xts cod')

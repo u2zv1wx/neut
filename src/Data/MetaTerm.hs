@@ -150,6 +150,7 @@ metaTreeConstants =
       ("meta.is-nil", [ArgNode]),
       ("meta.is-node", [ArgAny]),
       ("meta.leaf.equal", [ArgLeaf, ArgLeaf]),
+      ("meta.leaf.from-int", [ArgInt]),
       ("meta.leaf.mul", [ArgLeaf, ArgLeaf]),
       ("meta.leaf.new-symbol", [ArgLeaf]),
       ("meta.leaf.string-to-u8-list", [ArgLeaf]),
