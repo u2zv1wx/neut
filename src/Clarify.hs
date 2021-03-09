@@ -99,17 +99,22 @@ clarifyTerm tenv term =
       let (_, xs, _) = unzip3 xts
       return $ bindLet [(zName, e1')] (m, CompSigmaElim xs z e2')
     (m, TermDerangement expKind resultType ekts) -> do
-      let (es, ks, ts) = unzip3 ekts
-      xs <- mapM (const $ newNameWith' "sys") es
-      let xts = zipWith (\x t -> (fst t, x, t)) xs ts
-      let borrowedVarList = catMaybes $ map takeIffLinear (zip xts ks)
-      let xsAsVars = map (\(mx, x, _) -> (mx, ValueUpsilon x)) xts
-      resultVarName <- newNameWith' "result"
-      tuple <- constructResultTuple tenv m borrowedVarList (m, resultVarName, resultType)
-      let lamBody = (m, CompUpElim resultVarName (m, CompPrimitive (PrimitiveDerangement expKind xsAsVars)) tuple)
-      cls <- retClosure tenv Nothing [] m xts lamBody
-      es' <- mapM (clarifyPlus tenv) es
-      callClosure m cls es'
+      case (expKind, ekts) of
+        (DerangementNop, [(e, _, _)]) ->
+          clarifyTerm tenv e
+        _ -> do
+          let (es, ks, ts) = unzip3 ekts
+          xs <- mapM (const $ newNameWith' "sys") es
+          let xts = zipWith (\x t -> (fst t, x, t)) xs ts
+          let borrowedVarList = catMaybes $ map takeIffLinear (zip xts ks)
+          let xsAsVars = map (\(mx, x, _) -> (mx, ValueUpsilon x)) xts
+          resultVarName <- newNameWith' "result"
+          tuple <- constructResultTuple tenv m borrowedVarList (m, resultVarName, resultType)
+          let lamBody = (m, CompUpElim resultVarName (m, CompPrimitive (PrimitiveDerangement expKind xsAsVars)) tuple)
+          fvs <- nubFVS <$> chainOf' tenv xts es
+          cls <- retClosure tenv Nothing fvs m xts lamBody
+          es' <- mapM (clarifyPlus tenv) es
+          callClosure m cls es'
 
 clarifyPlus :: TypeEnv -> TermPlus -> WithEnv (Ident, CompPlus, ValuePlus)
 clarifyPlus tenv e@(m, _) = do
