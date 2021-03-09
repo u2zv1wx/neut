@@ -190,45 +190,6 @@ interpretArg es =
           e <- interpret tree
           return (xts, e : args)
 
--- (definition string
---   (Σ
---     ((len u64))
---     (array len u8)))
--- sigmaIntroString :: Hint -> [WeakTermPlus] -> WithEnv WeakTermPlus
--- sigmaIntroString m ts = do
---   p' ts
---   undefined
-
--- p "u8s:"
--- p' u8s
--- let z = asIdent "internal.sigma-tau"
--- k <- newNameWith'' "sigma"
--- let lenVar = asIdent "length"
--- arrVar <- newNameWith'' "array"
--- return
---   ( m,
---     WeakTermPiIntro
---       [ (m, z, (m, WeakTermTau)),
---         ( m,
---           k,
---           ( m,
---             WeakTermPi
---               [ (m, lenVar, (m, WeakTermConst (showIntSize 64))),
---                 (m, arrVar, (m, WeakTermArray (m, WeakTermUpsilon lenVar) (ArrayInt 8)))
---               ]
---               (m, WeakTermUpsilon z)
---           )
---         )
---       ]
---       ( m,
---         WeakTermPiElim
---           (m, WeakTermUpsilon k)
---           [ (m, WeakTermInt (i64 m) (toInteger $ length u8s)),
---             (m, WeakTermArrayIntro (ArrayInt 8) u8s)
---           ]
---       )
---   )
-
 interpretWeakIdentPlus :: TreePlus -> WithEnv WeakIdentPlus
 interpretWeakIdentPlus tree =
   case tree of
