@@ -37,7 +37,7 @@ clarifyStmt tenv ss =
       return (m, CompUpIntro (m, ValueInt 64 0))
     StmtLet m (mx, x, t) e : cont -> do
       e' <- clarifyTerm tenv e >>= reduceCompPlus
-      insCompEnv (asText x <> "_" <> T.pack (show (asInt x))) False [] e'
+      insCompEnv (toGlobalVarName x) False [] e'
       let app = (m, CompPiElimDownElim (m, ValueConst (toGlobalVarName x)) [])
       cont' <- clarifyStmt (insTypeEnv [(mx, x, t)] tenv) cont
       holeVarName <- newNameWith' "hole"
@@ -210,7 +210,7 @@ makeClosure mName mxts2 m mxts1 e = do
     Just name -> do
       let cls = (m, ValueSigmaIntro [envExp, fvEnv, (m, ValueConst (toGlobalVarName name))])
       e' <- substCompPlus (IntMap.fromList [(asInt name, cls)]) IntMap.empty e
-      registerIfNecessary m (asText name <> "_" <> T.pack (show (asInt name))) True xts1 xts2 e'
+      registerIfNecessary m (toGlobalVarName name) True xts1 xts2 e'
       return cls
 
 registerIfNecessary ::
@@ -368,4 +368,4 @@ toSwitcherBranch m tenv d = do
 
 toGlobalVarName :: Ident -> T.Text
 toGlobalVarName x =
-  asText x <> "_" <> T.pack (show (asInt x))
+  "_" <> T.pack (show (asInt x))
