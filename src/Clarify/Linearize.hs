@@ -12,8 +12,8 @@ type LinearChain = [(Ident, (Ident, Ident))]
 
 linearize ::
   [(Ident, CompPlus)] -> -- [(x1, t1), ..., (xn, tn)]  (closed chain)
-  CompPlus -> -- xiがlinearでない仕方で出現しうるterm
-  WithEnv CompPlus -- closed chainの要素がすべてlinearになったterm
+  CompPlus -> -- a term that can contain non-linear occurrences of xi
+  WithEnv CompPlus -- a term in which all the variables in the closed chain occur linearly
 linearize binder e =
   case binder of
     [] ->
@@ -21,55 +21,50 @@ linearize binder e =
     (x, t) : xts -> do
       e' <- linearize xts e
       (newNameList, e'') <- distinguishComp x e'
-      withHeader newNameList x t e''
+      case newNameList of
+        [] ->
+          insertHeaderForAffine x t e''
+        [z] ->
+          insertHeaderForLinear x z e''
+        _ -> do
+          insertHeaderForRelevant (x : newNameList) t e''
 
--- insert header for a variable
-withHeader :: [Ident] -> Ident -> CompPlus -> CompPlus -> WithEnv CompPlus
-withHeader xs x t e =
-  case xs of
-    [] ->
-      withHeaderAffine x t e
-    [z] ->
-      withHeaderLinear z x e
-    _ -> do
-      withHeaderRelevant (x : xs) t e
-
--- withHeaderAffine x t e ~>
+-- insertHeaderForAffine x t e ~>
 --   bind _ :=
 --     bind exp := t^# in        --
 --     exp @ (0, x) in           -- AffineApp
 --   e
-withHeaderAffine :: Ident -> CompPlus -> CompPlus -> WithEnv CompPlus
-withHeaderAffine x t e@(m, _) = do
+insertHeaderForAffine :: Ident -> CompPlus -> CompPlus -> WithEnv CompPlus
+insertHeaderForAffine x t e@(m, _) = do
   hole <- newNameWith' "unit"
   discardUnusedVar <- toAffineApp m x t
   return (m, CompUpElim hole discardUnusedVar e)
 
--- withHeaderLinear z x e ~>
+-- insertHeaderForLinear z x e ~>
 --   bind z := return x in
 --   e
-withHeaderLinear :: Ident -> Ident -> CompPlus -> WithEnv CompPlus
-withHeaderLinear z x e@(m, _) =
+insertHeaderForLinear :: Ident -> Ident -> CompPlus -> WithEnv CompPlus
+insertHeaderForLinear x z e@(m, _) =
   return (m, CompUpElim z (m, CompUpIntro (m, ValueUpsilon x)) e)
 
--- withHeaderRelevant [x, x1, ..., x{N}] t e ~>
+-- insertHeaderForRelevant [x, x1, ..., x{N}] t e ~>
 --   bind exp := t in
 --   bind sigTmp1 := exp @ (1, x) in               --
 --   let (x1, tmp1) := sigTmp1 in                  --
---   ...                                           -- withHeaderRelevant'
+--   ...                                           -- insertHeaderForRelevant'
 --   bind sigTmp{N-1} := exp @ (1, tmp{N-2}) in    --
 --   let (x{N-1}, x{N}) := sigTmp{N-1} in          --
 --   e                                             --
 -- (assuming N >= 2)
-withHeaderRelevant ::
+insertHeaderForRelevant ::
   [Ident] ->
   CompPlus ->
   CompPlus ->
   WithEnv CompPlus
-withHeaderRelevant xs t e@(m, _) = do
+insertHeaderForRelevant xs t e@(m, _) = do
   (expVarName, expVar) <- newValueUpsilonWith m "exp"
   linearChain <- toLinearChain xs
-  rel <- withHeaderRelevant' t expVar linearChain e
+  rel <- insertHeaderForRelevant' t expVar linearChain e
   return (m, CompUpElim expVarName t rel)
 
 --    toLinearChain [x0, x1, x2, ..., x{N-1}] (N >= 3)
@@ -98,7 +93,7 @@ toLinearChain xs = do
   let pairSeq = zip valueSeq (tail tmpSeq')
   return $ zip (init tmpSeq') pairSeq
 
--- withHeaderRelevant' expVar [(x1, (x2, tmpA)), (tmpA, (x3, tmpB)), (tmpB, (x3, x4))] ~>
+-- insertHeaderForRelevant' expVar [(x1, (x2, tmpA)), (tmpA, (x3, tmpB)), (tmpB, (x3, x4))] ~>
 --   bind sigVar1 := expVar @ (1, x1) in
 --   let (x2, tmpA) := sigVar1 in
 --   bind sigVar2 := expVar @ (1, tmpA) in
@@ -106,13 +101,13 @@ toLinearChain xs = do
 --   bind sigVar3 := expVar @ (1, tmpB) in
 --   let (x3, x4) := sigVar3 in
 --   e
-withHeaderRelevant' :: CompPlus -> ValuePlus -> LinearChain -> CompPlus -> WithEnv CompPlus
-withHeaderRelevant' t expVar ch cont@(m, _) =
+insertHeaderForRelevant' :: CompPlus -> ValuePlus -> LinearChain -> CompPlus -> WithEnv CompPlus
+insertHeaderForRelevant' t expVar ch cont@(m, _) =
   case ch of
     [] ->
       return cont
     (x, (x1, x2)) : chain -> do
-      cont' <- withHeaderRelevant' t expVar chain cont
+      cont' <- insertHeaderForRelevant' t expVar chain cont
       (sigVarName, sigVar) <- newValueUpsilonWith m "sig"
       return
         ( m,
@@ -129,44 +124,44 @@ withHeaderRelevant' t expVar ch cont@(m, _) =
 distinguishValue :: Ident -> ValuePlus -> WithEnv ([Ident], ValuePlus)
 distinguishValue z term =
   case term of
-    (ml, ValueUpsilon x) ->
+    (m, ValueUpsilon x) ->
       if x /= z
         then return ([], term)
         else do
           x' <- newNameWith x
-          return ([x'], (ml, ValueUpsilon x'))
-    (ml, ValueSigmaIntro ds) -> do
+          return ([x'], (m, ValueUpsilon x'))
+    (m, ValueSigmaIntro ds) -> do
       (vss, ds') <- unzip <$> mapM (distinguishValue z) ds
-      return (concat vss, (ml, ValueSigmaIntro ds'))
+      return (concat vss, (m, ValueSigmaIntro ds'))
     _ ->
       return ([], term)
 
 distinguishComp :: Ident -> CompPlus -> WithEnv ([Ident], CompPlus)
 distinguishComp z term =
   case term of
-    (ml, CompPrimitive theta) -> do
+    (m, CompPrimitive theta) -> do
       (vs, theta') <- distinguishPrimitive z theta
-      return (vs, (ml, CompPrimitive theta'))
-    (ml, CompPiElimDownElim d ds) -> do
+      return (vs, (m, CompPrimitive theta'))
+    (m, CompPiElimDownElim d ds) -> do
       (vs, d') <- distinguishValue z d
       (vss, ds') <- unzip <$> mapM (distinguishValue z) ds
-      return (concat $ vs : vss, (ml, CompPiElimDownElim d' ds'))
-    (ml, CompSigmaElim xs d e) -> do
+      return (concat $ vs : vss, (m, CompPiElimDownElim d' ds'))
+    (m, CompSigmaElim xs d e) -> do
       (vs1, d') <- distinguishValue z d
       (vs2, e') <- distinguishComp z e
-      return (concat [vs1, vs2], (ml, CompSigmaElim xs d' e'))
-    (ml, CompUpIntro d) -> do
+      return (concat [vs1, vs2], (m, CompSigmaElim xs d' e'))
+    (m, CompUpIntro d) -> do
       (vs, d') <- distinguishValue z d
-      return (vs, (ml, CompUpIntro d'))
-    (ml, CompUpElim x e1 e2) -> do
+      return (vs, (m, CompUpIntro d'))
+    (m, CompUpElim x e1 e2) -> do
       (vs1, e1') <- distinguishComp z e1
       (vs2, e2') <- distinguishComp z e2
-      return (concat [vs1, vs2], (ml, CompUpElim x e1' e2'))
-    (ml, CompEnumElim d branchList) -> do
+      return (concat [vs1, vs2], (m, CompUpElim x e1' e2'))
+    (m, CompEnumElim d branchList) -> do
       (vs, d') <- distinguishValue z d
       let (cs, es) = unzip branchList
       (vss, es') <- unzip <$> mapM (distinguishComp z) es
-      return (concat $ vs : vss, (ml, CompEnumElim d' (zip cs es')))
+      return (concat $ vs : vss, (m, CompEnumElim d' (zip cs es')))
 
 distinguishPrimitive :: Ident -> Primitive -> WithEnv ([Ident], Primitive)
 distinguishPrimitive z term =
