@@ -37,7 +37,6 @@ sigmaS4 mName m mxts =
   case mName of
     Nothing -> do
       h <- newTextWith' "sigma"
-      -- h <- newTextWith "sigma"
       registerSwitcher m h (sigmaT m mxts) (sigma4 m mxts)
       return (m, ValueConst h)
     Just name ->
