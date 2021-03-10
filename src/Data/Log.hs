@@ -1,24 +1,4 @@
-module Data.Log
-  ( Log,
-    Error (Error),
-    outputLog,
-    outputLog',
-    outputPass,
-    outputFail,
-    logNote,
-    logNote',
-    logWarning,
-    logError,
-    logError',
-    logCritical,
-    logCritical',
-    raiseError,
-    raiseError',
-    raiseCritical,
-    raiseCritical',
-    raiseSyntaxError,
-  )
-where
+module Data.Log where
 
 import Control.Exception.Safe
 import Data.Basic
@@ -28,12 +8,18 @@ import System.Console.ANSI
 
 data LogLevel
   = LogLevelNote
-  | LogLevelPass -- for test
   | LogLevelWarning
   | LogLevelError
-  | LogLevelFail -- for test
   | LogLevelCritical -- "impossible" happened
+  | LogLevelPass -- for test
+  | LogLevelFail -- for test
   deriving (Show, Eq)
+
+type Log =
+  (Maybe PosInfo, LogLevel, T.Text)
+
+type ColorFlag =
+  Bool
 
 newtype Error
   = Error [Log]
@@ -72,12 +58,6 @@ logLevelToSGR level =
       [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Red]
     LogLevelCritical ->
       [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Red]
-
-type Log =
-  (Maybe PosInfo, LogLevel, T.Text)
-
-type ColorFlag =
-  Bool
 
 outputLog :: ColorFlag -> String -> Log -> IO ()
 outputLog b eoe (mpos, l, t) = do

@@ -61,7 +61,6 @@ data Env = Env
     --
     -- clarify
     --
-    typeEnv :: TypeEnv,
     codeEnv :: Map.HashMap T.Text Definition,
     --
     -- LLVM
@@ -90,7 +89,6 @@ initialEnv =
       prefixEnv = [],
       sectionEnv = [],
       weakTypeEnv = IntMap.empty,
-      typeEnv = IntMap.empty,
       constTypeEnv = Map.empty,
       codeEnv = Map.empty,
       lowCompEnv = Map.empty,
