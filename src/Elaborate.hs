@@ -174,15 +174,10 @@ elaboratePlus (m, x, t) = do
 checkSwitchExaustiveness :: Hint -> T.Text -> [EnumCase] -> WithEnv ()
 checkSwitchExaustiveness m x caseList = do
   let b = EnumCaseDefault `elem` caseList
-  case asLowInt x of
-    Just _ ->
-      when (not b) $
-        raiseError m "this integer-switch is ill-constructed in that it does not contain `default`"
-    Nothing -> do
-      enumSet <- lookupEnumSet m x
-      let len = toInteger $ length (nub caseList)
-      when (not ((toInteger (length enumSet)) <= len || b)) $
-        raiseError m "this switch here is ill-constructed in that it is not exhaustive"
+  enumSet <- lookupEnumSet m x
+  let len = toInteger $ length (nub caseList)
+  when (not ((toInteger (length enumSet)) <= len || b)) $
+    raiseError m "this switch here is ill-constructed in that it is not exhaustive"
 
 lookupEnumSet :: Hint -> T.Text -> WithEnv [T.Text]
 lookupEnumSet m name = do

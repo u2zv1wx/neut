@@ -25,6 +25,9 @@ data TEnv = TEnv
 
 type Tokenizer a = StateT TEnv IO a
 
+type EscapeFlag =
+  Bool
+
 tokenize :: T.Text -> WithEnv [TreePlus]
 tokenize input = do
   modify (\env -> env {count = 1 + count env})
@@ -182,9 +185,6 @@ string = do
   let (x, rest') = T.splitAt len s
   modify (\env -> env {text = rest'})
   return x
-
-type EscapeFlag =
-  Bool
 
 headStringLengthOf :: EscapeFlag -> T.Text -> Int -> Tokenizer Int
 headStringLengthOf flag s i =

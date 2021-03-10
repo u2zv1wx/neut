@@ -38,7 +38,7 @@ clarifyStmt tenv ss =
     StmtLet m (mx, x, t) e : cont -> do
       e' <- clarifyTerm tenv e >>= reduceCompPlus
       insCompEnv (asText x <> "_" <> T.pack (show (asInt x))) False [] e'
-      let app = (m, CompPiElimDownElim (m, ValueConst $ asText x <> "_" <> T.pack (show (asInt x))) [])
+      let app = (m, CompPiElimDownElim (m, ValueConst (toGlobalVarName x)) [])
       cont' <- clarifyStmt (insTypeEnv [(mx, x, t)] tenv) cont
       holeVarName <- newNameWith' "hole"
       return (m, CompUpElim holeVarName app cont')
@@ -57,7 +57,7 @@ clarifyTerm tenv term =
       senv <- gets substEnv
       if not $ IntMap.member (asInt x) senv
         then return (m, CompUpIntro (m, ValueUpsilon x))
-        else return (m, CompPiElimDownElim (m, ValueConst $ asText x <> "_" <> T.pack (show (asInt x))) [])
+        else return (m, CompPiElimDownElim (m, ValueConst (toGlobalVarName x)) [])
     (m, TermPi {}) ->
       returnClosureS4 m
     (m, TermPiIntro mxts e) -> do
@@ -208,7 +208,7 @@ makeClosure mName mxts2 m mxts1 e = do
       registerIfNecessary m name False xts1 xts2 e
       return (m, ValueSigmaIntro [envExp, fvEnv, (m, ValueConst name)])
     Just name -> do
-      let cls = (m, ValueSigmaIntro [envExp, fvEnv, (m, ValueConst $ asText name <> "_" <> T.pack (show (asInt name)))])
+      let cls = (m, ValueSigmaIntro [envExp, fvEnv, (m, ValueConst (toGlobalVarName name))])
       e' <- substCompPlus (IntMap.fromList [(asInt name, cls)]) IntMap.empty e
       registerIfNecessary m (asText name <> "_" <> T.pack (show (asInt name))) True xts1 xts2 e'
       return cls
@@ -365,3 +365,7 @@ toSwitcherBranch m tenv d = do
   d' <- clarifyTerm tenv d
   (varName, var) <- newValueUpsilonWith m "res"
   return $ \val -> callClosure m d' [(varName, (m, CompUpIntro val), var)] >>= reduceCompPlus
+
+toGlobalVarName :: Ident -> T.Text
+toGlobalVarName x =
+  asText x <> "_" <> T.pack (show (asInt x))

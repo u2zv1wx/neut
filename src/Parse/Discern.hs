@@ -28,7 +28,7 @@ discernIdentPlus (m, x, t) = do
     raiseError m $ "the variable `" <> asText x <> "` is already defined at the top level"
   t' <- discern' nenv t
   x' <- newNameWith x
-  modify (\env -> env {topNameEnv = Map.insert (asText x) x' (topNameEnv env)})
+  modify (\env -> env {topNameEnv = Map.insert (asText x) x' nenv})
   return (m, x', t')
 
 discernDef :: Def -> WithEnv Def

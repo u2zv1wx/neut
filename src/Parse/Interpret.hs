@@ -140,7 +140,7 @@ interpret inputTree =
           | otherwise ->
             raiseSyntaxError m "(question TREE)"
         "derangement"
-          | (derangement : resultType : eks) <- rest -> do
+          | derangement : resultType : eks <- rest -> do
             derangement' <- interpretDerangement derangement
             checkDerangementArity m derangement' eks
             resultType' <- interpret resultType
