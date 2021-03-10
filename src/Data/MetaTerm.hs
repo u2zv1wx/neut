@@ -10,9 +10,9 @@ import Data.Tree
 -- untyped lambda calculus with AST values (node / leaf)
 data MetaTerm
   = MetaTermVar Ident
-  | MetaTermImpIntro [Ident] (Maybe Ident) MetaTermPlus
+  | MetaTermImpIntro [Ident] (Maybe Ident) MetaTermPlus -- the `Maybe Ident` part is for variadic lambda
   | MetaTermImpElim MetaTermPlus [MetaTermPlus]
-  | MetaTermFix Ident [Ident] (Maybe Ident) MetaTermPlus
+  | MetaTermFix Ident [Ident] (Maybe Ident) MetaTermPlus -- the `Maybe Ident` part is for variadic fix
   | MetaTermLeaf T.Text
   | MetaTermNode [MetaTermPlus]
   | MetaTermConst T.Text
@@ -34,14 +34,7 @@ data Arg
   | ArgAny
   deriving (Ord, Eq, Show)
 
-embed :: TreePlus -> MetaTermPlus
-embed term =
-  case term of
-    (m, TreeLeaf x) ->
-      (m, MetaTermLeaf x)
-    (m, TreeNode es) ->
-      (m, MetaTermNode (map embed es))
-
+-- fixme: make this function capture-avoidng
 substMetaTerm :: SubstMetaTerm -> MetaTermPlus -> MetaTermPlus
 substMetaTerm sub term =
   case term of

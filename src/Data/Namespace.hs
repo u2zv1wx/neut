@@ -29,7 +29,7 @@ nsUnsafe =
 {-# INLINE nsOS #-}
 nsOS :: T.Text
 nsOS =
-  "os."
+  "os" <> nsSep
 
 use :: T.Text -> WithEnv ()
 use s =

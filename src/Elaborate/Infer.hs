@@ -64,7 +64,6 @@ infer' ctx term =
     (m, WeakTermConst x)
       -- i64, f16, etc.
       | Just _ <- asLowInt x ->
-        -- return ((m, WeakTermEnum x), (m, WeakTermTau))
         return ((m, WeakTermConst x), (m, WeakTermTau))
       | Just _ <- asLowFloat x ->
         return ((m, WeakTermConst x), (m, WeakTermTau))

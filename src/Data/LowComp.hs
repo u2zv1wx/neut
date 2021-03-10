@@ -20,12 +20,12 @@ data LowComp
   -- since LLVM doesn't allow us to write something like `%foo = store i32 3, i32* %ptr`.
   | LowCompCont LowOp LowComp
   | LowCompSwitch (LowValue, LowType) LowComp [(Int, LowComp)] -- EnumElim
-  | LowCompCall LowValue [LowValue]
+  | LowCompCall LowValue [LowValue] -- tail call
   | LowCompUnreachable -- for empty case analysis
   deriving (Show)
 
 data LowOp
-  = LowOpCall LowValue [LowValue]
+  = LowOpCall LowValue [LowValue] -- non-tail call
   | LowOpGetElementPtr
       (LowValue, LowType) -- (base pointer, the type of base pointer)
       [(LowValue, LowType)] -- [(index, the-type-of-index)]
