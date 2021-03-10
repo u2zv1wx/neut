@@ -114,10 +114,10 @@ substWeakTermPlus' sub nenv term =
     (_, WeakTermTau) ->
       return term
     (m, WeakTermUpsilon x)
-      | Just e2@(_, e) <- IntMap.lookup (asInt x) sub ->
-        return (supHint (metaOf term) (metaOf e2), e)
       | Just x' <- IntMap.lookup (asInt x) nenv ->
         return (m, WeakTermUpsilon x')
+      | Just e2@(_, e) <- IntMap.lookup (asInt x) sub ->
+        return (supHint (metaOf term) (metaOf e2), e)
       | otherwise ->
         return term
     (m, WeakTermPi xts t) -> do
@@ -132,10 +132,9 @@ substWeakTermPlus' sub nenv term =
       return (m, WeakTermPiElim e' es')
     (m, WeakTermFix (mx, x, t) xts e) -> do
       t' <- substWeakTermPlus' sub nenv t
-      let sub' = IntMap.delete (asInt x) sub
       x' <- newNameWith x
       let nenv' = IntMap.insert (asInt x) x' nenv
-      (xts', e') <- substWeakTermPlus'' sub' nenv' xts e
+      (xts', e') <- substWeakTermPlus'' sub nenv' xts e
       return (m, WeakTermFix (mx, x', t') xts' e')
     (_, WeakTermConst _) ->
       return term
@@ -194,9 +193,8 @@ substWeakTermPlus'' sub nenv binder e =
       e' <- substWeakTermPlus' sub nenv e
       return ([], e')
     ((m, x, t) : xts) -> do
-      let sub' = IntMap.delete (asInt x) sub
       x' <- newNameWith x
       let nenv' = IntMap.insert (asInt x) x' nenv
-      (xts', e') <- substWeakTermPlus'' sub' nenv' xts e
+      (xts', e') <- substWeakTermPlus'' sub nenv' xts e
       t' <- substWeakTermPlus' sub nenv t
       return ((m, x', t') : xts', e')

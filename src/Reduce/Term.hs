@@ -115,10 +115,10 @@ substTermPlus' sub nenv term =
     (_, TermTau) ->
       return term
     (m, TermUpsilon x)
-      | Just e <- IntMap.lookup (asInt x) sub ->
-        return e
       | Just x' <- IntMap.lookup (asInt x) nenv ->
         return (m, TermUpsilon x')
+      | Just e <- IntMap.lookup (asInt x) sub ->
+        return e
       | otherwise ->
         return term
     (m, TermPi xts t) -> do
@@ -133,10 +133,11 @@ substTermPlus' sub nenv term =
       return (m, TermPiElim e' es')
     (m, TermFix (mx, x, t) xts e) -> do
       t' <- substTermPlus' sub nenv t
-      let sub' = IntMap.delete (asInt x) sub
+      -- let sub' = IntMap.delete (asInt x) sub
       x' <- newNameWith x
       let nenv' = IntMap.insert (asInt x) x' nenv
-      (xts', e') <- substTermPlus'' sub' nenv' xts e
+      -- (xts', e') <- substTermPlus'' sub' nenv' xts e
+      (xts', e') <- substTermPlus'' sub nenv' xts e
       return (m, TermFix (mx, x', t') xts' e')
     (_, TermConst _) ->
       return term
@@ -183,10 +184,11 @@ substTermPlus'' sub nenv binder e =
       e' <- substTermPlus' sub nenv e
       return ([], e')
     ((m, x, t) : xts) -> do
-      let sub' = IntMap.delete (asInt x) sub
+      -- let sub' = IntMap.delete (asInt x) sub
       x' <- newNameWith x
       let nenv' = IntMap.insert (asInt x) x' nenv
-      (xts', e') <- substTermPlus'' sub' nenv' xts e
+      (xts', e') <- substTermPlus'' sub nenv' xts e
+      -- (xts', e') <- substTermPlus'' sub' nenv' xts e
       t' <- substTermPlus' sub nenv t
       return ((m, x', t') : xts', e')
 

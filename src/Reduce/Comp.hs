@@ -81,10 +81,10 @@ substValuePlus sub nenv term =
     (_, ValueConst {}) ->
       return term
     (m, ValueUpsilon x)
-      | Just e <- IntMap.lookup (asInt x) sub ->
-        return e
       | Just x' <- IntMap.lookup (asInt x) nenv ->
         return (m, ValueUpsilon x')
+      | Just e <- IntMap.lookup (asInt x) sub ->
+        return e
       | otherwise ->
         return (m, ValueUpsilon x)
     (m, ValueSigmaIntro vs) -> do
@@ -109,20 +109,18 @@ substCompPlus sub nenv term =
       return (m, CompPiElimDownElim v' ds')
     (m, CompSigmaElim xs v e) -> do
       v' <- substValuePlus sub nenv v
-      let sub' = foldr IntMap.delete sub (map asInt xs)
       xs' <- mapM newNameWith xs
       let nenv' = IntMap.union (IntMap.fromList (zip (map asInt xs) xs')) nenv
-      e' <- substCompPlus sub' nenv' e
+      e' <- substCompPlus sub nenv' e
       return (m, CompSigmaElim xs' v' e')
     (m, CompUpIntro v) -> do
       v' <- substValuePlus sub nenv v
       return (m, CompUpIntro v')
     (m, CompUpElim x e1 e2) -> do
       e1' <- substCompPlus sub nenv e1
-      let sub' = IntMap.delete (asInt x) sub
       x' <- newNameWith x
       let nenv' = IntMap.insert (asInt x) x' nenv
-      e2' <- substCompPlus sub' nenv' e2
+      e2' <- substCompPlus sub nenv' e2
       return (m, CompUpElim x' e1' e2')
     (m, CompEnumElim v branchList) -> do
       v' <- substValuePlus sub nenv v
