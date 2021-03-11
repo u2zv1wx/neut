@@ -3,6 +3,7 @@ module Data.Comp where
 import Data.Basic
 import qualified Data.IntMap as IntMap
 import Data.LowType
+import qualified Data.Set as S
 import qualified Data.Text as T
 
 data Value
@@ -52,3 +53,40 @@ asUpsilon term =
       Just x
     _ ->
       Nothing
+
+varValue :: ValuePlus -> S.Set Ident
+varValue v =
+  case v of
+    (_, ValueUpsilon x) ->
+      S.singleton x
+    (_, ValueSigmaIntro vs) ->
+      S.unions $ map varValue vs
+    _ ->
+      S.empty
+
+varComp :: CompPlus -> S.Set Ident
+varComp c =
+  case c of
+    (_, CompPrimitive prim) ->
+      case prim of
+        PrimitivePrimOp _ vs ->
+          S.unions $ map varValue vs
+        PrimitiveDerangement _ vs ->
+          S.unions $ map varValue vs
+    (_, CompPiElimDownElim v vs) ->
+      S.unions $ map varValue (v : vs)
+    (_, CompSigmaElim xs v e) -> do
+      let s1 = varValue v
+      let s2 = S.filter (`notElem` xs) $ varComp e
+      S.union s1 s2
+    (_, CompUpIntro v) ->
+      varValue v
+    (_, CompUpElim x e1 e2) -> do
+      let s1 = varComp e1
+      let s2 = S.filter (/= x) $ varComp e2
+      S.union s1 s2
+    (_, CompEnumElim v caseList) -> do
+      let s1 = varValue v
+      let (_, es) = unzip caseList
+      let s2 = S.unions (map varComp es)
+      S.union s1 s2

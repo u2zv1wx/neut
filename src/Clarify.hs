@@ -19,6 +19,7 @@ import Data.List (nubBy)
 import Data.Log
 import Data.LowType
 import Data.Maybe (catMaybes)
+import qualified Data.Set as S
 import Data.Term
 import qualified Data.Text as T
 import Reduce.Comp
@@ -71,7 +72,9 @@ clarifyTerm tenv term =
     (m, TermFix (mx, x, t) mxts e) -> do
       e' <- clarifyTerm (insTypeEnv ((mx, x, t) : mxts) tenv) e
       fvs <- nubFVS <$> chainOf tenv term
-      retClosure tenv (Just x) fvs m mxts e'
+      if S.member x (varComp e')
+        then retClosure tenv (Just x) fvs m mxts e'
+        else retClosure tenv Nothing fvs m mxts e'
     (m, TermConst x) ->
       clarifyConst tenv m x
     (m, TermInt size l) ->
