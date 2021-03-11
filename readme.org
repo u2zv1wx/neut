@@ -572,6 +572,8 @@ Now I think you are basically ready to, for example, start reading [[https://git
 That pretty much should do it. I hope you enjoy this language.
 
 * Syntax and Semantics of Statements
+(fixme: the content below is out-of-date)
+
 A program of neut is a list of statements. Each statement is one of the following statements described in this section.
 
 Please note that the descriptions in the followings are not that formal yet.
