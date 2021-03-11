@@ -34,40 +34,40 @@ data Arg
   | ArgAny
   deriving (Ord, Eq, Show)
 
--- substMetaTerm :: SubstMetaTerm -> MetaTermPlus -> MetaTermPlus
--- substMetaTerm sub term =
---   case term of
---     (_, MetaTermVar x)
---       | Just e <- IntMap.lookup (asInt x) sub ->
---         e
---       | otherwise ->
---         term
---     (m, MetaTermImpIntro xs mx e) -> do
---       let sub' = foldr IntMap.delete sub (map asInt (xs ++ catMaybes [mx]))
---       let e' = substMetaTerm sub' e
---       (m, MetaTermImpIntro xs mx e')
---     (m, MetaTermImpElim e es) -> do
---       let e' = substMetaTerm sub e
---       let es' = map (substMetaTerm sub) es
---       (m, MetaTermImpElim e' es')
---     (m, MetaTermFix f xs mx e) -> do
---       let sub' = foldr IntMap.delete sub (map asInt (f : xs ++ catMaybes [mx]))
---       let e' = substMetaTerm sub' e
---       (m, MetaTermFix f xs mx e')
---     (_, MetaTermLeaf _) ->
---       term
---     (m, MetaTermNode es) -> do
---       let es' = map (substMetaTerm sub) es
---       (m, MetaTermNode es')
---     (_, MetaTermConst _) ->
---       term
---     (_, MetaTermInteger _) ->
---       term
---     (m, MetaTermIf cond onTrue onFalse) -> do
---       let cond' = substMetaTerm sub cond
---       let onTrue' = substMetaTerm sub onTrue
---       let onFalse' = substMetaTerm sub onFalse
---       (m, MetaTermIf cond' onTrue' onFalse')
+substMetaTerm :: SubstMetaTerm -> MetaTermPlus -> MetaTermPlus
+substMetaTerm sub term =
+  case term of
+    (_, MetaTermVar x)
+      | Just e <- IntMap.lookup (asInt x) sub ->
+        e
+      | otherwise ->
+        term
+    (m, MetaTermImpIntro xs mx e) -> do
+      let sub' = foldr IntMap.delete sub (map asInt (xs ++ catMaybes [mx]))
+      let e' = substMetaTerm sub' e
+      (m, MetaTermImpIntro xs mx e')
+    (m, MetaTermImpElim e es) -> do
+      let e' = substMetaTerm sub e
+      let es' = map (substMetaTerm sub) es
+      (m, MetaTermImpElim e' es')
+    (m, MetaTermFix f xs mx e) -> do
+      let sub' = foldr IntMap.delete sub (map asInt (f : xs ++ catMaybes [mx]))
+      let e' = substMetaTerm sub' e
+      (m, MetaTermFix f xs mx e')
+    (_, MetaTermLeaf _) ->
+      term
+    (m, MetaTermNode es) -> do
+      let es' = map (substMetaTerm sub) es
+      (m, MetaTermNode es')
+    (_, MetaTermConst _) ->
+      term
+    (_, MetaTermInteger _) ->
+      term
+    (m, MetaTermIf cond onTrue onFalse) -> do
+      let cond' = substMetaTerm sub cond
+      let onTrue' = substMetaTerm sub onTrue
+      let onFalse' = substMetaTerm sub onFalse
+      (m, MetaTermIf cond' onTrue' onFalse')
 
 showMetaTerm :: MetaTermPlus -> T.Text
 showMetaTerm e =

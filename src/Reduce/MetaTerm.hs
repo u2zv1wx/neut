@@ -1,6 +1,5 @@
 module Reduce.MetaTerm
   ( reduceMetaTerm,
-    substMetaTerm,
   )
 where
 
@@ -18,8 +17,7 @@ import qualified Data.Text as T
 import Data.Tree
 import Text.Read (readMaybe)
 
-type NameEnv = IntMap.IntMap Ident
-
+-- bottleneck (13 ~ 18%)
 reduceMetaTerm :: MetaTermPlus -> WithEnv MetaTermPlus
 reduceMetaTerm term =
   case term of
@@ -32,22 +30,25 @@ reduceMetaTerm term =
             if length xs > length es'
               then raiseError m $ "the function here must be called with x (>= " <> T.pack (show (length xs)) <> ") arguments, but found " <> T.pack (show (length es'))
               else do
-                let es1 = take (length xs) es'
-                let restArg = (m, MetaTermNode (drop (length xs) es'))
+                let (es1, es2) = splitAt (length xs) es'
+                let restArg = (m, MetaTermNode es2)
                 let sub = IntMap.fromList $ zip (map asInt xs) es1 ++ [(asInt rest, restArg)]
-                substMetaTerm sub body >>= reduceMetaTerm
+                reduceMetaTerm $ substMetaTerm sub body
           | otherwise -> do
             if length xs /= length es'
               then raiseArityMismatch m (length xs) (length es')
               else do
                 let sub = IntMap.fromList $ zip (map asInt xs) es'
-                substMetaTerm sub body >>= reduceMetaTerm
+                reduceMetaTerm $ substMetaTerm sub body
         (_, MetaTermFix {}) ->
           reduceFix m e' es'
         (_, MetaTermConst c) ->
           reduceConstApp m c es'
         _ -> do
           raiseError m $ "the term \n  " <> showAsSExp (toTree e') <> "\ncannot be applied to:\n  " <> T.intercalate "\n" (map (showAsSExp . toTree) es')
+    (m, MetaTermNode es) -> do
+      es' <- mapM reduceMetaTerm es
+      return $ (m, MetaTermNode es')
     (_, MetaTermIf cond onTrue onFalse) -> do
       cond' <- reduceMetaTerm cond
       case cond' of
@@ -55,12 +56,10 @@ reduceMetaTerm term =
           reduceMetaTerm onFalse
         _ ->
           reduceMetaTerm onTrue
-    (m, MetaTermNode es) -> do
-      es' <- mapM reduceMetaTerm es
-      return (m, MetaTermNode es')
-    _ -> do
+    _ ->
       return term
 
+{-# INLINE reduceFix #-}
 reduceFix :: Hint -> MetaTermPlus -> [MetaTermPlus] -> WithEnv MetaTermPlus
 reduceFix m e es =
   case e of
@@ -72,15 +71,13 @@ reduceFix m e es =
             let es1 = take (length xs) es
             let restArg = (m, MetaTermNode (drop (length xs) es))
             let sub = IntMap.fromList $ (asInt f, e) : zip (map asInt xs) es1 ++ [(asInt rest, restArg)]
-            -- reduceMetaTerm $ substMetaTerm sub (m, body)
-            substMetaTerm sub (m, body) >>= reduceMetaTerm
+            reduceMetaTerm $ substMetaTerm sub (m, body)
       | otherwise -> do
         if length xs /= length es
           then raiseArityMismatch m (length xs) (length es)
           else do
             let sub = IntMap.fromList $ (asInt f, e) : zip (map asInt xs) es
-            -- reduceMetaTerm $ substMetaTerm sub (m, body)
-            substMetaTerm sub (m, body) >>= reduceMetaTerm
+            reduceMetaTerm $ substMetaTerm sub (m, body)
     _ ->
       raiseCritical (fst e) "unreachable"
 
@@ -245,51 +242,3 @@ liftBool b m =
   if b
     then (m, MetaTermLeaf "true")
     else (m, MetaTermNode [])
-
-substMetaTerm :: SubstMetaTerm -> MetaTermPlus -> WithEnv MetaTermPlus
-substMetaTerm sub term =
-  substMetaTerm' sub IntMap.empty term
-
-substMetaTerm' :: SubstMetaTerm -> NameEnv -> MetaTermPlus -> WithEnv MetaTermPlus
-substMetaTerm' sub nenv term =
-  case term of
-    (m, MetaTermVar x)
-      | Just x' <- IntMap.lookup (asInt x) nenv ->
-        return (m, MetaTermVar x')
-      | Just e <- IntMap.lookup (asInt x) sub ->
-        return e
-      | otherwise ->
-        return term
-    (m, MetaTermImpIntro xs mx e) -> do
-      xs' <- mapM newNameWith xs
-      let nenv' = IntMap.union (IntMap.fromList (zip (map asInt xs) xs')) nenv
-      e' <- substMetaTerm' sub nenv' e
-      return (m, MetaTermImpIntro xs' mx e')
-    -- e' <- substMetaTerm' sub' nenv e
-    -- return (m, MetaTermImpIntro xs mx e')
-    (m, MetaTermImpElim e es) -> do
-      e' <- substMetaTerm' sub nenv e
-      es' <- mapM (substMetaTerm' sub nenv) es
-      return (m, MetaTermImpElim e' es')
-    (m, MetaTermFix f xs mx e) -> do
-      f' <- newNameWith f
-      xs' <- mapM newNameWith xs
-      let nenv' = IntMap.union (IntMap.fromList $ (asInt f, f') : zip (map asInt xs) xs') nenv
-      e' <- substMetaTerm' sub nenv' e
-      return (m, MetaTermFix f' xs' mx e')
-    -- e' <- substMetaTerm' sub' nenv e
-    -- return (m, MetaTermFix f xs mx e')
-    (_, MetaTermLeaf _) ->
-      return term
-    (m, MetaTermNode es) -> do
-      es' <- mapM (substMetaTerm' sub nenv) es
-      return (m, MetaTermNode es')
-    (_, MetaTermConst _) ->
-      return term
-    (_, MetaTermInteger _) ->
-      return term
-    (m, MetaTermIf cond onTrue onFalse) -> do
-      cond' <- substMetaTerm' sub nenv cond
-      onTrue' <- substMetaTerm' sub nenv onTrue
-      onFalse' <- substMetaTerm' sub nenv onFalse
-      return (m, MetaTermIf cond' onTrue' onFalse')
