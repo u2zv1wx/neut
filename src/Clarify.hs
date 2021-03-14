@@ -39,9 +39,9 @@ clarifyStmt tenv ss =
     StmtLet m (mx, x, t) e : cont -> do
       e' <- clarifyTerm tenv e >>= reduceCompPlus
       insCompEnv (toGlobalVarName x) False [] e'
-      let app = (m, CompPiElimDownElim (m, ValueConst (toGlobalVarName x)) [])
       cont' <- clarifyStmt (insTypeEnv [(mx, x, t)] tenv) cont
       holeVarName <- newNameWith' "hole"
+      let app = (m, CompPiElimDownElim (m, ValueConst (toGlobalVarName x)) [])
       return (m, CompUpElim holeVarName app cont')
     StmtResourceType m name discarder copier : cont -> do
       discarder' <- toSwitcherBranch m tenv discarder

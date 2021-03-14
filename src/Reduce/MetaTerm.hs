@@ -21,6 +21,13 @@ import Text.Read (readMaybe)
 reduceMetaTerm :: MetaTermPlus -> WithEnv MetaTermPlus
 reduceMetaTerm term =
   case term of
+    (_, MetaTermVar x) -> do
+      ctx <- gets metaTermCtx
+      case IntMap.lookup (asInt x) ctx of
+        Just e ->
+          reduceMetaTerm e
+        Nothing ->
+          return term
     (m, MetaTermImpElim e es) -> do
       e' <- reduceMetaTerm e
       es' <- mapM reduceMetaTerm es

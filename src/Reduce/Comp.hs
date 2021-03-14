@@ -42,7 +42,11 @@ reduceCompPlus term =
                 xs == ys ->
                 return (mUp, CompUpIntro v) -- eta-reduce
             _ ->
-              return (m, CompSigmaElim xs v e')
+              case xs of
+                [] ->
+                  return e'
+                _ ->
+                  return (m, CompSigmaElim xs v e')
     (m, CompUpIntro v) ->
       return (m, CompUpIntro v)
     (m, CompUpElim x e1 e2) -> do

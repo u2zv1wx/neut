@@ -185,8 +185,9 @@ preprocessAux headStmt restStmtList = do
 
 evaluate :: TreePlus -> WithEnv MetaTermPlus
 evaluate e = do
-  ctx <- gets metaTermCtx
-  interpretCode e >>= discernMetaTerm >>= return . substMetaTerm ctx >>= reduceMetaTerm
+  -- ctx <- gets metaTermCtx
+  -- interpretCode e >>= discernMetaTerm >>= return . substMetaTerm ctx >>= reduceMetaTerm
+  interpretCode e >>= discernMetaTerm >>= reduceMetaTerm
 
 includeFile ::
   Hint ->
