@@ -167,17 +167,25 @@ interpretArg es =
       (xts, args) <- interpretArg treeList
       case tree of
         (m, TreeLeaf "_") -> do
-          h <- asIdent <$> newTextWith "_"
+          h <- interpretIdent tree
           return (h : xts, (m, MetaTermVar h) : args)
         _ -> do
           e <- interpretCode tree
           return (xts, e : args)
 
 interpretIdent :: TreePlus -> WithEnv Ident
-interpretIdent tree =
+interpretIdent tree = do
+  x' <- interpretLeafText tree
+  return $ asIdent x'
+
+interpretLeafText :: TreePlus -> WithEnv T.Text
+interpretLeafText tree =
   case tree of
+    (_, TreeLeaf "_") -> do
+      h <- newText
+      return h
     (_, TreeLeaf x) ->
-      return $ asIdent x
+      return x
     t ->
       raiseSyntaxError (fst t) "LEAF"
 

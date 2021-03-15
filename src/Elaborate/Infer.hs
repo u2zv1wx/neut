@@ -197,7 +197,7 @@ inferPiElim ctx m (e, t) ets = do
         cod' <- inferArgs m ets xts cod
         return ((m, WeakTermPiElim e es), cod')
     _ -> do
-      ys <- mapM (const $ newNameWith' "arg") es
+      ys <- mapM (const $ newIdentFromText "arg") es
       yts <- newTypeAsterListInCtx ctx $ zip ys (map metaOf es)
       cod <- newTypeAsterInCtx (ctx ++ yts) m
       insConstraintEnv t (metaOf e, WeakTermPi yts cod)
@@ -312,7 +312,7 @@ productTypeOf m ts =
     [t] ->
       return t
     _ -> do
-      xs <- mapM (const $ newNameWith'' "_") ts
+      xs <- mapM (const $ newIdentFromText "_") ts
       let xts = zipWith (\x t -> (m, x, t)) xs ts
       weakTermSigma m xts
 
@@ -330,9 +330,9 @@ takeBorrowedTypes tks =
 
 weakTermSigma :: Hint -> [WeakIdentPlus] -> WithEnv WeakTermPlus
 weakTermSigma m xts = do
-  z <- newNameWith' "internal.sigma-tau"
+  z <- newIdentFromText "internal.sigma-tau"
   let vz = (m, WeakTermUpsilon z)
-  k <- newNameWith'' "sigma"
+  k <- newIdentFromText "sigma"
   return (m, WeakTermPi [(m, z, (m, WeakTermTau)), (m, k, (m, WeakTermPi xts vz))] vz)
 
 lookupConstTypeEnv :: Hint -> T.Text -> WithEnv TermPlus
@@ -353,7 +353,7 @@ lookupConstTypeEnv m x
 primOpToType :: Hint -> PrimOp -> WithEnv TermPlus
 primOpToType m (PrimOp op domList cod) = do
   domList' <- mapM (lowTypeToType m) domList
-  xs <- mapM (const (newNameWith'' "_")) domList'
+  xs <- mapM (const (newIdentFromText "_")) domList'
   let xts = zipWith (\x t -> (m, x, t)) xs domList'
   if S.member op cmpOpSet
     then do

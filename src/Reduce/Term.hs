@@ -130,7 +130,7 @@ substTermPlus' sub nenv term =
       return (m, TermPiElim e' es')
     (m, TermFix (mx, x, t) xts e) -> do
       t' <- substTermPlus' sub nenv t
-      x' <- newNameWith x
+      x' <- newIdentFromIdent x
       let nenv' = IntMap.insert (asInt x) x' nenv
       (xts', e') <- substTermPlus'' sub nenv' xts e
       return (m, TermFix (mx, x', t') xts' e')
@@ -179,7 +179,7 @@ substTermPlus'' sub nenv binder e =
       e' <- substTermPlus' sub nenv e
       return ([], e')
     ((m, x, t) : xts) -> do
-      x' <- newNameWith x
+      x' <- newIdentFromIdent x
       let nenv' = IntMap.insert (asInt x) x' nenv
       (xts', e') <- substTermPlus'' sub nenv' xts e
       t' <- substTermPlus' sub nenv t

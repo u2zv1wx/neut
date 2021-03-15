@@ -130,35 +130,22 @@ newCount = do
     then raiseCritical' "counter exhausted"
     else return i
 
-{-# INLINE newNameWith #-}
-newNameWith :: Ident -> WithEnv Ident
-newNameWith (I (s, _)) = do
-  j <- newCount
-  return $ I (s, j)
-
-{-# INLINE newNameWith' #-}
-newNameWith' :: T.Text -> WithEnv Ident
-newNameWith' s = do
+{-# INLINE newIdentFromText #-}
+newIdentFromText :: T.Text -> WithEnv Ident
+newIdentFromText s = do
   i <- newCount
   return $ I (s, i)
 
-{-# INLINE newNameWith'' #-}
-newNameWith'' :: T.Text -> WithEnv Ident
-newNameWith'' s = do
-  i <- newCount
-  return $ I ("(" <> s <> "-" <> T.pack (show i) <> ")", i)
+{-# INLINE newIdentFromIdent #-}
+newIdentFromIdent :: Ident -> WithEnv Ident
+newIdentFromIdent x =
+  newIdentFromText (asText x)
 
-{-# INLINE newTextWith #-}
-newTextWith :: T.Text -> WithEnv T.Text
-newTextWith s = do
+{-# INLINE newText #-}
+newText :: WithEnv T.Text
+newText = do
   i <- newCount
-  return $ "(" <> s <> "-" <> T.pack (show i) <> ")"
-
-{-# INLINE newTextWith' #-}
-newTextWith' :: T.Text -> WithEnv T.Text
-newTextWith' s = do
-  i <- newCount
-  return $ s <> "_" <> T.pack (show i)
+  return $ ";" <> T.pack (show i)
 
 {-# INLINE newAster #-}
 newAster :: Hint -> WithEnv WeakTermPlus
@@ -169,7 +156,7 @@ newAster m = do
 {-# INLINE newValueUpsilonWith #-}
 newValueUpsilonWith :: Hint -> T.Text -> WithEnv (Ident, ValuePlus)
 newValueUpsilonWith m name = do
-  x <- newNameWith' name
+  x <- newIdentFromText name
   return (x, (m, ValueUpsilon x))
 
 --

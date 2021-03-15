@@ -62,13 +62,13 @@ discernBinder nenv binder mf e =
     [] -> do
       case mf of
         Just f -> do
-          f' <- newNameWith f
+          f' <- newIdentFromIdent f
           e' <- discernMetaTerm' (Map.insert (asText f) f' nenv) e
           return ([], Just f', e')
         Nothing -> do
           e' <- discernMetaTerm' nenv e
           return ([], Nothing, e')
     x : xs -> do
-      x' <- newNameWith x
+      x' <- newIdentFromIdent x
       (xs', mf', e') <- discernBinder (Map.insert (asText x) x' nenv) xs mf e
       return (x' : xs', mf', e')

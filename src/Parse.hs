@@ -90,7 +90,8 @@ parse stmtTreeList =
 interpretAux :: TreePlus -> [TreePlus] -> WithEnv [WeakStmt]
 interpretAux headStmt restStmtList = do
   e <- interpret headStmt >>= discern
-  h <- newNameWith'' "_"
+  -- h <- newIdentFromText' "_"
+  h <- newIdentFromText "_"
   let m = metaOf e
   t <- newAster m
   defList <- parse restStmtList

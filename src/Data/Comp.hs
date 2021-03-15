@@ -46,14 +46,6 @@ type CompPlus =
 type SubstValuePlus =
   IntMap.IntMap ValuePlus
 
-asUpsilon :: ValuePlus -> Maybe Ident
-asUpsilon term =
-  case term of
-    (_, ValueUpsilon x) ->
-      Just x
-    _ ->
-      Nothing
-
 varValue :: ValuePlus -> S.Set Ident
 varValue v =
   case v of

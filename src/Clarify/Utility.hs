@@ -98,3 +98,8 @@ boolTrue =
 boolFalse :: T.Text
 boolFalse =
   "bool" <> nsSep <> "false"
+
+{-# INLINE toGlobalVarName #-}
+toGlobalVarName :: Ident -> T.Text
+toGlobalVarName x =
+  "_" <> T.pack (show (asInt x))

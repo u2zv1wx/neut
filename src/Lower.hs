@@ -6,7 +6,7 @@ where
 import Control.Monad.State.Lazy
 import Data.Basic
 import Data.Comp
-import Data.Env hiding (newNameWith'')
+import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import Data.Log
 import Data.LowComp
@@ -36,11 +36,11 @@ lowerComp term =
     (_, CompSigmaElim xs v e) -> do
       let basePtrType = LowTypePointer $ LowTypeArray (length xs) voidPtr -- base pointer type  ([(length xs) x ARRAY_ELEM_TYPE])
       let idxList = map (\i -> (LowValueInt i, LowTypeInt 32)) [0 ..]
-      ys <- mapM newNameWith xs
+      ys <- mapM newIdentFromIdent xs
       let xts' = zip xs (repeat voidPtr)
       loadContent v basePtrType (zip idxList (zip ys xts')) e
     (_, CompUpIntro d) -> do
-      result <- newNameWith' $ takeBaseName d
+      result <- newIdentFromText $ takeBaseName d
       lowerValueLet result d $ LowCompReturn $ LowValueLocal result
     (_, CompUpElim x e1 e2) -> do
       e1' <- lowerComp e1
@@ -156,7 +156,7 @@ lowerCompPrimitive m codeOp =
         -- return $ LowCompReturn (LowValueInt 0)
         DerangementSyscall i -> do
           (xs, vs) <- unzip <$> mapM (const $ newValueLocal "sys-call-arg") args
-          res <- newNameWith' "result"
+          res <- newIdentFromText "result"
           lowerValueLet' (zip xs args) $
             LowCompLet res (LowOpSyscall i vs) $
               LowCompReturn (LowValueLocal res)
@@ -171,7 +171,7 @@ lowerCompPrimitive m codeOp =
         DerangementLoad valueLowType -> do
           let ptr = args !! 0
           (ptrVar, castPtrThen) <- llvmCast (Just $ takeBaseName ptr) ptr (LowTypePointer valueLowType)
-          resName <- newNameWith' "result"
+          resName <- newIdentFromText "result"
           uncast <- llvmUncast (Just $ asText resName) (LowValueLocal resName) valueLowType
           castPtrThen $
             LowCompLet resName (LowOpLoad ptrVar valueLowType) uncast
@@ -186,18 +186,18 @@ lowerCompPrimitive m codeOp =
         DerangementCreateArray elemType -> do
           let arrayType = AggPtrTypeArray (length args) elemType
           let argTypeList = zip args (repeat elemType)
-          resName <- newNameWith' "result"
+          resName <- newIdentFromText "result"
           storeContent m resName arrayType argTypeList (LowCompReturn (LowValueLocal resName))
         DerangementCreateStruct elemTypeList -> do
           let structType = AggPtrTypeStruct elemTypeList
           let argTypeList = zip args elemTypeList
-          resName <- newNameWith' "result"
+          resName <- newIdentFromText "result"
           storeContent m resName structType argTypeList (LowCompReturn (LowValueLocal resName))
 
 lowerCompPrimOp :: PrimOp -> [ValuePlus] -> WithEnv LowComp
 lowerCompPrimOp op@(PrimOp _ domList cod) vs = do
   (argVarList, castArgsThen) <- llvmCastPrimArgs $ zip vs domList
-  result <- newNameWith' "prim-op-result"
+  result <- newIdentFromText "prim-op-result"
   uncast <- llvmUncast (Just $ asText result) (LowValueLocal result) cod
   castArgsThen $ LowCompLet result (LowOpPrimOp op argVarList) uncast
 
@@ -442,7 +442,7 @@ toFunPtrType xs =
 
 newValueLocal :: T.Text -> WithEnv (Ident, LowValue)
 newValueLocal name = do
-  x <- newNameWith' name
+  x <- newIdentFromText name
   return (x, LowValueLocal x)
 
 newValueLocal' :: Maybe T.Text -> WithEnv (Ident, LowValue)
@@ -454,9 +454,9 @@ newNameWith'' :: Maybe T.Text -> WithEnv Ident
 newNameWith'' mName =
   case mName of
     Nothing ->
-      newNameWith' "var"
+      newIdentFromText "var"
     Just name ->
-      newNameWith' name
+      newIdentFromText name
 
 enumValueToInteger :: Hint -> T.Text -> WithEnv Int
 enumValueToInteger m l =

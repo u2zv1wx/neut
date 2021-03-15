@@ -36,7 +36,7 @@ linearize binder e =
 --   e
 insertHeaderForAffine :: Ident -> CompPlus -> CompPlus -> WithEnv CompPlus
 insertHeaderForAffine x t e@(m, _) = do
-  hole <- newNameWith' "unit"
+  hole <- newIdentFromText "unit"
   discardUnusedVar <- toAffineApp m x t
   return (m, CompUpElim hole discardUnusedVar e)
 
@@ -88,7 +88,7 @@ insertHeaderForRelevant xs t e@(m, _) = do
 toLinearChain :: [Ident] -> WithEnv LinearChain
 toLinearChain xs = do
   let valueSeq = init $ tail xs
-  tmpSeq <- mapM (const $ newNameWith' "chain") $ replicate (length xs - 3) ()
+  tmpSeq <- mapM (const $ newIdentFromText "chain") $ replicate (length xs - 3) ()
   let tmpSeq' = [head xs] ++ tmpSeq ++ [last xs]
   let pairSeq = zip valueSeq (tail tmpSeq')
   return $ zip (init tmpSeq') pairSeq
@@ -128,7 +128,7 @@ distinguishValue z term =
       if x /= z
         then return ([], term)
         else do
-          x' <- newNameWith x
+          x' <- newIdentFromIdent x
           return ([x'], (m, ValueUpsilon x'))
     (m, ValueSigmaIntro ds) -> do
       (vss, ds') <- unzip <$> mapM (distinguishValue z) ds

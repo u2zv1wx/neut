@@ -71,7 +71,7 @@ emitLowComp retType llvm =
     LowCompReturn d ->
       emitRet retType d
     LowCompCall f args -> do
-      tmp <- newNameWith' "tmp"
+      tmp <- newIdentFromText "tmp"
       op <-
         emitOp $
           unwordsL
@@ -83,7 +83,7 @@ emitLowComp retType llvm =
       a <- emitRet retType (LowValueLocal tmp)
       return $ op <> a
     LowCompSwitch (d, lowType) defaultBranch branchList -> do
-      defaultLabel <- newNameWith' "default"
+      defaultLabel <- newIdentFromText "default"
       labelList <- constructLabelList branchList
       op <-
         emitOp $
@@ -224,7 +224,7 @@ constructLabelList input =
     [] ->
       return []
     (_ : rest) -> do
-      label <- newNameWith' "case"
+      label <- newIdentFromText "case"
       labelList <- constructLabelList rest
       return $ label : labelList
 

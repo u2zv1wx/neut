@@ -40,7 +40,7 @@ clarifyStmt tenv ss =
       e' <- clarifyTerm tenv e >>= reduceCompPlus
       insCompEnv (toGlobalVarName x) False [] e'
       cont' <- clarifyStmt (insTypeEnv [(mx, x, t)] tenv) cont
-      holeVarName <- newNameWith' "hole"
+      holeVarName <- newIdentFromText "hole"
       let app = (m, CompPiElimDownElim (m, ValueConst (toGlobalVarName x)) [])
       return (m, CompUpElim holeVarName app cont')
     StmtResourceType m name discarder copier : cont -> do
@@ -110,10 +110,10 @@ clarifyTerm tenv term =
           (xs, es', xsAsVars) <- unzip3 <$> mapM (clarifyPlus tenv) es
           let xts = zipWith (\x t -> (fst t, x, t)) xs ts
           let borrowedVarList = catMaybes $ map takeIffLinear (zip xts ks)
-          resultVarName <- newNameWith' "result"
+          resultVarName <- newIdentFromText "result"
           tuple <- constructResultTuple tenv m borrowedVarList (m, resultVarName, resultType)
           let lamBody = bindLet (zip xs es') (m, CompUpElim resultVarName (m, CompPrimitive (PrimitiveDerangement expKind xsAsVars)) tuple)
-          h <- newNameWith' "der"
+          h <- newIdentFromText "der"
           fvs <- nubFVS <$> chainOf' tenv xts es
           cls <- retClosure tenv (Just h) fvs m [] lamBody -- cls shouldn't be reduced since it can be effectful
           callClosure m cls []
@@ -250,7 +250,7 @@ callClosure :: Hint -> CompPlus -> [(Ident, CompPlus, ValuePlus)] -> WithEnv Com
 callClosure m e zexes = do
   let (zs, es', xs) = unzip3 zexes
   (clsVarName, clsVar) <- newValueUpsilonWith m "closure"
-  typeVarName <- newNameWith' "exp"
+  typeVarName <- newIdentFromText "exp"
   (envVarName, envVar) <- newValueUpsilonWith m "env"
   (lamVarName, lamVar) <- newValueUpsilonWith m "thunk"
   return $
@@ -349,9 +349,9 @@ lookupTypeEnv m (I (name, x)) tenv =
 
 termSigmaIntro :: Hint -> [IdentPlus] -> WithEnv TermPlus
 termSigmaIntro m xts = do
-  z <- newNameWith' "internal.sigma-tau-tuple"
+  z <- newIdentFromText "internal.sigma-tau-tuple"
   let vz = (m, TermUpsilon z)
-  k <- newNameWith'' "sigma"
+  k <- newIdentFromText "sigma"
   let args = map (\(mx, x, _) -> (mx, TermUpsilon x)) xts
   return
     ( m,
@@ -367,7 +367,3 @@ toSwitcherBranch m tenv d = do
   d' <- clarifyTerm tenv d
   (varName, var) <- newValueUpsilonWith m "res"
   return $ \val -> callClosure m d' [(varName, (m, CompUpIntro val), var)] >>= reduceCompPlus
-
-toGlobalVarName :: Ident -> T.Text
-toGlobalVarName x =
-  "_" <> T.pack (show (asInt x))

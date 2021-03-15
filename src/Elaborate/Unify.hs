@@ -196,7 +196,7 @@ simpBinder' sub args1 args2 =
 
 asWeakIdentPlus :: Hint -> WeakTermPlus -> WithEnv WeakIdentPlus
 asWeakIdentPlus m t = do
-  h <- newNameWith' "aster"
+  h <- newIdentFromText "aster"
   return (m, h, t)
 
 asPairList ::
@@ -277,7 +277,7 @@ toVarList' ctx xs termList =
       | otherwise -> do
         let m = metaOf e
         t <- newTypeAsterInCtx ctx m
-        x <- newNameWith' "aster"
+        x <- newIdentFromText "aster"
         xts <- toVarList' (ctx ++ [(m, x, t)]) xs es
         return $ (m, x, t) : xts
 

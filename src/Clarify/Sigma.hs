@@ -36,7 +36,7 @@ sigmaS4 ::
 sigmaS4 mName m mxts =
   case mName of
     Nothing -> do
-      h <- newTextWith' "sigma"
+      h <- toGlobalVarName <$> newIdentFromText "sigma"
       registerSwitcher m h (sigmaT m mxts) (sigma4 m mxts)
       return (m, ValueConst h)
     Just name ->
@@ -66,7 +66,7 @@ sigmaT m mxts argVar = do
   xts <- mapM supplyName mxts
   -- as == [APP-1, ..., APP-n]   (`a` here stands for `app`)
   as <- forM xts $ \(x, t) -> toAffineApp m x t
-  ys <- mapM (const $ newNameWith' "arg") xts
+  ys <- mapM (const $ newIdentFromText "arg") xts
   let body = bindLet (zip ys as) (m, CompUpIntro (m, ValueSigmaIntro []))
   body' <- linearize xts body
   return (m, CompSigmaElim (map fst xts) argVar body')
@@ -143,7 +143,7 @@ supplyName mName =
     Right (x, t) ->
       return (x, t)
     Left t -> do
-      x <- newNameWith' "unused-sigarg"
+      x <- newIdentFromText "unused-sigarg"
       return (x, t)
 
 returnClosureS4 :: Hint -> WithEnv CompPlus

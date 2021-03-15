@@ -82,7 +82,7 @@ preprocess' stmtList = do
                   raiseError m $ "the meta-variable `" <> name <> "` is already defined at the top level"
                 body' <- evaluate body
                 name' <- withSectionPrefix name
-                name'' <- newNameWith $ asIdent name'
+                name'' <- newIdentFromIdent $ asIdent name'
                 modify (\env -> env {topMetaNameEnv = Map.insert name' name'' (topMetaNameEnv env)})
                 modify (\env -> env {metaTermCtx = IntMap.insert (asInt name'') body' (metaTermCtx env)})
                 preprocess' restStmtList

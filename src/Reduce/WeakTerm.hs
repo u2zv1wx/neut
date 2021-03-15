@@ -132,7 +132,7 @@ substWeakTermPlus' sub nenv term =
       return (m, WeakTermPiElim e' es')
     (m, WeakTermFix (mx, x, t) xts e) -> do
       t' <- substWeakTermPlus' sub nenv t
-      x' <- newNameWith x
+      x' <- newIdentFromIdent x
       let nenv' = IntMap.insert (asInt x) x' nenv
       (xts', e') <- substWeakTermPlus'' sub nenv' xts e
       return (m, WeakTermFix (mx, x', t') xts' e')
@@ -193,7 +193,7 @@ substWeakTermPlus'' sub nenv binder e =
       e' <- substWeakTermPlus' sub nenv e
       return ([], e')
     ((m, x, t) : xts) -> do
-      x' <- newNameWith x
+      x' <- newIdentFromIdent x
       let nenv' = IntMap.insert (asInt x) x' nenv
       (xts', e') <- substWeakTermPlus'' sub nenv' xts e
       t' <- substWeakTermPlus' sub nenv t

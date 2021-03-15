@@ -27,7 +27,7 @@ discernIdentPlus (m, x, t) = do
   when (Map.member (asText x) nenv) $
     raiseError m $ "the variable `" <> asText x <> "` is already defined at the top level"
   t' <- discern' nenv t
-  x' <- newNameWith x
+  x' <- newIdentFromIdent x
   modify (\env -> env {topNameEnv = Map.insert (asText x) x' nenv})
   return (m, x', t')
 
@@ -118,7 +118,7 @@ discernBinder nenv binder e =
       return ([], e')
     (mx, x, t) : xts -> do
       t' <- discern' nenv t
-      x' <- newNameWith x
+      x' <- newIdentFromIdent x
       (xts', e') <- discernBinder (Map.insert (asText x) x' nenv) xts e
       return ((mx, x', t') : xts', e')
 

@@ -5,7 +5,7 @@ module Reduce.Comp
 where
 
 import Control.Monad.State.Lazy
-import Data.Basic
+import Data.Basic hiding (asIdent)
 import Data.Comp
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
@@ -38,7 +38,7 @@ reduceCompPlus term =
           e' <- reduceCompPlus e
           case e' of
             (mUp, CompUpIntro (_, ValueSigmaIntro ds))
-              | Just ys <- mapM asUpsilon ds,
+              | Just ys <- mapM asIdent ds,
                 xs == ys ->
                 return (mUp, CompUpIntro v) -- eta-reduce
             _ ->
@@ -82,8 +82,6 @@ reduceCompPlus term =
 substValuePlus :: SubstValuePlus -> NameEnv -> ValuePlus -> ValuePlus
 substValuePlus sub nenv term =
   case term of
-    (_, ValueConst {}) ->
-      term
     (m, ValueUpsilon x)
       | Just x' <- IntMap.lookup (asInt x) nenv ->
         (m, ValueUpsilon x')
@@ -94,11 +92,7 @@ substValuePlus sub nenv term =
     (m, ValueSigmaIntro vs) -> do
       let vs' = map (substValuePlus sub nenv) vs
       (m, ValueSigmaIntro vs')
-    (_, ValueInt {}) ->
-      term
-    (_, ValueFloat {}) ->
-      term
-    (_, ValueEnumIntro {}) ->
+    _ ->
       term
 
 substCompPlus :: SubstValuePlus -> NameEnv -> CompPlus -> WithEnv CompPlus
@@ -113,7 +107,7 @@ substCompPlus sub nenv term =
       return (m, CompPiElimDownElim v' ds')
     (m, CompSigmaElim xs v e) -> do
       let v' = substValuePlus sub nenv v
-      xs' <- mapM newNameWith xs
+      xs' <- mapM newIdentFromIdent xs
       let nenv' = IntMap.union (IntMap.fromList (zip (map asInt xs) xs')) nenv
       e' <- substCompPlus sub nenv' e
       return (m, CompSigmaElim xs' v' e')
@@ -122,7 +116,7 @@ substCompPlus sub nenv term =
       return (m, CompUpIntro v')
     (m, CompUpElim x e1 e2) -> do
       e1' <- substCompPlus sub nenv e1
-      x' <- newNameWith x
+      x' <- newIdentFromIdent x
       let nenv' = IntMap.insert (asInt x) x' nenv
       e2' <- substCompPlus sub nenv' e2
       return (m, CompUpElim x' e1' e2')
@@ -141,3 +135,11 @@ substPrimitive sub nenv c =
     PrimitiveDerangement expKind ds -> do
       let ds' = map (substValuePlus sub nenv) ds
       PrimitiveDerangement expKind ds'
+
+asIdent :: ValuePlus -> Maybe Ident
+asIdent term =
+  case term of
+    (_, ValueUpsilon x) ->
+      Just x
+    _ ->
+      Nothing
