@@ -36,7 +36,7 @@ clarifyStmt tenv ss =
       ph <- gets phase
       m <- newHint ph 1 1 <$> getCurrentFilePath
       return (m, CompUpIntro (m, ValueInt 64 0))
-    StmtLet m (mx, x, t) e : cont -> do
+    StmtDef m (mx, x, t) e : cont -> do
       e' <- clarifyTerm tenv e >>= reduceCompPlus
       insCompEnv (toGlobalVarName x) False [] e'
       cont' <- clarifyStmt (insTypeEnv [(mx, x, t)] tenv) cont

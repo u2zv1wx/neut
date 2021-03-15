@@ -129,8 +129,10 @@ reduceConstApp m c es =
         return (mLeaf, MetaTermLeaf (s1 <> s2))
     "meta.leaf.new-symbol"
       | [(_, MetaTermLeaf s)] <- es -> do
-        i <- newCount
-        return (m, MetaTermLeaf (s <> "#" <> T.pack (show i)))
+        k <- newText
+        return (m, MetaTermLeaf (s <> k))
+    -- i <- newCount
+    -- return (m, MetaTermLeaf (s <> "#" <> T.pack (show i)))
     "meta.leaf.string-to-u8-list"
       | [(mStr, MetaTermLeaf atom)] <- es -> do
         case readMaybe (T.unpack atom) of

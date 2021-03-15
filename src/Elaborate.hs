@@ -30,7 +30,7 @@ elaborateStmt' stmt =
   case stmt of
     [] -> do
       return []
-    WeakStmtLet m (mx, x, t) e : cont -> do
+    WeakStmtDef m (mx, x, t) e : cont -> do
       (e', te) <- infer e
       t' <- inferType t
       insConstraintEnv te t'
@@ -40,7 +40,7 @@ elaborateStmt' stmt =
       insWeakTypeEnv x $ weaken t''
       modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e'') (substEnv env)})
       cont' <- elaborateStmt' cont
-      return $ StmtLet m (mx, x, t'') e'' : cont'
+      return $ StmtDef m (mx, x, t'') e'' : cont'
     WeakStmtResourceType m name discarder copier : cont -> do
       insConstTypeEnv name (m, TermTau)
       sub <- gets substEnv

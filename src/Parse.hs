@@ -29,14 +29,14 @@ parse stmtTreeList =
             --
             -- basic statements
             --
-            "let"
+            "define"
               | [xt, e] <- rest -> do
                 e' <- interpret e >>= discern
                 xt' <- prefixTextPlus xt >>= interpretIdentPlus >>= discernIdentPlus
                 defList <- parse restStmtList
-                return $ WeakStmtLet m xt' e' : defList
+                return $ WeakStmtDef m xt' e' : defList
               | otherwise ->
-                raiseSyntaxError m "(let LEAF TREE TREE) | (let TREE TREE)"
+                raiseSyntaxError m "(define LEAF TREE TREE) | (define TREE TREE)"
             "declare-enum"
               | (_, TreeLeaf name) : ts <- rest -> do
                 xis <- interpretEnumItem m name ts
@@ -90,12 +90,11 @@ parse stmtTreeList =
 interpretAux :: TreePlus -> [TreePlus] -> WithEnv [WeakStmt]
 interpretAux headStmt restStmtList = do
   e <- interpret headStmt >>= discern
-  -- h <- newIdentFromText' "_"
   h <- newIdentFromText "_"
   let m = metaOf e
   t <- newAster m
   defList <- parse restStmtList
-  return $ WeakStmtLet m (m, h, t) e : defList
+  return $ WeakStmtDef m (m, h, t) e : defList
 
 insertConstant :: Hint -> T.Text -> WithEnv ()
 insertConstant m x = do
