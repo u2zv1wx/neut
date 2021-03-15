@@ -289,7 +289,7 @@ showVariable :: Ident -> T.Text
 showVariable x =
   if T.any (\c -> c `S.member` S.fromList "()") $ asText x
     then "_"
-    else asText x
+    else asText' x
 
 showClause :: (EnumCase, WeakTermPlus) -> T.Text
 showClause (c, e) =

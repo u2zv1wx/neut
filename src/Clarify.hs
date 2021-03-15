@@ -107,17 +107,16 @@ clarifyTerm tenv term =
           clarifyTerm tenv e
         _ -> do
           let (es, ks, ts) = unzip3 ekts
-          xs <- mapM (const $ newNameWith' "sys") es
+          (xs, es', xsAsVars) <- unzip3 <$> mapM (clarifyPlus tenv) es
           let xts = zipWith (\x t -> (fst t, x, t)) xs ts
           let borrowedVarList = catMaybes $ map takeIffLinear (zip xts ks)
-          let xsAsVars = map (\(mx, x, _) -> (mx, ValueUpsilon x)) xts
           resultVarName <- newNameWith' "result"
           tuple <- constructResultTuple tenv m borrowedVarList (m, resultVarName, resultType)
-          let lamBody = (m, CompUpElim resultVarName (m, CompPrimitive (PrimitiveDerangement expKind xsAsVars)) tuple)
+          let lamBody = bindLet (zip xs es') (m, CompUpElim resultVarName (m, CompPrimitive (PrimitiveDerangement expKind xsAsVars)) tuple)
+          h <- newNameWith' "der"
           fvs <- nubFVS <$> chainOf' tenv xts es
-          cls <- retClosure tenv Nothing fvs m xts lamBody
-          es' <- mapM (clarifyPlus tenv) es
-          callClosure m cls es'
+          cls <- retClosure tenv (Just h) fvs m [] lamBody -- cls shouldn't be reduced since it can be effectful
+          callClosure m cls []
 
 clarifyPlus :: TypeEnv -> TermPlus -> WithEnv (Ident, CompPlus, ValuePlus)
 clarifyPlus tenv e@(m, _) = do

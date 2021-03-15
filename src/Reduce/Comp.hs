@@ -114,8 +114,10 @@ substCompPlus sub nenv term =
     (m, CompSigmaElim xs v e) -> do
       v' <- substValuePlus sub nenv v
       xs' <- mapM newNameWith xs
+      let sub' = foldr IntMap.delete sub (map asInt xs)
       let nenv' = IntMap.union (IntMap.fromList (zip (map asInt xs) xs')) nenv
-      e' <- substCompPlus sub nenv' e
+      -- e' <- substCompPlus sub nenv' e
+      e' <- substCompPlus sub' nenv' e
       return (m, CompSigmaElim xs' v' e')
     (m, CompUpIntro v) -> do
       v' <- substValuePlus sub nenv v
@@ -123,8 +125,10 @@ substCompPlus sub nenv term =
     (m, CompUpElim x e1 e2) -> do
       e1' <- substCompPlus sub nenv e1
       x' <- newNameWith x
+      let sub' = foldr IntMap.delete sub (map asInt [x])
       let nenv' = IntMap.insert (asInt x) x' nenv
-      e2' <- substCompPlus sub nenv' e2
+      e2' <- substCompPlus sub' nenv' e2
+      -- e2' <- substCompPlus sub nenv' e2
       return (m, CompUpElim x' e1' e2')
     (m, CompEnumElim v branchList) -> do
       v' <- substValuePlus sub nenv v
