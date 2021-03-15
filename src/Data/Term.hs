@@ -5,7 +5,6 @@ import Data.Basic
 import qualified Data.IntMap as IntMap
 import Data.Log
 import Data.LowType
-import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.WeakTerm
 
@@ -52,62 +51,6 @@ asUpsilon term =
       Just x
     _ ->
       Nothing
-
-varTermPlus :: TermPlus -> S.Set Ident
-varTermPlus term =
-  case term of
-    (_, TermTau) ->
-      S.empty
-    (_, TermUpsilon x) ->
-      S.singleton x
-    (_, TermPi xts t) ->
-      varTermPlus' xts [t]
-    (_, TermPiIntro xts e) ->
-      varTermPlus' xts [e]
-    (_, TermPiElim e es) -> do
-      let xs1 = varTermPlus e
-      let xs2 = S.unions $ map varTermPlus es
-      S.union xs1 xs2
-    (_, TermFix (_, x, t) xts e) -> do
-      let set1 = varTermPlus t
-      let set2 = S.filter (/= x) (varTermPlus' xts [e])
-      S.union set1 set2
-    (_, TermConst _) ->
-      S.empty
-    (_, TermInt _ _) ->
-      S.empty
-    (_, TermFloat _ _) ->
-      S.empty
-    (_, TermEnum _) ->
-      S.empty
-    (_, TermEnumIntro _) ->
-      S.empty
-    (_, TermEnumElim (e, t) les) -> do
-      let xs = varTermPlus t
-      let ys = varTermPlus e
-      let zs = S.unions $ map (varTermPlus . snd) les
-      S.unions [xs, ys, zs]
-    (_, TermTensor ts) ->
-      S.unions $ map varTermPlus ts
-    (_, TermTensorIntro es) ->
-      S.unions $ map varTermPlus es
-    (_, TermTensorElim xts e1 e2) -> do
-      let xs = varTermPlus e1
-      let ys = varTermPlus' xts [e2]
-      S.unions [xs, ys]
-    (_, TermDerangement _ _ ekts) -> do
-      let (es, _, ts) = unzip3 ekts
-      S.unions $ map varTermPlus (es ++ ts)
-
-varTermPlus' :: [IdentPlus] -> [TermPlus] -> S.Set Ident
-varTermPlus' binder es =
-  case binder of
-    [] ->
-      S.unions $ map varTermPlus es
-    ((_, x, t) : xts) -> do
-      let set1 = varTermPlus t
-      let set2 = varTermPlus' xts es
-      S.union set1 $ S.filter (/= x) set2
 
 weaken :: TermPlus -> WeakTermPlus
 weaken term =

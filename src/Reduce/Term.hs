@@ -42,15 +42,12 @@ reduceTermPlus term =
             substTermPlus' sub IntMap.empty body >>= reduceTermPlus
         _ ->
           return (m, app)
-    (m, TermFix (mx, x, t) xts e)
-      | x `notElem` varTermPlus e ->
-        reduceTermPlus (m, TermPiIntro xts e)
-      | otherwise -> do
-        t' <- reduceTermPlus t
-        e' <- reduceTermPlus e
-        let (ms, xs, ts) = unzip3 xts
-        ts' <- mapM reduceTermPlus ts
-        return (m, TermFix (mx, x, t') (zip3 ms xs ts') e')
+    (m, TermFix (mx, x, t) xts e) -> do
+      t' <- reduceTermPlus t
+      e' <- reduceTermPlus e
+      let (ms, xs, ts) = unzip3 xts
+      ts' <- mapM reduceTermPlus ts
+      return (m, TermFix (mx, x, t') (zip3 ms xs ts') e')
     (m, TermEnumElim (e, t) les) -> do
       e' <- reduceTermPlus e
       let (ls, es) = unzip les
@@ -133,10 +130,8 @@ substTermPlus' sub nenv term =
       return (m, TermPiElim e' es')
     (m, TermFix (mx, x, t) xts e) -> do
       t' <- substTermPlus' sub nenv t
-      -- let sub' = IntMap.delete (asInt x) sub
       x' <- newNameWith x
       let nenv' = IntMap.insert (asInt x) x' nenv
-      -- (xts', e') <- substTermPlus'' sub' nenv' xts e
       (xts', e') <- substTermPlus'' sub nenv' xts e
       return (m, TermFix (mx, x', t') xts' e')
     (_, TermConst _) ->
@@ -184,11 +179,9 @@ substTermPlus'' sub nenv binder e =
       e' <- substTermPlus' sub nenv e
       return ([], e')
     ((m, x, t) : xts) -> do
-      -- let sub' = IntMap.delete (asInt x) sub
       x' <- newNameWith x
       let nenv' = IntMap.insert (asInt x) x' nenv
       (xts', e') <- substTermPlus'' sub nenv' xts e
-      -- (xts', e') <- substTermPlus'' sub' nenv' xts e
       t' <- substTermPlus' sub nenv t
       return ((m, x', t') : xts', e')
 
