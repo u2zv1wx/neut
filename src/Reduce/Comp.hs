@@ -79,69 +79,65 @@ reduceCompPlus term =
           es' <- mapM reduceCompPlus es
           return (m, CompEnumElim v (zip ls es'))
 
-substValuePlus :: SubstValuePlus -> NameEnv -> ValuePlus -> WithEnv ValuePlus
+substValuePlus :: SubstValuePlus -> NameEnv -> ValuePlus -> ValuePlus
 substValuePlus sub nenv term =
   case term of
     (_, ValueConst {}) ->
-      return term
+      term
     (m, ValueUpsilon x)
       | Just x' <- IntMap.lookup (asInt x) nenv ->
-        return (m, ValueUpsilon x')
+        (m, ValueUpsilon x')
       | Just e <- IntMap.lookup (asInt x) sub ->
-        return e
+        e
       | otherwise ->
-        return (m, ValueUpsilon x)
+        (m, ValueUpsilon x)
     (m, ValueSigmaIntro vs) -> do
-      vs' <- mapM (substValuePlus sub nenv) vs
-      return (m, ValueSigmaIntro vs')
+      let vs' = map (substValuePlus sub nenv) vs
+      (m, ValueSigmaIntro vs')
     (_, ValueInt {}) ->
-      return term
+      term
     (_, ValueFloat {}) ->
-      return term
+      term
     (_, ValueEnumIntro {}) ->
-      return term
+      term
 
 substCompPlus :: SubstValuePlus -> NameEnv -> CompPlus -> WithEnv CompPlus
 substCompPlus sub nenv term =
   case term of
     (m, CompPrimitive theta) -> do
-      theta' <- substPrimitive sub nenv theta
+      let theta' = substPrimitive sub nenv theta
       return (m, CompPrimitive theta')
     (m, CompPiElimDownElim v ds) -> do
-      v' <- substValuePlus sub nenv v
-      ds' <- mapM (substValuePlus sub nenv) ds
+      let v' = substValuePlus sub nenv v
+      let ds' = map (substValuePlus sub nenv) ds
       return (m, CompPiElimDownElim v' ds')
     (m, CompSigmaElim xs v e) -> do
-      v' <- substValuePlus sub nenv v
+      let v' = substValuePlus sub nenv v
       xs' <- mapM newNameWith xs
-      let sub' = foldr IntMap.delete sub (map asInt xs)
       let nenv' = IntMap.union (IntMap.fromList (zip (map asInt xs) xs')) nenv
-      -- e' <- substCompPlus sub nenv' e
-      e' <- substCompPlus sub' nenv' e
+      e' <- substCompPlus sub nenv' e
       return (m, CompSigmaElim xs' v' e')
     (m, CompUpIntro v) -> do
-      v' <- substValuePlus sub nenv v
+      let v' = substValuePlus sub nenv v
       return (m, CompUpIntro v')
     (m, CompUpElim x e1 e2) -> do
       e1' <- substCompPlus sub nenv e1
       x' <- newNameWith x
-      let sub' = foldr IntMap.delete sub (map asInt [x])
       let nenv' = IntMap.insert (asInt x) x' nenv
-      e2' <- substCompPlus sub' nenv' e2
-      -- e2' <- substCompPlus sub nenv' e2
+      e2' <- substCompPlus sub nenv' e2
       return (m, CompUpElim x' e1' e2')
     (m, CompEnumElim v branchList) -> do
-      v' <- substValuePlus sub nenv v
+      let v' = substValuePlus sub nenv v
       let (cs, es) = unzip branchList
       es' <- mapM (substCompPlus sub nenv) es
       return (m, CompEnumElim v' (zip cs es'))
 
-substPrimitive :: SubstValuePlus -> NameEnv -> Primitive -> WithEnv Primitive
+substPrimitive :: SubstValuePlus -> NameEnv -> Primitive -> Primitive
 substPrimitive sub nenv c =
   case c of
     PrimitivePrimOp op vs -> do
-      vs' <- mapM (substValuePlus sub nenv) vs
-      return $ PrimitivePrimOp op vs'
+      let vs' = map (substValuePlus sub nenv) vs
+      PrimitivePrimOp op vs'
     PrimitiveDerangement expKind ds -> do
-      ds' <- mapM (substValuePlus sub nenv) ds
-      return $ PrimitiveDerangement expKind ds'
+      let ds' = map (substValuePlus sub nenv) ds
+      PrimitiveDerangement expKind ds'
