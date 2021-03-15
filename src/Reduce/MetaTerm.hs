@@ -10,6 +10,7 @@ import Data.Basic
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import qualified Data.IntMap as IntMap
+import Data.List (intersperse)
 import Data.Log
 import Data.Maybe (catMaybes)
 import Data.MetaTerm
@@ -17,7 +18,6 @@ import qualified Data.Text as T
 import Data.Tree
 import Text.Read (readMaybe)
 
--- bottleneck (13 ~ 18%)
 reduceMetaTerm :: MetaTermPlus -> WithEnv MetaTermPlus
 reduceMetaTerm term =
   case term of
@@ -135,7 +135,7 @@ reduceConstApp m c es =
       | [(mStr, MetaTermLeaf atom)] <- es -> do
         case readMaybe (T.unpack atom) of
           Just str -> do
-            -- (string-to-u8-list "abcd") ~> (97 98 99 100)
+            -- e.g. (string-to-u8-list "abcd") ~> (97 98 99 100)
             let u8s = encode str
             return (m, MetaTermNode (map (\i -> (mStr, MetaTermLeaf (T.pack (show i)))) u8s))
           Nothing ->
@@ -147,6 +147,11 @@ reduceConstApp m c es =
     "meta.node.cons"
       | [t, (_, MetaTermNode ts)] <- es ->
         return (m, MetaTermNode (t : ts))
+    "meta.node.filter"
+      | [f, (mNode, MetaTermNode ts)] <- es -> do
+        boolList <- mapM reduceMetaTerm $ map (\t -> (fst t, MetaTermImpElim f [t])) ts
+        let ts' = map snd $ filter (\(t, _) -> unliftBool t) $ zip boolList ts
+        return (mNode, MetaTermNode ts')
     "meta.node.head"
       | [(mNode, MetaTermNode ts)] <- es ->
         case ts of
@@ -154,6 +159,68 @@ reduceConstApp m c es =
             return h
           _ ->
             raiseError mNode "the constant `head` cannot be applied to nil"
+    "meta.node.return"
+      | [e] <- es ->
+        return (fst e, MetaTermNode [e])
+    "meta.node.append"
+      | [(mNode1, MetaTermNode ts1), (_, MetaTermNode ts2)] <- es ->
+        return (mNode1, MetaTermNode (ts1 ++ ts2))
+    "meta.node.init"
+      | [(mNode, MetaTermNode ts)] <- es ->
+        case ts of
+          [] ->
+            raiseError mNode "the constant `init` cannot be applied to nil"
+          _ : _ ->
+            return (mNode, MetaTermNode (init ts))
+    "meta.node.last"
+      | [(mNode, MetaTermNode ts)] <- es ->
+        case ts of
+          [] -> do
+            raiseError mNode "the constant `last` cannot be applied to nil"
+          _ : _ ->
+            return (last ts)
+    "meta.node.join"
+      | [(mNode, MetaTermNode tss)] <- es -> do
+        ts <- concat <$> mapM takeNode tss
+        return (mNode, MetaTermNode ts)
+    "meta.node.length"
+      | [(mNode, MetaTermNode ts)] <- es -> do
+        return (mNode, MetaTermInteger (toInteger (length ts)))
+    "meta.node.list" -> do
+      ts <- join <$> mapM takeNode es
+      return (m, MetaTermNode ts)
+    "meta.node.map"
+      | [f, (mNode, MetaTermNode ts)] <- es -> do
+        ts' <- mapM reduceMetaTerm $ map (\t -> (fst t, MetaTermImpElim f [t])) ts
+        return (mNode, MetaTermNode ts')
+    "meta.node.take"
+      | [(_, MetaTermInteger i), (mNode, MetaTermNode ts)] <- es -> do
+        return (mNode, MetaTermNode (take (fromInteger i) ts))
+    "meta.node.drop"
+      | [(_, MetaTermInteger i), (mNode, MetaTermNode ts)] <- es -> do
+        return (mNode, MetaTermNode (drop (fromInteger i) ts))
+    "meta.node.take-while"
+      | [predicate, (mNode, MetaTermNode ts)] <- es -> do
+        ts' <- runTakeWhile predicate ts
+        return (mNode, MetaTermNode ts')
+    "meta.node.drop-while"
+      | [predicate, (mNode, MetaTermNode ts)] <- es -> do
+        ts' <- runDropWhile predicate ts
+        return (mNode, MetaTermNode ts')
+    "meta.node.nth"
+      | [(_, MetaTermInteger i), node@(_, MetaTermNode ts)] <- es -> do
+        if 0 <= i && fromInteger i < length ts
+          then return (ts !! fromInteger i)
+          else raiseError m $ "the index " <> T.pack (show i) <> " is out of range of:\n" <> showAsSExp (toTree node)
+    "meta.node.replicate"
+      | [(_, MetaTermInteger i), t] <- es -> do
+        return (m, MetaTermNode (replicate (fromInteger i) t))
+    "meta.node.reverse"
+      | [(mNode, MetaTermNode ts)] <- es ->
+        return (mNode, MetaTermNode (reverse ts))
+    "meta.node.intersperse"
+      | [t, (mNode, MetaTermNode ts)] <- es ->
+        return (mNode, MetaTermNode (intersperse t ts))
     "meta.node.tail"
       | [(mNode, MetaTermNode ts)] <- es ->
         case ts of
@@ -170,6 +237,39 @@ reduceConstApp m c es =
         return $ liftBool (op i1 i2) m
       | otherwise -> do
         raiseConstAppError m c es
+
+takeNode :: MetaTermPlus -> WithEnv [MetaTermPlus]
+takeNode t =
+  case t of
+    (_, MetaTermNode ts) ->
+      return ts
+    _ -> do
+      let err = toConstError ArgNode t
+      throw $ Error [err]
+
+runTakeWhile :: MetaTermPlus -> [MetaTermPlus] -> WithEnv [MetaTermPlus]
+runTakeWhile predicate ts =
+  case ts of
+    [] ->
+      return []
+    t : rest -> do
+      b <- reduceMetaTerm (fst t, MetaTermImpElim predicate [t])
+      if unliftBool b
+        then do
+          rest' <- runTakeWhile predicate rest
+          return $ t : rest'
+        else return []
+
+runDropWhile :: MetaTermPlus -> [MetaTermPlus] -> WithEnv [MetaTermPlus]
+runDropWhile predicate ts =
+  case ts of
+    [] ->
+      return []
+    t : rest -> do
+      b <- reduceMetaTerm (fst t, MetaTermImpElim predicate [t])
+      if unliftBool b
+        then runDropWhile predicate rest
+        else return rest
 
 raiseConstAppError :: Hint -> T.Text -> [MetaTermPlus] -> WithEnv a
 raiseConstAppError m c es = do
@@ -249,3 +349,11 @@ liftBool b m =
   if b
     then (m, MetaTermLeaf "true")
     else (m, MetaTermNode [])
+
+unliftBool :: MetaTermPlus -> Bool
+unliftBool t =
+  case t of
+    (_, MetaTermNode []) ->
+      False
+    _ ->
+      True

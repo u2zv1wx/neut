@@ -133,6 +133,8 @@ metaConstants :: Map.HashMap T.Text [Arg]
 metaConstants =
   Map.unions [metaTreeConstants, metaArithConstants, metaCmpConstants]
 
+-- some of the constants here can be definable in the meta-language of course,
+-- but nevertheless defined in the compiler to achieve better performance
 metaTreeConstants :: Map.HashMap T.Text [Arg]
 metaTreeConstants =
   Map.fromList
@@ -148,7 +150,24 @@ metaTreeConstants =
       ("meta.leaf.uncons", [ArgLeaf]),
       ("meta.node.cons", [ArgAny, ArgNode]),
       ("meta.node.head", [ArgNode]),
-      ("meta.node.tail", [ArgNode])
+      ("meta.node.take", [ArgInt, ArgNode]),
+      ("meta.node.take-while", [ArgLam, ArgNode]),
+      ("meta.node.drop", [ArgInt, ArgNode]),
+      ("meta.node.drop-while", [ArgLam, ArgNode]),
+      ("meta.node.nth", [ArgInt, ArgNode]),
+      ("meta.node.filter", [ArgLam, ArgNode]),
+      ("meta.node.append", [ArgNode, ArgNode]),
+      ("meta.node.return", [ArgAny]),
+      ("meta.node.reverse", [ArgNode]),
+      ("meta.node.replicate", [ArgInt, ArgAny]),
+      ("meta.node.join", [ArgNode]),
+      ("meta.node.init", [ArgNode]),
+      ("meta.node.last", [ArgNode]),
+      ("meta.node.length", [ArgNode]),
+      ("meta.node.list", [ArgNode]),
+      ("meta.node.map", [ArgLam, ArgNode]),
+      ("meta.node.tail", [ArgNode]),
+      ("meta.node.intersperse", [ArgAny, ArgNode])
     ]
 
 metaArithConstants :: Map.HashMap T.Text [Arg]
