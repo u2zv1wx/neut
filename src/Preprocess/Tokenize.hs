@@ -233,7 +233,7 @@ newlineSet =
 {-# INLINE nonSymbolSet #-}
 nonSymbolSet :: S.Set Char
 nonSymbolSet =
-  S.fromList "() \"\n;`,"
+  S.fromList $ "() \"\n;" ++ map fst (Map.toList readMacroMap)
 
 {-# INLINE updateStreamL #-}
 updateStreamL :: T.Text -> Tokenizer ()
@@ -258,6 +258,7 @@ raiseTokenizeError txt = do
   m <- currentHint
   throw $ Error [logError (getPosInfo m) txt]
 
+{-# INLINE readMacroMap #-}
 readMacroMap :: Map.HashMap Char T.Text
 readMacroMap =
   Map.fromList
