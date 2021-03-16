@@ -139,6 +139,7 @@ metaTreeConstants :: Map.HashMap T.Text [Arg]
 metaTreeConstants =
   Map.fromList
     [ ("meta.dump", [ArgAny]),
+      ("meta.annotate-location", [ArgAny, ArgAny]),
       ("meta.is-leaf", [ArgAny]),
       ("meta.is-nil", [ArgNode]),
       ("meta.is-node", [ArgAny]),

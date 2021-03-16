@@ -38,7 +38,6 @@ data Env = Env
     --
     -- parse
     --
-    phase :: Int,
     constantSet :: S.Set T.Text,
     fileEnv :: Map.HashMap (Path Abs File) VisitInfo,
     traceEnv :: [Path Abs File],
@@ -54,7 +53,7 @@ data Env = Env
     --
     weakTypeEnv :: IntMap.IntMap WeakTermPlus,
     constTypeEnv :: Map.HashMap T.Text TermPlus,
-    constraintEnv :: [PreConstraint],
+    constraintEnv :: [Constraint],
     suspendedConstraintEnv :: [SuspendedConstraint],
     substEnv :: IntMap.IntMap WeakTermPlus,
     -- opaqueEnv :: S.Set Ident,
@@ -79,7 +78,6 @@ initialEnv =
       endOfEntry = "",
       topMetaNameEnv = Map.empty,
       metaTermCtx = IntMap.empty,
-      phase = 0,
       constantSet = S.empty,
       enumEnv = Map.empty,
       fileEnv = Map.empty,

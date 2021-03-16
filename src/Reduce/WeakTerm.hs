@@ -34,7 +34,7 @@ reduceWeakTermPlus term =
           | length xts == length es' -> do
             let xs = map (\(_, x, _) -> asInt x) xts
             let sub = IntMap.fromList $ zip xs es'
-            substWeakTermPlus' sub IntMap.empty body >>= reduceWeakTermPlus
+            substWeakTermPlus' sub IntMap.empty (m, snd body) >>= reduceWeakTermPlus
         _ ->
           return (m, app)
     (m, WeakTermFix (mx, x, t) xts e)
@@ -57,11 +57,11 @@ reduceWeakTermPlus term =
         (_, WeakTermEnumIntro l) ->
           case lookup (EnumCaseLabel l) les'' of
             Just body ->
-              reduceWeakTermPlus body
+              reduceWeakTermPlus (m, snd body)
             Nothing ->
               case lookup EnumCaseDefault les'' of
                 Just body ->
-                  reduceWeakTermPlus body
+                  reduceWeakTermPlus (m, snd body)
                 Nothing ->
                   return (m, WeakTermEnumElim (e', t') les')
         _ ->
@@ -79,14 +79,14 @@ reduceWeakTermPlus term =
           | length es == length xts -> do
             let xs = map (\(_, x, _) -> asInt x) xts
             let sub = IntMap.fromList $ zip xs es
-            substWeakTermPlus' sub IntMap.empty e2 >>= reduceWeakTermPlus
+            substWeakTermPlus' sub IntMap.empty (m, snd e2) >>= reduceWeakTermPlus
         _ -> do
           e2' <- reduceWeakTermPlus e2
           let (ms, xs, ts) = unzip3 xts
           ts' <- mapM reduceWeakTermPlus ts
           return (m, WeakTermTensorElim (zip3 ms xs ts') e1' e2')
-    (_, WeakTermQuestion e _) ->
-      reduceWeakTermPlus e
+    (m, WeakTermQuestion e _) ->
+      reduceWeakTermPlus (m, snd e)
     (m, WeakTermDerangement i t ekts) -> do
       let (es, ks, ts) = unzip3 ekts
       es' <- mapM reduceWeakTermPlus es
@@ -116,8 +116,9 @@ substWeakTermPlus' sub nenv term =
     (m, WeakTermUpsilon x)
       | Just x' <- IntMap.lookup (asInt x) nenv ->
         return (m, WeakTermUpsilon x')
-      | Just e2@(_, e) <- IntMap.lookup (asInt x) sub ->
-        return (supHint (metaOf term) (metaOf e2), e)
+      | Just e2 <- IntMap.lookup (asInt x) sub ->
+        return e2
+      -- return (supHint (metaOf term) (metaOf e2), e)
       | otherwise ->
         return term
     (m, WeakTermPi xts t) -> do
@@ -142,8 +143,9 @@ substWeakTermPlus' sub nenv term =
       case IntMap.lookup x sub of
         Nothing ->
           return term
-        Just e2@(_, e) ->
-          return (supHint (metaOf term) (metaOf e2), e)
+        Just e2 ->
+          -- return (supHint (metaOf term) (metaOf e2), e)
+          return e2
     (m, WeakTermInt t x) -> do
       t' <- substWeakTermPlus' sub nenv t
       return (m, WeakTermInt t' x)

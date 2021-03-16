@@ -33,8 +33,7 @@ clarifyStmt :: TypeEnv -> [Stmt] -> WithEnv CompPlus
 clarifyStmt tenv ss =
   case ss of
     [] -> do
-      ph <- gets phase
-      m <- newHint ph 1 1 <$> getCurrentFilePath
+      m <- newHint 1 1 <$> getCurrentFilePath
       return (m, CompUpIntro (m, ValueInt 64 0))
     StmtDef m (mx, x, t) e : cont -> do
       e' <- clarifyTerm tenv e >>= reduceCompPlus

@@ -50,10 +50,10 @@ data WeakStmt
   | WeakStmtResourceType Hint T.Text WeakTermPlus WeakTermPlus
   deriving (Show)
 
-type PreConstraint =
-  (WeakTermPlus, WeakTermPlus)
+type Constraint =
+  (WeakTermPlus, WeakTermPlus) -- (expected-type, actual-type)
 
-type SuspendedConstraint = (S.Set Int, PreConstraint)
+type SuspendedConstraint = (S.Set Int, Constraint)
 
 toVar :: Hint -> Ident -> WeakTermPlus
 toVar m x =

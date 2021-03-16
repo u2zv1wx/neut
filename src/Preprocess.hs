@@ -36,7 +36,6 @@ visit :: Path Abs File -> WithEnv [TreePlus]
 visit path = do
   pushTrace path
   modify (\env -> env {fileEnv = Map.insert path VisitInfoActive (fileEnv env)})
-  modify (\env -> env {phase = 1 + phase env})
   content <- liftIO $ TIO.readFile $ toFilePath path
   tokenize content >>= preprocess'
 
@@ -348,7 +347,7 @@ generateLastStmtList :: T.Text -> (Env -> [T.Text]) -> WithEnv [TreePlus]
 generateLastStmtList atom accessor = do
   path <- getCurrentFilePath
   env <- gets accessor
-  let m = newHint 0 0 0 path
+  let m = newHint 0 0 path
   return $ map (\x -> (m, TreeNode [(m, TreeLeaf atom), (m, TreeLeaf x)])) env
 
 generateUnuseStmtList :: WithEnv [TreePlus]

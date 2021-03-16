@@ -38,6 +38,7 @@ infer' ctx term =
       return ((m, WeakTermTau), (m, WeakTermTau))
     (m, WeakTermUpsilon x) -> do
       t <- lookupWeakTypeEnv m x
+      -- return ((m, WeakTermUpsilon x), t)
       return ((m, WeakTermUpsilon x), (m, snd t))
     (m, WeakTermPi xts t) -> do
       (xts', t') <- inferPi ctx xts t
@@ -84,10 +85,10 @@ infer' ctx term =
       k <- lookupKind m l
       let t = (m, WeakTermEnum k)
       return ((m, WeakTermEnumIntro l), t)
-    (m, WeakTermEnumElim (e, t) ces) -> do
-      tEnum <- inferType' ctx t
+    (m, WeakTermEnumElim (e, _) ces) -> do
+      -- tEnum <- inferType' ctx t
       (e', t') <- infer' ctx e
-      insConstraintEnv tEnum t'
+      -- insConstraintEnv tEnum t'
       if null ces
         then do
           h <- newTypeAsterInCtx ctx m
@@ -97,7 +98,9 @@ infer' ctx term =
           (cs', tcs) <- unzip <$> mapM (inferEnumCase ctx) cs
           forM_ (zip (repeat t') tcs) $ uncurry insConstraintEnv
           (es', ts) <- unzip <$> mapM (infer' ctx) es
-          constrainList ts
+          -- let tHead = head ts
+          forM_ (zip (repeat (head ts)) (tail ts)) $ uncurry insConstraintEnv
+          -- constrainList ts
           return ((m, WeakTermEnumElim (e', t') $ zip cs' es'), head ts)
     (m, WeakTermTensor ts) -> do
       ts' <- mapM (inferType' ctx) ts
@@ -109,7 +112,7 @@ infer' ctx term =
       (e1', t1) <- infer' ctx e1
       (xts', (e2', t2)) <- inferBinder ctx xts e2
       let ts = map (\(_, _, t) -> t) xts'
-      insConstraintEnv t1 (m, WeakTermTensor ts)
+      insConstraintEnv (m, WeakTermTensor ts) t1
       return ((m, WeakTermTensorElim xts' e1' e2'), t2)
     (m, WeakTermQuestion e _) -> do
       (e', te) <- infer' ctx e
@@ -133,7 +136,7 @@ inferArgs m args1 args2 cod =
     ([], []) ->
       return cod
     ((e, t) : ets, (_, x, tx) : xts) -> do
-      insConstraintEnv t tx
+      insConstraintEnv tx t
       let sub = IntMap.singleton (asInt x) e
       (xts', cod') <- substWeakTermPlus'' sub IntMap.empty xts cod
       inferArgs m ets xts' cod'
@@ -148,7 +151,7 @@ inferExternal m x comp = do
 inferType' :: Context -> WeakTermPlus -> WithEnv WeakTermPlus
 inferType' ctx t = do
   (t', u) <- infer' ctx t
-  insConstraintEnv u (metaOf t, WeakTermTau)
+  insConstraintEnv (metaOf t, WeakTermTau) u
   return t'
 
 inferPi ::
@@ -200,7 +203,7 @@ inferPiElim ctx m (e, t) ets = do
       ys <- mapM (const $ newIdentFromText "arg") es
       yts <- newTypeAsterListInCtx ctx $ zip ys (map metaOf es)
       cod <- newTypeAsterInCtx (ctx ++ yts) m
-      insConstraintEnv t (metaOf e, WeakTermPi yts cod)
+      insConstraintEnv (metaOf e, WeakTermPi yts cod) t
       cod' <- inferArgs m ets yts cod
       return ((m, WeakTermPiElim e es), cod')
 
@@ -213,7 +216,8 @@ inferPiElim ctx m (e, t) ets = do
 newAsterInCtx :: Context -> Hint -> WithEnv (WeakTermPlus, WeakTermPlus)
 newAsterInCtx ctx m = do
   higherAster <- newAster m
-  let varSeq = map (\(_, x, _) -> (m, WeakTermUpsilon x)) ctx
+  let varSeq = map (\(mx, x, _) -> (mx, WeakTermUpsilon x)) ctx
+  -- let varSeq = map (\(_, x, _) -> (m, WeakTermUpsilon x)) ctx
   let higherApp = (m, WeakTermPiElim higherAster varSeq)
   aster <- newAster m
   let app = (m, WeakTermPiElim aster varSeq)
@@ -224,7 +228,8 @@ newAsterInCtx ctx m = do
 -- and return ?M @ (x1, ..., xn) : Univ{i}.
 newTypeAsterInCtx :: Context -> Hint -> WithEnv WeakTermPlus
 newTypeAsterInCtx ctx m = do
-  let varSeq = map (\(_, x, _) -> (m, WeakTermUpsilon x)) ctx
+  let varSeq = map (\(mx, x, _) -> (mx, WeakTermUpsilon x)) ctx
+  -- let varSeq = map (\(_, x, _) -> (m, WeakTermUpsilon x)) ctx
   aster <- newAster m
   return (m, WeakTermPiElim aster varSeq)
 
@@ -258,16 +263,16 @@ inferEnumCase ctx weakCase =
       h <- newTypeAsterInCtx ctx m
       return ((m, EnumCaseDefault), h)
 
-constrainList :: [WeakTermPlus] -> WithEnv ()
-constrainList typeList =
-  case typeList of
-    [] ->
-      return ()
-    [_] ->
-      return ()
-    (t1 : t2 : ts) -> do
-      insConstraintEnv t1 t2
-      constrainList $ t2 : ts
+-- constrainList :: [WeakTermPlus] -> WithEnv ()
+-- constrainList typeList =
+--   case typeList of
+--     [] ->
+--       return ()
+--     [_] ->
+--       return ()
+--     (t1 : t2 : ts) -> do
+--       insConstraintEnv t1 t2
+--       constrainList $ t2 : ts
 
 insConstraintEnv :: WeakTermPlus -> WeakTermPlus -> WithEnv ()
 insConstraintEnv t1 t2 =

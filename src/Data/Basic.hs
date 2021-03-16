@@ -12,9 +12,6 @@ instance Show Ident where
   show (I (s, i)) =
     T.unpack s ++ "-" ++ show i
 
-type Phase =
-  Int
-
 type Line =
   Int
 
@@ -22,7 +19,7 @@ type Column =
   Int
 
 type Loc =
-  (Phase, Line, Column)
+  (Line, Column)
 
 data Hint = Hint
   { metaFileName :: Path Abs File,
@@ -82,39 +79,14 @@ isLinear' found input =
 showHint :: Hint -> String
 showHint m = do
   let name = metaFileName m
-  let (_, l, c) = metaLocation m
+  let (l, c) = metaLocation m
   toFilePath name ++ ":" ++ show l ++ ":" ++ show c
 
-showHint' :: Hint -> String
-showHint' m = do
-  let name = metaFileName m
-  let (ph, l, c) = metaLocation m
-  toFilePath name ++ ":" ++ show ph ++ ":" ++ show l ++ ":" ++ show c
-
-supHint :: Hint -> Hint -> Hint
-supHint m1 m2 =
-  Hint
-    { metaFileName = supFileName m1 m2,
-      metaLocation = supLocation m1 m2
-    }
-
-supFileName :: Hint -> Hint -> Path Abs File
-supFileName m1 m2 =
-  case metaLocation m1 `compare` metaLocation m2 of
-    GT -> metaFileName m1
-    _ -> metaFileName m2
-
-supLocation :: Hint -> Hint -> Loc
-supLocation m1 m2 =
-  case metaLocation m1 `compare` metaLocation m2 of
-    GT -> metaLocation m1
-    _ -> metaLocation m2
-
-newHint :: Int -> Int -> Int -> Path Abs File -> Hint
-newHint p l c path =
+newHint :: Int -> Int -> Path Abs File -> Hint
+newHint l c path =
   Hint
     { metaFileName = path,
-      metaLocation = (p, l, c)
+      metaLocation = (l, c)
     }
 
 getPosInfo :: Hint -> PosInfo
@@ -122,5 +94,5 @@ getPosInfo m =
   (metaFileName m, metaLocation m)
 
 showPosInfo :: Path Abs File -> Loc -> String
-showPosInfo path (_, l, c) =
+showPosInfo path (l, c) =
   toFilePath path ++ ":" ++ show l ++ ":" ++ show c

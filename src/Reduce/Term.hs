@@ -39,7 +39,7 @@ reduceTermPlus term =
             valueCond -> do
             let xs = map (\(_, x, _) -> asInt x) xts
             let sub = IntMap.fromList $ zip xs es'
-            substTermPlus' sub IntMap.empty body >>= reduceTermPlus
+            substTermPlus' sub IntMap.empty (m, snd body) >>= reduceTermPlus
         _ ->
           return (m, app)
     (m, TermFix (mx, x, t) xts e) -> do
@@ -59,11 +59,11 @@ reduceTermPlus term =
         (_, TermEnumIntro l) ->
           case lookup (EnumCaseLabel l) les'' of
             Just body ->
-              reduceTermPlus body
+              reduceTermPlus (m, snd body)
             Nothing ->
               case lookup EnumCaseDefault les'' of
                 Just body ->
-                  reduceTermPlus body
+                  reduceTermPlus (m, snd body)
                 Nothing ->
                   return (m, TermEnumElim (e', t') les')
         _ ->
@@ -81,7 +81,7 @@ reduceTermPlus term =
           | length es == length xts -> do
             let xs = map (\(_, x, _) -> asInt x) xts
             let sub = IntMap.fromList $ zip xs es
-            substTermPlus' sub IntMap.empty e2 >>= reduceTermPlus
+            substTermPlus' sub IntMap.empty (m, snd e2) >>= reduceTermPlus
         _ -> do
           e2' <- reduceTermPlus e2
           let (ms, xs, ts) = unzip3 xts

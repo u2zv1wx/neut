@@ -43,13 +43,12 @@ elaborateStmt' stmt =
       return $ StmtDef m (mx, x, t'') e'' : cont'
     WeakStmtResourceType m name discarder copier : cont -> do
       insConstTypeEnv name (m, TermTau)
-      sub <- gets substEnv
-      (discarder', tDiscarder) <- substWeakTermPlus sub discarder >>= infer
-      (copier', tCopier) <- substWeakTermPlus sub copier >>= infer
+      (discarder', tDiscarder) <- infer discarder
+      (copier', tCopier) <- infer copier
       let tPtr = (m, WeakTermEnum (nsUnsafe <> "pointer"))
       h <- newIdentFromText "res"
-      insConstraintEnv tDiscarder (m, WeakTermPi [(m, h, tPtr)] (m, WeakTermTensor []))
-      insConstraintEnv tCopier (m, WeakTermPi [(m, h, tPtr)] (m, WeakTermTensor [tPtr, tPtr]))
+      insConstraintEnv (m, WeakTermPi [(m, h, tPtr)] (m, WeakTermTensor [])) tDiscarder
+      insConstraintEnv (m, WeakTermPi [(m, h, tPtr)] (m, WeakTermTensor [tPtr, tPtr])) tCopier
       unify
       discarder'' <- elaborate' discarder' >>= reduceTermPlus
       copier'' <- elaborate' copier' >>= reduceTermPlus

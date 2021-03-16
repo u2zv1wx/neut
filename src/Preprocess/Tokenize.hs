@@ -15,8 +15,7 @@ import Data.Tree
 import Path
 
 data TEnv = TEnv
-  { tPhase :: Int,
-    text :: T.Text,
+  { text :: T.Text,
     line :: Int,
     column :: Int,
     filePath :: Path Abs File
@@ -32,8 +31,7 @@ tokenize :: T.Text -> WithEnv [TreePlus]
 tokenize input = do
   modify (\env -> env {count = 1 + count env})
   path <- getCurrentFilePath
-  ph <- gets phase
-  let env = TEnv {tPhase = ph, text = input, line = 1, column = 1, filePath = path}
+  let env = TEnv {text = input, line = 1, column = 1, filePath = path}
   resultOrError <- liftIO $ try $ runStateT (program []) env
   case resultOrError of
     Left err ->
@@ -209,11 +207,10 @@ headStringLengthOf flag s i =
 
 currentHint :: Tokenizer Hint
 currentHint = do
-  ph <- gets tPhase
   l <- gets line
   c <- gets column
   path <- gets filePath
-  return $ newHint ph (fromEnum l) (fromEnum c) path
+  return $ newHint (fromEnum l) (fromEnum c) path
 
 {-# INLINE isSymbolChar #-}
 isSymbolChar :: Char -> Bool
