@@ -93,9 +93,6 @@ reduceConstApp m c es =
       | [arg] <- es -> do
         liftIO $ putStrLn $ T.unpack $ showAsSExp $ toTree arg
         return (m, MetaTermLeaf "true")
-    "meta.annotate-location"
-      | [e1, e2] <- es ->
-        return (fst e1, snd e2)
     "meta.is-nil"
       | [(_, MetaTermNode ts)] <- es ->
         return $ liftBool (null ts) m
