@@ -32,21 +32,9 @@ reduceMetaTerm term =
       e' <- reduceMetaTerm e
       es' <- mapM reduceMetaTerm es
       case e' of
-        (_, MetaTermImpIntro xs mRest body)
-          | Just rest <- mRest -> do
-            if length xs > length es'
-              then raiseError m $ "the function here must be called with x (>= " <> T.pack (show (length xs)) <> ") arguments, but found " <> T.pack (show (length es'))
-              else do
-                let (es1, es2) = splitAt (length xs) es'
-                let restArg = (m, MetaTermNode es2)
-                let sub = IntMap.fromList $ zip (map asInt xs) es1 ++ [(asInt rest, restArg)]
-                reduceMetaTerm $ substMetaTerm sub body
-          | otherwise -> do
-            if length xs /= length es'
-              then raiseArityMismatch m (length xs) (length es')
-              else do
-                let sub = IntMap.fromList $ zip (map asInt xs) es'
-                reduceMetaTerm $ substMetaTerm sub body
+        (mImp, MetaTermImpIntro xs mRest body) -> do
+          h <- newIdentFromText "_"
+          reduceFix m (mImp, MetaTermFix h xs mRest body) es'
         (_, MetaTermFix {}) ->
           reduceFix m e' es'
         (_, MetaTermConst c) ->
@@ -56,13 +44,13 @@ reduceMetaTerm term =
     (m, MetaTermNode es) -> do
       es' <- mapM reduceMetaTerm es
       return $ (m, MetaTermNode es')
-    (_, MetaTermIf cond onTrue onFalse) -> do
+    (mIf, MetaTermIf cond onTrue onFalse) -> do
       cond' <- reduceMetaTerm cond
       case cond' of
         (_, MetaTermNode []) ->
-          reduceMetaTerm onFalse
+          reduceMetaTerm (mIf, snd onFalse)
         _ ->
-          reduceMetaTerm onTrue
+          reduceMetaTerm (mIf, snd onTrue)
     _ ->
       return term
 
@@ -109,24 +97,24 @@ reduceConstApp m c es =
       | [(_, MetaTermNode ts)] <- es ->
         return $ liftBool (null ts) m
     "meta.is-leaf"
-      | [(mLeaf, MetaTermLeaf _)] <- es ->
-        return $ liftBool True mLeaf
-      | [(mNode, MetaTermNode _)] <- es ->
-        return $ liftBool False mNode
+      | [(_, MetaTermLeaf _)] <- es ->
+        return $ liftBool True m
+      | [(_, MetaTermNode _)] <- es ->
+        return $ liftBool False m
     "meta.is-node"
-      | [(mLeaf, MetaTermLeaf _)] <- es ->
-        return $ liftBool False mLeaf
-      | [(mNode, MetaTermNode _)] <- es ->
-        return $ liftBool True mNode
+      | [(_, MetaTermLeaf _)] <- es ->
+        return $ liftBool False m
+      | [(_, MetaTermNode _)] <- es ->
+        return $ liftBool True m
     "meta.leaf.equal"
       | [(_, MetaTermLeaf s1), (_, MetaTermLeaf s2)] <- es ->
         return $ liftBool (s1 == s2) m
     "meta.leaf.from-int"
-      | [(mInt, MetaTermInteger x)] <- es ->
-        return (mInt, MetaTermLeaf (T.pack (show x)))
+      | [(_, MetaTermInteger x)] <- es ->
+        return (m, MetaTermLeaf (T.pack (show x)))
     "meta.leaf.mul"
-      | [(mLeaf, MetaTermLeaf s1), (_, MetaTermLeaf s2)] <- es ->
-        return (mLeaf, MetaTermLeaf (s1 <> s2))
+      | [(_, MetaTermLeaf s1), (_, MetaTermLeaf s2)] <- es ->
+        return (m, MetaTermLeaf (s1 <> s2))
     "meta.leaf.new-symbol"
       | [(_, MetaTermLeaf s)] <- es -> do
         k <- newText
@@ -143,89 +131,89 @@ reduceConstApp m c es =
     "meta.leaf.uncons"
       | [(mLeaf, MetaTermLeaf s)] <- es,
         Just (ch, rest) <- T.uncons s -> do
-        return (mLeaf, MetaTermNode [(mLeaf, MetaTermLeaf (T.singleton ch)), (mLeaf, MetaTermLeaf rest)])
+        return (m, MetaTermNode [(mLeaf, MetaTermLeaf (T.singleton ch)), (mLeaf, MetaTermLeaf rest)])
     "meta.node.cons"
       | [t, (_, MetaTermNode ts)] <- es ->
         return (m, MetaTermNode (t : ts))
     "meta.node.filter"
-      | [f, (mNode, MetaTermNode ts)] <- es -> do
+      | [f, (_, MetaTermNode ts)] <- es -> do
         boolList <- mapM reduceMetaTerm $ map (\t -> (fst t, MetaTermImpElim f [t])) ts
         let ts' = map snd $ filter (\(t, _) -> unliftBool t) $ zip boolList ts
-        return (mNode, MetaTermNode ts')
+        return (m, MetaTermNode ts')
     "meta.node.head"
       | [(mNode, MetaTermNode ts)] <- es ->
         case ts of
           h : _ ->
-            return h
+            return (m, snd h)
           _ ->
             raiseError mNode "the constant `head` cannot be applied to nil"
     "meta.node.return"
       | [e] <- es ->
-        return (fst e, MetaTermNode [e])
+        return (m, MetaTermNode [e])
     "meta.node.append"
-      | [(mNode1, MetaTermNode ts1), (_, MetaTermNode ts2)] <- es ->
-        return (mNode1, MetaTermNode (ts1 ++ ts2))
+      | [(_, MetaTermNode ts1), (_, MetaTermNode ts2)] <- es ->
+        return (m, MetaTermNode (ts1 ++ ts2))
     "meta.node.init"
       | [(mNode, MetaTermNode ts)] <- es ->
         case ts of
           [] ->
             raiseError mNode "the constant `init` cannot be applied to nil"
           _ : _ ->
-            return (mNode, MetaTermNode (init ts))
+            return (m, MetaTermNode (init ts))
     "meta.node.last"
       | [(mNode, MetaTermNode ts)] <- es ->
         case ts of
           [] -> do
             raiseError mNode "the constant `last` cannot be applied to nil"
           _ : _ ->
-            return (last ts)
+            return (m, snd (last ts))
     "meta.node.join"
-      | [(mNode, MetaTermNode tss)] <- es -> do
+      | [(_, MetaTermNode tss)] <- es -> do
         ts <- concat <$> mapM takeNode tss
-        return (mNode, MetaTermNode ts)
+        return (m, MetaTermNode ts)
     "meta.node.length"
-      | [(mNode, MetaTermNode ts)] <- es -> do
-        return (mNode, MetaTermInteger (toInteger (length ts)))
+      | [(_, MetaTermNode ts)] <- es -> do
+        return (m, MetaTermInteger (toInteger (length ts)))
     "meta.node.list" -> do
       ts <- join <$> mapM takeNode es
       return (m, MetaTermNode ts)
     "meta.node.map"
-      | [f, (mNode, MetaTermNode ts)] <- es -> do
+      | [f, (_, MetaTermNode ts)] <- es -> do
         ts' <- mapM reduceMetaTerm $ map (\t -> (fst t, MetaTermImpElim f [t])) ts
-        return (mNode, MetaTermNode ts')
+        return (m, MetaTermNode ts')
     "meta.node.take"
-      | [(_, MetaTermInteger i), (mNode, MetaTermNode ts)] <- es -> do
-        return (mNode, MetaTermNode (take (fromInteger i) ts))
+      | [(_, MetaTermInteger i), (_, MetaTermNode ts)] <- es -> do
+        return (m, MetaTermNode (take (fromInteger i) ts))
     "meta.node.drop"
-      | [(_, MetaTermInteger i), (mNode, MetaTermNode ts)] <- es -> do
-        return (mNode, MetaTermNode (drop (fromInteger i) ts))
+      | [(_, MetaTermInteger i), (_, MetaTermNode ts)] <- es -> do
+        return (m, MetaTermNode (drop (fromInteger i) ts))
     "meta.node.take-while"
-      | [predicate, (mNode, MetaTermNode ts)] <- es -> do
+      | [predicate, (_, MetaTermNode ts)] <- es -> do
         ts' <- runTakeWhile predicate ts
-        return (mNode, MetaTermNode ts')
+        return (m, MetaTermNode ts')
     "meta.node.drop-while"
-      | [predicate, (mNode, MetaTermNode ts)] <- es -> do
+      | [predicate, (_, MetaTermNode ts)] <- es -> do
         ts' <- runDropWhile predicate ts
-        return (mNode, MetaTermNode ts')
+        return (m, MetaTermNode ts')
     "meta.node.nth"
       | [(_, MetaTermInteger i), node@(_, MetaTermNode ts)] <- es -> do
         if 0 <= i && fromInteger i < length ts
-          then return (ts !! fromInteger i)
+          then return (m, snd (ts !! fromInteger i))
           else raiseError m $ "the index " <> T.pack (show i) <> " is out of range of:\n" <> showAsSExp (toTree node)
     "meta.node.replicate"
       | [(_, MetaTermInteger i), t] <- es -> do
         return (m, MetaTermNode (replicate (fromInteger i) t))
     "meta.node.reverse"
-      | [(mNode, MetaTermNode ts)] <- es ->
-        return (mNode, MetaTermNode (reverse ts))
+      | [(_, MetaTermNode ts)] <- es ->
+        return (m, MetaTermNode (reverse ts))
     "meta.node.intersperse"
-      | [t, (mNode, MetaTermNode ts)] <- es ->
-        return (mNode, MetaTermNode (intersperse t ts))
+      | [t, (_, MetaTermNode ts)] <- es ->
+        return (m, MetaTermNode (intersperse t ts))
     "meta.node.tail"
       | [(mNode, MetaTermNode ts)] <- es ->
         case ts of
           (_ : rest) ->
-            return (mNode, MetaTermNode rest)
+            return (m, MetaTermNode rest)
           _ ->
             raiseError mNode "the constant `tail` cannot be applied to nil"
     _
