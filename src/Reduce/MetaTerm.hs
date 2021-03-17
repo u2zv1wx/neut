@@ -130,15 +130,15 @@ reduceConstApp m c es =
       | [(_, MetaTermLeaf s)] <- es -> do
         k <- newText
         return (m, MetaTermLeaf (s <> k))
-    "meta.leaf.string-to-u8-list"
+    "meta.leaf.string-to-i8-list"
       | [(mStr, MetaTermLeaf atom)] <- es -> do
         case readMaybe (T.unpack atom) of
           Just str -> do
-            -- e.g. (string-to-u8-list "abcd") ~> (97 98 99 100)
-            let u8s = encode str
-            return (m, MetaTermNode (map (\i -> (mStr, MetaTermLeaf (T.pack (show i)))) u8s))
+            -- e.g. (string-to-i8-list "abcd") ~> (97 98 99 100)
+            let i8s = encode str
+            return (m, MetaTermNode (map (\i -> (mStr, MetaTermLeaf (T.pack (show i)))) i8s))
           Nothing ->
-            raiseError mStr "the argument of `string-to-u8-list` must be a string"
+            raiseError mStr "the argument of `string-to-i8-list` must be a string"
     "meta.leaf.uncons"
       | [(mLeaf, MetaTermLeaf s)] <- es,
         Just (ch, rest) <- T.uncons s -> do
