@@ -339,7 +339,7 @@ isSpecialForm :: Map.HashMap T.Text Ident -> TreePlus -> WithEnv Bool
 isSpecialForm nenv tree = do
   case tree of
     (m, TreeLeaf x) -> do
-      my <- resolveSymbol (asMetaVar m nenv) x
+      my <- resolveSymbol m (asMetaVar m nenv) x
       case my of
         Just _ ->
           return True

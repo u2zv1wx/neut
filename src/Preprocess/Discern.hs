@@ -23,8 +23,8 @@ discernMetaTerm' :: NameEnv -> MetaTermPlus -> WithEnv MetaTermPlus
 discernMetaTerm' nenv term =
   case term of
     (m, MetaTermVar (I (s, _))) ->
-      tryCand (resolveSymbol (asMetaVar m nenv) s) $
-        tryCand (resolveSymbol (asMetaConstant m) s) $
+      tryCand (resolveSymbol m (asMetaVar m nenv) s) $
+        tryCand (resolveSymbol m (asMetaConstant m) s) $
           raiseError m $ "undefined meta-variable: " <> s
     (m, MetaTermImpIntro xs mf e) -> do
       (xs', mf', e') <- discernBinder nenv xs mf e

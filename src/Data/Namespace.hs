@@ -96,38 +96,50 @@ handleEnd m s cont = do
         raiseError m $
           "the innermost section is not `" <> s <> "`, but is `" <> s' <> "`"
 
-resolveSymbol :: (T.Text -> WithEnv (Maybe b)) -> T.Text -> WithEnv (Maybe b)
-resolveSymbol predicate name = do
+{-# INLINE resolveSymbol #-}
+resolveSymbol :: Hint -> (T.Text -> WithEnv (Maybe b)) -> T.Text -> WithEnv (Maybe b)
+resolveSymbol m predicate name = do
   penv <- gets prefixEnv
-  takeFirst predicate $ (map (\prefix -> prefix <> nsSep <> name) penv) ++ [name]
-
--- takeFirst predicate $ name : (map (\prefix -> prefix <> nsSep <> name) penv)
-
-takeFirst :: (a -> WithEnv (Maybe b)) -> [a] -> WithEnv (Maybe b)
-takeFirst predicate candidateList =
-  case candidateList of
+  candList <- takeAll predicate $ name : (map (\prefix -> prefix <> nsSep <> name) penv)
+  case candList of
     [] ->
       return Nothing
+    [prefixedName] ->
+      predicate prefixedName
+    _ -> do
+      let candInfo = T.concat $ map (\cand -> "\n- " <> cand) candList
+      raiseError m $ "this `" <> name <> "` is ambiguous since it could refer to:" <> candInfo
+
+takeAll :: (T.Text -> WithEnv (Maybe b)) -> [T.Text] -> WithEnv [T.Text]
+takeAll predicate candidateList =
+  case candidateList of
+    [] ->
+      return []
     x : xs -> do
       mv <- predicate x
+      ys <- takeAll predicate xs
       case mv of
-        Just v ->
-          return $ Just v
+        Just _ -> do
+          return $ x : ys
         Nothing ->
-          takeFirst predicate xs
+          return ys
 
+{-# INLINE asVar #-}
 asVar :: Hint -> Map.HashMap T.Text Ident -> T.Text -> (Ident -> a) -> WithEnv (Maybe (Hint, a))
 asVar m nenv var f =
   return $ Map.lookup var nenv >>= \x -> return (m, f x)
 
+{-# INLINE asMetaVar #-}
 asMetaVar :: Hint -> Map.HashMap T.Text Ident -> T.Text -> WithEnv (Maybe MetaTermPlus)
 asMetaVar m nenv var =
   asVar m nenv var MetaTermVar
 
+{-# INLINE asWeakVar #-}
 asWeakVar :: Hint -> Map.HashMap T.Text Ident -> T.Text -> WithEnv (Maybe WeakTermPlus)
 asWeakVar m nenv var =
   asVar m nenv var WeakTermVar
 
+{-# INLINE findThenModify #-}
 findThenModify :: (Env -> Map.HashMap T.Text t) -> T.Text -> (T.Text -> a) -> WithEnv (Maybe a)
 findThenModify info name f = do
   env <- gets info
@@ -135,24 +147,29 @@ findThenModify info name f = do
     then return $ Just $ f name
     else return Nothing
 
+{-# INLINE asWeakEnumValue #-}
 asWeakEnumValue :: Hint -> T.Text -> WithEnv (Maybe WeakTermPlus)
 asWeakEnumValue m name = do
   findThenModify revEnumEnv name (\x -> (m, WeakTermEnumIntro x))
 
+{-# INLINE asWeakEnumType #-}
 asWeakEnumType :: Hint -> T.Text -> WithEnv (Maybe WeakTermPlus)
 asWeakEnumType m name = do
   findThenModify enumEnv name (\x -> (m, WeakTermEnum x))
 
+{-# INLINE asEnumCase #-}
 asEnumCase :: T.Text -> WithEnv (Maybe EnumCase)
 asEnumCase name =
   findThenModify revEnumEnv name EnumCaseLabel
 
+{-# INLINE asMetaConstant #-}
 asMetaConstant :: Hint -> T.Text -> WithEnv (Maybe MetaTermPlus)
 asMetaConstant m name =
   if Map.member name metaConstants
     then return $ Just (m, MetaTermConst name)
     else return Nothing
 
+{-# INLINE asWeakConstant #-}
 asWeakConstant :: Hint -> T.Text -> WithEnv (Maybe WeakTermPlus)
 asWeakConstant m name
   | Just (LowTypeInt _) <- asLowTypeMaybe name =

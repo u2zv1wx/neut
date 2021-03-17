@@ -44,10 +44,10 @@ discern' nenv term =
     (m, WeakTermTau) ->
       return (m, WeakTermTau)
     (m, WeakTermVar (I (s, _))) ->
-      tryCand (resolveSymbol (asWeakVar m nenv) s) $
-        tryCand (resolveSymbol (asWeakEnumValue m) s) $
-          tryCand (resolveSymbol (asWeakEnumType m) s) $
-            tryCand (resolveSymbol (asWeakConstant m) s) $
+      tryCand (resolveSymbol m (asWeakVar m nenv) s) $
+        tryCand (resolveSymbol m (asWeakEnumValue m) s) $
+          tryCand (resolveSymbol m (asWeakEnumType m) s) $
+            tryCand (resolveSymbol m (asWeakConstant m) s) $
               raiseError m $ "undefined variable: " <> s
     (m, WeakTermPi xts t) -> do
       (xts', t') <- discernBinder nenv xts t
@@ -136,7 +136,7 @@ discernEnumCase :: Hint -> EnumCase -> WithEnv EnumCase
 discernEnumCase m weakCase =
   case weakCase of
     EnumCaseLabel l -> do
-      ml <- resolveSymbol asEnumCase l
+      ml <- resolveSymbol m asEnumCase l
       case ml of
         Just l' ->
           return l'
