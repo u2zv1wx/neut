@@ -8,7 +8,7 @@ import qualified Data.Text as T
 
 data WeakTerm
   = WeakTermTau
-  | WeakTermUpsilon Ident
+  | WeakTermVar Ident
   | WeakTermPi [WeakIdentPlus] WeakTermPlus
   | WeakTermPiIntro [WeakIdentPlus] WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
@@ -57,7 +57,7 @@ type SuspendedConstraint = (S.Set Int, Constraint)
 
 toVar :: Hint -> Ident -> WeakTermPlus
 toVar m x =
-  (m, WeakTermUpsilon x)
+  (m, WeakTermVar x)
 
 i8 :: Hint -> WeakTermPlus
 i8 m =
@@ -72,7 +72,7 @@ varWeakTermPlus term =
   case term of
     (_, WeakTermTau) ->
       S.empty
-    (_, WeakTermUpsilon x) ->
+    (_, WeakTermVar x) ->
       S.singleton x
     (_, WeakTermPi xts t) ->
       varWeakTermPlus' xts [t]
@@ -134,7 +134,7 @@ asterWeakTermPlus term =
   case term of
     (_, WeakTermTau) ->
       S.empty
-    (_, WeakTermUpsilon _) ->
+    (_, WeakTermVar _) ->
       S.empty
     (_, WeakTermPi xts t) ->
       asterWeakTermPlus' xts [t]
@@ -195,10 +195,10 @@ metaOf :: WeakTermPlus -> Hint
 metaOf =
   fst
 
-asUpsilon :: WeakTermPlus -> Maybe Ident
-asUpsilon term =
+asVar :: WeakTermPlus -> Maybe Ident
+asVar term =
   case term of
-    (_, WeakTermUpsilon x) ->
+    (_, WeakTermVar x) ->
       Just x
     _ ->
       Nothing
@@ -208,7 +208,7 @@ toText term =
   case term of
     (_, WeakTermTau) ->
       "tau"
-    (_, WeakTermUpsilon x) ->
+    (_, WeakTermVar x) ->
       showVariable x
     (_, WeakTermPi xts cod)
       | [(_, I ("internal.sigma-tau", _), _), (_, _, (_, WeakTermPi yts _))] <- xts ->

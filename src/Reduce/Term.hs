@@ -111,9 +111,9 @@ substTermPlus' sub nenv term =
   case term of
     (_, TermTau) ->
       return term
-    (m, TermUpsilon x)
+    (m, TermVar x)
       | Just x' <- IntMap.lookup (asInt x) nenv ->
-        return (m, TermUpsilon x')
+        return (m, TermVar x')
       | Just e <- IntMap.lookup (asInt x) sub ->
         return e
       | otherwise ->
@@ -190,7 +190,7 @@ isValue term =
   case term of
     (_, TermTau) ->
       True
-    (_, TermUpsilon _) ->
+    (_, TermVar _) ->
       True
     (_, TermPi {}) ->
       True

@@ -17,7 +17,7 @@ lower :: CompPlus -> WithEnv LowComp
 lower mainTerm@(m, _) = do
   mainTerm'' <- lowerComp mainTerm
   -- the result of "main" must be i64, not i8*
-  (result, resultVar) <- newValueUpsilonWith m "result"
+  (result, resultVar) <- newValueVarWith m "result"
   (cast, castThen) <- llvmCast (Just "cast") resultVar (LowTypeInt 64)
   castResult <- castThen (LowCompReturn cast)
   -- let result: i8* := (main-term) in {cast result to i64}
@@ -70,7 +70,7 @@ takeBaseName term =
   case term of
     (_, ValueConst s) ->
       s
-    (_, ValueUpsilon (I (s, _))) ->
+    (_, ValueVar (I (s, _))) ->
       s
     (_, ValueSigmaIntro ds) ->
       "array" <> T.pack (show (length ds))
@@ -321,7 +321,7 @@ lowerValueLet x lowerValue cont =
             llvmUncastLet x (LowValueGlobal y) (toFunPtrType args) cont
           | otherwise ->
             llvmUncastLet x (LowValueGlobal y) (toFunPtrType args) cont
-    (_, ValueUpsilon y) ->
+    (_, ValueVar y) ->
       llvmUncastLet x (LowValueLocal y) voidPtr cont
     (m, ValueSigmaIntro ds) -> do
       let arrayType = AggPtrTypeArray (length ds) voidPtr
@@ -384,7 +384,7 @@ storeContent ::
   WithEnv LowComp
 storeContent m reg aggPtrType dts cont = do
   let lowType = toLowType aggPtrType
-  (cast, castThen) <- llvmCast (Just $ asText reg) (m, ValueUpsilon reg) lowType
+  (cast, castThen) <- llvmCast (Just $ asText reg) (m, ValueVar reg) lowType
   storeThenCont <- storeContent' cast lowType (zip [0 ..] dts) cont
   castThenStoreThenCont <- castThen storeThenCont
   case aggPtrType of

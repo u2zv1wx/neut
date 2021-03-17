@@ -113,9 +113,9 @@ substWeakTermPlus' sub nenv term =
   case term of
     (_, WeakTermTau) ->
       return term
-    (m, WeakTermUpsilon x)
+    (m, WeakTermVar x)
       | Just x' <- IntMap.lookup (asInt x) nenv ->
-        return (m, WeakTermUpsilon x')
+        return (m, WeakTermVar x')
       | Just e2 <- IntMap.lookup (asInt x) sub ->
         return e2
       -- return (supHint (metaOf term) (metaOf e2), e)

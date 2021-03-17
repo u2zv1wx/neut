@@ -18,7 +18,7 @@ import Elaborate.Infer
 import Reduce.WeakTerm
 
 data Stuck
-  = StuckPiElimUpsilon Ident Hint [(Hint, [WeakTermPlus])]
+  = StuckPiElimVar Ident Hint [(Hint, [WeakTermPlus])]
   | StuckPiElimFix WeakTermPlus Hint [(Hint, [WeakTermPlus])]
   | StuckPiElimAster Int [[WeakTermPlus]]
 
@@ -151,15 +151,15 @@ simp' constraintList =
                       _ -> do
                         e1'' <- substWeakTermPlus (IntMap.fromList $ zip (map asInt zs) es) e1'
                         simp $ (e1'', e2') : cs
-                (Just (StuckPiElimUpsilon x1 _ mess1), Just (StuckPiElimUpsilon x2 _ mess2))
+                (Just (StuckPiElimVar x1 _ mess1), Just (StuckPiElimVar x2 _ mess2))
                   | x1 == x2,
                     Nothing <- IntMap.lookup (asInt x1) sub,
                     Just pairList <- asPairList (map snd mess1) (map snd mess2) ->
                     simp $ pairList ++ cs
-                (Just (StuckPiElimUpsilon x1 _ mess1), _)
+                (Just (StuckPiElimVar x1 _ mess1), _)
                   | Just lam <- IntMap.lookup (asInt x1) sub ->
                     simp $ (toPiElim lam mess1, e2) : cs
-                (_, Just (StuckPiElimUpsilon x2 _ mess2))
+                (_, Just (StuckPiElimVar x2 _ mess2))
                   | Just lam <- IntMap.lookup (asInt x2) sub ->
                     simp $ (e1, toPiElim lam mess2) : cs
                 (Just (StuckPiElimFix fix1 _ mess1), Just (StuckPiElimFix fix2 _ mess2)) -> do
@@ -194,7 +194,7 @@ simpBinder' sub args1 args2 =
     ((m1, x1, t1) : xts1, (_, x2, t2) : xts2) -> do
       t2' <- substWeakTermPlus sub t2
       simp [(t1, t2')]
-      let var1 = (m1, WeakTermUpsilon x1)
+      let var1 = (m1, WeakTermVar x1)
       let sub' = IntMap.insert (asInt x2) var1 sub
       simpBinder' sub' xts1 xts2
     _ ->
@@ -225,8 +225,8 @@ asPairList list1 list2 =
 asStuckedTerm :: WeakTermPlus -> Maybe Stuck
 asStuckedTerm term =
   case term of
-    (m, WeakTermUpsilon x) ->
-      Just $ StuckPiElimUpsilon x m []
+    (m, WeakTermVar x) ->
+      Just $ StuckPiElimVar x m []
     (m, WeakTermFix {}) ->
       Just $ StuckPiElimFix term m []
     (_, WeakTermAster h) ->
@@ -234,10 +234,10 @@ asStuckedTerm term =
     (m, WeakTermPiElim e es) ->
       case asStuckedTerm e of
         Just (StuckPiElimAster h iexss)
-          | Just _ <- mapM asUpsilon es ->
+          | Just _ <- mapM asVar es ->
             Just $ StuckPiElimAster h $ iexss ++ [es]
-        Just (StuckPiElimUpsilon x mx ess) ->
-          Just $ StuckPiElimUpsilon x mx $ ess ++ [(m, es)]
+        Just (StuckPiElimVar x mx ess) ->
+          Just $ StuckPiElimVar x mx $ ess ++ [(m, es)]
         Just (StuckPiElimFix f mf ess) ->
           Just $ StuckPiElimFix f mf $ ess ++ [(m, es)]
         _ ->
@@ -255,7 +255,7 @@ includeCheck xs ys =
 
 getVarList :: [WeakTermPlus] -> [Ident]
 getVarList xs =
-  catMaybes $ map asUpsilon xs
+  catMaybes $ map asVar xs
 
 toPiElim :: WeakTermPlus -> [(Hint, [WeakTermPlus])] -> WeakTermPlus
 toPiElim e args =
@@ -275,7 +275,7 @@ toVarList' ctx xs termList =
     [] ->
       return []
     e : es
-      | (m, WeakTermUpsilon x) <- e,
+      | (m, WeakTermVar x) <- e,
         x `S.member` xs -> do
         t <- newTypeAsterInCtx ctx m
         xts <- toVarList' (ctx ++ [(m, x, t)]) xs es
@@ -324,7 +324,7 @@ isEq l r =
   case (l, r) of
     ((_, WeakTermTau), (_, WeakTermTau)) ->
       return True
-    ((_, WeakTermUpsilon x1), (_, WeakTermUpsilon x2)) ->
+    ((_, WeakTermVar x1), (_, WeakTermVar x2)) ->
       return $ x1 == x2
     ((_, WeakTermPi xts1 cod1), (_, WeakTermPi xts2 cod2)) -> do
       isEq' xts1 cod1 xts2 cod2
@@ -399,7 +399,7 @@ isEq'' sub xts1 cod1 xts2 cod2 =
     (((m1, x1, t1) : rest1), ((_, x2, t2) : rest2)) -> do
       t2' <- substWeakTermPlus sub t2
       b1 <- isEq t1 t2'
-      let sub' = IntMap.insert (asInt x2) (m1, WeakTermUpsilon x1) sub
+      let sub' = IntMap.insert (asInt x2) (m1, WeakTermVar x1) sub
       b2 <- isEq'' sub' rest1 cod1 rest2 cod2
       return $ b1 && b2
     _ ->

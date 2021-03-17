@@ -43,7 +43,7 @@ discern' nenv term =
   case term of
     (m, WeakTermTau) ->
       return (m, WeakTermTau)
-    (m, WeakTermUpsilon (I (s, _))) ->
+    (m, WeakTermVar (I (s, _))) ->
       tryCand (resolveSymbol (asWeakVar m nenv) s) $
         tryCand (resolveSymbol (asWeakEnumValue m) s) $
           tryCand (resolveSymbol (asWeakEnumType m) s) $

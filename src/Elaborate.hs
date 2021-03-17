@@ -60,12 +60,12 @@ elaborate' term =
   case term of
     (m, WeakTermTau) ->
       return (m, TermTau)
-    (m, WeakTermUpsilon x) -> do
+    (m, WeakTermVar x) -> do
       cset <- gets constantSet
       let x' = asText x
       if S.member x' cset
         then return (m, TermConst x')
-        else return (m, TermUpsilon x)
+        else return (m, TermVar x)
     (m, WeakTermPi xts t) -> do
       xts' <- mapM elaboratePlus xts
       t' <- elaborate' t

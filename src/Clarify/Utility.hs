@@ -10,7 +10,7 @@ import qualified Data.Text as T
 
 toApp :: T.Text -> Hint -> Ident -> CompPlus -> WithEnv CompPlus
 toApp switcher m x t = do
-  (expVarName, expVar) <- newValueUpsilonWith m "exp"
+  (expVarName, expVar) <- newValueVarWith m "exp"
   return
     ( m,
       CompUpElim
@@ -19,7 +19,7 @@ toApp switcher m x t = do
         ( m,
           CompPiElimDownElim
             expVar
-            [(m, ValueEnumIntro switcher), (m, ValueUpsilon x)]
+            [(m, ValueEnumIntro switcher), (m, ValueVar x)]
         )
     )
 
@@ -61,8 +61,8 @@ makeSwitcher ::
   (ValuePlus -> WithEnv CompPlus) ->
   WithEnv ([Ident], CompPlus)
 makeSwitcher m compAff compRel = do
-  (switchVarName, switchVar) <- newValueUpsilonWith m "switch"
-  (argVarName, argVar) <- newValueUpsilonWith m "arg"
+  (switchVarName, switchVar) <- newValueVarWith m "switch"
+  (argVarName, argVar) <- newValueVarWith m "arg"
   aff <- compAff argVar
   rel <- compRel argVar
   return

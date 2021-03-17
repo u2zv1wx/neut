@@ -10,7 +10,7 @@ import Data.WeakTerm
 
 data Term
   = TermTau
-  | TermUpsilon Ident
+  | TermVar Ident
   | TermPi [IdentPlus] TermPlus
   | TermPiIntro [IdentPlus] TermPlus
   | TermPiElim TermPlus [TermPlus]
@@ -44,10 +44,10 @@ data Stmt
   | StmtResourceType Hint T.Text TermPlus TermPlus
   deriving (Show)
 
-asUpsilon :: TermPlus -> Maybe Ident
-asUpsilon term =
+asVar :: TermPlus -> Maybe Ident
+asVar term =
   case term of
-    (_, TermUpsilon x) ->
+    (_, TermVar x) ->
       Just x
     _ ->
       Nothing
@@ -57,8 +57,8 @@ weaken term =
   case term of
     (m, TermTau) ->
       (m, WeakTermTau)
-    (m, TermUpsilon x) ->
-      (m, WeakTermUpsilon x)
+    (m, TermVar x) ->
+      (m, WeakTermVar x)
     (m, TermPi xts t) ->
       (m, WeakTermPi (weakenArgs xts) (weaken t))
     (m, TermPiIntro xts body) -> do

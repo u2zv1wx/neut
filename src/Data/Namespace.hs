@@ -10,7 +10,7 @@ import Data.MetaTerm
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Tree
-import Data.WeakTerm
+import Data.WeakTerm hiding (asVar)
 
 nsSepChar :: Char
 nsSepChar =
@@ -126,7 +126,7 @@ asMetaVar m nenv var =
 
 asWeakVar :: Hint -> Map.HashMap T.Text Ident -> T.Text -> WithEnv (Maybe WeakTermPlus)
 asWeakVar m nenv var =
-  asVar m nenv var WeakTermUpsilon
+  asVar m nenv var WeakTermVar
 
 findThenModify :: (Env -> Map.HashMap T.Text t) -> T.Text -> (T.Text -> a) -> WithEnv (Maybe a)
 findThenModify info name f = do

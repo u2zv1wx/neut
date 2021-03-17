@@ -36,10 +36,10 @@ infer' ctx term =
   case term of
     (m, WeakTermTau) ->
       return ((m, WeakTermTau), (m, WeakTermTau))
-    (m, WeakTermUpsilon x) -> do
+    (m, WeakTermVar x) -> do
       t <- lookupWeakTypeEnv m x
-      -- return ((m, WeakTermUpsilon x), t)
-      return ((m, WeakTermUpsilon x), (m, snd t))
+      -- return ((m, WeakTermVar x), t)
+      return ((m, WeakTermVar x), (m, snd t))
     (m, WeakTermPi xts t) -> do
       (xts', t') <- inferPi ctx xts t
       return ((m, WeakTermPi xts' t'), (m, WeakTermTau))
@@ -216,8 +216,8 @@ inferPiElim ctx m (e, t) ets = do
 newAsterInCtx :: Context -> Hint -> WithEnv (WeakTermPlus, WeakTermPlus)
 newAsterInCtx ctx m = do
   higherAster <- newAster m
-  let varSeq = map (\(mx, x, _) -> (mx, WeakTermUpsilon x)) ctx
-  -- let varSeq = map (\(_, x, _) -> (m, WeakTermUpsilon x)) ctx
+  let varSeq = map (\(mx, x, _) -> (mx, WeakTermVar x)) ctx
+  -- let varSeq = map (\(_, x, _) -> (m, WeakTermVar x)) ctx
   let higherApp = (m, WeakTermPiElim higherAster varSeq)
   aster <- newAster m
   let app = (m, WeakTermPiElim aster varSeq)
@@ -228,8 +228,8 @@ newAsterInCtx ctx m = do
 -- and return ?M @ (x1, ..., xn) : Univ{i}.
 newTypeAsterInCtx :: Context -> Hint -> WithEnv WeakTermPlus
 newTypeAsterInCtx ctx m = do
-  let varSeq = map (\(mx, x, _) -> (mx, WeakTermUpsilon x)) ctx
-  -- let varSeq = map (\(_, x, _) -> (m, WeakTermUpsilon x)) ctx
+  let varSeq = map (\(mx, x, _) -> (mx, WeakTermVar x)) ctx
+  -- let varSeq = map (\(_, x, _) -> (m, WeakTermVar x)) ctx
   aster <- newAster m
   return (m, WeakTermPiElim aster varSeq)
 
@@ -336,7 +336,7 @@ takeBorrowedTypes tks =
 weakTermSigma :: Hint -> [WeakIdentPlus] -> WithEnv WeakTermPlus
 weakTermSigma m xts = do
   z <- newIdentFromText "internal.sigma-tau"
-  let vz = (m, WeakTermUpsilon z)
+  let vz = (m, WeakTermVar z)
   k <- newIdentFromText "sigma"
   return (m, WeakTermPi [(m, z, (m, WeakTermTau)), (m, k, (m, WeakTermPi xts vz))] vz)
 

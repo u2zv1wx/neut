@@ -43,7 +43,7 @@ interpret inputTree =
                   h <- newAster m
                   return (m, WeakTermQuestion e h)
             | otherwise ->
-              return (m, WeakTermUpsilon $ asIdent atom)
+              return (m, WeakTermVar $ asIdent atom)
     (m, TreeNode (leaf@(_, TreeLeaf headAtom) : rest)) ->
       case headAtom of
         "Π"
@@ -185,7 +185,7 @@ interpretArg es =
       case tree of
         (_, TreeLeaf "_") -> do
           xt@(m, h, _) <- interpretIdentPlus tree
-          return (xt : xts, (m, WeakTermUpsilon h) : args)
+          return (xt : xts, (m, WeakTermVar h) : args)
         _ -> do
           e <- interpret tree
           return (xts, e : args)

@@ -106,7 +106,7 @@ sigma4 m mxts argVar = do
 
 toPairInfo :: (Ident, CompPlus) -> WithEnv (Ident, (ValuePlus, CompPlus))
 toPairInfo (_, t@(m, _)) = do
-  (name, var) <- newValueUpsilonWith m "pair"
+  (name, var) <- newValueVarWith m "pair"
   return (name, (var, t))
 
 -- transposeSigma [d1, ..., dn] :=
@@ -116,8 +116,8 @@ toPairInfo (_, t@(m, _)) = do
 --   return ((x1, ..., xn), (y1, ..., yn))
 transposeSigma :: Hint -> [(ValuePlus, CompPlus)] -> WithEnv CompPlus
 transposeSigma m ds = do
-  (xList, xVarList) <- unzip <$> mapM (const $ newValueUpsilonWith m "sig-x") ds
-  (yList, yVarList) <- unzip <$> mapM (const $ newValueUpsilonWith m "sig-y") ds
+  (xList, xVarList) <- unzip <$> mapM (const $ newValueVarWith m "sig-x") ds
+  (yList, yVarList) <- unzip <$> mapM (const $ newValueVarWith m "sig-y") ds
   return $
     bindSigmaElim
       (zip (zip xList yList) ds)
@@ -148,7 +148,7 @@ supplyName mName =
 
 returnClosureS4 :: Hint -> WithEnv CompPlus
 returnClosureS4 m = do
-  (env, envVar) <- newValueUpsilonWith m "env"
+  (env, envVar) <- newValueVarWith m "env"
   retImmS4 <- returnImmediateS4 m
   t <-
     sigmaS4

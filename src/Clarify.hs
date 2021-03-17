@@ -53,10 +53,10 @@ clarifyTerm tenv term =
   case term of
     (m, TermTau) ->
       returnImmediateS4 m
-    (m, TermUpsilon x) -> do
+    (m, TermVar x) -> do
       senv <- gets substEnv
       if not $ IntMap.member (asInt x) senv
-        then return (m, CompUpIntro (m, ValueUpsilon x))
+        then return (m, CompUpIntro (m, ValueVar x))
         else return (m, CompPiElimDownElim (m, ValueConst (toGlobalVarName x)) [])
     (m, TermPi {}) ->
       returnClosureS4 m
@@ -120,7 +120,7 @@ clarifyTerm tenv term =
 clarifyPlus :: TypeEnv -> TermPlus -> WithEnv (Ident, CompPlus, ValuePlus)
 clarifyPlus tenv e@(m, _) = do
   e' <- clarifyTerm tenv e
-  (varName, var) <- newValueUpsilonWith m "var"
+  (varName, var) <- newValueVarWith m "var"
   return (varName, e', var)
 
 clarifyBinder :: TypeEnv -> [IdentPlus] -> WithEnv [(Hint, Ident, CompPlus)]
@@ -161,7 +161,7 @@ clarifyConst tenv m constName
 clarifyPrimOp :: TypeEnv -> PrimOp -> Hint -> WithEnv CompPlus
 clarifyPrimOp tenv op@(PrimOp _ domList _) m = do
   argTypeList <- mapM (lowTypeToType m) domList
-  (xs, varList) <- unzip <$> mapM (const (newValueUpsilonWith m "prim")) domList
+  (xs, varList) <- unzip <$> mapM (const (newValueVarWith m "prim")) domList
   let mxts = zipWith (\x t -> (m, x, t)) xs argTypeList
   retClosure tenv Nothing [] m mxts (m, CompPrimitive (PrimitivePrimOp op varList))
 
@@ -182,7 +182,7 @@ constructResultTuple ::
   WithEnv CompPlus
 constructResultTuple tenv m borrowedVarTypeList result@(_, resultVarName, _) =
   if null borrowedVarTypeList
-    then return (m, CompUpIntro (m, ValueUpsilon resultVarName))
+    then return (m, CompUpIntro (m, ValueVar resultVarName))
     else do
       let tupleTypeInfo = borrowedVarTypeList ++ [result]
       tuple <- termSigmaIntro m tupleTypeInfo
@@ -200,7 +200,7 @@ makeClosure mName mxts2 m mxts1 e = do
   let xts1 = dropFst mxts1
   let xts2 = dropFst mxts2
   envExp <- sigmaS4 Nothing m $ map Right xts2
-  let vs = map (\(mx, x, _) -> (mx, ValueUpsilon x)) mxts2
+  let vs = map (\(mx, x, _) -> (mx, ValueVar x)) mxts2
   let fvEnv = (m, ValueSigmaIntro vs)
   case mName of
     Nothing -> do
@@ -226,7 +226,7 @@ registerIfNecessary m name isFixed xts1 xts2 e = do
   cenv <- gets codeEnv
   when (not $ name `Map.member` cenv) $ do
     e' <- linearize (xts2 ++ xts1) e
-    (envVarName, envVar) <- newValueUpsilonWith m "env"
+    (envVarName, envVar) <- newValueVarWith m "env"
     let args = map fst xts1 ++ [envVarName]
     body <- reduceCompPlus (m, CompSigmaElim (map fst xts2) envVar e')
     insCompEnv name isFixed args body
@@ -248,10 +248,10 @@ retClosure tenv mName fvs m xts e = do
 callClosure :: Hint -> CompPlus -> [(Ident, CompPlus, ValuePlus)] -> WithEnv CompPlus
 callClosure m e zexes = do
   let (zs, es', xs) = unzip3 zexes
-  (clsVarName, clsVar) <- newValueUpsilonWith m "closure"
+  (clsVarName, clsVar) <- newValueVarWith m "closure"
   typeVarName <- newIdentFromText "exp"
-  (envVarName, envVar) <- newValueUpsilonWith m "env"
-  (lamVarName, lamVar) <- newValueUpsilonWith m "thunk"
+  (envVarName, envVar) <- newValueVarWith m "env"
+  (lamVarName, lamVar) <- newValueVarWith m "thunk"
   return $
     bindLet
       ((clsVarName, e) : zip zs es')
@@ -267,7 +267,7 @@ chainOf tenv term =
   case term of
     (_, TermTau) ->
       return []
-    (m, TermUpsilon x) -> do
+    (m, TermVar x) -> do
       t <- lookupTypeEnv m x tenv
       xts <- chainOf tenv t
       senv <- gets substEnv
@@ -349,20 +349,20 @@ lookupTypeEnv m (I (name, x)) tenv =
 termSigmaIntro :: Hint -> [IdentPlus] -> WithEnv TermPlus
 termSigmaIntro m xts = do
   z <- newIdentFromText "internal.sigma-tau-tuple"
-  let vz = (m, TermUpsilon z)
+  let vz = (m, TermVar z)
   k <- newIdentFromText "sigma"
-  let args = map (\(mx, x, _) -> (mx, TermUpsilon x)) xts
+  let args = map (\(mx, x, _) -> (mx, TermVar x)) xts
   return
     ( m,
       TermPiIntro
         [ (m, z, (m, TermTau)),
           (m, k, (m, TermPi xts vz))
         ]
-        (m, TermPiElim (m, TermUpsilon k) args)
+        (m, TermPiElim (m, TermVar k) args)
     )
 
 toSwitcherBranch :: Hint -> TypeEnv -> TermPlus -> WithEnv (ValuePlus -> WithEnv CompPlus)
 toSwitcherBranch m tenv d = do
   d' <- clarifyTerm tenv d
-  (varName, var) <- newValueUpsilonWith m "res"
+  (varName, var) <- newValueVarWith m "res"
   return $ \val -> callClosure m d' [(varName, (m, CompUpIntro val), var)] >>= reduceCompPlus

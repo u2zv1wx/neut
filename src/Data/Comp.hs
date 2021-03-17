@@ -8,7 +8,7 @@ import qualified Data.Text as T
 
 data Value
   = ValueConst T.Text
-  | ValueUpsilon Ident
+  | ValueVar Ident
   | ValueSigmaIntro [ValuePlus]
   | ValueInt IntSize Integer
   | ValueFloat FloatSize Double
@@ -49,7 +49,7 @@ type SubstValuePlus =
 varValue :: ValuePlus -> S.Set Ident
 varValue v =
   case v of
-    (_, ValueUpsilon x) ->
+    (_, ValueVar x) ->
       S.singleton x
     (_, ValueSigmaIntro vs) ->
       S.unions $ map varValue vs

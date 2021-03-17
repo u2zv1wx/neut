@@ -45,7 +45,7 @@ insertHeaderForAffine x t e@(m, _) = do
 --   e
 insertHeaderForLinear :: Ident -> Ident -> CompPlus -> WithEnv CompPlus
 insertHeaderForLinear x z e@(m, _) =
-  return (m, CompUpElim z (m, CompUpIntro (m, ValueUpsilon x)) e)
+  return (m, CompUpElim z (m, CompUpIntro (m, ValueVar x)) e)
 
 -- insertHeaderForRelevant [x, x1, ..., x{N}] t e ~>
 --   bind exp := t in
@@ -62,7 +62,7 @@ insertHeaderForRelevant ::
   CompPlus ->
   WithEnv CompPlus
 insertHeaderForRelevant xs t e@(m, _) = do
-  (expVarName, expVar) <- newValueUpsilonWith m "exp"
+  (expVarName, expVar) <- newValueVarWith m "exp"
   linearChain <- toLinearChain xs
   rel <- insertHeaderForRelevant' t expVar linearChain e
   return (m, CompUpElim expVarName t rel)
@@ -108,7 +108,7 @@ insertHeaderForRelevant' t expVar ch cont@(m, _) =
       return cont
     (x, (x1, x2)) : chain -> do
       cont' <- insertHeaderForRelevant' t expVar chain cont
-      (sigVarName, sigVar) <- newValueUpsilonWith m "sig"
+      (sigVarName, sigVar) <- newValueVarWith m "sig"
       return
         ( m,
           CompUpElim
@@ -116,7 +116,7 @@ insertHeaderForRelevant' t expVar ch cont@(m, _) =
             ( m,
               CompPiElimDownElim
                 expVar
-                [(m, ValueEnumIntro boolTrue), (m, ValueUpsilon x)]
+                [(m, ValueEnumIntro boolTrue), (m, ValueVar x)]
             )
             (m, CompSigmaElim [x1, x2] sigVar cont')
         )
@@ -124,12 +124,12 @@ insertHeaderForRelevant' t expVar ch cont@(m, _) =
 distinguishValue :: Ident -> ValuePlus -> WithEnv ([Ident], ValuePlus)
 distinguishValue z term =
   case term of
-    (m, ValueUpsilon x) ->
+    (m, ValueVar x) ->
       if x /= z
         then return ([], term)
         else do
           x' <- newIdentFromIdent x
-          return ([x'], (m, ValueUpsilon x'))
+          return ([x'], (m, ValueVar x'))
     (m, ValueSigmaIntro ds) -> do
       (vss, ds') <- unzip <$> mapM (distinguishValue z) ds
       return (concat vss, (m, ValueSigmaIntro ds'))
