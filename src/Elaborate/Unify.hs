@@ -18,8 +18,8 @@ import Elaborate.Infer
 import Reduce.WeakTerm
 
 data Stuck
-  = StuckPiElimVar Ident Hint [(Hint, [WeakTermPlus])]
-  | StuckPiElimFix WeakTermPlus Hint [(Hint, [WeakTermPlus])]
+  = StuckPiElimVar Ident [(Hint, [WeakTermPlus])]
+  | StuckPiElimFix WeakTermPlus [(Hint, [WeakTermPlus])]
   | StuckPiElimAster Int [[WeakTermPlus]]
 
 unify :: WithEnv ()
@@ -151,18 +151,18 @@ simp' constraintList =
                       _ -> do
                         e1'' <- substWeakTermPlus (IntMap.fromList $ zip (map asInt zs) es) e1'
                         simp $ (e1'', e2') : cs
-                (Just (StuckPiElimVar x1 _ mess1), Just (StuckPiElimVar x2 _ mess2))
+                (Just (StuckPiElimVar x1 mess1), Just (StuckPiElimVar x2 mess2))
                   | x1 == x2,
                     Nothing <- IntMap.lookup (asInt x1) sub,
                     Just pairList <- asPairList (map snd mess1) (map snd mess2) ->
                     simp $ pairList ++ cs
-                (Just (StuckPiElimVar x1 _ mess1), _)
+                (Just (StuckPiElimVar x1 mess1), _)
                   | Just lam <- IntMap.lookup (asInt x1) sub ->
                     simp $ (toPiElim lam mess1, e2) : cs
-                (_, Just (StuckPiElimVar x2 _ mess2))
+                (_, Just (StuckPiElimVar x2 mess2))
                   | Just lam <- IntMap.lookup (asInt x2) sub ->
                     simp $ (e1, toPiElim lam mess2) : cs
-                (Just (StuckPiElimFix fix1 _ mess1), Just (StuckPiElimFix fix2 _ mess2)) -> do
+                (Just (StuckPiElimFix fix1 mess1), Just (StuckPiElimFix fix2 mess2)) -> do
                   b <- isEq fix1 fix2
                   case (b, asPairList (map snd mess1) (map snd mess2)) of
                     (True, Just pairList) -> do
@@ -225,10 +225,10 @@ asPairList list1 list2 =
 asStuckedTerm :: WeakTermPlus -> Maybe Stuck
 asStuckedTerm term =
   case term of
-    (m, WeakTermVar x) ->
-      Just $ StuckPiElimVar x m []
-    (m, WeakTermFix {}) ->
-      Just $ StuckPiElimFix term m []
+    (_, WeakTermVar x) ->
+      Just $ StuckPiElimVar x []
+    (_, WeakTermFix {}) ->
+      Just $ StuckPiElimFix term []
     (_, WeakTermAster h) ->
       Just $ StuckPiElimAster h []
     (m, WeakTermPiElim e es) ->
@@ -236,10 +236,10 @@ asStuckedTerm term =
         Just (StuckPiElimAster h iexss)
           | Just _ <- mapM asVar es ->
             Just $ StuckPiElimAster h $ iexss ++ [es]
-        Just (StuckPiElimVar x mx ess) ->
-          Just $ StuckPiElimVar x mx $ ess ++ [(m, es)]
-        Just (StuckPiElimFix f mf ess) ->
-          Just $ StuckPiElimFix f mf $ ess ++ [(m, es)]
+        Just (StuckPiElimVar x ess) ->
+          Just $ StuckPiElimVar x $ ess ++ [(m, es)]
+        Just (StuckPiElimFix f ess) ->
+          Just $ StuckPiElimFix f $ ess ++ [(m, es)]
         _ ->
           Nothing
     _ ->
