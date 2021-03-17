@@ -12,6 +12,7 @@ import qualified Data.HashMap.Lazy as Map
 import qualified Data.IntMap as IntMap
 import Data.List (intersperse)
 import Data.Log
+import Data.LowType
 import Data.Maybe (catMaybes)
 import Data.MetaTerm
 import qualified Data.Text as T
@@ -93,6 +94,16 @@ reduceConstApp m c es =
       | [arg] <- es -> do
         liftIO $ putStrLn $ T.unpack $ showAsSExp $ toTree arg
         return (m, MetaTermLeaf "true")
+    "meta.size-of"
+      | [t] <- es -> do
+        case t of
+          (_, MetaTermLeaf lowTypeStr)
+            | Just intSize <- asLowInt lowTypeStr ->
+              return (m, MetaTermInteger (toInteger $ intSize `div` 8))
+            | Just floatSize <- asLowFloat lowTypeStr ->
+              return (m, MetaTermInteger (toInteger $ sizeAsInt floatSize `div` 8))
+          _ ->
+            return (m, MetaTermInteger 8) -- (hardcoded for 64 bit architecture; this should be generalized later)
     "meta.is-nil"
       | [(_, MetaTermNode ts)] <- es ->
         return $ liftBool (null ts) m
