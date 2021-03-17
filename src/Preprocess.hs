@@ -171,6 +171,13 @@ preprocess' stmtList = do
                     preprocess' $ as1 ++ restStmtList
               | otherwise ->
                 raiseSyntaxError m "(introspect LEAF TREE*)"
+            "dry-expand"
+              | [e] <- rest -> do
+                e' <- autoQuote e >>= evaluate >>= specialize
+                note m (showAsSExp e')
+                preprocess' restStmtList
+              | otherwise ->
+                raiseSyntaxError m "(dry-expand TREE)"
             _ ->
               preprocessAux headStmt restStmtList
         _ ->
