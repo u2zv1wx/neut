@@ -112,6 +112,7 @@ simp' constraintList =
             simp $ (t1, t2) : zip es1 es2 ++ zip ts1 ts2 ++ cs
         (e1@(m1, _), e2@(m2, _)) -> do
           sub <- gets substEnv
+          oenv <- gets opaqueEnv
           let fvs1 = varWeakTermPlus e1
           let fvs2 = varWeakTermPlus e2
           let fmvs1 = asterWeakTermPlus e1
@@ -153,14 +154,14 @@ simp' constraintList =
                         simp $ (e1'', e2') : cs
                 (Just (StuckPiElimVar x1 mess1), Just (StuckPiElimVar x2 mess2))
                   | x1 == x2,
-                    Nothing <- IntMap.lookup (asInt x1) sub,
+                    Nothing <- lookupDefinition oenv x1 sub,
                     Just pairList <- asPairList (map snd mess1) (map snd mess2) ->
                     simp $ pairList ++ cs
                 (Just (StuckPiElimVar x1 mess1), _)
-                  | Just lam <- IntMap.lookup (asInt x1) sub ->
+                  | Just lam <- lookupDefinition oenv x1 sub ->
                     simp $ (toPiElim lam mess1, e2) : cs
                 (_, Just (StuckPiElimVar x2 mess2))
-                  | Just lam <- IntMap.lookup (asInt x2) sub ->
+                  | Just lam <- lookupDefinition oenv x2 sub ->
                     simp $ (e1, toPiElim lam mess2) : cs
                 (Just (StuckPiElimFix fix1 mess1), Just (StuckPiElimFix fix2 mess2)) -> do
                   b <- isEq fix1 fix2
@@ -245,10 +246,12 @@ asStuckedTerm term =
     _ ->
       Nothing
 
+{-# INLINE occurCheck #-}
 occurCheck :: Int -> S.Set Int -> Bool
 occurCheck h fmvs =
   h `S.notMember` fmvs
 
+{-# INLINE includeCheck #-}
 includeCheck :: [Ident] -> S.Set Ident -> [Ident]
 includeCheck xs ys =
   filter (`notElem` xs) $ S.toList ys
@@ -317,6 +320,13 @@ lookupAll is sub =
       v <- IntMap.lookup (asInt j) sub
       vs <- lookupAll js sub
       return $ v : vs
+
+{-# INLINE lookupDefinition #-}
+lookupDefinition :: S.Set Ident -> Ident -> (IntMap.IntMap WeakTermPlus) -> Maybe WeakTermPlus
+lookupDefinition oenv x sub =
+  if S.member x oenv
+    then Nothing
+    else IntMap.lookup (asInt x) sub
 
 -- term equality up to alpha-equivalence
 isEq :: WeakTermPlus -> WeakTermPlus -> WithEnv Bool

@@ -48,6 +48,7 @@ type IdentDef =
 data WeakStmt
   = WeakStmtDef Hint WeakIdentPlus WeakTermPlus
   | WeakStmtResourceType Hint T.Text WeakTermPlus WeakTermPlus
+  | WeakStmtOpaque Ident
   deriving (Show)
 
 type Constraint =

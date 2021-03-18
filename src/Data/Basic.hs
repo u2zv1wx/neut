@@ -61,6 +61,7 @@ asInt :: Ident -> Int
 asInt (I (_, i)) =
   i
 
+{-# INLINE isLinear #-}
 isLinear :: (Eq a, Ord a) => [a] -> Bool
 isLinear =
   isLinear' S.empty
