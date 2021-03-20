@@ -19,7 +19,6 @@ import Reduce.WeakTerm
 
 data Stuck
   = StuckPiElimVar Ident [(Hint, [WeakTermPlus])]
-  | StuckPiElimFix WeakTermPlus [(Hint, [WeakTermPlus])]
   | StuckPiElimAster Int [[WeakTermPlus]]
 
 unify :: WithEnv ()
@@ -167,14 +166,6 @@ simp' constraintList =
                 (_, Just (StuckPiElimVar x2 mess2))
                   | Just lam <- lookupDefinition x2 sub ->
                     simp $ (e1, toPiElim lam mess2) : cs
-                (Just (StuckPiElimFix fix1 mess1), Just (StuckPiElimFix fix2 mess2)) -> do
-                  b <- isEq fix1 fix2
-                  case (b, asPairList (map snd mess1) (map snd mess2)) of
-                    (True, Just pairList) -> do
-                      simp $ pairList ++ cs
-                    _ -> do
-                      modify (\env -> env {suspendedConstraintEnv = (fmvs, (e1, e2)) : suspendedConstraintEnv env})
-                      simp cs
                 _ -> do
                   modify (\env -> env {suspendedConstraintEnv = (fmvs, (e1, e2)) : suspendedConstraintEnv env})
                   simp cs
@@ -232,8 +223,6 @@ asStuckedTerm term =
   case term of
     (_, WeakTermVar x) ->
       Just $ StuckPiElimVar x []
-    (_, WeakTermFix {}) ->
-      Just $ StuckPiElimFix term []
     (_, WeakTermAster h) ->
       Just $ StuckPiElimAster h []
     (m, WeakTermPiElim e es) ->
@@ -243,8 +232,6 @@ asStuckedTerm term =
             Just $ StuckPiElimAster h $ iexss ++ [es]
         Just (StuckPiElimVar x ess) ->
           Just $ StuckPiElimVar x $ ess ++ [(m, es)]
-        Just (StuckPiElimFix f ess) ->
-          Just $ StuckPiElimFix f $ ess ++ [(m, es)]
         _ ->
           Nothing
     _ ->
@@ -329,10 +316,6 @@ lookupAll is sub =
 lookupDefinition :: Ident -> (IntMap.IntMap WeakTermPlus) -> Maybe WeakTermPlus
 lookupDefinition x sub =
   IntMap.lookup (asInt x) sub
-
--- if S.member x oenv
---   then Nothing
---   else
 
 -- term equality up to alpha-equivalence
 isEq :: WeakTermPlus -> WeakTermPlus -> WithEnv Bool

@@ -63,7 +63,7 @@ interpret inputTree =
             (xts', e') <- interpretBinder xts e
             return (m, WeakTermPiIntro (Just name) xts' e')
           | otherwise ->
-            raiseSyntaxError m "(Π-introduction (TREE*) TREE)"
+            raiseSyntaxError m "(Π-introduction-constructor LEAF (TREE*) TREE)"
         "Π-elimination"
           | e : es <- rest ->
             interpretPiElim m e es

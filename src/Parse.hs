@@ -16,6 +16,7 @@ import Data.Tree
 import Data.WeakTerm
 import Parse.Discern
 import Parse.Interpret
+import Text.Read (readMaybe)
 
 parse :: [TreePlus] -> WithEnv [WeakStmt]
 parse stmtTreeList =
@@ -91,6 +92,15 @@ parse stmtTreeList =
                     return $ WeakStmtOpaque s' : ss
               | otherwise ->
                 raiseSyntaxError m "(set-as-opaque LEAF)"
+            "set-as-data"
+              | ((_, TreeLeaf name) : (_, TreeLeaf intStr) : constructorNameList) <- rest,
+                Just i <- readMaybe (T.unpack intStr) -> do
+                xs <- mapM extractLeaf constructorNameList
+                modify (\env -> env {dataEnv = Map.insert name xs (dataEnv env)})
+                forM_ xs $ \x -> modify (\env -> env {constructorEnv = Map.insert x i (constructorEnv env)})
+                parse restStmtList
+              | otherwise -> do
+                raiseSyntaxError m "(set-as-data LEAF INT LEAF*)"
             "statement" ->
               parse $ rest ++ restStmtList
             _ ->
@@ -131,3 +141,11 @@ insEnumEnv m name xis = do
                 revEnumEnv = rev `Map.union` revEnumEnv e
               }
         )
+
+extractLeaf :: TreePlus -> WithEnv T.Text
+extractLeaf t =
+  case t of
+    (_, TreeLeaf x) ->
+      return x
+    _ ->
+      raiseSyntaxError (fst t) "LEAF"

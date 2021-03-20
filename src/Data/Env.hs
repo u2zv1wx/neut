@@ -45,6 +45,8 @@ data Env = Env
     enumEnv :: Map.HashMap T.Text [(T.Text, Int)],
     -- [("left", ("choice", 0)), ("right", ("choice", 1)), ...]
     revEnumEnv :: Map.HashMap T.Text (T.Text, Int),
+    dataEnv :: Map.HashMap T.Text [T.Text],
+    constructorEnv :: Map.HashMap T.Text Int,
     prefixEnv :: [T.Text],
     sectionEnv :: [T.Text],
     topNameEnv :: Map.HashMap T.Text Ident,
@@ -83,6 +85,8 @@ initialEnv =
       fileEnv = Map.empty,
       traceEnv = [],
       revEnumEnv = Map.empty,
+      dataEnv = Map.empty,
+      constructorEnv = Map.empty,
       topNameEnv = Map.empty,
       prefixEnv = [],
       sectionEnv = [],

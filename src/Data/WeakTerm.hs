@@ -229,11 +229,11 @@ toText term =
         --   "*"
         _ ->
           showCons $ map toText $ e : es
-    (_, WeakTermFix (_, x, _) _ _) -> do
-      asText x
-    -- (_, WeakTermFix (_, x, _) xts e) -> do
-    --   let argStr = inParen $ showItems $ map showArg xts
-    --   showCons ["fix", showVariable x, argStr, toText e]
+    -- (_, WeakTermFix (_, x, _) _ _) -> do
+    --   asText x
+    (_, WeakTermFix (_, x, _) xts e) -> do
+      let argStr = inParen $ showItems $ map showArg xts
+      showCons ["fix", showVariable x, argStr, toText e]
     (_, WeakTermConst x) ->
       x
     (_, WeakTermAster _) ->
