@@ -55,7 +55,8 @@ clarifyTerm tenv term =
       returnImmediateS4 m
     (m, TermVar x) -> do
       senv <- gets substEnv
-      if not $ IntMap.member (asInt x) senv
+      oenv <- gets opaqueEnv
+      if (not $ IntMap.member (asInt x) senv) && (not (S.member x oenv))
         then return (m, CompUpIntro (m, ValueVar x))
         else return (m, CompPiElimDownElim (m, ValueConst (toGlobalVarName x)) [])
     (m, TermPi {}) ->
@@ -271,7 +272,8 @@ chainOf tenv term =
       t <- lookupTypeEnv m x tenv
       xts <- chainOf tenv t
       senv <- gets substEnv
-      if not $ IntMap.member (asInt x) senv
+      oenv <- gets opaqueEnv
+      if (not $ IntMap.member (asInt x) senv) && (not (S.member x oenv))
         then return $ xts ++ [(m, x, t)]
         else return $ xts
     (_, TermPi {}) ->

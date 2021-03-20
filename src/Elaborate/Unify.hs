@@ -113,8 +113,11 @@ simp' constraintList =
         (e1@(m1, _), e2@(m2, _)) -> do
           sub <- gets substEnv
           oenv <- gets opaqueEnv
-          let fvs1 = varWeakTermPlus e1
-          let fvs2 = varWeakTermPlus e2
+          -- opaqueEnvの変数のうちvarとしてカウントされないものを明示できると便利ではある。
+          -- トップレベルの変数はvarとしてカウントしてほしくないわけで,そこを反映したい。
+          -- ここをやっておくと, clarifyでの分岐も削れて処理が高速になる。
+          let fvs1 = S.filter (\v -> S.notMember v oenv) $ varWeakTermPlus e1
+          let fvs2 = S.filter (\v -> S.notMember v oenv) $ varWeakTermPlus e2
           let fmvs1 = asterWeakTermPlus e1
           let fmvs2 = asterWeakTermPlus e2
           let fmvs = S.union fmvs1 fmvs2 -- fmvs: free meta-variables
@@ -154,14 +157,14 @@ simp' constraintList =
                         simp $ (e1'', e2') : cs
                 (Just (StuckPiElimVar x1 mess1), Just (StuckPiElimVar x2 mess2))
                   | x1 == x2,
-                    Nothing <- lookupDefinition oenv x1 sub,
+                    Nothing <- lookupDefinition x1 sub,
                     Just pairList <- asPairList (map snd mess1) (map snd mess2) ->
                     simp $ pairList ++ cs
-                (Just (StuckPiElimVar x1 mess1), _)
-                  | Just lam <- lookupDefinition oenv x1 sub ->
+                (Just (StuckPiElimVar x1 mess1), _) -- ここの展開はなるべくlazyにしたほうがいいかも。つまり, queueを利用するやつをここでやる感じ。DeltaConstraint.
+                  | Just lam <- lookupDefinition x1 sub ->
                     simp $ (toPiElim lam mess1, e2) : cs
                 (_, Just (StuckPiElimVar x2 mess2))
-                  | Just lam <- lookupDefinition oenv x2 sub ->
+                  | Just lam <- lookupDefinition x2 sub ->
                     simp $ (e1, toPiElim lam mess2) : cs
                 (Just (StuckPiElimFix fix1 mess1), Just (StuckPiElimFix fix2 mess2)) -> do
                   b <- isEq fix1 fix2
@@ -322,11 +325,13 @@ lookupAll is sub =
       return $ v : vs
 
 {-# INLINE lookupDefinition #-}
-lookupDefinition :: S.Set Ident -> Ident -> (IntMap.IntMap WeakTermPlus) -> Maybe WeakTermPlus
-lookupDefinition oenv x sub =
-  if S.member x oenv
-    then Nothing
-    else IntMap.lookup (asInt x) sub
+lookupDefinition :: Ident -> (IntMap.IntMap WeakTermPlus) -> Maybe WeakTermPlus
+lookupDefinition x sub =
+  IntMap.lookup (asInt x) sub
+
+-- if S.member x oenv
+--   then Nothing
+--   else
 
 -- term equality up to alpha-equivalence
 isEq :: WeakTermPlus -> WeakTermPlus -> WithEnv Bool

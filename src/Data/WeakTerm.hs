@@ -225,8 +225,8 @@ toText term =
       showCons ["λ", argStr, toText e]
     (_, WeakTermPiElim e es) ->
       case e of
-        (_, WeakTermAster _) ->
-          "*"
+        -- (_, WeakTermAster _) ->
+        --   "*"
         _ ->
           showCons $ map toText $ e : es
     (_, WeakTermFix (_, x, _) _ _) -> do
