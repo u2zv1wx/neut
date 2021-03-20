@@ -10,7 +10,7 @@ data WeakTerm
   = WeakTermTau
   | WeakTermVar Ident
   | WeakTermPi [WeakIdentPlus] WeakTermPlus
-  | WeakTermPiIntro [WeakIdentPlus] WeakTermPlus
+  | WeakTermPiIntro (Maybe T.Text) [WeakIdentPlus] WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
   | WeakTermFix WeakIdentPlus [WeakIdentPlus] WeakTermPlus
   | WeakTermAster Int
@@ -77,7 +77,7 @@ varWeakTermPlus term =
       S.singleton x
     (_, WeakTermPi xts t) ->
       varWeakTermPlus' xts [t]
-    (_, WeakTermPiIntro xts e) ->
+    (_, WeakTermPiIntro _ xts e) ->
       varWeakTermPlus' xts [e]
     (_, WeakTermPiElim e es) -> do
       let xs = varWeakTermPlus e
@@ -139,7 +139,7 @@ asterWeakTermPlus term =
       S.empty
     (_, WeakTermPi xts t) ->
       asterWeakTermPlus' xts [t]
-    (_, WeakTermPiIntro xts e) ->
+    (_, WeakTermPiIntro _ xts e) ->
       asterWeakTermPlus' xts [e]
     (_, WeakTermPiElim e es) -> do
       let set1 = asterWeakTermPlus e
@@ -220,7 +220,7 @@ toText term =
             showCons ["∑", inParen $ showTypeArgs zts, toText t]
       | otherwise ->
         showCons ["Π", inParen $ showTypeArgs xts, toText cod]
-    (_, WeakTermPiIntro xts e) -> do
+    (_, WeakTermPiIntro _ xts e) -> do
       let argStr = inParen $ showItems $ map showArg xts
       showCons ["λ", argStr, toText e]
     (_, WeakTermPiElim e es) ->

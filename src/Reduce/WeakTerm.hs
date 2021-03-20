@@ -20,17 +20,17 @@ reduceWeakTermPlus term =
       ts' <- mapM reduceWeakTermPlus ts
       cod' <- reduceWeakTermPlus cod
       return (m, WeakTermPi (zip3 ms xs ts') cod')
-    (m, WeakTermPiIntro xts e) -> do
+    (m, WeakTermPiIntro mName xts e) -> do
       let (ms, xs, ts) = unzip3 xts
       ts' <- mapM reduceWeakTermPlus ts
       e' <- reduceWeakTermPlus e
-      return (m, WeakTermPiIntro (zip3 ms xs ts') e')
+      return (m, WeakTermPiIntro mName (zip3 ms xs ts') e')
     (m, WeakTermPiElim e es) -> do
       e' <- reduceWeakTermPlus e
       es' <- mapM reduceWeakTermPlus es
       let app = WeakTermPiElim e' es'
       case e' of
-        (_, WeakTermPiIntro xts body)
+        (_, WeakTermPiIntro Nothing xts body)
           | length xts == length es' -> do
             let xs = map (\(_, x, _) -> asInt x) xts
             let sub = IntMap.fromList $ zip xs es'
@@ -39,7 +39,7 @@ reduceWeakTermPlus term =
           return (m, app)
     (m, WeakTermFix (mx, x, t) xts e)
       | x `notElem` varWeakTermPlus e ->
-        reduceWeakTermPlus (m, WeakTermPiIntro xts e)
+        reduceWeakTermPlus (m, WeakTermPiIntro Nothing xts e)
       | otherwise -> do
         t' <- reduceWeakTermPlus t
         e' <- reduceWeakTermPlus e
@@ -124,9 +124,9 @@ substWeakTermPlus' sub nenv term =
     (m, WeakTermPi xts t) -> do
       (xts', t') <- substWeakTermPlus'' sub nenv xts t
       return (m, WeakTermPi xts' t')
-    (m, WeakTermPiIntro xts body) -> do
+    (m, WeakTermPiIntro mName xts body) -> do
       (xts', body') <- substWeakTermPlus'' sub nenv xts body
-      return (m, WeakTermPiIntro xts' body')
+      return (m, WeakTermPiIntro mName xts' body')
     (m, WeakTermPiElim e es) -> do
       e' <- substWeakTermPlus' sub nenv e
       es' <- mapM (substWeakTermPlus' sub nenv) es

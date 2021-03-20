@@ -55,7 +55,13 @@ interpret inputTree =
         "Π-introduction"
           | [(_, TreeNode xts), e] <- rest -> do
             (xts', e') <- interpretBinder xts e
-            return (m, WeakTermPiIntro xts' e')
+            return (m, WeakTermPiIntro Nothing xts' e')
+          | otherwise ->
+            raiseSyntaxError m "(Π-introduction (TREE*) TREE)"
+        "Π-introduction-constructor"
+          | [(_, TreeLeaf name), (_, TreeNode xts), e] <- rest -> do
+            (xts', e') <- interpretBinder xts e
+            return (m, WeakTermPiIntro (Just name) xts' e')
           | otherwise ->
             raiseSyntaxError m "(Π-introduction (TREE*) TREE)"
         "Π-elimination"
@@ -173,7 +179,7 @@ interpretPiElim m f es = do
   (xts, args) <- interpretArg es
   if null xts
     then return (m, WeakTermPiElim f' args)
-    else return (m, WeakTermPiIntro xts (m, WeakTermPiElim f' args))
+    else return (m, WeakTermPiIntro Nothing xts (m, WeakTermPiElim f' args))
 
 interpretArg :: [TreePlus] -> WithEnv ([WeakIdentPlus], [WeakTermPlus])
 interpretArg es =

@@ -24,6 +24,11 @@ import Data.Term
 import qualified Data.Text as T
 import Reduce.Comp
 
+data ClosureName
+  = ClosureNameAnonymous
+  | ClosureNameFix Ident
+  | ClosureNameConstructor T.Text
+
 clarify :: [Stmt] -> WithEnv CompPlus
 clarify ss = do
   e <- clarifyStmt IntMap.empty ss
@@ -61,10 +66,14 @@ clarifyTerm tenv term =
         else return (m, CompPiElimDownElim (m, ValueConst (toGlobalVarName x)) [])
     (m, TermPi {}) ->
       returnClosureS4 m
-    (m, TermPiIntro mxts e) -> do
+    (m, TermPiIntro mName mxts e) -> do
       e' <- clarifyTerm (insTypeEnv mxts tenv) e
       fvs <- nubFVS <$> chainOf tenv term
-      retClosure tenv Nothing fvs m mxts e'
+      case mName of
+        Nothing ->
+          retClosure tenv ClosureNameAnonymous fvs m mxts e'
+        Just name ->
+          retClosure tenv (ClosureNameConstructor name) fvs m mxts e'
     (m, TermPiElim e es) -> do
       es' <- mapM (clarifyPlus tenv) es
       e' <- clarifyTerm tenv e
@@ -73,8 +82,8 @@ clarifyTerm tenv term =
       e' <- clarifyTerm (insTypeEnv ((mx, x, t) : mxts) tenv) e
       fvs <- nubFVS <$> chainOf tenv term
       if S.member x (varComp e')
-        then retClosure tenv (Just x) fvs m mxts e'
-        else retClosure tenv Nothing fvs m mxts e'
+        then retClosure tenv (ClosureNameFix x) fvs m mxts e'
+        else retClosure tenv ClosureNameAnonymous fvs m mxts e'
     (m, TermConst x) ->
       clarifyConst tenv m x
     (m, TermInt size l) ->
@@ -115,7 +124,7 @@ clarifyTerm tenv term =
           let lamBody = bindLet (zip xs es') (m, CompUpElim resultVarName (m, CompPrimitive (PrimitiveDerangement expKind xsAsVars)) tuple)
           h <- newIdentFromText "der"
           fvs <- nubFVS <$> chainOf' tenv xts es
-          cls <- retClosure tenv (Just h) fvs m [] lamBody -- cls shouldn't be reduced since it can be effectful
+          cls <- retClosure tenv (ClosureNameFix h) fvs m [] lamBody -- cls shouldn't be reduced since it can be effectful
           callClosure m cls []
 
 clarifyPlus :: TypeEnv -> TermPlus -> WithEnv (Ident, CompPlus, ValuePlus)
@@ -140,7 +149,7 @@ constructEnumFVS tenv es =
 
 alignFVS :: TypeEnv -> Hint -> [IdentPlus] -> [CompPlus] -> WithEnv [CompPlus]
 alignFVS tenv m fvs es = do
-  es' <- mapM (retClosure tenv Nothing fvs m []) es
+  es' <- mapM (retClosure tenv ClosureNameAnonymous fvs m []) es
   mapM (\cls -> callClosure m cls []) es'
 
 nubFVS :: [IdentPlus] -> [IdentPlus]
@@ -164,7 +173,7 @@ clarifyPrimOp tenv op@(PrimOp _ domList _) m = do
   argTypeList <- mapM (lowTypeToType m) domList
   (xs, varList) <- unzip <$> mapM (const (newValueVarWith m "prim")) domList
   let mxts = zipWith (\x t -> (m, x, t)) xs argTypeList
-  retClosure tenv Nothing [] m mxts (m, CompPrimitive (PrimitivePrimOp op varList))
+  retClosure tenv ClosureNameAnonymous [] m mxts (m, CompPrimitive (PrimitivePrimOp op varList))
 
 takeIffLinear :: (IdentPlus, DerangementArg) -> Maybe IdentPlus
 takeIffLinear (xt, k) =
@@ -191,7 +200,7 @@ constructResultTuple tenv m borrowedVarTypeList result@(_, resultVarName, _) =
       clarifyTerm tenv' tuple
 
 makeClosure ::
-  Maybe Ident ->
+  ClosureName ->
   [(Hint, Ident, CompPlus)] -> -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
   Hint -> -- meta of lambda
   [(Hint, Ident, CompPlus)] -> -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
@@ -204,15 +213,20 @@ makeClosure mName mxts2 m mxts1 e = do
   let vs = map (\(mx, x, _) -> (mx, ValueVar x)) mxts2
   let fvEnv = (m, ValueSigmaIntro vs)
   case mName of
-    Nothing -> do
+    ClosureNameAnonymous -> do
       i <- newCount
       let name = "thunk-" <> T.pack (show i)
       registerIfNecessary m name False xts1 xts2 e
       return (m, ValueSigmaIntro [envExp, fvEnv, (m, ValueConst name)])
-    Just name -> do
+    ClosureNameFix name -> do
       let cls = (m, ValueSigmaIntro [envExp, fvEnv, (m, ValueConst (toGlobalVarName name))])
       e' <- substCompPlus (IntMap.fromList [(asInt name, cls)]) IntMap.empty e
       registerIfNecessary m (toGlobalVarName name) True xts1 xts2 e'
+      return cls
+    ClosureNameConstructor name -> do
+      let cls = (m, ValueSigmaIntro [envExp, fvEnv, (m, ValueConst (wrapWithQuote name))])
+      -- e' <- substCompPlus (IntMap.fromList [(asInt name, cls)]) IntMap.empty e
+      registerIfNecessary m (wrapWithQuote name) True xts1 xts2 e
       return cls
 
 registerIfNecessary ::
@@ -234,7 +248,7 @@ registerIfNecessary m name isFixed xts1 xts2 e = do
 
 retClosure ::
   TypeEnv ->
-  Maybe Ident -> -- the name of newly created closure
+  ClosureName -> -- the name of newly created closure
   [IdentPlus] -> -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
   Hint -> -- meta of lambda
   [IdentPlus] -> -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
@@ -278,7 +292,7 @@ chainOf tenv term =
         else return $ xts
     (_, TermPi {}) ->
       return []
-    (_, TermPiIntro xts e) ->
+    (_, TermPiIntro _ xts e) ->
       chainOf' tenv xts [e]
     (_, TermPiElim e es) -> do
       xs1 <- chainOf tenv e
@@ -357,6 +371,7 @@ termSigmaIntro m xts = do
   return
     ( m,
       TermPiIntro
+        Nothing
         [ (m, z, (m, TermTau)),
           (m, k, (m, TermPi xts vz))
         ]

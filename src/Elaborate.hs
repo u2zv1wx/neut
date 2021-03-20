@@ -74,16 +74,16 @@ elaborate' term =
       xts' <- mapM elaboratePlus xts
       t' <- elaborate' t
       return (m, TermPi xts' t')
-    (m, WeakTermPiIntro xts e) -> do
+    (m, WeakTermPiIntro mName xts e) -> do
       xts' <- mapM elaboratePlus xts
       e' <- elaborate' e
-      return (m, TermPiIntro xts' e')
+      return (m, TermPiIntro mName xts' e')
     (m, WeakTermPiElim (mh, WeakTermAster x) es) -> do
       sub <- gets substEnv
       case IntMap.lookup x sub of
         Nothing ->
           raiseError mh "couldn't instantiate the asterisk here"
-        Just (_, WeakTermPiIntro xts e)
+        Just (_, WeakTermPiIntro Nothing xts e)
           | length xts == length es -> do
             let xs = map (\(_, y, _) -> asInt y) xts
             let s = IntMap.fromList $ zip xs es

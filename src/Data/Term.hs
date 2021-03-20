@@ -12,7 +12,7 @@ data Term
   = TermTau
   | TermVar Ident
   | TermPi [IdentPlus] TermPlus
-  | TermPiIntro [IdentPlus] TermPlus
+  | TermPiIntro (Maybe T.Text) [IdentPlus] TermPlus
   | TermPiElim TermPlus [TermPlus]
   | TermFix IdentPlus [IdentPlus] TermPlus
   | TermConst T.Text
@@ -61,9 +61,9 @@ weaken term =
       (m, WeakTermVar x)
     (m, TermPi xts t) ->
       (m, WeakTermPi (weakenArgs xts) (weaken t))
-    (m, TermPiIntro xts body) -> do
+    (m, TermPiIntro mName xts body) -> do
       let xts' = weakenArgs xts
-      (m, WeakTermPiIntro xts' (weaken body))
+      (m, WeakTermPiIntro mName xts' (weaken body))
     (m, TermPiElim e es) -> do
       let e' = weaken e
       let es' = map weaken es

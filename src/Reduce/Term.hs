@@ -23,18 +23,18 @@ reduceTermPlus term =
       ts' <- mapM reduceTermPlus ts
       cod' <- reduceTermPlus cod
       return (m, TermPi (zip3 ms xs ts') cod')
-    (m, TermPiIntro xts e) -> do
+    (m, TermPiIntro mName xts e) -> do
       let (ms, xs, ts) = unzip3 xts
       ts' <- mapM reduceTermPlus ts
       e' <- reduceTermPlus e
-      return (m, TermPiIntro (zip3 ms xs ts') e')
+      return (m, TermPiIntro mName (zip3 ms xs ts') e')
     (m, TermPiElim e es) -> do
       e' <- reduceTermPlus e
       es' <- mapM reduceTermPlus es
       let app = TermPiElim e' es'
       let valueCond = and $ map isValue es
       case e' of
-        (_, TermPiIntro xts body)
+        (_, TermPiIntro Nothing xts body)
           | length xts == length es',
             valueCond -> do
             let xs = map (\(_, x, _) -> asInt x) xts
@@ -121,9 +121,9 @@ substTermPlus' sub nenv term =
     (m, TermPi xts t) -> do
       (xts', t') <- substTermPlus'' sub nenv xts t
       return (m, TermPi xts' t')
-    (m, TermPiIntro xts body) -> do
+    (m, TermPiIntro mName xts body) -> do
       (xts', body') <- substTermPlus'' sub nenv xts body
-      return (m, TermPiIntro xts' body')
+      return (m, TermPiIntro mName xts' body')
     (m, TermPiElim e es) -> do
       e' <- substTermPlus' sub nenv e
       es' <- mapM (substTermPlus' sub nenv) es

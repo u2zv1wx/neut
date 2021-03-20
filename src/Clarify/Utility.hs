@@ -102,7 +102,12 @@ boolFalse =
 {-# INLINE toGlobalVarName #-}
 toGlobalVarName :: Ident -> T.Text
 toGlobalVarName x =
-  "\"" <> asText' x <> "\""
+  wrapWithQuote $ asText' x
+
+{-# INLINE wrapWithQuote #-}
+wrapWithQuote :: T.Text -> T.Text
+wrapWithQuote x =
+  "\"" <> x <> "\""
 
 -- toGlobalVarName x =
 --   "_" <> T.pack (show (asInt x))

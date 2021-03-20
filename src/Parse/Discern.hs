@@ -52,9 +52,9 @@ discern' nenv term =
     (m, WeakTermPi xts t) -> do
       (xts', t') <- discernBinder nenv xts t
       return (m, WeakTermPi xts' t')
-    (m, WeakTermPiIntro xts e) -> do
+    (m, WeakTermPiIntro mName xts e) -> do
       (xts', e') <- discernBinder nenv xts e
-      return (m, WeakTermPiIntro xts' e')
+      return (m, WeakTermPiIntro mName xts' e')
     (m, WeakTermPiElim e es) -> do
       es' <- mapM (discern' nenv) es
       e' <- discern' nenv e

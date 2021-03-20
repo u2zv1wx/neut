@@ -76,8 +76,9 @@ simp' constraintList =
             xt2 <- asWeakIdentPlus m2 cod2
             simpBinder (xts1 ++ [xt1]) (xts2 ++ [xt2])
             simp cs
-        ((m1, WeakTermPiIntro xts1 e1), (m2, WeakTermPiIntro xts2 e2))
-          | length xts1 == length xts2 -> do
+        ((m1, WeakTermPiIntro mName1 xts1 e1), (m2, WeakTermPiIntro mName2 xts2 e2))
+          | mName1 == mName2,
+            length xts1 == length xts2 -> do
             xt1 <- asWeakIdentPlus m1 e1
             xt2 <- asWeakIdentPlus m2 e2
             simpBinder (xts1 ++ [xt1]) (xts2 ++ [xt2])
@@ -300,7 +301,7 @@ bindFormalArgs e args =
       e
     xts : xtss -> do
       let e' = bindFormalArgs e xtss
-      (metaOf e', WeakTermPiIntro xts e')
+      (metaOf e', WeakTermPiIntro Nothing xts e')
 
 lookupAny :: [Int] -> IntMap.IntMap a -> Maybe (Int, a)
 lookupAny is sub =
@@ -343,8 +344,9 @@ isEq l r =
       return $ x1 == x2
     ((_, WeakTermPi xts1 cod1), (_, WeakTermPi xts2 cod2)) -> do
       isEq' xts1 cod1 xts2 cod2
-    ((_, WeakTermPiIntro xts1 e1), (_, WeakTermPiIntro xts2 e2)) ->
-      isEq' xts1 e1 xts2 e2
+    ((_, WeakTermPiIntro mName1 xts1 e1), (_, WeakTermPiIntro mName2 xts2 e2))
+      | mName1 == mName2 ->
+        isEq' xts1 e1 xts2 e2
     ((_, WeakTermPiElim e1 es1), (_, WeakTermPiElim e2 es2)) -> do
       b1 <- isEq e1 e2
       b2 <- and <$> zipWithM isEq es1 es2

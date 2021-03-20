@@ -43,9 +43,9 @@ infer' ctx term =
     (m, WeakTermPi xts t) -> do
       (xts', t') <- inferPi ctx xts t
       return ((m, WeakTermPi xts' t'), (m, WeakTermTau))
-    (m, WeakTermPiIntro xts e) -> do
+    (m, WeakTermPiIntro mName xts e) -> do
       (xts', (e', t')) <- inferBinder ctx xts e
-      return ((m, WeakTermPiIntro xts' e'), (m, WeakTermPi xts' t'))
+      return ((m, WeakTermPiIntro mName xts' e'), (m, WeakTermPi xts' t'))
     (m, WeakTermPiElim e es) -> do
       etls <- mapM (infer' ctx) es
       etl <- infer' ctx e
