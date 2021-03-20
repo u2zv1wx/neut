@@ -45,6 +45,7 @@ asText :: Ident -> T.Text
 asText (I (s, _)) =
   s
 
+{-# INLINE asText' #-}
 asText' :: Ident -> T.Text
 asText' (I (s, i)) =
   s <> "-" <> T.pack (show i)
