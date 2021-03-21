@@ -139,6 +139,11 @@ asWeakVar :: Hint -> Map.HashMap T.Text Ident -> T.Text -> WithEnv (Maybe WeakTe
 asWeakVar m nenv var =
   asVar m nenv var WeakTermVar
 
+{-# INLINE asItself #-}
+asItself :: Hint -> Map.HashMap T.Text Ident -> T.Text -> WithEnv (Maybe (Hint, Ident))
+asItself m nenv var =
+  asVar m nenv var id
+
 {-# INLINE findThenModify #-}
 findThenModify :: (Env -> Map.HashMap T.Text t) -> T.Text -> (T.Text -> a) -> WithEnv (Maybe a)
 findThenModify info name f = do

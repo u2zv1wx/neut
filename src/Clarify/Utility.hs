@@ -104,6 +104,11 @@ toGlobalVarName :: Ident -> T.Text
 toGlobalVarName x =
   wrapWithQuote $ asText' x
 
+{-# INLINE toConstructorLabelName #-}
+toConstructorLabelName :: Ident -> T.Text
+toConstructorLabelName x =
+  wrapWithQuote $ asText x
+
 {-# INLINE wrapWithQuote #-}
 wrapWithQuote :: T.Text -> T.Text
 wrapWithQuote x =

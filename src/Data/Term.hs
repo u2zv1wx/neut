@@ -12,7 +12,7 @@ data Term
   = TermTau
   | TermVar Ident
   | TermPi [IdentPlus] TermPlus
-  | TermPiIntro (Maybe T.Text) [IdentPlus] TermPlus
+  | TermPiIntro (Maybe (T.Text, T.Text)) [IdentPlus] TermPlus
   | TermPiElim TermPlus [TermPlus]
   | TermFix IdentPlus [IdentPlus] TermPlus
   | TermConst T.Text
@@ -25,7 +25,15 @@ data Term
   | TermTensorIntro [TermPlus]
   | TermTensorElim [IdentPlus] TermPlus TermPlus
   | TermDerangement Derangement TermPlus [(TermPlus, DerangementArg, TermPlus)]
+  | TermCase
+      TermPlus -- result type
+      (Maybe TermPlus) -- noetic subject (this is for `case-noetic`)
+      (TermPlus, TermPlus) -- (pattern-matched value, its type)
+      [(Pattern, TermPlus)]
   deriving (Show)
+
+type Pattern =
+  (Ident, [IdentPlus])
 
 type TermPlus =
   (Hint, Term)
@@ -106,6 +114,13 @@ weaken term =
       let ts' = map weaken ts
       let resultType' = weaken resultType
       (m, WeakTermDerangement i resultType' (zip3 es' ks ts'))
+    (m, TermCase resultType mSubject (e, t) patList) -> do
+      let resultType' = weaken resultType
+      let mSubject' = fmap weaken mSubject
+      let e' = weaken e
+      let t' = weaken t
+      let patList' = map (\((p, xts), body) -> ((p, weakenArgs xts), weaken body)) patList
+      (m, WeakTermCase resultType' mSubject' (e', t') patList')
 
 weakenArgs :: [(Hint, Ident, TermPlus)] -> [(Hint, Ident, WeakTermPlus)]
 weakenArgs xts = do

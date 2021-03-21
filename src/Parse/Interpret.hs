@@ -59,11 +59,11 @@ interpret inputTree =
           | otherwise ->
             raiseSyntaxError m "(Π-introduction (TREE*) TREE)"
         "Π-introduction-constructor"
-          | [(_, TreeLeaf name), (_, TreeNode xts), e] <- rest -> do
+          | [(_, TreeLeaf dataName), (_, TreeLeaf constructorName), (_, TreeNode xts), e] <- rest -> do
             (xts', e') <- interpretBinder xts e
-            return (m, WeakTermPiIntro (Just name) xts' e')
+            return (m, WeakTermPiIntro (Just (dataName, constructorName)) xts' e')
           | otherwise ->
-            raiseSyntaxError m "(Π-introduction-constructor LEAF (TREE*) TREE)"
+            raiseSyntaxError m "(Π-introduction-constructor LEAF LEAF (TREE*) TREE)"
         "Π-elimination"
           | e : es <- rest ->
             interpretPiElim m e es

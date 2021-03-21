@@ -18,7 +18,7 @@ import qualified Data.IntMap as IntMap
 import Data.List (nubBy)
 import Data.Log
 import Data.LowType
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, maybeToList)
 import qualified Data.Set as S
 import Data.Term
 import qualified Data.Text as T
@@ -68,19 +68,19 @@ clarifyTerm tenv term =
       returnClosureS4 m
     (m, TermPiIntro mName mxts e) -> do
       e' <- clarifyTerm (insTypeEnv mxts tenv) e
-      fvs <- nubFVS <$> chainOf tenv term
+      fvs <- nubFreeVariables <$> chainOf tenv term
       case mName of
         Nothing ->
           retClosure tenv ClosureNameAnonymous fvs m mxts e'
-        Just name ->
-          retClosure tenv (ClosureNameConstructor name) fvs m mxts e'
+        Just (_, consName) ->
+          retClosure tenv (ClosureNameConstructor consName) fvs m mxts e'
     (m, TermPiElim e es) -> do
       es' <- mapM (clarifyPlus tenv) es
       e' <- clarifyTerm tenv e
       callClosure m e' es'
     (m, TermFix (mx, x, t) mxts e) -> do
       e' <- clarifyTerm (insTypeEnv ((mx, x, t) : mxts) tenv) e
-      fvs <- nubFVS <$> chainOf tenv term
+      fvs <- nubFreeVariables <$> chainOf tenv term
       if S.member x (varComp e')
         then retClosure tenv (ClosureNameFix x) fvs m mxts e'
         else retClosure tenv ClosureNameAnonymous fvs m mxts e'
@@ -96,8 +96,8 @@ clarifyTerm tenv term =
       return (m, CompUpIntro (m, ValueEnumIntro l))
     (m, TermEnumElim (e, _) bs) -> do
       let (cs, es) = unzip bs
-      fvs <- constructEnumFVS tenv es
-      es' <- (mapM (clarifyTerm tenv) >=> alignFVS tenv m fvs) es
+      fvs <- chainFromTermList tenv es
+      es' <- (mapM (clarifyTerm tenv) >=> alignFreeVariables tenv m fvs) es
       (y, e', yVar) <- clarifyPlus tenv e
       return $ bindLet [(y, e')] (m, CompEnumElim yVar (zip (map snd cs) es'))
     (m, TermTensor {}) ->
@@ -123,9 +123,90 @@ clarifyTerm tenv term =
           tuple <- constructResultTuple tenv m borrowedVarList (m, resultVarName, resultType)
           let lamBody = bindLet (zip xs es') (m, CompUpElim resultVarName (m, CompPrimitive (PrimitiveDerangement expKind xsAsVars)) tuple)
           h <- newIdentFromText "der"
-          fvs <- nubFVS <$> chainOf' tenv xts es
+          fvs <- nubFreeVariables <$> chainOf' tenv xts es
           cls <- retClosure tenv (ClosureNameFix h) fvs m [] lamBody -- cls shouldn't be reduced since it can be effectful
           callClosure m cls []
+    (m, TermCase resultType mSubject (e, _) patList) -> do
+      -- let (tvar, env, tag) := e in
+      -- case tag of
+      --   0 ->
+      --     NIL_INTERNAL  @ (result-type, clause-closure-for-nil, null,  env)
+      --   1 ->
+      --     CONS_INTERNAL @ (result-type, null, clause-closure-for-cons, env)
+      case mSubject of
+        -- case
+        Nothing -> do
+          fvs <- chainFromTermList tenv $ map (caseClauseToLambda m) patList
+          resultType' <- clarifyPlus tenv resultType
+          ((closureVarName, closureVar), typeVarName, (tagVarName, tagVar), (envVarName, envVar)) <- newClosureNames m
+          branchList <- forM (zip patList [0 ..]) $ \(((constructorName, xts), body), i) -> do
+            body' <- clarifyTerm tenv body
+            clauseClosure <- retClosure tenv ClosureNameAnonymous fvs m xts body'
+            -- baseArgs == [null, ..., null, clauseClosure, null, ..., null]
+            --              0          i-1   i              i+1        (length patList - 1)
+            baseArgs <- constructArguments clauseClosure i $ length patList - 1
+            let (argVarNameList, argList, argVarList) = unzip3 (resultType' : baseArgs)
+            return $
+              ( EnumCaseInt i,
+                bindLet
+                  (zip argVarNameList argList)
+                  ( m,
+                    CompPiElimDownElim
+                      (m, ValueConst (toConstructorLabelName constructorName))
+                      (argVarList ++ [envVar]) -- argVarList ++ [envVar] == [resultType, null, ..., null, clauseClosure, null, ..., null, env]
+                  )
+              )
+          closure <- clarifyTerm tenv e
+          return $
+            bindLet
+              [(closureVarName, closure)]
+              ( m,
+                CompSigmaElim
+                  [typeVarName, envVarName, tagVarName]
+                  closureVar
+                  (m, CompEnumElim tagVar branchList)
+              )
+        -- case-noetic
+        Just _ ->
+          undefined
+
+newClosureNames :: Hint -> WithEnv ((Ident, ValuePlus), Ident, (Ident, ValuePlus), (Ident, ValuePlus))
+newClosureNames m = do
+  closureVarInfo <- newValueVarWith m "closure"
+  typeVarName <- newIdentFromText "exp"
+  envVarInfo <- newValueVarWith m "env"
+  lamVarInfo <- newValueVarWith m "thunk"
+  return (closureVarInfo, typeVarName, envVarInfo, lamVarInfo)
+
+-- (closureVarName, closureVar) <- newValueVarWith m "closure"
+-- typeVarName <- newIdentFromText "exp"
+-- (envVarName, envVar) <- newValueVarWith m "env"
+-- (lamVarName, lamVar) <- newValueVarWith m "thunk"
+-- return ()
+
+caseClauseToLambda :: Hint -> (Pattern, TermPlus) -> TermPlus
+caseClauseToLambda m pat =
+  case pat of
+    ((_, xts), body) ->
+      (m, TermPiIntro Nothing xts body)
+
+constructArguments :: CompPlus -> Int -> Int -> WithEnv [(Ident, CompPlus, ValuePlus)]
+constructArguments cls clsIndex upperBound = do
+  (innerClsVarName, innerClsVar) <- newValueVarWith (fst cls) "var"
+  constructArguments' (innerClsVarName, cls, innerClsVar) clsIndex 0 upperBound
+
+constructArguments' :: (Ident, CompPlus, ValuePlus) -> Int -> Int -> Int -> WithEnv [(Ident, CompPlus, ValuePlus)]
+constructArguments' clsInfo clsIndex cursor upperBound = do
+  if cursor == upperBound
+    then return []
+    else do
+      rest <- constructArguments' clsInfo clsIndex (cursor + 1) upperBound
+      if cursor == clsIndex
+        then return $ clsInfo : rest
+        else do
+          let (_, (m, _), _) = clsInfo
+          (argVarName, argVar) <- newValueVarWith m "arg"
+          return $ (argVarName, (m, CompUpIntro (m, ValueSigmaIntro [])), argVar) : rest
 
 clarifyPlus :: TypeEnv -> TermPlus -> WithEnv (Ident, CompPlus, ValuePlus)
 clarifyPlus tenv e@(m, _) = do
@@ -143,17 +224,22 @@ clarifyBinder tenv binder =
       xts' <- clarifyBinder (IntMap.insert (asInt x) t tenv) xts
       return $ (m, x, t') : xts'
 
-constructEnumFVS :: TypeEnv -> [TermPlus] -> WithEnv [IdentPlus]
-constructEnumFVS tenv es =
-  nubFVS <$> concat <$> mapM (chainOf tenv) es
+chainFromTermList :: TypeEnv -> [TermPlus] -> WithEnv [IdentPlus]
+chainFromTermList tenv es =
+  nubFreeVariables <$> concat <$> mapM (chainOf tenv) es
 
-alignFVS :: TypeEnv -> Hint -> [IdentPlus] -> [CompPlus] -> WithEnv [CompPlus]
-alignFVS tenv m fvs es = do
+-- alignFreeVariable :: TypeEnv -> Hint -> [IdentPlus] -> CompPlus -> WithEnv CompPlus
+-- alignFreeVariable tenv m fvs e = do
+--   e' <- retClosure tenv ClosureNameAnonymous fvs m [] e
+--   callClosure m e' []
+
+alignFreeVariables :: TypeEnv -> Hint -> [IdentPlus] -> [CompPlus] -> WithEnv [CompPlus]
+alignFreeVariables tenv m fvs es = do
   es' <- mapM (retClosure tenv ClosureNameAnonymous fvs m []) es
   mapM (\cls -> callClosure m cls []) es'
 
-nubFVS :: [IdentPlus] -> [IdentPlus]
-nubFVS =
+nubFreeVariables :: [IdentPlus] -> [IdentPlus]
+nubFreeVariables =
   nubBy (\(_, x, _) (_, y, _) -> x == y)
 
 clarifyConst :: TypeEnv -> Hint -> T.Text -> WithEnv CompPlus
@@ -224,10 +310,14 @@ makeClosure mName mxts2 m mxts1 e = do
       registerIfNecessary m (toGlobalVarName name) True xts1 xts2 e'
       return cls
     ClosureNameConstructor name -> do
-      let cls = (m, ValueSigmaIntro [envExp, fvEnv, (m, ValueConst (wrapWithQuote name))])
-      -- e' <- substCompPlus (IntMap.fromList [(asInt name, cls)]) IntMap.empty e
-      registerIfNecessary m (wrapWithQuote name) True xts1 xts2 e
-      return cls
+      cenv <- gets constructorEnv
+      case Map.lookup name cenv of
+        Just (_, k) -> do
+          let cls = (m, ValueSigmaIntro [envExp, fvEnv, (m, ValueInt 64 (toInteger k))])
+          registerIfNecessary m (wrapWithQuote name) True xts1 xts2 e
+          return cls
+        Nothing ->
+          raiseCritical m $ "no such constructor is registered: `" <> name <> "`"
 
 registerIfNecessary ::
   Hint ->
@@ -263,17 +353,14 @@ retClosure tenv mName fvs m xts e = do
 callClosure :: Hint -> CompPlus -> [(Ident, CompPlus, ValuePlus)] -> WithEnv CompPlus
 callClosure m e zexes = do
   let (zs, es', xs) = unzip3 zexes
-  (clsVarName, clsVar) <- newValueVarWith m "closure"
-  typeVarName <- newIdentFromText "exp"
-  (envVarName, envVar) <- newValueVarWith m "env"
-  (lamVarName, lamVar) <- newValueVarWith m "thunk"
+  ((closureVarName, closureVar), typeVarName, (envVarName, envVar), (lamVarName, lamVar)) <- newClosureNames m
   return $
     bindLet
-      ((clsVarName, e) : zip zs es')
+      ((closureVarName, e) : zip zs es')
       ( m,
         CompSigmaElim
           [typeVarName, envVarName, lamVarName]
-          clsVar
+          closureVar
           (m, CompPiElimDownElim lamVar (xs ++ [envVar]))
       )
 
@@ -329,6 +416,11 @@ chainOf tenv term =
     (_, TermDerangement _ _ ekts) -> do
       let (es, _, ts) = unzip3 ekts
       concat <$> mapM (chainOf tenv) (es ++ ts)
+    (_, TermCase _ mSubject (e, _) patList) -> do
+      xs1 <- concat <$> (mapM (chainOf tenv) $ maybeToList mSubject)
+      xs2 <- chainOf tenv e
+      xs3 <- concat <$> (forM patList $ \((_, xts), body) -> chainOf' tenv xts [body])
+      return $ xs1 ++ xs2 ++ xs3
 
 chainOf' :: TypeEnv -> [IdentPlus] -> [TermPlus] -> WithEnv [IdentPlus]
 chainOf' tenv binder es =

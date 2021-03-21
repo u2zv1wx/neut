@@ -357,6 +357,8 @@ constructSwitch switch =
       constructSwitch [(EnumCaseDefault, code)]
     (EnumCaseLabel l, code@(m, _)) : rest -> do
       i <- enumValueToInteger m l
+      constructSwitch $ (EnumCaseInt i, code) : rest
+    (EnumCaseInt i, code) : rest -> do
       code' <- lowerComp code
       mSwitch <- constructSwitch rest
       return $ do

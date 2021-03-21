@@ -3,6 +3,7 @@ module Data.WeakTerm where
 import Data.Basic
 import qualified Data.IntMap as IntMap
 import Data.LowType
+import Data.Maybe (maybeToList)
 import qualified Data.Set as S
 import qualified Data.Text as T
 
@@ -10,7 +11,7 @@ data WeakTerm
   = WeakTermTau
   | WeakTermVar Ident
   | WeakTermPi [WeakIdentPlus] WeakTermPlus
-  | WeakTermPiIntro (Maybe T.Text) [WeakIdentPlus] WeakTermPlus
+  | WeakTermPiIntro (Maybe (T.Text, T.Text)) [WeakIdentPlus] WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
   | WeakTermFix WeakIdentPlus [WeakIdentPlus] WeakTermPlus
   | WeakTermAster Int
@@ -25,7 +26,15 @@ data WeakTerm
   | WeakTermTensorElim [WeakIdentPlus] WeakTermPlus WeakTermPlus
   | WeakTermQuestion WeakTermPlus WeakTermPlus -- e : t (output the type `t` as note)
   | WeakTermDerangement Derangement WeakTermPlus [(WeakTermPlus, DerangementArg, WeakTermPlus)] -- (derangement NUM result-type arg-1 ... arg-n)
+  | WeakTermCase
+      WeakTermPlus -- result type
+      (Maybe WeakTermPlus) -- noetic subject (this is for `case-noetic`)
+      (WeakTermPlus, WeakTermPlus) -- (pattern-matched value, its type)
+      [(WeakPattern, WeakTermPlus)]
   deriving (Show)
+
+type WeakPattern =
+  (Ident, [WeakIdentPlus])
 
 type WeakTermPlus =
   (Hint, WeakTerm)
@@ -119,6 +128,13 @@ varWeakTermPlus term =
     (_, WeakTermDerangement _ t ekts) -> do
       let (es, _, ts) = unzip3 ekts
       S.unions $ varWeakTermPlus t : map varWeakTermPlus (es ++ ts)
+    (_, WeakTermCase resultType mSubject (e, t) patList) -> do
+      let xs1 = varWeakTermPlus resultType
+      let xs2 = S.unions $ map varWeakTermPlus $ maybeToList mSubject
+      let xs3 = varWeakTermPlus e
+      let xs4 = varWeakTermPlus t
+      let xs5 = S.unions $ map (\((_, xts), body) -> varWeakTermPlus' xts [body]) patList
+      S.unions [xs1, xs2, xs3, xs4, xs5]
 
 varWeakTermPlus' :: [WeakIdentPlus] -> [WeakTermPlus] -> S.Set Ident
 varWeakTermPlus' binder es =
@@ -181,6 +197,13 @@ asterWeakTermPlus term =
     (_, WeakTermDerangement _ t ekts) -> do
       let (es, _, ts) = unzip3 ekts
       S.unions $ asterWeakTermPlus t : map asterWeakTermPlus (es ++ ts)
+    (_, WeakTermCase resultType mSubject (e, t) patList) -> do
+      let xs1 = asterWeakTermPlus resultType
+      let xs2 = S.unions $ map asterWeakTermPlus $ maybeToList mSubject
+      let xs3 = asterWeakTermPlus e
+      let xs4 = asterWeakTermPlus t
+      let xs5 = S.unions $ map (\((_, xts), body) -> asterWeakTermPlus' xts [body]) patList
+      S.unions [xs1, xs2, xs3, xs4, xs5]
 
 asterWeakTermPlus' :: [WeakIdentPlus] -> [WeakTermPlus] -> S.Set Int
 asterWeakTermPlus' binder es =
@@ -265,6 +288,12 @@ toText term =
       let (es, _, _) = unzip3 ekts
       let es' = map toText es
       showCons $ "derangement" : T.pack (show i) : resultType' : es'
+    (_, WeakTermCase _ mSubject (_, _) _) -> do
+      case mSubject of
+        Nothing -> do
+          "<case>"
+        Just _ -> do
+          "<case-noetic>"
 
 inParen :: T.Text -> T.Text
 inParen s =
@@ -303,6 +332,8 @@ showCase c =
       l
     EnumCaseDefault ->
       "default"
+    EnumCaseInt i ->
+      T.pack (show i)
 
 showDerangementArgKind :: DerangementArg -> T.Text
 showDerangementArgKind k =

@@ -97,7 +97,7 @@ parse stmtTreeList =
                 Just i <- readMaybe (T.unpack intStr) -> do
                 xs <- mapM extractLeaf constructorNameList
                 modify (\env -> env {dataEnv = Map.insert name xs (dataEnv env)})
-                forM_ xs $ \x -> modify (\env -> env {constructorEnv = Map.insert x i (constructorEnv env)})
+                forM_ (zip xs [0 ..]) $ \(x, k) -> modify (\env -> env {constructorEnv = Map.insert x (i, k) (constructorEnv env)})
                 parse restStmtList
               | otherwise -> do
                 raiseSyntaxError m "(set-as-data LEAF INT LEAF*)"

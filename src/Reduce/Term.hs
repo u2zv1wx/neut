@@ -5,8 +5,10 @@ module Reduce.Term
   )
 where
 
+import Control.Monad.State.Lazy
 import Data.Basic
 import Data.Env
+import qualified Data.HashMap.Lazy as Map
 import qualified Data.IntMap as IntMap
 import Data.LowType
 import Data.Namespace
@@ -92,8 +94,42 @@ reduceTermPlus term =
       es' <- mapM reduceTermPlus es
       ts' <- mapM reduceTermPlus ts
       return (m, TermDerangement i t (zip3 es' ks ts'))
+    (m, TermCase resultType mSubject (e, t) clauseList) -> do
+      e' <- reduceTermPlus e
+      let lamList = map (toLamList m) clauseList
+      denv <- gets dataEnv
+      case e' of
+        (_, TermPiIntro (Just (dataName, consName)) _ _)
+          | Just consNameList <- Map.lookup dataName denv,
+            consName `elem` consNameList,
+            checkClauseListSanity consNameList clauseList -> do
+            let app = (m, TermPiElim e' (resultType : lamList))
+            reduceTermPlus app
+        _ -> do
+          resultType' <- reduceTermPlus resultType
+          mSubject' <- mapM reduceTermPlus mSubject
+          t' <- reduceTermPlus t
+          clauseList' <- forM clauseList $ \((name, xts), body) -> do
+            body' <- reduceTermPlus body
+            return ((name, xts), body')
+          return (m, TermCase resultType' mSubject' (e', t') clauseList')
     _ ->
       return term
+
+checkClauseListSanity :: [T.Text] -> [(Pattern, TermPlus)] -> Bool
+checkClauseListSanity consNameList clauseList =
+  case (consNameList, clauseList) of
+    ([], []) ->
+      True
+    (consName : restConsNameList, ((name, _), _) : restClauseList)
+      | consName == asText name ->
+        checkClauseListSanity restConsNameList restClauseList
+    _ ->
+      False
+
+toLamList :: Hint -> (Pattern, TermPlus) -> TermPlus
+toLamList m ((_, xts), body) =
+  (m, TermPiIntro Nothing xts body)
 
 substTermPlus ::
   SubstTerm ->
@@ -166,6 +202,15 @@ substTermPlus' sub nenv term =
       es' <- mapM (substTermPlus' sub nenv) es
       ts' <- mapM (substTermPlus' sub nenv) ts
       return (m, TermDerangement i resultType' (zip3 es' ks ts'))
+    (m, TermCase resultType mSubject (e, t) clauseList) -> do
+      resultType' <- substTermPlus' sub nenv resultType
+      mSubject' <- mapM (substTermPlus' sub nenv) mSubject
+      e' <- substTermPlus' sub nenv e
+      t' <- substTermPlus' sub nenv t
+      clauseList' <- forM clauseList $ \((name, xts), body) -> do
+        (xts', body') <- substTermPlus'' sub nenv xts body
+        return ((name, xts'), body')
+      return (m, TermCase resultType' mSubject' (e', t') clauseList')
 
 substTermPlus'' ::
   SubstTerm ->

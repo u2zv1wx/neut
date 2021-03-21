@@ -46,7 +46,7 @@ data Env = Env
     -- [("left", ("choice", 0)), ("right", ("choice", 1)), ...]
     revEnumEnv :: Map.HashMap T.Text (T.Text, Int),
     dataEnv :: Map.HashMap T.Text [T.Text],
-    constructorEnv :: Map.HashMap T.Text Int,
+    constructorEnv :: Map.HashMap T.Text (Int, Int),
     prefixEnv :: [T.Text],
     sectionEnv :: [T.Text],
     topNameEnv :: Map.HashMap T.Text Ident,

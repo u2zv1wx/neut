@@ -138,14 +138,15 @@ infer' ctx term =
               cenv <- gets constructorEnv
               case Map.lookup (asText constructorName) cenv of
                 Nothing ->
-                  raiseError m $ "no such constructor defined: " <> asText constructorName
+                  raiseCritical m $ "no such constructor defined (infer): " <> asText constructorName
                 Just (holeCount, _) -> do
                   holeList <- mapM (const $ newTypeAsterInCtx ctx m) $ replicate holeCount ()
                   clauseList' <- forM clauseList $ \((name, xts), body) -> do
                     (xts', (body', tBody)) <- inferBinder ctx xts body
                     insConstraintEnv resultType tBody
                     let xs = map (\(mx, x, _) -> (mx, WeakTermVar x)) xts'
-                    _ <- infer' ctx (m, WeakTermPiElim (m, WeakTermVar name) (holeList ++ xs))
+                    (_, tPat) <- infer' ctx (m, WeakTermPiElim (m, WeakTermVar name) (holeList ++ xs))
+                    insConstraintEnv t' tPat
                     return ((name, xts'), body')
                   return ((m, WeakTermCase resultType mSubject (e', t') clauseList'), resultType)
 

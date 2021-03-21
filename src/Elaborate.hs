@@ -168,6 +168,29 @@ elaborate' term =
       es' <- mapM elaborate' es
       ts' <- mapM (elaborate' >=> reduceTermPlus) ts
       return (m, TermDerangement i resultType' (zip3 es' ks ts'))
+    (m, WeakTermCase resultType mSubject (e, t) patList) -> do
+      resultType' <- elaborate' resultType
+      mSubject' <- mapM elaborate' mSubject
+      e' <- elaborate' e
+      t' <- elaborate' t
+      patList' <- forM patList $ \((c, xts), body) -> do
+        xts' <- mapM elaboratePlus xts
+        body' <- elaborate' body
+        return ((c, xts'), body')
+      denv <- gets dataEnv
+      oenv <- gets opaqueEnv
+      case t' of
+        (_, TermPiElim (_, TermVar name) _)
+          | Just bs <- Map.lookup (asText name) denv,
+            S.member name oenv -> do
+            let bs' = map (\((b, _), _) -> asText b) patList
+            forM_ (zip bs bs') $ \(b, b') -> do
+              if b == b'
+                then return ()
+                else raiseError m $ "the constructor here is supposed to be `" <> b <> "`, but is: `" <> b' <> "`" -- fixme: add hint for patterns
+            return (m, TermCase resultType' mSubject' (e', t') patList')
+        _ ->
+          raiseError (fst t) $ "the type of this term must be a data-type, but its type is:\n" <> toText (weaken t')
 
 elaboratePlus :: (Hint, a, WeakTermPlus) -> WithEnv (Hint, a, TermPlus)
 elaboratePlus (m, x, t) = do

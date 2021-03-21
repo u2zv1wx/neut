@@ -5,9 +5,12 @@ module Reduce.WeakTerm
   )
 where
 
+import Control.Monad.State.Lazy
 import Data.Basic
 import Data.Env
+import qualified Data.HashMap.Lazy as Map
 import qualified Data.IntMap as IntMap
+import qualified Data.Text as T
 import Data.WeakTerm
 
 type NameEnv = IntMap.IntMap Ident
@@ -92,8 +95,42 @@ reduceWeakTermPlus term =
       es' <- mapM reduceWeakTermPlus es
       ts' <- mapM reduceWeakTermPlus ts
       return (m, WeakTermDerangement i t (zip3 es' ks ts'))
+    (m, WeakTermCase resultType mSubject (e, t) clauseList) -> do
+      e' <- reduceWeakTermPlus e
+      let lamList = map (toLamList m) clauseList
+      denv <- gets dataEnv
+      case e' of
+        (_, WeakTermPiIntro (Just (dataName, consName)) _ _)
+          | Just consNameList <- Map.lookup dataName denv,
+            consName `elem` consNameList,
+            checkClauseListSanity consNameList clauseList -> do
+            let app = (m, WeakTermPiElim e' (resultType : lamList))
+            reduceWeakTermPlus app
+        _ -> do
+          resultType' <- reduceWeakTermPlus resultType
+          mSubject' <- mapM reduceWeakTermPlus mSubject
+          t' <- reduceWeakTermPlus t
+          clauseList' <- forM clauseList $ \((name, xts), body) -> do
+            body' <- reduceWeakTermPlus body
+            return ((name, xts), body')
+          return (m, WeakTermCase resultType' mSubject' (e', t') clauseList')
     _ ->
       return term
+
+checkClauseListSanity :: [T.Text] -> [(WeakPattern, WeakTermPlus)] -> Bool
+checkClauseListSanity consNameList clauseList =
+  case (consNameList, clauseList) of
+    ([], []) ->
+      True
+    (consName : restConsNameList, ((name, _), _) : restClauseList)
+      | consName == asText name ->
+        checkClauseListSanity restConsNameList restClauseList
+    _ ->
+      False
+
+toLamList :: Hint -> (WeakPattern, WeakTermPlus) -> WeakTermPlus
+toLamList m ((_, xts), body) =
+  (m, WeakTermPiIntro Nothing xts body)
 
 substWeakTermPlus ::
   SubstWeakTerm ->
@@ -182,6 +219,15 @@ substWeakTermPlus' sub nenv term =
       es' <- mapM (substWeakTermPlus' sub nenv) es
       ts' <- mapM (substWeakTermPlus' sub nenv) ts
       return (m, WeakTermDerangement i resultType' (zip3 es' ks ts'))
+    (m, WeakTermCase resultType mSubject (e, t) clauseList) -> do
+      resultType' <- substWeakTermPlus' sub nenv resultType
+      mSubject' <- mapM (substWeakTermPlus' sub nenv) mSubject
+      e' <- substWeakTermPlus' sub nenv e
+      t' <- substWeakTermPlus' sub nenv t
+      clauseList' <- forM clauseList $ \((name, xts), body) -> do
+        (xts', body') <- substWeakTermPlus'' sub nenv xts body
+        return ((name, xts'), body')
+      return (m, WeakTermCase resultType' mSubject' (e', t') clauseList')
 
 substWeakTermPlus'' ::
   SubstWeakTerm ->
