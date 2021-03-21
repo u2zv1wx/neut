@@ -156,6 +156,23 @@ interpret inputTree =
             return (m, WeakTermDerangement derangement' resultType' (zip3 es ks hs))
           | otherwise ->
             raiseSyntaxError m "(derangement LEAF TREE TREE*)"
+        "case"
+          | e : clauseList <- rest -> do
+            e' <- interpret e
+            clauseList' <- mapM interpretCaseClause clauseList
+            let doNotCare = (m, WeakTermTau)
+            return (m, WeakTermCase doNotCare Nothing (e', doNotCare) clauseList')
+          | otherwise ->
+            raiseSyntaxError m "(case TREE TREE*)"
+        "case-noetic"
+          | s : e : clauseList <- rest -> do
+            s' <- interpret s
+            e' <- interpret e
+            clauseList' <- mapM interpretCaseClause clauseList
+            let doNotCare = (m, WeakTermTau)
+            return (m, WeakTermCase doNotCare (Just s') (e', doNotCare) clauseList')
+          | otherwise ->
+            raiseSyntaxError m "(case-noetic TREE TREE TREE*)"
         _
           | [(_, TreeLeaf value)] <- rest,
             Just (intSize, v) <- readValueInt headAtom value ->
@@ -283,6 +300,25 @@ interpretEnumCase tree =
       return (m, EnumCaseLabel l)
     (m, _) ->
       raiseSyntaxError m "default | LEAF"
+
+interpretCaseClause :: TreePlus -> WithEnv (WeakPattern, WeakTermPlus)
+interpretCaseClause tree =
+  case tree of
+    (_, TreeNode [c, e]) -> do
+      c' <- interpretPattern c
+      e' <- interpret e
+      return (c', e')
+    e ->
+      raiseSyntaxError (fst e) "(TREE TREE)"
+
+interpretPattern :: TreePlus -> WithEnv WeakPattern
+interpretPattern tree =
+  case tree of
+    (_, TreeNode ((_, TreeLeaf patName) : xts)) -> do
+      xts' <- mapM interpretWeakIdentPlus xts
+      return (asIdent patName, xts')
+    _ ->
+      raiseSyntaxError (fst tree) "(LEAF TREE*)"
 
 readValueInt :: T.Text -> T.Text -> Maybe (IntSize, Integer)
 readValueInt t x
