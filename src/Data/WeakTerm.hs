@@ -259,8 +259,10 @@ toText term =
       showCons ["fix", showVariable x, argStr, toText e]
     (_, WeakTermConst x) ->
       x
-    (_, WeakTermAster _) ->
-      "*"
+    (_, WeakTermAster i) ->
+      "?M" <> T.pack (show i)
+    -- (_, WeakTermAster _) ->
+    --   "*"
     (_, WeakTermInt _ a) ->
       T.pack $ show a
     (_, WeakTermFloat _ a) ->

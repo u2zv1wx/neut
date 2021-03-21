@@ -1,5 +1,6 @@
 module Clarify.Sigma
-  ( returnImmediateS4,
+  ( immediateS4,
+    returnImmediateS4,
     sigmaS4,
     returnClosureS4,
   )

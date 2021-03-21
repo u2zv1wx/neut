@@ -158,6 +158,7 @@ distinguishComp z term =
       (vs2, e2') <- distinguishComp z e2
       return (concat [vs1, vs2], (m, CompUpElim x e1' e2'))
     (m, CompEnumElim d branchList) -> do
+      -- fixme: branchごとに同じように変数を処理すること。つまり,複数のbranchで同名の変数が出たときに,同じように名前を変えること。
       (vs, d') <- distinguishValue z d
       let (cs, es) = unzip branchList
       (vss, es') <- unzip <$> mapM (distinguishComp z) es

@@ -130,21 +130,21 @@ clarifyTerm tenv term =
       -- let (tvar, env, tag) := e in
       -- case tag of
       --   0 ->
-      --     NIL_INTERNAL  @ (result-type, clause-closure-for-nil, null,  env)
+      --     NIL_INTERNAL  @ (result-type, clause-closure-for-nil, clause-closure-for-cons, env)
       --   1 ->
-      --     CONS_INTERNAL @ (result-type, null, clause-closure-for-cons, env)
+      --     CONS_INTERNAL @ (result-type, clause-closure-for-nil, clause-closure-for-cons, env)
       case mSubject of
         -- case
         Nothing -> do
           fvs <- chainFromTermList tenv $ map (caseClauseToLambda m) patList
           resultType' <- clarifyPlus tenv resultType
-          ((closureVarName, closureVar), typeVarName, (tagVarName, tagVar), (envVarName, envVar)) <- newClosureNames m
+          ((closureVarName, closureVar), typeVarName, (envVarName, envVar), (tagVarName, tagVar)) <- newClosureNames m
           branchList <- forM (zip patList [0 ..]) $ \(((constructorName, xts), body), i) -> do
-            body' <- clarifyTerm tenv body
+            body' <- clarifyTerm (insTypeEnv xts tenv) body
             clauseClosure <- retClosure tenv ClosureNameAnonymous fvs m xts body'
-            -- baseArgs == [null, ..., null, clauseClosure, null, ..., null]
+            -- baseArgs == [fake, ..., fake, clauseClosure, fake, ..., fake]
             --              0          i-1   i              i+1        (length patList - 1)
-            baseArgs <- constructArguments clauseClosure i $ length patList - 1
+            baseArgs <- constructArguments clauseClosure i $ length patList
             let (argVarNameList, argList, argVarList) = unzip3 (resultType' : baseArgs)
             return $
               ( EnumCaseInt i,
@@ -178,12 +178,6 @@ newClosureNames m = do
   lamVarInfo <- newValueVarWith m "thunk"
   return (closureVarInfo, typeVarName, envVarInfo, lamVarInfo)
 
--- (closureVarName, closureVar) <- newValueVarWith m "closure"
--- typeVarName <- newIdentFromText "exp"
--- (envVarName, envVar) <- newValueVarWith m "env"
--- (lamVarName, lamVar) <- newValueVarWith m "thunk"
--- return ()
-
 caseClauseToLambda :: Hint -> (Pattern, TermPlus) -> TermPlus
 caseClauseToLambda m pat =
   case pat of
@@ -206,7 +200,13 @@ constructArguments' clsInfo clsIndex cursor upperBound = do
         else do
           let (_, (m, _), _) = clsInfo
           (argVarName, argVar) <- newValueVarWith m "arg"
-          return $ (argVarName, (m, CompUpIntro (m, ValueSigmaIntro [])), argVar) : rest
+          fakeClosure <- makeFakeClosure m
+          return $ (argVarName, (m, CompUpIntro fakeClosure), argVar) : rest
+
+makeFakeClosure :: Hint -> WithEnv ValuePlus
+makeFakeClosure m = do
+  imm <- immediateS4 m
+  return (m, ValueSigmaIntro [imm, (m, ValueInt 64 0), (m, ValueInt 64 0)])
 
 clarifyPlus :: TypeEnv -> TermPlus -> WithEnv (Ident, CompPlus, ValuePlus)
 clarifyPlus tenv e@(m, _) = do
@@ -314,7 +314,7 @@ makeClosure mName mxts2 m mxts1 e = do
       case Map.lookup name cenv of
         Just (_, k) -> do
           let cls = (m, ValueSigmaIntro [envExp, fvEnv, (m, ValueInt 64 (toInteger k))])
-          registerIfNecessary m (wrapWithQuote name) True xts1 xts2 e
+          registerIfNecessary m (wrapWithQuote name) False xts1 xts2 e
           return cls
         Nothing ->
           raiseCritical m $ "no such constructor is registered: `" <> name <> "`"

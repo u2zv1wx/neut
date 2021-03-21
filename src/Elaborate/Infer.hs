@@ -86,9 +86,7 @@ infer' ctx term =
       let t = (m, WeakTermEnum k)
       return ((m, WeakTermEnumIntro l), t)
     (m, WeakTermEnumElim (e, _) ces) -> do
-      -- tEnum <- inferType' ctx t
       (e', t') <- infer' ctx e
-      -- insConstraintEnv tEnum t'
       if null ces
         then do
           h <- newTypeAsterInCtx ctx m
@@ -98,9 +96,7 @@ infer' ctx term =
           (cs', tcs) <- unzip <$> mapM (inferEnumCase ctx) cs
           forM_ (zip (repeat t') tcs) $ uncurry insConstraintEnv
           (es', ts) <- unzip <$> mapM (infer' ctx) es
-          -- let tHead = head ts
           forM_ (zip (repeat (head ts)) (tail ts)) $ uncurry insConstraintEnv
-          -- constrainList ts
           return ((m, WeakTermEnumElim (e', t') $ zip cs' es'), head ts)
     (m, WeakTermTensor ts) -> do
       ts' <- mapM (inferType' ctx) ts
@@ -140,12 +136,13 @@ infer' ctx term =
                 Nothing ->
                   raiseCritical m $ "no such constructor defined (infer): " <> asText constructorName
                 Just (holeCount, _) -> do
-                  holeList <- mapM (const $ newTypeAsterInCtx ctx m) $ replicate holeCount ()
+                  holeList <- mapM (const $ newAsterInCtx ctx m) $ replicate holeCount ()
                   clauseList' <- forM clauseList $ \((name, xts), body) -> do
                     (xts', (body', tBody)) <- inferBinder ctx xts body
                     insConstraintEnv resultType tBody
-                    let xs = map (\(mx, x, _) -> (mx, WeakTermVar x)) xts'
-                    (_, tPat) <- infer' ctx (m, WeakTermPiElim (m, WeakTermVar name) (holeList ++ xs))
+                    let xs = map (\(mx, x, t) -> ((mx, WeakTermVar x), t)) xts'
+                    tCons <- lookupWeakTypeEnv m name
+                    (_, tPat) <- inferPiElim ctx m ((m, WeakTermVar name), tCons) (holeList ++ xs)
                     insConstraintEnv t' tPat
                     return ((name, xts'), body')
                   return ((m, WeakTermCase resultType mSubject (e', t') clauseList'), resultType)
