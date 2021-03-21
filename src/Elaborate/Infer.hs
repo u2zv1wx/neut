@@ -124,6 +124,30 @@ infer' ctx term =
       let borrowedTypes = takeBorrowedTypes $ zip ts' ks
       productType <- productTypeOf m (borrowedTypes ++ [resultType'])
       return ((m, WeakTermDerangement kind resultType' (zip3 es' ks ts')), productType)
+    (m, WeakTermCase _ mSubject (e, _) clauseList) -> do
+      resultType <- newTypeAsterInCtx ctx m
+      case mSubject of
+        Just _ ->
+          undefined
+        Nothing -> do
+          (e', t') <- infer' ctx e
+          case clauseList of
+            [] ->
+              return ((m, WeakTermCase resultType mSubject (e', t') []), resultType) -- ex falso quodlibet
+            ((constructorName, _), _) : _ -> do
+              cenv <- gets constructorEnv
+              case Map.lookup (asText constructorName) cenv of
+                Nothing ->
+                  raiseError m $ "no such constructor defined: " <> asText constructorName
+                Just (holeCount, _) -> do
+                  holeList <- mapM (const $ newTypeAsterInCtx ctx m) $ replicate holeCount ()
+                  clauseList' <- forM clauseList $ \((name, xts), body) -> do
+                    (xts', (body', tBody)) <- inferBinder ctx xts body
+                    insConstraintEnv resultType tBody
+                    let xs = map (\(mx, x, _) -> (mx, WeakTermVar x)) xts'
+                    _ <- infer' ctx (m, WeakTermPiElim (m, WeakTermVar name) (holeList ++ xs))
+                    return ((name, xts'), body')
+                  return ((m, WeakTermCase resultType mSubject (e', t') clauseList'), resultType)
 
 inferArgs ::
   Hint ->
@@ -262,6 +286,8 @@ inferEnumCase ctx weakCase =
     (m, EnumCaseDefault) -> do
       h <- newTypeAsterInCtx ctx m
       return ((m, EnumCaseDefault), h)
+    (m, EnumCaseInt _) -> do
+      raiseCritical m "enum-case-int shouldn't be used in the target language"
 
 -- constrainList :: [WeakTermPlus] -> WithEnv ()
 -- constrainList typeList =
