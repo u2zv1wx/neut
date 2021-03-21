@@ -105,6 +105,20 @@ discern' nenv term =
       es' <- mapM (discern' nenv) es
       ts' <- mapM (discern' nenv) ts
       return (m, WeakTermDerangement i resultType' (zip3 es' ks ts'))
+    (m, WeakTermCase resultType mSubject (e, t) clauseList) -> do
+      resultType' <- discern' nenv resultType
+      mSubject' <- mapM (discern' nenv) mSubject
+      e' <- discern' nenv e
+      t' <- discern' nenv t
+      clauseList' <- forM clauseList $ \((constructorName, xts), body) -> do
+        constructorName' <- resolveSymbol m (asItself m nenv) (asText constructorName)
+        case constructorName' of
+          Just (_, newName) -> do
+            (xts', body') <- discernBinder nenv xts body
+            return ((newName, xts'), body')
+          Nothing ->
+            raiseError m $ "no such constructor is defined: " <> asText constructorName
+      return (m, WeakTermCase resultType' mSubject' (e', t') clauseList')
 
 discernBinder ::
   NameEnv ->
