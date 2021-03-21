@@ -130,9 +130,9 @@ clarifyTerm tenv term =
       -- let (tvar, env, tag) := e in
       -- case tag of
       --   0 ->
-      --     NIL_INTERNAL  @ (result-type, clause-closure-for-nil, clause-closure-for-cons, env)
+      --     NIL_INTERNAL  @ (result-type, clause-closure-for-nil, fake-closure, env)
       --   1 ->
-      --     CONS_INTERNAL @ (result-type, clause-closure-for-nil, clause-closure-for-cons, env)
+      --     CONS_INTERNAL @ (result-type, fake-closure, clause-closure-for-cons, env)
       case mSubject of
         -- case
         Nothing -> do
