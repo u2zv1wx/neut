@@ -228,11 +228,6 @@ chainFromTermList :: TypeEnv -> [TermPlus] -> WithEnv [IdentPlus]
 chainFromTermList tenv es =
   nubFreeVariables <$> concat <$> mapM (chainOf tenv) es
 
--- alignFreeVariable :: TypeEnv -> Hint -> [IdentPlus] -> CompPlus -> WithEnv CompPlus
--- alignFreeVariable tenv m fvs e = do
---   e' <- retClosure tenv ClosureNameAnonymous fvs m [] e
---   callClosure m e' []
-
 alignFreeVariables :: TypeEnv -> Hint -> [IdentPlus] -> [CompPlus] -> WithEnv [CompPlus]
 alignFreeVariables tenv m fvs es = do
   es' <- mapM (retClosure tenv ClosureNameAnonymous fvs m []) es
