@@ -290,7 +290,8 @@ makeClosure mName mxts2 m mxts1 e = do
       i <- newCount
       let name = "thunk-" <> T.pack (show i)
       registerIfNecessary m name False False xts1 xts2 e
-      return (m, ValueSigmaIntro [envExp, fvEnv, (m, ValueConst name)])
+      return (m, ValueSigmaIntro [envExp, fvEnv, (m, ValueConst (wrapWithQuote name))])
+    -- return (m, ValueSigmaIntro [envExp, fvEnv, (m, ValueConst name)])
     ClosureNameFix name -> do
       let cls = (m, ValueSigmaIntro [envExp, fvEnv, (m, ValueConst (toGlobalVarName name))])
       e' <- substCompPlus (IntMap.fromList [(asInt name, cls)]) IntMap.empty e
