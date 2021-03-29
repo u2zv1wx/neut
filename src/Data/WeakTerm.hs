@@ -248,6 +248,8 @@ toText term =
       showCons ["λ", argStr, toText e]
     (_, WeakTermPiElim e es) ->
       case e of
+        (_, WeakTermAster i) ->
+          "?M" <> T.pack (show i)
         -- (_, WeakTermAster _) ->
         --   "*"
         _ ->
@@ -259,10 +261,10 @@ toText term =
       showCons ["fix", showVariable x, argStr, toText e]
     (_, WeakTermConst x) ->
       x
-    (_, WeakTermAster i) ->
-      "?M" <> T.pack (show i)
     -- (_, WeakTermAster _) ->
     --   "*"
+    (_, WeakTermAster i) ->
+      "?M" <> T.pack (show i)
     (_, WeakTermInt _ a) ->
       T.pack $ show a
     (_, WeakTermFloat _ a) ->
@@ -290,12 +292,14 @@ toText term =
       let (es, _, _) = unzip3 ekts
       let es' = map toText es
       showCons $ "derangement" : T.pack (show i) : resultType' : es'
-    (_, WeakTermCase _ mSubject (_, _) _) -> do
+    (_, WeakTermCase _ mSubject (e, _) caseClause) -> do
       case mSubject of
         Nothing -> do
-          "<case>"
+          showCons $ "case" : toText e : map showCaseClause caseClause
         Just _ -> do
-          "<case-noetic>"
+          showCons $ "case-noetic" : toText e : map showCaseClause caseClause
+
+-- "<case-noetic>"
 
 inParen :: T.Text -> T.Text
 inParen s =
@@ -322,6 +326,19 @@ showVariable x =
   if T.any (\c -> c `S.member` S.fromList "()") $ asText x
     then "_"
     else asText' x
+
+showCaseClause :: (WeakPattern, WeakTermPlus) -> T.Text
+showCaseClause (pat, e) =
+  inParen $ showPattern pat <> " " <> toText e
+
+showPattern :: (Ident, [WeakIdentPlus]) -> T.Text
+showPattern (f, xts) = do
+  case xts of
+    [] ->
+      inParen $ asText f
+    _ -> do
+      let xs = map (\(_, x, _) -> x) xts
+      inParen $ asText f <> " " <> T.intercalate " " (map showVariable xs)
 
 showClause :: (EnumCase, WeakTermPlus) -> T.Text
 showClause (c, e) =

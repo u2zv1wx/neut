@@ -18,7 +18,7 @@ data Value
 data Comp
   = CompPrimitive Primitive
   | CompPiElimDownElim ValuePlus [ValuePlus] -- ((force v) v1 ... vn)
-  | CompSigmaElim [Ident] ValuePlus CompPlus
+  | CompSigmaElim Bool [Ident] ValuePlus CompPlus
   | CompUpIntro ValuePlus
   | CompUpElim Ident CompPlus CompPlus
   | CompEnumElim ValuePlus [(EnumCase, CompPlus)]
@@ -67,7 +67,7 @@ varComp c =
           S.unions $ map varValue vs
     (_, CompPiElimDownElim v vs) ->
       S.unions $ map varValue (v : vs)
-    (_, CompSigmaElim xs v e) -> do
+    (_, CompSigmaElim _ xs v e) -> do
       let s1 = varValue v
       let s2 = S.filter (`notElem` xs) $ varComp e
       S.union s1 s2

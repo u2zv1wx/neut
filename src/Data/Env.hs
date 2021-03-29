@@ -55,6 +55,7 @@ data Env = Env
     --
     weakTypeEnv :: IntMap.IntMap WeakTermPlus,
     constTypeEnv :: Map.HashMap T.Text TermPlus,
+    holeEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus),
     constraintEnv :: [Constraint],
     suspendedConstraintEnv :: [SuspendedConstraint],
     substEnv :: IntMap.IntMap WeakTermPlus,
@@ -83,6 +84,7 @@ initialEnv =
       constantSet = S.empty,
       enumEnv = Map.empty,
       fileEnv = Map.empty,
+      holeEnv = IntMap.empty,
       traceEnv = [],
       revEnumEnv = Map.empty,
       dataEnv = Map.empty,

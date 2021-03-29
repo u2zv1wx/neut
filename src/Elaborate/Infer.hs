@@ -59,9 +59,15 @@ infer' ctx term =
       let piType = (m, WeakTermPi xts' tCod)
       insConstraintEnv piType t'
       return ((m, WeakTermFix (mx, x, t') xts' e'), piType)
-    (m, WeakTermAster _) -> do
-      (app, higherApp) <- newAsterInCtx ctx m
-      return (app, higherApp)
+    (m, WeakTermAster x) -> do
+      henv <- gets holeEnv
+      case IntMap.lookup x henv of
+        Just asterInfo ->
+          return asterInfo
+        Nothing -> do
+          (app, higherApp) <- newAsterInCtx ctx m
+          modify (\env -> env {holeEnv = IntMap.insert x (app, higherApp) henv})
+          return (app, higherApp)
     (m, WeakTermConst x)
       -- i64, f16, etc.
       | Just _ <- asLowInt x ->
@@ -122,30 +128,33 @@ infer' ctx term =
       return ((m, WeakTermDerangement kind resultType' (zip3 es' ks ts')), productType)
     (m, WeakTermCase _ mSubject (e, _) clauseList) -> do
       resultType <- newTypeAsterInCtx ctx m
-      case mSubject of
-        Just _ ->
-          undefined
-        Nothing -> do
-          (e', t') <- infer' ctx e
-          case clauseList of
-            [] ->
-              return ((m, WeakTermCase resultType mSubject (e', t') []), resultType) -- ex falso quodlibet
-            ((constructorName, _), _) : _ -> do
-              cenv <- gets constructorEnv
-              case Map.lookup (asText constructorName) cenv of
-                Nothing ->
-                  raiseCritical m $ "no such constructor defined (infer): " <> asText constructorName
-                Just (holeCount, _) -> do
-                  holeList <- mapM (const $ newAsterInCtx ctx m) $ replicate holeCount ()
-                  clauseList' <- forM clauseList $ \((name, xts), body) -> do
-                    (xts', (body', tBody)) <- inferBinder ctx xts body
-                    insConstraintEnv resultType tBody
-                    let xs = map (\(mx, x, t) -> ((mx, WeakTermVar x), t)) xts'
-                    tCons <- lookupWeakTypeEnv m name
-                    (_, tPat) <- inferPiElim ctx m ((m, WeakTermVar name), tCons) (holeList ++ xs)
-                    insConstraintEnv t' tPat
-                    return ((name, xts'), body')
-                  return ((m, WeakTermCase resultType mSubject (e', t') clauseList'), resultType)
+      (e', t') <- infer' ctx e
+      mSubject' <- mapM (inferSubject m ctx) mSubject
+      case clauseList of
+        [] ->
+          return ((m, WeakTermCase resultType mSubject' (e', t') []), resultType) -- ex falso quodlibet
+        ((constructorName, _), _) : _ -> do
+          cenv <- gets constructorEnv
+          case Map.lookup (asText constructorName) cenv of
+            Nothing ->
+              raiseCritical m $ "no such constructor defined (infer): " <> asText constructorName
+            Just (holeCount, _) -> do
+              holeList <- mapM (const $ newAsterInCtx ctx m) $ replicate holeCount ()
+              clauseList' <- forM clauseList $ \((name, xts), body) -> do
+                (xts', (body', tBody)) <- inferBinder ctx xts body
+                insConstraintEnv resultType tBody
+                let xs = map (\(mx, x, t) -> ((mx, WeakTermVar x), t)) xts'
+                tCons <- lookupWeakTypeEnv m name
+                (_, tPat) <- inferPiElim ctx m ((m, WeakTermVar name), tCons) (holeList ++ xs)
+                insConstraintEnv t' tPat
+                return ((name, xts'), body')
+              return ((m, WeakTermCase resultType mSubject' (e', t') clauseList'), resultType)
+
+inferSubject :: Hint -> Context -> WeakTermPlus -> WithEnv WeakTermPlus
+inferSubject m ctx subject = do
+  (subject', tSub) <- infer' ctx subject
+  insConstraintEnv (m, WeakTermTau) tSub
+  return subject'
 
 inferArgs ::
   Hint ->
@@ -286,17 +295,6 @@ inferEnumCase ctx weakCase =
       return ((m, EnumCaseDefault), h)
     (m, EnumCaseInt _) -> do
       raiseCritical m "enum-case-int shouldn't be used in the target language"
-
--- constrainList :: [WeakTermPlus] -> WithEnv ()
--- constrainList typeList =
---   case typeList of
---     [] ->
---       return ()
---     [_] ->
---       return ()
---     (t1 : t2 : ts) -> do
---       insConstraintEnv t1 t2
---       constrainList $ t2 : ts
 
 insConstraintEnv :: WeakTermPlus -> WeakTermPlus -> WithEnv ()
 insConstraintEnv t1 t2 =

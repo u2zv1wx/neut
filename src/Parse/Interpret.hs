@@ -165,14 +165,22 @@ interpret inputTree =
           | otherwise ->
             raiseSyntaxError m "(case TREE TREE*)"
         "case-noetic"
-          | s : e : clauseList <- rest -> do
-            s' <- interpret s
+          | e : clauseList <- rest -> do
+            s <- newAster m
             e' <- interpret e
-            clauseList' <- mapM interpretCaseClause clauseList
+            te <- newAster m
+            let e'' = castFromNoema s te e'
+            clauseList' <- mapM (interpretNoeticCaseClause s) clauseList
             let doNotCare = (m, WeakTermTau)
-            return (m, WeakTermCase doNotCare (Just s') (e', doNotCare) clauseList')
+            return (m, WeakTermCase doNotCare (Just s) (e'', te) clauseList')
           | otherwise ->
             raiseSyntaxError m "(case-noetic TREE TREE TREE*)"
+        "unsafe.hole"
+          | [(_, TreeLeaf intStr)] <- rest,
+            Just i <- readMaybe $ T.unpack intStr -> do
+            return (m, WeakTermAster i)
+          | otherwise ->
+            raiseSyntaxError m "(unsafe.hole INT)"
         _
           | [(_, TreeLeaf value)] <- rest,
             Just (intSize, v) <- readValueInt headAtom value ->
@@ -300,6 +308,66 @@ interpretEnumCase tree =
       return (m, EnumCaseLabel l)
     (m, _) ->
       raiseSyntaxError m "default | LEAF"
+
+interpretNoeticCaseClause :: WeakTermPlus -> TreePlus -> WithEnv (WeakPattern, WeakTermPlus)
+interpretNoeticCaseClause subject tree =
+  case tree of
+    (_, TreeNode [c, e]) -> do
+      (c', nameMap) <- interpretNoeticPattern c
+      e' <- interpretNoeticCaseBody subject nameMap e
+      return (c', e')
+    e ->
+      raiseSyntaxError (fst e) "(TREE TREE)"
+
+interpretNoeticCaseBody :: WeakTermPlus -> [(T.Text, T.Text, WeakTermPlus)] -> TreePlus -> WithEnv WeakTermPlus
+interpretNoeticCaseBody subject nameMap body =
+  case nameMap of
+    [] ->
+      interpret body
+    ((new, orig, t) : rest) -> do
+      body' <- interpretNoeticCaseBody subject rest body
+      let m = fst t
+      let new' = castToNoema subject t (m, WeakTermVar $ asIdent new)
+      return
+        ( m,
+          WeakTermPiElim
+            (m, WeakTermPiIntro Nothing [(m, asIdent orig, wrapWithNoema subject t)] body')
+            [new']
+        )
+
+interpretNoeticPattern :: TreePlus -> WithEnv (WeakPattern, [(T.Text, T.Text, WeakTermPlus)])
+interpretNoeticPattern tree =
+  case tree of
+    (_, TreeNode ((_, TreeLeaf patName) : xts)) -> do
+      (xts', nameMap) <- unzip <$> mapM interpretNoeticWeakIdentPlus xts
+      return ((asIdent patName, xts'), nameMap)
+    _ ->
+      raiseSyntaxError (fst tree) "(LEAF TREE*)"
+
+interpretNoeticWeakIdentPlus :: TreePlus -> WithEnv (WeakIdentPlus, (T.Text, T.Text, WeakTermPlus))
+interpretNoeticWeakIdentPlus tree =
+  case tree of
+    (mLeaf, TreeLeaf x) -> do
+      (new, orig) <- interpretNoeticLeaf x
+      t <- newAster mLeaf
+      return ((mLeaf, asIdent new, t), (new, orig, t))
+    (mNode, TreeNode [(_, TreeLeaf x), t]) -> do
+      (new, orig) <- interpretNoeticLeaf x
+      t' <- interpret t
+      return ((mNode, asIdent new, t'), (new, orig, t'))
+    t ->
+      raiseSyntaxError (fst t) "(LEAF TREE)"
+
+interpretNoeticLeaf :: T.Text -> WithEnv (T.Text, T.Text)
+interpretNoeticLeaf x =
+  case x of
+    "_" -> do
+      x' <- newText
+      x'' <- newText
+      return (x'', x')
+    _ -> do
+      x' <- newText
+      return (x', x)
 
 interpretCaseClause :: TreePlus -> WithEnv (WeakPattern, WeakTermPlus)
 interpretCaseClause tree =
@@ -467,3 +535,33 @@ headDiscriminantOf labelNumList =
       0
     ((_, i) : _) ->
       i
+
+castFromNoema :: WeakTermPlus -> WeakTermPlus -> WeakTermPlus -> WeakTermPlus
+castFromNoema subject baseType tree = do
+  let m = fst tree
+  ( m,
+    WeakTermPiElim
+      (m, WeakTermVar (asIdent "unsafe.cast"))
+      [ wrapWithNoema subject baseType,
+        baseType,
+        tree
+      ]
+    )
+
+castToNoema :: WeakTermPlus -> WeakTermPlus -> WeakTermPlus -> WeakTermPlus
+castToNoema subject baseType tree = do
+  let m = fst tree
+  ( m,
+    WeakTermPiElim
+      (m, WeakTermVar (asIdent "unsafe.cast"))
+      [ baseType,
+        wrapWithNoema subject baseType,
+        tree
+      ]
+    )
+
+-- t ~> (noema * t)
+wrapWithNoema :: WeakTermPlus -> WeakTermPlus -> WeakTermPlus
+wrapWithNoema subject baseType = do
+  let m = fst baseType
+  (m, WeakTermPiElim (m, WeakTermVar (asIdent "noema")) [subject, baseType])

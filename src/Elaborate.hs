@@ -172,7 +172,7 @@ elaborate' term =
       resultType' <- elaborate' resultType
       mSubject' <- mapM elaborate' mSubject
       e' <- elaborate' e
-      t' <- elaborate' t
+      t' <- elaborate' t >>= reduceTermPlus
       patList' <- forM patList $ \((c, xts), body) -> do
         xts' <- mapM elaboratePlus xts
         body' <- elaborate' body
