@@ -144,7 +144,6 @@ clarifyTerm tenv term =
               ( m,
                 CompPiElimDownElim
                   (m, ValueConst consName)
-                  -- (m, ValueConst (toConstructorLabelName constructorName))
                   (argVarList ++ [envVar])
               )
           )
@@ -291,18 +290,16 @@ makeClosure mName mxts2 m mxts1 e = do
       let name = "thunk-" <> T.pack (show i)
       registerIfNecessary m name False False xts1 xts2 e
       return (m, ValueSigmaIntro [envExp, fvEnv, (m, ValueConst (wrapWithQuote name))])
-    -- return (m, ValueSigmaIntro [envExp, fvEnv, (m, ValueConst name)])
     ClosureNameFix name -> do
-      let cls = (m, ValueSigmaIntro [envExp, fvEnv, (m, ValueConst (toGlobalVarName name))])
+      let name' = asText' name
+      let cls = (m, ValueSigmaIntro [envExp, fvEnv, (m, ValueConst (wrapWithQuote name'))])
       e' <- substCompPlus (IntMap.fromList [(asInt name, cls)]) IntMap.empty e
-      registerIfNecessary m (asText' name) True False xts1 xts2 e'
-      -- registerIfNecessary m (toGlobalVarName name) True False xts1 xts2 e'
+      registerIfNecessary m name' True False xts1 xts2 e'
       return cls
     ClosureNameConstructor name -> do
       cenv <- gets constructorEnv
       case Map.lookup name cenv of
         Just (_, constructorNumber) -> do
-          -- registerIfNecessary m (wrapWithQuote name) False True xts1 xts2 e
           registerIfNecessary m name False True xts1 xts2 e
           return $ (m, ValueSigmaIntro [envExp, fvEnv, (m, ValueInt 64 (toInteger constructorNumber))])
         Nothing ->
@@ -324,7 +321,6 @@ registerIfNecessary m name isFixed isNoetic xts1 xts2 e = do
     (envVarName, envVar) <- newValueVarWith m "env"
     let args = map fst xts1 ++ [envVarName]
     body <- reduceCompPlus (m, CompSigmaElim False (map fst xts2) envVar e')
-    -- insCompEnv name isFixed args body
     insCompEnv (wrapWithQuote name) isFixed args body
     when isNoetic $ do
       bodyNoetic <- reduceCompPlus (m, CompSigmaElim True (map fst xts2) envVar e')
