@@ -70,7 +70,7 @@ sigmaT m mxts argVar = do
   ys <- mapM (const $ newIdentFromText "arg") xts
   let body = bindLet (zip ys as) (m, CompUpIntro (m, ValueSigmaIntro []))
   body' <- linearize xts body
-  return (m, CompSigmaElim (map fst xts) argVar body')
+  return (m, CompSigmaElim False (map fst xts) argVar body')
 
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
 -- sigma4 NAME LOC [(x1, t1), ..., (xn, tn)]   ~>
@@ -103,7 +103,7 @@ sigma4 m mxts argVar = do
   transposedPair <- transposeSigma m pairVarTypeList
   let body = bindLet (zip pairVarNameList as) transposedPair
   body' <- linearize xts body
-  return (m, CompSigmaElim (map fst xts) argVar body')
+  return (m, CompSigmaElim False (map fst xts) argVar body')
 
 toPairInfo :: (Ident, CompPlus) -> WithEnv (Ident, (ValuePlus, CompPlus))
 toPairInfo (_, t@(m, _)) = do
@@ -136,7 +136,7 @@ bindSigmaElim binder cont =
     [] ->
       cont
     ((x, y), (d, _)) : xyds ->
-      (fst cont, CompSigmaElim [x, y] d $ bindSigmaElim xyds cont)
+      (fst cont, CompSigmaElim False [x, y] d $ bindSigmaElim xyds cont)
 
 supplyName :: Either b (Ident, b) -> WithEnv (Ident, b)
 supplyName mName =

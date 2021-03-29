@@ -33,12 +33,12 @@ lowerComp term =
       (fun, castThen) <- llvmCast (Just $ takeBaseName v) v $ toFunPtrType ds
       castThenCall <- castThen $ LowCompCall fun vs
       lowerValueLet' (zip xs ds) castThenCall
-    (_, CompSigmaElim xs v e) -> do
+    (_, CompSigmaElim isNoetic xs v e) -> do
       let basePtrType = LowTypePointer $ LowTypeArray (length xs) voidPtr -- base pointer type  ([(length xs) x ARRAY_ELEM_TYPE])
       let idxList = map (\i -> (LowValueInt i, LowTypeInt 32)) [0 ..]
       ys <- mapM newIdentFromIdent xs
       let xts' = zip xs (repeat voidPtr)
-      loadContent v basePtrType (zip idxList (zip ys xts')) e
+      loadContent isNoetic v basePtrType (zip idxList (zip ys xts')) e
     (_, CompUpIntro d) -> do
       result <- newIdentFromText $ takeBaseName d
       lowerValueLet result d $ LowCompReturn $ LowValueLocal result
@@ -104,12 +104,13 @@ takeBaseName' lowerValue =
       "null"
 
 loadContent ::
+  Bool -> -- noetic-or-not
   ValuePlus -> -- base pointer
   LowType -> -- the type of base pointer
   [((LowValue, LowType), (Ident, (Ident, LowType)))] -> -- [(the index of an element, the variable to load the element)]
   CompPlus -> -- continuation
   WithEnv LowComp
-loadContent v bt iyxs cont =
+loadContent isNoetic v bt iyxs cont =
   case iyxs of
     [] ->
       lowerComp cont
@@ -118,24 +119,28 @@ loadContent v bt iyxs cont =
       (bp, castThen) <- llvmCast (Just $ takeBaseName v) v bt
       let yxs = map (\(_, yx) -> yx) iyxs
       uncastThenCont <- uncastList yxs cont
-      extractThenFreeThenUncastThenCont <- loadContent' bp bt ixs uncastThenCont
+      extractThenFreeThenUncastThenCont <- loadContent' isNoetic bp bt ixs uncastThenCont
       castThen extractThenFreeThenUncastThenCont
 
 loadContent' ::
+  Bool -> -- noetic-or-not
   LowValue -> -- base pointer
   LowType -> -- the type of base pointer
   [((LowValue, LowType), (Ident, LowType))] -> -- [(the index of an element, the variable to keep the loaded content)]
   LowComp -> -- continuation
   WithEnv LowComp
-loadContent' bp bt values cont =
+loadContent' isNoetic bp bt values cont =
   case values of
-    [] -> do
-      l <- llvmUncast (Just $ takeBaseName' bp) bp bt
-      tmp <- newNameWith'' $ Just $ takeBaseName' bp
-      j <- newCount
-      commConv tmp l $ LowCompCont (LowOpFree (LowValueLocal tmp) bt j) cont
+    []
+      | isNoetic ->
+        return cont
+      | otherwise -> do
+        l <- llvmUncast (Just $ takeBaseName' bp) bp bt
+        tmp <- newNameWith'' $ Just $ takeBaseName' bp
+        j <- newCount
+        commConv tmp l $ LowCompCont (LowOpFree (LowValueLocal tmp) bt j) cont
     (i, (x, et)) : xis -> do
-      cont' <- loadContent' bp bt xis cont
+      cont' <- loadContent' isNoetic bp bt xis cont
       (posName, pos) <- newValueLocal' (Just $ asText x)
       return $
         LowCompLet

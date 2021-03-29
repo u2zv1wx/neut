@@ -118,7 +118,7 @@ insertHeaderForRelevant' t expVar ch cont@(m, _) =
                 expVar
                 [(m, ValueEnumIntro boolTrue), (m, ValueVar x)]
             )
-            (m, CompSigmaElim [x1, x2] sigVar cont')
+            (m, CompSigmaElim False [x1, x2] sigVar cont')
         )
 
 distinguishValue :: Ident -> ValuePlus -> WithEnv ([Ident], ValuePlus)
@@ -146,10 +146,10 @@ distinguishComp z term =
       (vs, d') <- distinguishValue z d
       (vss, ds') <- unzip <$> mapM (distinguishValue z) ds
       return (concat $ vs : vss, (m, CompPiElimDownElim d' ds'))
-    (m, CompSigmaElim xs d e) -> do
+    (m, CompSigmaElim b xs d e) -> do
       (vs1, d') <- distinguishValue z d
       (vs2, e') <- distinguishComp z e
-      return (concat [vs1, vs2], (m, CompSigmaElim xs d' e'))
+      return (concat [vs1, vs2], (m, CompSigmaElim b xs d' e'))
     (m, CompUpIntro d) -> do
       (vs, d') <- distinguishValue z d
       return (vs, (m, CompUpIntro d'))

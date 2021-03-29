@@ -28,7 +28,7 @@ reduceCompPlus term =
             substCompPlus sub IntMap.empty body >>= reduceCompPlus
         _ ->
           return (m, CompPiElimDownElim v ds)
-    (m, CompSigmaElim xs v e) ->
+    (m, CompSigmaElim isNoetic xs v e) ->
       case v of
         (_, ValueSigmaIntro ds)
           | length ds == length xs -> do
@@ -46,7 +46,7 @@ reduceCompPlus term =
                 [] ->
                   return e'
                 _ ->
-                  return (m, CompSigmaElim xs v e')
+                  return (m, CompSigmaElim isNoetic xs v e')
     (m, CompUpIntro v) ->
       return (m, CompUpIntro v)
     (m, CompUpElim x e1 e2) -> do
@@ -57,8 +57,8 @@ reduceCompPlus term =
           substCompPlus sub IntMap.empty e2 >>= reduceCompPlus
         (my, CompUpElim y ey1 ey2) ->
           reduceCompPlus (my, CompUpElim y ey1 (m, CompUpElim x ey2 e2)) -- commutative conversion
-        (my, CompSigmaElim yts vy ey) ->
-          reduceCompPlus (my, CompSigmaElim yts vy (m, CompUpElim x ey e2)) -- commutative conversion
+        (my, CompSigmaElim b yts vy ey) ->
+          reduceCompPlus (my, CompSigmaElim b yts vy (m, CompUpElim x ey e2)) -- commutative conversion
         _ -> do
           e2' <- reduceCompPlus e2
           case e2' of
@@ -105,12 +105,12 @@ substCompPlus sub nenv term =
       let v' = substValuePlus sub nenv v
       let ds' = map (substValuePlus sub nenv) ds
       return (m, CompPiElimDownElim v' ds')
-    (m, CompSigmaElim xs v e) -> do
+    (m, CompSigmaElim b xs v e) -> do
       let v' = substValuePlus sub nenv v
       xs' <- mapM newIdentFromIdent xs
       let nenv' = IntMap.union (IntMap.fromList (zip (map asInt xs) xs')) nenv
       e' <- substCompPlus sub nenv' e
-      return (m, CompSigmaElim xs' v' e')
+      return (m, CompSigmaElim b xs' v' e')
     (m, CompUpIntro v) -> do
       let v' = substValuePlus sub nenv v
       return (m, CompUpIntro v')
