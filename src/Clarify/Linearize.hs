@@ -23,22 +23,26 @@ linearize binder e =
       (newNameList, e'') <- distinguishComp x e'
       case newNameList of
         [] ->
-          insertHeaderForAffine x t e''
+          insertFooterForAffine x t e''
         [z] ->
           insertHeaderForLinear x z e''
         _ -> do
           insertHeaderForRelevant (x : newNameList) t e''
 
--- insertHeaderForAffine x t e ~>
+-- insertFooterForAffine x t e ~>
+--   bind ans := e in
 --   bind _ :=
 --     bind exp := t^# in        --
 --     exp @ (0, x) in           -- AffineApp
---   e
-insertHeaderForAffine :: Ident -> CompPlus -> CompPlus -> WithEnv CompPlus
-insertHeaderForAffine x t e@(m, _) = do
+--   ans
+insertFooterForAffine :: Ident -> CompPlus -> CompPlus -> WithEnv CompPlus
+insertFooterForAffine x t e@(m, _) = do
+  ans <- newIdentFromText "answer"
   hole <- newIdentFromText "unit"
   discardUnusedVar <- toAffineApp m x t
-  return (m, CompUpElim hole discardUnusedVar e)
+  return (m, CompUpElim ans e (m, CompUpElim hole discardUnusedVar (m, CompUpIntro (m, ValueVar ans))))
+
+-- return (m, CompUpElim hole discardUnusedVar e)
 
 -- insertHeaderForLinear z x e ~>
 --   bind z := return x in
