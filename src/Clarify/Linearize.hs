@@ -8,8 +8,6 @@ import Data.Basic
 import Data.Comp
 import Data.Env
 
-type LinearChain = [(Ident, (Ident, Ident))]
-
 linearize ::
   [(Ident, CompPlus)] -> -- [(x1, t1), ..., (xn, tn)]  (closed chain)
   CompPlus -> -- a term that can contain non-linear occurrences of xi
@@ -23,107 +21,32 @@ linearize binder e =
       (newNameList, e'') <- distinguishComp x e'
       case newNameList of
         [] ->
-          insertFooterForAffine x t e''
-        [z] ->
-          insertHeaderForLinear x z e''
-        _ -> do
-          insertHeaderForRelevant (x : newNameList) t e''
+          insertFooter x t e''
+        z : zs ->
+          insertHeader x z zs t e''
 
--- insertFooterForAffine x t e ~>
---   bind ans := e in
---   bind _ :=
---     bind exp := t^# in        --
---     exp @ (0, x) in           -- AffineApp
---   ans
-insertFooterForAffine :: Ident -> CompPlus -> CompPlus -> WithEnv CompPlus
-insertFooterForAffine x t e@(m, _) = do
+insertFooter :: Ident -> CompPlus -> CompPlus -> WithEnv CompPlus
+insertFooter x t e@(m, _) = do
   ans <- newIdentFromText "answer"
   hole <- newIdentFromText "unit"
   discardUnusedVar <- toAffineApp m x t
   return (m, CompUpElim ans e (m, CompUpElim hole discardUnusedVar (m, CompUpIntro (m, ValueVar ans))))
 
--- return (m, CompUpElim hole discardUnusedVar e)
-
--- insertHeaderForLinear z x e ~>
---   bind z := return x in
---   e
-insertHeaderForLinear :: Ident -> Ident -> CompPlus -> WithEnv CompPlus
-insertHeaderForLinear x z e@(m, _) =
-  return (m, CompUpElim z (m, CompUpIntro (m, ValueVar x)) e)
-
--- insertHeaderForRelevant [x, x1, ..., x{N}] t e ~>
---   bind exp := t in
---   bind sigTmp1 := exp @ (1, x) in               --
---   let (x1, tmp1) := sigTmp1 in                  --
---   ...                                           -- insertHeaderForRelevant'
---   bind sigTmp{N-1} := exp @ (1, tmp{N-2}) in    --
---   let (x{N-1}, x{N}) := sigTmp{N-1} in          --
---   e                                             --
--- (assuming N >= 2)
-insertHeaderForRelevant ::
+insertHeader ::
+  Ident ->
+  Ident ->
   [Ident] ->
   CompPlus ->
   CompPlus ->
   WithEnv CompPlus
-insertHeaderForRelevant xs t e@(m, _) = do
-  (expVarName, expVar) <- newValueVarWith m "exp"
-  linearChain <- toLinearChain xs
-  rel <- insertHeaderForRelevant' t expVar linearChain e
-  return (m, CompUpElim expVarName t rel)
-
---    toLinearChain [x0, x1, x2, ..., x{N-1}] (N >= 3)
--- ~> [(x0, (x1, tmp1)), (tmp1, (x2, tmp2)), ..., (tmp{N-3}, (x{N-2}, x{N-1}))]
---
--- example behavior (length xs = 5):
---   xs = [x1, x2, x3, x4, x5]
---   valueSeq = [x2, x3, x4]
---   tmpSeq = [tmpA, tmpB]
---   tmpSeq' = [x1, tmpA, tmpB, x5]
---   pairSeq = [(x2, tmpA), (x3, tmpB), (x4, x5)]
---   result = [(x1, (x2, tmpA)), (tmpA, (x3, tmpB)), (tmpB, (x4, x5))]
---
--- example behavior (length xs = 3):
---   xs = [x1, x2, x3]
---   valueSeq = [x2]
---   tmpSeq = []
---   tmpSeq' = [x1, x3]
---   pairSeq = [(x2, x3)]
---   result = [(x1, (x2, x3))]
-toLinearChain :: [Ident] -> WithEnv LinearChain
-toLinearChain xs = do
-  let valueSeq = init $ tail xs
-  tmpSeq <- mapM (const $ newIdentFromText "chain") $ replicate (length xs - 3) ()
-  let tmpSeq' = [head xs] ++ tmpSeq ++ [last xs]
-  let pairSeq = zip valueSeq (tail tmpSeq')
-  return $ zip (init tmpSeq') pairSeq
-
--- insertHeaderForRelevant' expVar [(x1, (x2, tmpA)), (tmpA, (x3, tmpB)), (tmpB, (x3, x4))] ~>
---   bind sigVar1 := expVar @ (1, x1) in
---   let (x2, tmpA) := sigVar1 in
---   bind sigVar2 := expVar @ (1, tmpA) in
---   let (x3, tmpB) := sigVar2 in
---   bind sigVar3 := expVar @ (1, tmpB) in
---   let (x3, x4) := sigVar3 in
---   e
-insertHeaderForRelevant' :: CompPlus -> ValuePlus -> LinearChain -> CompPlus -> WithEnv CompPlus
-insertHeaderForRelevant' t expVar ch cont@(m, _) =
-  case ch of
+insertHeader x z1 zs t e@(m, _) = do
+  case zs of
     [] ->
-      return cont
-    (x, (x1, x2)) : chain -> do
-      cont' <- insertHeaderForRelevant' t expVar chain cont
-      (sigVarName, sigVar) <- newValueVarWith m "sig"
-      return
-        ( m,
-          CompUpElim
-            sigVarName
-            ( m,
-              CompPiElimDownElim
-                expVar
-                [(m, ValueEnumIntro boolTrue), (m, ValueVar x)]
-            )
-            (m, CompSigmaElim False [x1, x2] sigVar cont')
-        )
+      return (m, CompUpElim z1 (m, CompUpIntro (m, ValueVar x)) e)
+    z2 : rest -> do
+      e' <- insertHeader x z2 rest t e
+      copyRelevantVar <- toRelevantApp m x t
+      return (m, CompUpElim z1 copyRelevantVar e')
 
 distinguishValue :: Ident -> ValuePlus -> WithEnv ([Ident], ValuePlus)
 distinguishValue z term =

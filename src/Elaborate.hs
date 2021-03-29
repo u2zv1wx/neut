@@ -48,7 +48,8 @@ elaborateStmt' stmt =
       let tPtr = (m, WeakTermEnum (nsUnsafe <> "pointer"))
       h <- newIdentFromText "res"
       insConstraintEnv (m, WeakTermPi [(m, h, tPtr)] (m, WeakTermTensor [])) tDiscarder
-      insConstraintEnv (m, WeakTermPi [(m, h, tPtr)] (m, WeakTermTensor [tPtr, tPtr])) tCopier
+      insConstraintEnv (m, WeakTermPi [(m, h, tPtr)] tPtr) tCopier
+      -- insConstraintEnv (m, WeakTermPi [(m, h, tPtr)] (m, WeakTermTensor [tPtr, tPtr])) tCopier
       unify
       discarder'' <- elaborate' discarder' >>= reduceTermPlus
       copier'' <- elaborate' copier' >>= reduceTermPlus

@@ -26,7 +26,9 @@ returnImmediateS4 m = do
 immediateS4 :: Hint -> WithEnv ValuePlus
 immediateS4 m = do
   let immediateT _ = return (m, CompUpIntro (m, ValueSigmaIntro []))
-  let immediate4 arg = return (m, CompUpIntro (m, ValueSigmaIntro [arg, arg]))
+  -- let immediate4 arg = return (m, CompUpIntro (m, ValueSigmaIntro [arg, arg]))
+  let immediate4 arg = return (m, CompUpIntro arg)
+  -- let immediate4 arg = return (m, CompUpIntro (m, ValueSigmaIntro [arg]))
   tryCache m immediateName $ registerSwitcher m immediateName immediateT immediate4
 
 sigmaS4 ::
@@ -68,27 +70,23 @@ sigmaT m mxts argVar = do
   -- as == [APP-1, ..., APP-n]   (`a` here stands for `app`)
   as <- forM xts $ \(x, t) -> toAffineApp m x t
   ys <- mapM (const $ newIdentFromText "arg") xts
-  let body = bindLet (zip ys as) (m, CompUpIntro (m, ValueSigmaIntro []))
-  body' <- linearize xts body
+  body' <- linearize xts $ bindLet (zip ys as) (m, CompUpIntro (m, ValueSigmaIntro []))
   return (m, CompSigmaElim False (map fst xts) argVar body')
 
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
 -- sigma4 NAME LOC [(x1, t1), ..., (xn, tn)]   ~>
 --   update CompEnv with NAME ~> (thunk LAM), where LAM is:
 --   lam z.
---     let (x1, ..., xn) := z in
+--     let-noetic (x1, ..., xn) := z in
 --     <LINEARIZE_HEADER for x1, .., xn> in                                      ---
---     bind pair-1 :=                                                  ---       ---
+--     bind x1' :=                                                     ---       ---
 --       bind f1 = t1 in              ---                              ---       ---
 --       f1 @ (1, x1) in              ---  APP-1                       ---       ---
 --     ...                                                             ---       ---
---     bind pair-n :=                                                  --- body  --- body'
+--     bind xn' :=                                                     --- body  --- body'
 --       bind fn = tn in              ---                              ---       ---
 --       fn @ (1, xn) in              ---  APP-n                       ---       ---
---     let (p11, p12) := pair-1 in               ---                   ---       ---
---     ...                                       ---  TRANSPOSED-PAIR  ---       ---
---     let (pn1, pn2) := pair-n in               ---                   ---       ---
---     return ((p11, ..., pn1), (p12, ..., pn2)) ---                   ---       ---
+--     return (x1', ..., xn')
 sigma4 ::
   Hint ->
   [Either CompPlus (Ident, CompPlus)] ->
@@ -98,45 +96,9 @@ sigma4 m mxts argVar = do
   xts <- mapM supplyName mxts
   -- as == [APP-1, ..., APP-n]
   as <- forM xts $ \(x, t) -> toRelevantApp m x t
-  -- pairVarNameList == [pair-1, ...,  pair-n]
-  (pairVarNameList, pairVarTypeList) <- unzip <$> mapM toPairInfo xts
-  transposedPair <- transposeSigma m pairVarTypeList
-  let body = bindLet (zip pairVarNameList as) transposedPair
-  body' <- linearize xts body
-  return (m, CompSigmaElim False (map fst xts) argVar body')
-
-toPairInfo :: (Ident, CompPlus) -> WithEnv (Ident, (ValuePlus, CompPlus))
-toPairInfo (_, t@(m, _)) = do
-  (name, var) <- newValueVarWith m "pair"
-  return (name, (var, t))
-
--- transposeSigma [d1, ..., dn] :=
---   let (x1, y1) := d1 in
---   ...
---   let (xn, yn) := dn in
---   return ((x1, ..., xn), (y1, ..., yn))
-transposeSigma :: Hint -> [(ValuePlus, CompPlus)] -> WithEnv CompPlus
-transposeSigma m ds = do
-  (xList, xVarList) <- unzip <$> mapM (const $ newValueVarWith m "sig-x") ds
-  (yList, yVarList) <- unzip <$> mapM (const $ newValueVarWith m "sig-y") ds
-  return $
-    bindSigmaElim
-      (zip (zip xList yList) ds)
-      ( m,
-        CompUpIntro
-          ( m,
-            ValueSigmaIntro
-              [(m, ValueSigmaIntro xVarList), (m, ValueSigmaIntro yVarList)]
-          )
-      )
-
-bindSigmaElim :: [((Ident, Ident), (ValuePlus, CompPlus))] -> CompPlus -> CompPlus
-bindSigmaElim binder cont =
-  case binder of
-    [] ->
-      cont
-    ((x, y), (d, _)) : xyds ->
-      (fst cont, CompSigmaElim False [x, y] d $ bindSigmaElim xyds cont)
+  (varNameList, varList) <- unzip <$> mapM (const $ newValueVarWith m "pair") xts
+  body' <- linearize xts $ bindLet (zip varNameList as) (m, CompUpIntro (m, ValueSigmaIntro varList))
+  return (m, CompSigmaElim True (map fst xts) argVar body')
 
 supplyName :: Either b (Ident, b) -> WithEnv (Ident, b)
 supplyName mName =
