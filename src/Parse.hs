@@ -40,8 +40,9 @@ parse stmtTreeList =
                 raiseSyntaxError m "(define LEAF TREE TREE) | (define TREE TREE)"
             "declare-enum"
               | (_, TreeLeaf name) : ts <- rest -> do
-                xis <- interpretEnumItem m name ts
-                insEnumEnv m name xis
+                name' <- withSectionPrefix name
+                xis <- interpretEnumItem m name' ts
+                insEnumEnv m name' xis
                 parse restStmtList
               | otherwise ->
                 raiseSyntaxError m "(declare-enum LEAF TREE ... TREE)"

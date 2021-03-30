@@ -36,7 +36,6 @@ elaborateStmt' stmt =
       insConstraintEnv te t'
       unify
       e'' <- elaborate' e' >>= inlineTermPlus
-      -- e'' <- elaborate' e' >>= reduceTermPlus
       t'' <- elaborate' t' >>= reduceTermPlus
       insWeakTypeEnv x $ weaken t''
       modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e'') (substEnv env)})
@@ -50,12 +49,9 @@ elaborateStmt' stmt =
       h <- newIdentFromText "res"
       insConstraintEnv (m, WeakTermPi [(m, h, tPtr)] (m, WeakTermTensor [])) tDiscarder
       insConstraintEnv (m, WeakTermPi [(m, h, tPtr)] tPtr) tCopier
-      -- insConstraintEnv (m, WeakTermPi [(m, h, tPtr)] (m, WeakTermTensor [tPtr, tPtr])) tCopier
       unify
       discarder'' <- elaborate' discarder' >>= inlineTermPlus
       copier'' <- elaborate' copier' >>= inlineTermPlus
-      -- discarder'' <- elaborate' discarder' >>= reduceTermPlus
-      -- copier'' <- elaborate' copier' >>= reduceTermPlus
       cont' <- elaborateStmt' cont
       return $ StmtResourceType m name discarder'' copier'' : cont'
     WeakStmtOpaque name : cont -> do
