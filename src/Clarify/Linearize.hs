@@ -4,6 +4,7 @@ module Clarify.Linearize
 where
 
 import Clarify.Utility
+import Control.Monad.State
 import Data.Basic
 import Data.Comp
 import Data.Env
@@ -85,11 +86,17 @@ distinguishComp z term =
       (vs2, e2') <- distinguishComp z e2
       return (concat [vs1, vs2], (m, CompUpElim x e1' e2'))
     (m, CompEnumElim d branchList) -> do
-      -- fixme: branchごとに同じように変数を処理すること。つまり,複数のbranchで同名の変数が出たときに,同じように名前を変えること。
       (vs, d') <- distinguishValue z d
-      let (cs, es) = unzip branchList
-      (vss, es') <- unzip <$> mapM (distinguishComp z) es
-      return (concat $ vs : vss, (m, CompEnumElim d' (zip cs es')))
+      case branchList of
+        [] ->
+          return (vs, (m, CompEnumElim d' []))
+        _ -> do
+          let (cs, es) = unzip branchList
+          envBefore <- get
+          (vsses, envAfterList) <- fmap unzip $ forM es $ \e -> liftIO $ runStateT (distinguishComp z e) envBefore
+          let (vss, es') = unzip vsses
+          put (head envAfterList)
+          return (concat $ [vs, head vss], (m, CompEnumElim d' (zip cs es')))
 
 distinguishPrimitive :: Ident -> Primitive -> WithEnv ([Ident], Primitive)
 distinguishPrimitive z term =
