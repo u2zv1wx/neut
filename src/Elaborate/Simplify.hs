@@ -129,22 +129,34 @@ simplify' constraintList =
                     Nothing <- lookupDefinition x1 sub,
                     Just pairList <- asPairList (map snd mess1) (map snd mess2) ->
                     simplify $ pairList ++ cs
-                (Just (StuckPiElimVar x1 mess1), Nothing)
-                  | Just lam <- lookupDefinition x1 sub -> do
-                    simplify $ (toPiElim lam mess1, e2) : cs
-                (Just (StuckPiElimVar x1 mess1), _)
+                (Just (StuckPiElimVar x1 mess1), Just (StuckPiElimVar x2 mess2))
+                  | x1 == x2,
+                    Just lam <- lookupDefinition x1 sub -> do
+                    simplify $ (toPiElim lam mess1, toPiElim lam mess2) : cs
+                (Just (StuckPiElimVar x1 mess1), Just (StuckPiElimVar x2 mess2))
+                  | x1 /= x2,
+                    Just lam1 <- lookupDefinition x1 sub,
+                    Just lam2 <- lookupDefinition x2 sub -> do
+                    -- expand the definition of the variable that is defined later
+                    if asInt x1 > asInt x2
+                      then simplify $ (toPiElim lam1 mess1, e2) : cs
+                      else simplify $ (e1, toPiElim lam2 mess2) : cs
+                (Just (StuckPiElimVar x1 mess1), Just (StuckPiElimAster {}))
                   | Just lam <- lookupDefinition x1 sub -> do
                     let susCon = SusCon (fmvs, (e1, e2), ConDelta (toPiElim lam mess1, e2))
                     modify (\env -> env {suspendedConstraintEnv = Q.insert susCon (suspendedConstraintEnv env)})
                     simplify cs
-                (Nothing, Just (StuckPiElimVar x2 mess2))
-                  | Just lam <- lookupDefinition x2 sub -> do
-                    simplify $ (e1, toPiElim lam mess2) : cs
-                (_, Just (StuckPiElimVar x2 mess2))
+                (Just (StuckPiElimVar x1 mess1), _)
+                  | Just lam <- lookupDefinition x1 sub -> do
+                    simplify $ (toPiElim lam mess1, e2) : cs
+                (Just (StuckPiElimAster {}), Just (StuckPiElimVar x2 mess2))
                   | Just lam <- lookupDefinition x2 sub -> do
                     let susCon = SusCon (fmvs, (e1, e2), ConDelta (e1, toPiElim lam mess2))
                     modify (\env -> env {suspendedConstraintEnv = Q.insert susCon (suspendedConstraintEnv env)})
                     simplify cs
+                (_, Just (StuckPiElimVar x2 mess2))
+                  | Just lam <- lookupDefinition x2 sub -> do
+                    simplify $ (e1, toPiElim lam mess2) : cs
                 _ -> do
                   let susCon = SusCon (fmvs, (e1, e2), ConOther)
                   modify (\env -> env {suspendedConstraintEnv = Q.insert susCon (suspendedConstraintEnv env)})
