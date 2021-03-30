@@ -13,7 +13,7 @@ data WeakTerm
   | WeakTermPi [WeakIdentPlus] WeakTermPlus
   | WeakTermPiIntro (Maybe (T.Text, T.Text)) [WeakIdentPlus] WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
-  | WeakTermFix WeakIdentPlus [WeakIdentPlus] WeakTermPlus
+  | WeakTermFix Bool WeakIdentPlus [WeakIdentPlus] WeakTermPlus
   | WeakTermAster Int
   | WeakTermConst T.Text
   | WeakTermInt WeakTermPlus Integer
@@ -92,7 +92,7 @@ varWeakTermPlus term =
       let xs = varWeakTermPlus e
       let ys = S.unions $ map varWeakTermPlus es
       S.union xs ys
-    (_, WeakTermFix (_, x, t) xts e) -> do
+    (_, WeakTermFix _ (_, x, t) xts e) -> do
       let set1 = varWeakTermPlus t
       let set2 = S.filter (/= x) (varWeakTermPlus' xts [e])
       S.union set1 set2
@@ -161,7 +161,7 @@ asterWeakTermPlus term =
       let set1 = asterWeakTermPlus e
       let set2 = S.unions $ map asterWeakTermPlus es
       S.union set1 set2
-    (_, WeakTermFix (_, _, t) xts e) -> do
+    (_, WeakTermFix _ (_, _, t) xts e) -> do
       let set1 = asterWeakTermPlus t
       let set2 = asterWeakTermPlus' xts [e]
       S.union set1 set2
@@ -256,9 +256,11 @@ toText term =
           showCons $ map toText $ e : es
     -- (_, WeakTermFix (_, x, _) _ _) -> do
     --   asText x
-    (_, WeakTermFix (_, x, _) xts e) -> do
+    (_, WeakTermFix b (_, x, _) xts e) -> do
       let argStr = inParen $ showItems $ map showArg xts
-      showCons ["fix", showVariable x, argStr, toText e]
+      if b
+        then showCons ["fix", showVariable x, argStr, toText e]
+        else showCons ["fix-irreducible", showVariable x, argStr, toText e]
     (_, WeakTermConst x) ->
       x
     -- (_, WeakTermAster _) ->

@@ -78,10 +78,10 @@ clarifyTerm tenv term =
       es' <- mapM (clarifyPlus tenv) es
       e' <- clarifyTerm tenv e
       callClosure m e' es'
-    (m, TermFix (mx, x, t) mxts e) -> do
+    (m, TermFix isReducible (mx, x, t) mxts e) -> do
       e' <- clarifyTerm (insTypeEnv ((mx, x, t) : mxts) tenv) e
       fvs <- nubFreeVariables <$> chainOf tenv term
-      if S.member x (varComp e')
+      if not isReducible || S.member x (varComp e')
         then retClosure tenv (ClosureNameFix x) fvs m mxts e'
         else retClosure tenv ClosureNameAnonymous fvs m mxts e'
     (m, TermConst x) ->
@@ -376,7 +376,7 @@ chainOf tenv term =
       xs1 <- chainOf tenv e
       xs2 <- concat <$> mapM (chainOf tenv) es
       return $ xs1 ++ xs2
-    (_, TermFix (_, x, t) xts e) -> do
+    (_, TermFix _ (_, x, t) xts e) -> do
       xs1 <- chainOf tenv t
       xs2 <- chainOf' (IntMap.insert (asInt x) t tenv) xts [e]
       return $ xs1 ++ filter (\(_, y, _) -> y /= x) xs2

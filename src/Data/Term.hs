@@ -14,7 +14,7 @@ data Term
   | TermPi [IdentPlus] TermPlus
   | TermPiIntro (Maybe (T.Text, T.Text)) [IdentPlus] TermPlus
   | TermPiElim TermPlus [TermPlus]
-  | TermFix IdentPlus [IdentPlus] TermPlus
+  | TermFix Bool IdentPlus [IdentPlus] TermPlus
   | TermConst T.Text
   | TermInt IntSize Integer
   | TermFloat FloatSize Double
@@ -76,11 +76,11 @@ weaken term =
       let e' = weaken e
       let es' = map weaken es
       (m, WeakTermPiElim e' es')
-    (m, TermFix (mx, x, t) xts e) -> do
+    (m, TermFix b (mx, x, t) xts e) -> do
       let t' = weaken t
       let xts' = weakenArgs xts
       let e' = weaken e
-      (m, WeakTermFix (mx, x, t') xts' e')
+      (m, WeakTermFix b (mx, x, t') xts' e')
     (m, TermConst x) ->
       (m, WeakTermConst x)
     (m, TermInt size x) ->

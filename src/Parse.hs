@@ -83,13 +83,9 @@ parse stmtTreeList =
             --
             "set-as-opaque"
               | [(_, TreeLeaf s)] <- rest -> do
-                nenv <- gets topNameEnv
-                case Map.lookup s nenv of
-                  Nothing ->
-                    raiseError m $ "no such top-level variable defined: " <> s
-                  Just s' -> do
-                    ss <- parse restStmtList
-                    return $ WeakStmtOpaque s' : ss
+                s' <- lookupTopLevelName m s
+                ss <- parse restStmtList
+                return $ WeakStmtOpaque s' : ss
               | otherwise ->
                 raiseSyntaxError m "(set-as-opaque LEAF)"
             "set-as-data"
@@ -149,3 +145,12 @@ extractLeaf t =
       return x
     _ ->
       raiseSyntaxError (fst t) "LEAF"
+
+lookupTopLevelName :: Hint -> T.Text -> WithEnv Ident
+lookupTopLevelName m s = do
+  nenv <- gets topNameEnv
+  case Map.lookup s nenv of
+    Nothing ->
+      raiseError m $ "no such top-level variable defined: " <> s
+    Just s' ->
+      return s'

@@ -72,9 +72,15 @@ interpret inputTree =
         "fix"
           | [xt, xts@(_, TreeNode _), e] <- rest -> do
             (m', xt', xts', e') <- interpretFix (m, TreeNode [xt, xts, e])
-            return (m', WeakTermFix xt' xts' e')
+            return (m', WeakTermFix True xt' xts' e')
           | otherwise ->
             raiseSyntaxError m "(fix TREE (TREE*) TREE)"
+        "fix-irreducible"
+          | [xt, xts@(_, TreeNode _), e] <- rest -> do
+            (m', xt', xts', e') <- interpretFix (m, TreeNode [xt, xts, e])
+            return (m', WeakTermFix False xt' xts' e')
+          | otherwise ->
+            raiseSyntaxError m "(fix-irreducible TREE (TREE*) TREE)"
         "constant"
           | [(_, TreeLeaf x)] <- rest ->
             return (m, WeakTermConst x)

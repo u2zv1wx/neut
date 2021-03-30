@@ -26,9 +26,7 @@ returnImmediateS4 m = do
 immediateS4 :: Hint -> WithEnv ValuePlus
 immediateS4 m = do
   let immediateT _ = return (m, CompUpIntro (m, ValueSigmaIntro []))
-  -- let immediate4 arg = return (m, CompUpIntro (m, ValueSigmaIntro [arg, arg]))
   let immediate4 arg = return (m, CompUpIntro arg)
-  -- let immediate4 arg = return (m, CompUpIntro (m, ValueSigmaIntro [arg]))
   tryCache m immediateName $ registerSwitcher m immediateName immediateT immediate4
 
 sigmaS4 ::

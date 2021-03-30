@@ -64,6 +64,7 @@ data Env = Env
     -- clarify
     --
     codeEnv :: Map.HashMap T.Text Definition,
+    -- irreducibleEnv :: S.Set T.Text,
     --
     -- LLVM
     --
@@ -102,7 +103,6 @@ initialEnv =
             ("free", ([voidPtr], voidPtr))
           ],
       constraintEnv = [],
-      -- constraintQueue = Q.empty,
       suspendedConstraintEnv = [],
       substEnv = IntMap.empty,
       opaqueEnv = S.empty,

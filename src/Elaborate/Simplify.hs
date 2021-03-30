@@ -51,7 +51,7 @@ simplify' constraintList =
             xt2 <- asWeakIdentPlus m2 e2
             simplifyBinder (xts1 ++ [xt1]) (xts2 ++ [xt2])
             simplify cs
-        ((m1, WeakTermFix xt1@(_, x1, _) xts1 e1), (m2, WeakTermFix xt2@(_, x2, _) xts2 e2))
+        ((m1, WeakTermFix _ xt1@(_, x1, _) xts1 e1), (m2, WeakTermFix _ xt2@(_, x2, _) xts2 e2))
           | x1 == x2,
             length xts1 == length xts2 -> do
             yt1 <- asWeakIdentPlus m1 e1
@@ -303,7 +303,7 @@ isEq l r =
       b1 <- isEq e1 e2
       b2 <- and <$> zipWithM isEq es1 es2
       return $ b1 && b2
-    ((_, WeakTermFix self1 xts1 e1), (_, WeakTermFix self2 xts2 e2)) ->
+    ((_, WeakTermFix _ self1 xts1 e1), (_, WeakTermFix _ self2 xts2 e2)) ->
       isEq' (self1 : xts1) e1 (self2 : xts2) e2
     ((_, WeakTermAster h1), (_, WeakTermAster h2)) ->
       return $ h1 == h2

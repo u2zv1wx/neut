@@ -95,11 +95,11 @@ elaborate' term =
       e' <- elaborate' e
       es' <- mapM elaborate' es
       return (m, TermPiElim e' es')
-    (m, WeakTermFix (mx, x, t) xts e) -> do
+    (m, WeakTermFix isReducible (mx, x, t) xts e) -> do
       t' <- elaborate' t
       xts' <- mapM elaboratePlus xts
       e' <- elaborate' e
-      return (m, TermFix (mx, x, t') xts' e')
+      return (m, TermFix isReducible (mx, x, t') xts' e')
     (m, WeakTermAster _) ->
       raiseCritical m "every meta-variable must be of the form (?M e1 ... en) where n >= 0, but the meta-variable here doesn't fit this pattern"
     (m, WeakTermConst x) ->
