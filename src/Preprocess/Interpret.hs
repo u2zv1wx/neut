@@ -68,6 +68,12 @@ interpretCode tree =
                 return (m, MetaTermIf cond' onTrue' onFalse')
               | otherwise ->
                 raiseSyntaxError m "(if-meta TREE TREE TREE)"
+            "cond-meta"
+              | _ : _ <- rest -> do
+                (condBodyList, defaultBody) <- interpretCondArgs m rest
+                return $ condToIfSeq m condBodyList defaultBody
+              | otherwise ->
+                raiseSyntaxError m "(cond-meta TREE+)"
             "leaf"
               | [(_, TreeLeaf x)] <- rest -> do
                 return (m, MetaTermLeaf x)
@@ -188,6 +194,30 @@ interpretLeafText tree =
       return x
     t ->
       raiseSyntaxError (fst t) "LEAF"
+
+condToIfSeq :: Hint -> [(MetaTermPlus, MetaTermPlus)] -> MetaTermPlus -> MetaTermPlus
+condToIfSeq m condBodyList defaultBody =
+  case condBodyList of
+    [] ->
+      defaultBody
+    (cond, body) : rest -> do
+      (m, MetaTermIf cond body (condToIfSeq m rest defaultBody))
+
+interpretCondArgs :: Hint -> [TreePlus] -> WithEnv ([(MetaTermPlus, MetaTermPlus)], MetaTermPlus)
+interpretCondArgs mCond treeList =
+  case treeList of
+    [] ->
+      raiseSyntaxError mCond "TREE"
+    [t] -> do
+      t' <- interpretCode t
+      return ([], t')
+    (_, TreeNode [cond, body]) : rest -> do
+      (condBodyList, defaultBody) <- interpretCondArgs mCond rest
+      cond' <- interpretCode cond
+      body' <- interpretCode body
+      return ((cond', body') : condBodyList, defaultBody)
+    (m, _) : _ ->
+      raiseSyntaxError m "(TREE TREE)"
 
 interpretWith :: TreePlus -> WithEnv MetaTermPlus
 interpretWith tree =
