@@ -34,6 +34,12 @@ elaborateStmt' stmt =
       (e', te) <- infer e
       t' <- inferType t
       insConstraintEnv te t'
+      -- cs <- gets constraintEnv
+      -- p "==========================================================="
+      -- forM_ cs $ \(e1, e2) -> do
+      --   p $ T.unpack $ toText e1
+      --   p $ T.unpack $ toText e2
+      --   p "---------------------"
       unify
       e'' <- elaborate' e' >>= inlineTermPlus
       t'' <- elaborate' t' >>= reduceTermPlus
@@ -81,7 +87,8 @@ elaborate' term =
     (m, WeakTermPiElim (mh, WeakTermAster x) es) -> do
       sub <- gets substEnv
       case IntMap.lookup x sub of
-        Nothing ->
+        Nothing -> do
+          p' term
           raiseError mh "couldn't instantiate the asterisk here"
         Just (_, WeakTermPiIntro Nothing xts e)
           | length xts == length es -> do

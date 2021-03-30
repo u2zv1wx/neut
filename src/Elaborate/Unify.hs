@@ -9,6 +9,7 @@ import Data.Basic
 import Data.Env
 import Data.List (nubBy)
 import Data.Log
+import qualified Data.PQueue.Min as Q
 import qualified Data.Text as T
 import Data.WeakTerm
 import Elaborate.Simplify
@@ -26,26 +27,29 @@ analyze = do
 synthesize :: WithEnv ()
 synthesize = do
   cs <- gets suspendedConstraintEnv
-  case cs of
-    [] ->
+  case Q.minView cs of
+    Nothing ->
       return ()
-    _
-      | otherwise ->
-        throwTypeErrors
+    Just ((SusCon (_, _, ConDelta c)), cs') -> do
+      modify (\env -> env {suspendedConstraintEnv = cs'})
+      simplify [c]
+      synthesize
+    Just ((SusCon (_, _, ConOther)), _) ->
+      throwTypeErrors
 
 throwTypeErrors :: WithEnv ()
 throwTypeErrors = do
   q <- gets suspendedConstraintEnv
-  let pcs = nubBy (\x y -> fst x == fst y) $ setupPosInfo q
+  let pcs = nubBy (\x y -> fst x == fst y) $ setupPosInfo $ Q.toList q
   errorList <- constructErrors [] pcs
   throw $ Error errorList
 
-setupPosInfo :: [SuspendedConstraint] -> [(PosInfo, Constraint)]
+setupPosInfo :: [SusCon] -> [(PosInfo, Constraint)]
 setupPosInfo constraintList =
   case constraintList of
     [] ->
       []
-    (_, (expectedTerm, actualTerm)) : cs -> do
+    (SusCon (_, (expectedTerm, actualTerm), _)) : cs -> do
       let loc = getPosInfo $ metaOf actualTerm
       (loc, (actualTerm, expectedTerm)) : setupPosInfo cs
 

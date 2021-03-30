@@ -4,6 +4,7 @@ import Data.Basic
 import qualified Data.IntMap as IntMap
 import Data.LowType
 import Data.Maybe (maybeToList)
+import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
 import qualified Data.Text as T
 
@@ -63,7 +64,31 @@ data WeakStmt
 type Constraint =
   (WeakTermPlus, WeakTermPlus) -- (expected-type, actual-type)
 
+data Con
+  = ConDelta (WeakTermPlus, WeakTermPlus) -- 展開したあとのやつ
+  | ConOther
+
 type SuspendedConstraint = (S.Set Int, Constraint)
+
+newtype SusCon = SusCon (S.Set Int, Constraint, Con)
+
+instance Eq SusCon where
+  (SusCon (_, _, c1)) == (SusCon (_, _, c2)) =
+    conToInt c1 == conToInt c2
+
+instance Ord SusCon where
+  (SusCon (_, _, c1)) `compare` (SusCon (_, _, c2)) =
+    conToInt c1 `compare` conToInt c2
+
+type SusConQueue = Q.MinQueue SusCon
+
+conToInt :: Con -> Int
+conToInt con =
+  case con of
+    ConDelta {} ->
+      0
+    ConOther {} ->
+      1
 
 toVar :: Hint -> Ident -> WeakTermPlus
 toVar m x =

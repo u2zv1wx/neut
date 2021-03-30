@@ -10,6 +10,7 @@ import Data.Log
 import Data.LowComp
 import Data.LowType
 import Data.MetaTerm
+import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
 import Data.Term
 import qualified Data.Text as T
@@ -57,7 +58,8 @@ data Env = Env
     constTypeEnv :: Map.HashMap T.Text TermPlus,
     holeEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus),
     constraintEnv :: [Constraint],
-    suspendedConstraintEnv :: [SuspendedConstraint],
+    suspendedConstraintEnv :: SusConQueue,
+    -- suspendedConstraintEnv :: [SuspendedConstraint],
     substEnv :: IntMap.IntMap WeakTermPlus,
     opaqueEnv :: S.Set Ident,
     --
@@ -103,7 +105,7 @@ initialEnv =
             ("free", ([voidPtr], voidPtr))
           ],
       constraintEnv = [],
-      suspendedConstraintEnv = [],
+      suspendedConstraintEnv = Q.empty,
       substEnv = IntMap.empty,
       opaqueEnv = S.empty,
       nopFreeSet = S.empty

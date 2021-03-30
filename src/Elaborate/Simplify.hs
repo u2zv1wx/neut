@@ -7,8 +7,8 @@ import Control.Monad.State.Lazy
 import Data.Basic
 import Data.Env
 import qualified Data.IntMap as IntMap
-import Data.List (partition)
 import Data.Maybe
+import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
 import Data.WeakTerm
 import Elaborate.Infer
@@ -129,14 +129,25 @@ simplify' constraintList =
                     Nothing <- lookupDefinition x1 sub,
                     Just pairList <- asPairList (map snd mess1) (map snd mess2) ->
                     simplify $ pairList ++ cs
-                (Just (StuckPiElimVar x1 mess1), _) -- ここの展開はなるべくlazyにしたほうがいいかも。つまり, queueを利用するやつをここでやる感じ。DeltaConstraint.
-                  | Just lam <- lookupDefinition x1 sub ->
+                (Just (StuckPiElimVar x1 mess1), Nothing)
+                  | Just lam <- lookupDefinition x1 sub -> do
                     simplify $ (toPiElim lam mess1, e2) : cs
-                (_, Just (StuckPiElimVar x2 mess2))
-                  | Just lam <- lookupDefinition x2 sub ->
+                (Just (StuckPiElimVar x1 mess1), _)
+                  | Just lam <- lookupDefinition x1 sub -> do
+                    let susCon = SusCon (fmvs, (e1, e2), ConDelta (toPiElim lam mess1, e2))
+                    modify (\env -> env {suspendedConstraintEnv = Q.insert susCon (suspendedConstraintEnv env)})
+                    simplify cs
+                (Nothing, Just (StuckPiElimVar x2 mess2))
+                  | Just lam <- lookupDefinition x2 sub -> do
                     simplify $ (e1, toPiElim lam mess2) : cs
+                (_, Just (StuckPiElimVar x2 mess2))
+                  | Just lam <- lookupDefinition x2 sub -> do
+                    let susCon = SusCon (fmvs, (e1, e2), ConDelta (e1, toPiElim lam mess2))
+                    modify (\env -> env {suspendedConstraintEnv = Q.insert susCon (suspendedConstraintEnv env)})
+                    simplify cs
                 _ -> do
-                  modify (\env -> env {suspendedConstraintEnv = (fmvs, (e1, e2)) : suspendedConstraintEnv env})
+                  let susCon = SusCon (fmvs, (e1, e2), ConOther)
+                  modify (\env -> env {suspendedConstraintEnv = Q.insert susCon (suspendedConstraintEnv env)})
                   simplify cs
 
 resolveHole :: Int -> [[WeakTermPlus]] -> WeakTermPlus -> S.Set Ident -> [Constraint] -> WithEnv ()
@@ -144,10 +155,12 @@ resolveHole h1 ies1 e2' fvs2 cs = do
   xss <- mapM (toVarList fvs2) ies1
   let lam = bindFormalArgs e2' xss
   modify (\env -> env {substEnv = IntMap.insert h1 lam (substEnv env)})
+  -- p $ T.unpack $ "resolve: " <> T.pack (show h1) <> " ~> " <> toText lam
   sus <- gets suspendedConstraintEnv
-  let (sus1, sus2) = partition (\(hs, _) -> S.member h1 hs) sus
+  let (sus1, sus2) = Q.partition (\(SusCon (hs, _, _)) -> S.member h1 hs) sus
   modify (\env -> env {suspendedConstraintEnv = sus2})
-  simplify $ map snd sus1 ++ cs
+  let sus1' = map (\(SusCon (_, c, _)) -> c) $ Q.toList sus1
+  simplify $ sus1' ++ cs
 
 simplifyBinder :: [WeakIdentPlus] -> [WeakIdentPlus] -> WithEnv ()
 simplifyBinder =
