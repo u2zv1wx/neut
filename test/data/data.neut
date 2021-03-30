@@ -9,13 +9,13 @@
     (_ (nat))))
 
 ; simple data (2)
-(define-data list ((A tau))
+(define-data my-list ((A tau))
   (nil)
-  (cons (_ A) (_ (list A))))
+  (cons (_ A) (_ (my-list A))))
 
-(define-data list2 ((A tau))
+(define-data my-list2 ((A tau))
   (nil)
-  (cons (_ A) (_ (list2 A))))
+  (cons (_ A) (_ (my-list2 A))))
 
 ; dependent inductive type with GADT
 ; (data vec ((A tau) (_ (nat)))
@@ -33,19 +33,19 @@
   (cons)
   (cons0
     (_ (item A))
-    (_ (list (list2 (list (item A))))))
+    (_ (my-list (my-list2 (my-list (item A))))))
   (cons1
     (_ (item A))
-    (_ (list (item A))))
+    (_ (my-list (item A))))
   (cons2
     (_ (item A))
-    (_ (list (list (list2 (item A))))))
+    (_ (my-list (my-list (my-list2 (item A))))))
   (cons3
     (_ (item A))
-    (_ (list (list (item A)))))
+    (_ (my-list (my-list (item A)))))
   (cons4
     (_ (item A))
-    (_ (list2 (list (item A)))))
+    (_ (my-list2 (my-list (item A)))))
   (cons5
     (_ A)
     (_ (item A))))
@@ -55,23 +55,23 @@
 ;     (item2 A self))
 ;   (cons0
 ;     ((_ self)
-;      (_ (list (list2 (list self)))))
+;      (_ (my-list (my-list2 (my-list self)))))
 ;     (item2 A self))
 ;   (cons1
 ;     ((_ self)
-;      (_ (list self)))
+;      (_ (my-list self)))
 ;     (item2 A self))
 ;   (cons2
 ;     ((_ self)
-;      (_ (list (list (list2 self)))))
+;      (_ (my-list (my-list (my-list2 self)))))
 ;     (item2 A self))
 ;   (cons3
 ;     ((_ self)
-;      (_ (list (list self))))
+;      (_ (my-list (my-list self))))
 ;     (item2 A self))
 ;   (cons4
 ;     ((_ self)
-;      (_ (list2 (list self))))
+;      (_ (my-list2 (my-list self))))
 ;     (item2 A self))
 ;   (cons5
 ;     ((_ A)

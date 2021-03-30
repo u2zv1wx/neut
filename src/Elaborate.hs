@@ -35,7 +35,8 @@ elaborateStmt' stmt =
       t' <- inferType t
       insConstraintEnv te t'
       unify
-      e'' <- elaborate' e' >>= reduceTermPlus
+      e'' <- elaborate' e' >>= inlineTermPlus
+      -- e'' <- elaborate' e' >>= reduceTermPlus
       t'' <- elaborate' t' >>= reduceTermPlus
       insWeakTypeEnv x $ weaken t''
       modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e'') (substEnv env)})
@@ -51,8 +52,10 @@ elaborateStmt' stmt =
       insConstraintEnv (m, WeakTermPi [(m, h, tPtr)] tPtr) tCopier
       -- insConstraintEnv (m, WeakTermPi [(m, h, tPtr)] (m, WeakTermTensor [tPtr, tPtr])) tCopier
       unify
-      discarder'' <- elaborate' discarder' >>= reduceTermPlus
-      copier'' <- elaborate' copier' >>= reduceTermPlus
+      discarder'' <- elaborate' discarder' >>= inlineTermPlus
+      copier'' <- elaborate' copier' >>= inlineTermPlus
+      -- discarder'' <- elaborate' discarder' >>= reduceTermPlus
+      -- copier'' <- elaborate' copier' >>= reduceTermPlus
       cont' <- elaborateStmt' cont
       return $ StmtResourceType m name discarder'' copier'' : cont'
     WeakStmtOpaque name : cont -> do
@@ -190,7 +193,7 @@ elaborate' term =
                 then return ()
                 else raiseError m $ "the constructor here is supposed to be `" <> b <> "`, but is: `" <> b' <> "`" -- fixme: add hint for patterns
             return (m, TermCase resultType' mSubject' (e', t') patList')
-        _ ->
+        _ -> do
           raiseError (fst t) $ "the type of this term must be a data-type, but its type is:\n" <> toText (weaken t')
 
 elaboratePlus :: (Hint, a, WeakTermPlus) -> WithEnv (Hint, a, TermPlus)

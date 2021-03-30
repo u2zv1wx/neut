@@ -82,17 +82,20 @@ parse stmtTreeList =
             -- other statements
             --
             "set-as-opaque"
-              | [(_, TreeLeaf s)] <- rest -> do
-                s' <- lookupTopLevelName m s
+              | [(_, TreeLeaf name)] <- rest -> do
+                name' <- withSectionPrefix name
+                name'' <- lookupTopLevelName m name'
                 ss <- parse restStmtList
-                return $ WeakStmtOpaque s' : ss
+                return $ WeakStmtOpaque name'' : ss
               | otherwise ->
                 raiseSyntaxError m "(set-as-opaque LEAF)"
             "set-as-data"
               | ((_, TreeLeaf name) : (_, TreeLeaf intStr) : constructorNameList) <- rest,
                 Just i <- readMaybe (T.unpack intStr) -> do
-                xs <- mapM extractLeaf constructorNameList
-                modify (\env -> env {dataEnv = Map.insert name xs (dataEnv env)})
+                xs <- mapM (extractLeaf >=> withSectionPrefix) constructorNameList
+                name' <- withSectionPrefix name
+                -- modify (\env -> env {dataEnv = Map.insert name xs (dataEnv env)})
+                modify (\env -> env {dataEnv = Map.insert name' xs (dataEnv env)})
                 forM_ (zip xs [0 ..]) $ \(x, k) -> modify (\env -> env {constructorEnv = Map.insert x (i, k) (constructorEnv env)})
                 parse restStmtList
               | otherwise -> do

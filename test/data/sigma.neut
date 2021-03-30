@@ -6,7 +6,7 @@
 ; nullary sigma-elim
 (reduce
   (sigma-elimination () a0
-    (safe-string.print-literal "0")))
+    (string.print-literal "0")))
 
 ; unary sigma-intro
 (define a1

@@ -21,41 +21,37 @@
   (witness (f (mu f))
     (unsafe.cast (mu f) (f (mu f)) x)))
 
-(define-data list-f ((a tau) (r tau))
+(define-data my-list-f ((a tau) (r tau))
   (nil)
   (cons (_ a) (_ r)))
 
-(define list
+(define my-list
   ((a tau))
-  (mu (list-f a _)))
+  (mu (my-list-f a _)))
 
-(define list.nil
+(define my-list.nil
   ((a tau))
-  (witness (list a)
-    (mu.in (list-f a _) (list-f.nil a (list a)))))
+  (witness (my-list a)
+    (mu.in (my-list-f a _) (my-list-f.nil a (my-list a)))))
 
-(define list.cons
+(define my-list.cons
   ((a tau)
    (x a)
-   (xs (list a)))
-  (witness (list a)
-    (mu.in (list-f a _) (list-f.cons a (list a) x xs))))
+   (xs (my-list a)))
+  (witness (my-list a)
+    (mu.in (my-list-f a _) (my-list-f.cons a (my-list a) x xs))))
 
 (define length
   ((a tau)
-   (xs (list a)))
+   (xs (my-list a)))
   (witness i64
-    (list-f.case
-      i64
-      a
-      (list a)
-      (mu.out (list-f a _) xs)
-      (λ ()
+    (case (mu.out (my-list-f a _) xs)
+      ((my-list-f.nil)
         0)
-      (λ (y ys)
+      ((my-list-f.cons y ys)
         (add-i64 1 (length a ys))))))
 
 (define xs
-  (list.cons i64 0 (list.cons * 1 (list.cons * 2 (list.nil *)))))
+  (my-list.cons i64 0 (my-list.cons * 1 (my-list.cons * 2 (my-list.nil *)))))
 
 (reduce (i64.print (length i64 xs)))

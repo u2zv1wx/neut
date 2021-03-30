@@ -1,15 +1,15 @@
 (include "../header.neut")
 
 (define p
-  ((str safe-string))
+  ((str string))
   (witness i64
     (with identity.bind
       (let _
         (let _ (i64 100))
-        (safe-string.print &str)
-        (safe-string.print &str))
-      (let _ (safe-string.print &str))
-      (let len (safe-string.print &str))
+        (string.print &str)
+        (string.print &str))
+      (let _ (string.print &str))
+      (let len (string.print &str))
       len)))
 
-(reduce (p (safe-string.new "あ")))
+(reduce (p (string.new "あ")))

@@ -1,5 +1,6 @@
 module Reduce.Term
   ( reduceTermPlus,
+    inlineTermPlus,
     substTermPlus,
     substTermPlus'',
   )
@@ -34,11 +35,11 @@ reduceTermPlus term =
       e' <- reduceTermPlus e
       es' <- mapM reduceTermPlus es
       let app = TermPiElim e' es'
-      let valueCond = and $ map isValue es
+      -- let valueCond = and $ map isValue es
       case e' of
         (_, TermPiIntro Nothing xts body)
-          | length xts == length es',
-            valueCond -> do
+          | length xts == length es' -> do
+            -- valueCond -> do
             let xs = map (\(_, x, _) -> asInt x) xts
             let sub = IntMap.fromList $ zip xs es'
             substTermPlus' sub IntMap.empty (m, snd body) >>= reduceTermPlus
@@ -111,6 +112,105 @@ reduceTermPlus term =
           t' <- reduceTermPlus t
           clauseList' <- forM clauseList $ \((name, xts), body) -> do
             body' <- reduceTermPlus body
+            return ((name, xts), body')
+          return (m, TermCase resultType' mSubject' (e', t') clauseList')
+    _ ->
+      return term
+
+inlineTermPlus :: TermPlus -> WithEnv TermPlus
+inlineTermPlus term =
+  case term of
+    (m, TermPi xts cod) -> do
+      let (ms, xs, ts) = unzip3 xts
+      ts' <- mapM inlineTermPlus ts
+      cod' <- inlineTermPlus cod
+      return (m, TermPi (zip3 ms xs ts') cod')
+    (m, TermPiIntro mName xts e) -> do
+      let (ms, xs, ts) = unzip3 xts
+      ts' <- mapM inlineTermPlus ts
+      e' <- inlineTermPlus e
+      return (m, TermPiIntro mName (zip3 ms xs ts') e')
+    (m, TermPiElim e es) -> do
+      e' <- inlineTermPlus e
+      es' <- mapM inlineTermPlus es
+      let app = TermPiElim e' es'
+      let valueCond = and $ map isValue es
+      case e' of
+        (_, TermPiIntro Nothing xts body)
+          | length xts == length es',
+            valueCond -> do
+            let xs = map (\(_, x, _) -> asInt x) xts
+            let sub = IntMap.fromList $ zip xs es'
+            substTermPlus' sub IntMap.empty (m, snd body) >>= inlineTermPlus
+        _ ->
+          return (m, app)
+    (m, TermFix b (mx, x, t) xts e) -> do
+      t' <- inlineTermPlus t
+      e' <- inlineTermPlus e
+      let (ms, xs, ts) = unzip3 xts
+      ts' <- mapM inlineTermPlus ts
+      return (m, TermFix b (mx, x, t') (zip3 ms xs ts') e')
+    (m, TermEnumElim (e, t) les) -> do
+      e' <- inlineTermPlus e
+      let (ls, es) = unzip les
+      es' <- mapM inlineTermPlus es
+      let les' = zip ls es'
+      let les'' = zip (map snd ls) es'
+      t' <- inlineTermPlus t
+      case e' of
+        (_, TermEnumIntro l) ->
+          case lookup (EnumCaseLabel l) les'' of
+            Just body ->
+              inlineTermPlus (m, snd body)
+            Nothing ->
+              case lookup EnumCaseDefault les'' of
+                Just body ->
+                  inlineTermPlus (m, snd body)
+                Nothing ->
+                  return (m, TermEnumElim (e', t') les')
+        _ ->
+          return (m, TermEnumElim (e', t') les')
+    (m, TermTensor ts) -> do
+      ts' <- mapM inlineTermPlus ts
+      return (m, TermTensor ts')
+    (m, TermTensorIntro es) -> do
+      es' <- mapM inlineTermPlus es
+      return (m, TermTensorIntro es')
+    (m, TermTensorElim xts e1 e2) -> do
+      e1' <- inlineTermPlus e1
+      case e1' of
+        (_, TermTensorIntro es)
+          | length es == length xts -> do
+            let xs = map (\(_, x, _) -> asInt x) xts
+            let sub = IntMap.fromList $ zip xs es
+            substTermPlus' sub IntMap.empty (m, snd e2) >>= inlineTermPlus
+        _ -> do
+          e2' <- inlineTermPlus e2
+          let (ms, xs, ts) = unzip3 xts
+          ts' <- mapM inlineTermPlus ts
+          return (m, TermTensorElim (zip3 ms xs ts') e1' e2')
+    (m, TermDerangement i t ekts) -> do
+      let (es, ks, ts) = unzip3 ekts
+      es' <- mapM inlineTermPlus es
+      ts' <- mapM inlineTermPlus ts
+      return (m, TermDerangement i t (zip3 es' ks ts'))
+    (m, TermCase resultType mSubject (e, t) clauseList) -> do
+      e' <- inlineTermPlus e
+      let lamList = map (toLamList m) clauseList
+      denv <- gets dataEnv
+      case e' of
+        (_, TermPiIntro (Just (dataName, consName)) _ _)
+          | Just consNameList <- Map.lookup dataName denv,
+            consName `elem` consNameList,
+            checkClauseListSanity consNameList clauseList -> do
+            let app = (m, TermPiElim e' (resultType : lamList))
+            inlineTermPlus app
+        _ -> do
+          resultType' <- inlineTermPlus resultType
+          mSubject' <- mapM inlineTermPlus mSubject
+          t' <- inlineTermPlus t
+          clauseList' <- forM clauseList $ \((name, xts), body) -> do
+            body' <- inlineTermPlus body
             return ((name, xts), body')
           return (m, TermCase resultType' mSubject' (e', t') clauseList')
     _ ->

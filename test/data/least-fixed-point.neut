@@ -26,62 +26,68 @@
    (F (functor f))
    (x (mu f)))
   (witness (f (mu f))
-    (mu.case (f (mu f)) f x
-      (λ (b v k)
+    (case x
+      ((mu.lan b v k)
         ((functor.map f F)
           b
           (mu f)
           k
           v)))))
 
-(define-data list-f ((a tau) (r tau))
+; (define mu.out
+;   ((f (hom tau tau))
+;    (F (functor f))
+;    (x (mu f)))
+;   (witness (f (mu f))
+;     (mu.case (f (mu f)) f x
+;       (λ (b v k)
+;         ((functor.map f F)
+;           b
+;           (mu f)
+;           k
+;           v)))))
+
+
+(define-data my-list-f ((a tau) (r tau))
   (nil)
   (cons (_ a) (_ r)))
 
-(define list ((a tau))
-  (mu (list-f a _)))
+(define my-list ((a tau))
+  (mu (my-list-f a _)))
 
-(define list.nil ((a tau))
-  (witness (list a)
-    (mu.in (list-f a _) (list-f.nil a (list a)))))
+(define my-list.nil ((a tau))
+  (witness (my-list a)
+    (mu.in (my-list-f a _) (my-list-f.nil a (my-list a)))))
 
-(define list.cons ((a tau) (x a) (xs (list a)))
-  (witness (list a)
-    (mu.in (list-f a _) (list-f.cons a (list a) x xs))))
+(define my-list.cons ((a tau) (x a) (xs (my-list a)))
+  (witness (my-list a)
+    (mu.in (my-list-f a _) (my-list-f.cons a (my-list a) x xs))))
 
-(define list-f.map ((a tau))
-  (witness (functor-type (list-f a _))
+(define my-list-f.map ((a tau))
+  (witness (functor-type (my-list-f a _))
     (λ (from to f m)
-      (witness (list-f a to)
-        (list-f.case
-          (list-f a to)
-          a
-          from
-          m
-          (λ ()
-            (list-f.nil a to))
-          (λ (y ys)
-            (list-f.cons a to y (f ys))))))))
+      (witness (my-list-f a to)
+        (case m
+          ((my-list-f.nil)
+            (my-list-f.nil a to))
+          ((my-list-f.cons y ys)
+            (my-list-f.cons a to y (f ys))))))))
 
-(define list-f.as-functor ((a tau))
-  (witness (functor (λ (r) (list-f a r)))
+(define my-list-f.as-functor ((a tau))
+  (witness (functor (λ (r) (my-list-f a r)))
     (functor.new
-      (λ (r) (list-f a r))
-      (list-f.map a))))
+      (λ (r) (my-list-f a r))
+      (my-list-f.map a))))
 
-(define my-length ((a tau) (xs (list a)))
+(define my-length ((a tau) (xs (my-list a)))
   (witness i64
-    (list-f.case
-      i64
-      a
-      (list a)
-      (mu.out (list-f a _) (list-f.as-functor a) xs)
-      (λ ()
+    (case (mu.out (my-list-f a _) (my-list-f.as-functor a) xs)
+      ((my-list-f.nil)
         0)
-      (λ (y ys)
+      ((my-list-f.cons y ys)
         (add-i64 1 (my-length a ys))))))
 
 (define xs
-  (list.cons i64 0 (list.cons i64 1 (list.cons i64 2 (list.nil i64)))))
+  (my-list.cons i64 0 (my-list.cons i64 1 (my-list.cons i64 2 (my-list.nil i64)))))
 
 (reduce (i64.print (my-length i64 xs)))

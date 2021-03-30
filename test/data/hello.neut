@@ -1,3 +1,3 @@
 (include "../header.neut")
 
-(reduce (safe-string.print-literal "hello, world!"))
+(reduce (string.print-literal "hello, world!"))
