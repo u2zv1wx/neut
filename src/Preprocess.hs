@@ -60,12 +60,15 @@ preprocess' stmtList = do
     [] -> do
       endStmtList <- generateEndStmtList
       unuseStmtList <- generateUnuseStmtList
-      case (endStmtList, unuseStmtList) of
-        (_ : _, _) ->
+      removeStmtList <- generateRemovePrefixStmtList
+      case (endStmtList, unuseStmtList, removeStmtList) of
+        (_ : _, _, _) ->
           preprocess' endStmtList
-        (_, _ : _) ->
+        (_, _ : _, _) ->
           preprocess' unuseStmtList
-        ([], []) ->
+        (_, _, _ : _) ->
+          preprocess' removeStmtList
+        ([], [], []) ->
           leave
     headStmt : restStmtList ->
       case headStmt of
@@ -145,6 +148,20 @@ preprocess' stmtList = do
                 return $ headStmt : treeList -- `(end NAME)` is also used in the object language
               | otherwise ->
                 raiseSyntaxError m "(end LEAF)"
+            "define-prefix"
+              | [(_, TreeLeaf from), (_, TreeLeaf to)] <- rest -> do
+                modify (\env -> env {nsEnv = (from, to) : (nsEnv env)})
+                treeList <- preprocess' restStmtList
+                return $ headStmt : treeList
+              | otherwise ->
+                raiseSyntaxError m "(define-prefix LEAF LEAF)"
+            "remove-prefix"
+              | [(_, TreeLeaf from), (_, TreeLeaf to)] <- rest -> do
+                modify (\env -> env {nsEnv = (filter (/= (from, to))) (nsEnv env)})
+                treeList <- preprocess' restStmtList
+                return $ headStmt : treeList
+              | otherwise ->
+                raiseSyntaxError m "(remove-prefix LEAF LEAF)"
             "use"
               | [(_, TreeLeaf s)] <- rest -> do
                 treeList <- use s >> preprocess' restStmtList
@@ -364,3 +381,12 @@ generateUnuseStmtList =
 generateEndStmtList :: WithEnv [TreePlus]
 generateEndStmtList =
   generateLastStmtList "end" sectionEnv
+
+generateRemovePrefixStmtList :: WithEnv [TreePlus]
+generateRemovePrefixStmtList = do
+  path <- getCurrentFilePath
+  let m = newHint 0 0 path
+  nenv <- gets nsEnv
+  return $ map (\(from, to) -> (m, TreeNode [(m, TreeLeaf "remove-prefix"), (m, TreeLeaf from), (m, TreeLeaf to)])) nenv
+
+-- generateLastStmtList "unuse" prefixEnv

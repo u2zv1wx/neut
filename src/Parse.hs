@@ -69,6 +69,18 @@ parse stmtTreeList =
                 handleEnd m s (parse restStmtList)
               | otherwise ->
                 raiseSyntaxError m "(end LEAF)"
+            "define-prefix"
+              | [(_, TreeLeaf from), (_, TreeLeaf to)] <- rest -> do
+                modify (\env -> env {nsEnv = (from, to) : (nsEnv env)})
+                parse restStmtList
+              | otherwise ->
+                raiseSyntaxError m "(define-prefix LEAF LEAF)"
+            "remove-prefix"
+              | [(_, TreeLeaf from), (_, TreeLeaf to)] <- rest -> do
+                modify (\env -> env {nsEnv = (filter (/= (from, to))) (nsEnv env)})
+                parse restStmtList
+              | otherwise ->
+                raiseSyntaxError m "(remove-prefix LEAF LEAF)"
             "use"
               | [(_, TreeLeaf s)] <- rest ->
                 use s >> parse restStmtList

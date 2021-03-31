@@ -99,16 +99,43 @@ handleEnd m s cont = do
 {-# INLINE resolveSymbol #-}
 resolveSymbol :: Hint -> (T.Text -> WithEnv (Maybe b)) -> T.Text -> WithEnv (Maybe b)
 resolveSymbol m predicate name = do
-  penv <- gets prefixEnv
-  candList <- takeAll predicate $ name : (map (\prefix -> prefix <> nsSep <> name) penv)
-  case candList of
+  candList <- constructCandList name
+  candList' <- takeAll predicate candList
+  case candList' of
     [] ->
       return Nothing
     [prefixedName] ->
       predicate prefixedName
     _ -> do
-      let candInfo = T.concat $ map (\cand -> "\n- " <> cand) candList
+      let candInfo = T.concat $ map (\cand -> "\n- " <> cand) candList'
       raiseError m $ "this `" <> name <> "` is ambiguous since it could refer to:" <> candInfo
+
+constructCandList :: T.Text -> WithEnv [T.Text]
+constructCandList name = do
+  penv <- gets prefixEnv
+  constructCandList' $ name : map (<> nsSep <> name) penv
+
+constructCandList' :: [T.Text] -> WithEnv [T.Text]
+constructCandList' nameList =
+  concat <$> mapM constructCandList'' nameList
+
+constructCandList'' :: T.Text -> WithEnv [T.Text]
+constructCandList'' name = do
+  nameList <- findNext name
+  if null nameList
+    then return [name]
+    else constructCandList' nameList
+
+findNext :: T.Text -> WithEnv [T.Text]
+findNext name = do
+  nenv <- gets nsEnv
+  fmap concat $
+    forM nenv $ \(from, to) -> do
+      case T.stripPrefix (from <> nsSep) name of
+        Just suffix -> do
+          return [to <> nsSep <> suffix] -- map (<> suffix) toList
+        Nothing ->
+          return []
 
 takeAll :: (T.Text -> WithEnv (Maybe b)) -> [T.Text] -> WithEnv [T.Text]
 takeAll predicate candidateList =

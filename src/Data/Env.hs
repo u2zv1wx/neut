@@ -49,6 +49,7 @@ data Env = Env
     dataEnv :: Map.HashMap T.Text [T.Text],
     constructorEnv :: Map.HashMap T.Text (Int, Int),
     prefixEnv :: [T.Text],
+    nsEnv :: [(T.Text, T.Text)],
     sectionEnv :: [T.Text],
     topNameEnv :: Map.HashMap T.Text Ident,
     --
@@ -85,6 +86,7 @@ initialEnv =
       topMetaNameEnv = Map.empty,
       metaTermCtx = IntMap.empty,
       constantSet = S.empty,
+      nsEnv = [],
       enumEnv = Map.empty,
       fileEnv = Map.empty,
       holeEnv = IntMap.empty,
