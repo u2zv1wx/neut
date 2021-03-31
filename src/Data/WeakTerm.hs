@@ -339,7 +339,11 @@ toTree term =
     (m, WeakTermPiIntro _ xts e) -> do
       (m, TreeNode [(m, TreeLeaf "λ"), (m, TreeNode (map toTreeArg xts)), toTree e])
     (m, WeakTermPiElim e es) ->
-      (m, TreeNode (map toTree $ e : es))
+      case e of
+        (_, WeakTermAster _) ->
+          (m, TreeLeaf "*")
+        _ ->
+          (m, TreeNode (map toTree $ e : es))
     (m, WeakTermFix b (_, x, _) xts e) -> do
       if b
         then (m, TreeNode [(m, TreeLeaf "fix"), (m, TreeLeaf (showVariable x)), (m, TreeNode (map toTreeArg xts)), toTree e])
@@ -359,7 +363,7 @@ toTree term =
     (m, WeakTermEnumElim (e, _) mles) -> do
       let (mls, es) = unzip mles
       let les = zip (map snd mls) es
-      (m, TreeNode [(m, TreeLeaf "switch"), toTree e, (m, TreeNode (map toTreeClause les))])
+      (m, TreeNode ((m, TreeLeaf "switch") : toTree e : (map toTreeClause les)))
     (m, WeakTermTensor ts) -> do
       (m, TreeNode ((m, TreeLeaf "tensor") : map toTree ts))
     (m, WeakTermTensorIntro es) -> do
@@ -406,7 +410,7 @@ showVariable :: Ident -> T.Text
 showVariable x =
   if T.any (\c -> c `S.member` S.fromList "()") $ asText x
     then "_"
-    else asText' x
+    else asText x
 
 showCaseClause :: (WeakPattern, WeakTermPlus) -> T.Text
 showCaseClause (pat, e) =

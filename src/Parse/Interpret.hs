@@ -258,7 +258,7 @@ interpretLeaf :: TreePlus -> WithEnv (Hint, Ident)
 interpretLeaf tree =
   case tree of
     (m, TreeLeaf "_") -> do
-      h <- newIdentFromText "H"
+      h <- newIdentFromText "_"
       return (m, h)
     (m, TreeLeaf x) ->
       return (m, asIdent x)
