@@ -18,67 +18,67 @@ data Stuck
   = StuckPiElimVar Ident [(Hint, [WeakTermPlus])]
   | StuckPiElimAster Int [[WeakTermPlus]]
 
-simplify :: [Constraint] -> WithEnv ()
+simplify :: [(Constraint, Constraint)] -> WithEnv ()
 simplify cs =
   case cs of
     [] ->
       return ()
-    ((e1, e2) : rest) -> do
+    ((e1, e2), orig) : rest -> do
       e1' <- reduceWeakTermPlus e1
       e2' <- reduceWeakTermPlus e2
       b <- isEq e1' e2'
       if b
         then simplify rest
-        else simplify' $ (e1', e2') : rest
+        else simplify' $ ((e1', e2'), orig) : rest
 
-simplify' :: [Constraint] -> WithEnv ()
+simplify' :: [(Constraint, Constraint)] -> WithEnv ()
 simplify' constraintList =
   case constraintList of
     [] ->
       return ()
-    c : cs ->
+    (c, orig) : cs ->
       case c of
         ((m1, WeakTermPi xts1 cod1), (m2, WeakTermPi xts2 cod2))
           | length xts1 == length xts2 -> do
             xt1 <- asWeakIdentPlus m1 cod1
             xt2 <- asWeakIdentPlus m2 cod2
-            simplifyBinder (xts1 ++ [xt1]) (xts2 ++ [xt2])
+            simplifyBinder orig (xts1 ++ [xt1]) (xts2 ++ [xt2])
             simplify cs
         ((m1, WeakTermPiIntro mName1 xts1 e1), (m2, WeakTermPiIntro mName2 xts2 e2))
           | mName1 == mName2,
             length xts1 == length xts2 -> do
             xt1 <- asWeakIdentPlus m1 e1
             xt2 <- asWeakIdentPlus m2 e2
-            simplifyBinder (xts1 ++ [xt1]) (xts2 ++ [xt2])
+            simplifyBinder orig (xts1 ++ [xt1]) (xts2 ++ [xt2])
             simplify cs
         ((m1, WeakTermFix _ xt1@(_, x1, _) xts1 e1), (m2, WeakTermFix _ xt2@(_, x2, _) xts2 e2))
           | x1 == x2,
             length xts1 == length xts2 -> do
             yt1 <- asWeakIdentPlus m1 e1
             yt2 <- asWeakIdentPlus m2 e2
-            simplifyBinder (xt1 : xts1 ++ [yt1]) (xt2 : xts2 ++ [yt2])
+            simplifyBinder orig (xt1 : xts1 ++ [yt1]) (xt2 : xts2 ++ [yt2])
             simplify cs
         ((_, WeakTermInt t1 l1), (_, WeakTermInt t2 l2))
           | l1 == l2 ->
-            simplify $ (t1, t2) : cs
+            simplify $ ((t1, t2), orig) : cs
         ((_, WeakTermFloat t1 l1), (_, WeakTermFloat t2 l2))
           | l1 == l2 ->
-            simplify $ (t1, t2) : cs
+            simplify $ ((t1, t2), orig) : cs
         ((_, WeakTermTensor ts1), (_, WeakTermTensor ts2))
           | length ts1 == length ts2 ->
-            simplify $ zip ts1 ts2 ++ cs
+            simplify $ map (\item -> (item, orig)) (zip ts1 ts2) ++ cs
         ((_, WeakTermTensorIntro es1), (_, WeakTermTensorIntro es2))
           | length es1 == length es2 ->
-            simplify $ zip es1 es2 ++ cs
+            simplify $ map ((,) orig) (zip es1 es2) ++ cs
         ((_, WeakTermQuestion e1 t1), (_, WeakTermQuestion e2 t2)) ->
-          simplify $ (e1, e2) : (t1, t2) : cs
+          simplify $ ((e1, e2), orig) : ((t1, t2), orig) : cs
         ((_, WeakTermDerangement i1 t1 ekts1), (_, WeakTermDerangement i2 t2 ekts2))
           | length ekts1 == length ekts2,
             i1 == i2,
             (es1, ks1, ts1) <- unzip3 ekts1,
             (es2, ks2, ts2) <- unzip3 ekts2,
             ks1 == ks2 -> do
-            simplify $ (t1, t2) : zip es1 es2 ++ zip ts1 ts2 ++ cs
+            simplify $ map ((,) orig) ((t1, t2) : zip es1 es2 ++ zip ts1 ts2) ++ cs
         (e1@(m1, _), e2@(m2, _)) -> do
           sub <- gets substEnv
           oenv <- gets opaqueEnv
@@ -95,7 +95,7 @@ simplify' constraintList =
               let s = IntMap.singleton h e
               e1' <- substWeakTermPlus s (m1, snd e1)
               e2' <- substWeakTermPlus s (m2, snd e2)
-              simplify $ (e1', e2') : cs
+              simplify $ ((e1', e2'), orig) : cs
             Nothing -> do
               let e1' = (m1, snd e1)
               let e2' = (m2, snd e2)
@@ -111,7 +111,7 @@ simplify' constraintList =
                         resolveHole h1 ies1 e2' fvs2 cs
                       _ -> do
                         e2'' <- substWeakTermPlus (IntMap.fromList $ zip (map asInt zs) es) e2'
-                        simplify $ (e1', e2'') : cs
+                        simplify $ ((e1', e2''), orig) : cs
                 (_, Just (StuckPiElimAster h2 ies2))
                   | xs2 <- concatMap getVarList ies2,
                     occurCheck h2 fmvs1,
@@ -123,46 +123,46 @@ simplify' constraintList =
                         resolveHole h2 ies2 e1' fvs1 cs
                       _ -> do
                         e1'' <- substWeakTermPlus (IntMap.fromList $ zip (map asInt zs) es) e1'
-                        simplify $ (e1'', e2') : cs
+                        simplify $ ((e1'', e2'), orig) : cs
                 (Just (StuckPiElimVar x1 mess1), Just (StuckPiElimVar x2 mess2))
                   | x1 == x2,
                     Nothing <- lookupDefinition x1 sub,
                     Just pairList <- asPairList (map snd mess1) (map snd mess2) ->
-                    simplify $ pairList ++ cs
+                    simplify $ map ((,) orig) pairList ++ cs
                 (Just (StuckPiElimVar x1 mess1), Just (StuckPiElimVar x2 mess2))
                   | x1 == x2,
                     Just lam <- lookupDefinition x1 sub -> do
-                    simplify $ (toPiElim lam mess1, toPiElim lam mess2) : cs
+                    simplify $ ((toPiElim lam mess1, toPiElim lam mess2), orig) : cs
                 (Just (StuckPiElimVar x1 mess1), Just (StuckPiElimVar x2 mess2))
                   | x1 /= x2,
                     Just lam1 <- lookupDefinition x1 sub,
                     Just lam2 <- lookupDefinition x2 sub -> do
                     -- expand the definition of the variable that is defined later
                     if asInt x1 > asInt x2
-                      then simplify $ (toPiElim lam1 mess1, e2) : cs
-                      else simplify $ (e1, toPiElim lam2 mess2) : cs
+                      then simplify $ ((toPiElim lam1 mess1, e2), orig) : cs
+                      else simplify $ ((e1, toPiElim lam2 mess2), orig) : cs
                 (Just (StuckPiElimVar x1 mess1), Just (StuckPiElimAster {}))
                   | Just lam <- lookupDefinition x1 sub -> do
-                    let susCon = SusCon (fmvs, (e1, e2), ConDelta (toPiElim lam mess1, e2))
+                    let susCon = SusCon (fmvs, ((e1, e2), orig), ConDelta (toPiElim lam mess1, e2))
                     modify (\env -> env {suspendedConstraintEnv = Q.insert susCon (suspendedConstraintEnv env)})
                     simplify cs
                 (Just (StuckPiElimVar x1 mess1), _)
                   | Just lam <- lookupDefinition x1 sub -> do
-                    simplify $ (toPiElim lam mess1, e2) : cs
+                    simplify $ ((toPiElim lam mess1, e2), orig) : cs
                 (Just (StuckPiElimAster {}), Just (StuckPiElimVar x2 mess2))
                   | Just lam <- lookupDefinition x2 sub -> do
-                    let susCon = SusCon (fmvs, (e1, e2), ConDelta (e1, toPiElim lam mess2))
+                    let susCon = SusCon (fmvs, ((e1, e2), orig), ConDelta (e1, toPiElim lam mess2))
                     modify (\env -> env {suspendedConstraintEnv = Q.insert susCon (suspendedConstraintEnv env)})
                     simplify cs
                 (_, Just (StuckPiElimVar x2 mess2))
                   | Just lam <- lookupDefinition x2 sub -> do
-                    simplify $ (e1, toPiElim lam mess2) : cs
+                    simplify $ ((e1, toPiElim lam mess2), orig) : cs
                 _ -> do
-                  let susCon = SusCon (fmvs, (e1, e2), ConOther)
+                  let susCon = SusCon (fmvs, ((e1, e2), orig), ConOther)
                   modify (\env -> env {suspendedConstraintEnv = Q.insert susCon (suspendedConstraintEnv env)})
                   simplify cs
 
-resolveHole :: Int -> [[WeakTermPlus]] -> WeakTermPlus -> S.Set Ident -> [Constraint] -> WithEnv ()
+resolveHole :: Int -> [[WeakTermPlus]] -> WeakTermPlus -> S.Set Ident -> [(Constraint, Constraint)] -> WithEnv ()
 resolveHole h1 ies1 e2' fvs2 cs = do
   xss <- mapM (toVarList fvs2) ies1
   let lam = bindFormalArgs e2' xss
@@ -174,19 +174,19 @@ resolveHole h1 ies1 e2' fvs2 cs = do
   let sus1' = map (\(SusCon (_, c, _)) -> c) $ Q.toList sus1
   simplify $ sus1' ++ cs
 
-simplifyBinder :: [WeakIdentPlus] -> [WeakIdentPlus] -> WithEnv ()
-simplifyBinder =
-  simplifyBinder' IntMap.empty
+simplifyBinder :: Constraint -> [WeakIdentPlus] -> [WeakIdentPlus] -> WithEnv ()
+simplifyBinder orig =
+  simplifyBinder' orig IntMap.empty
 
-simplifyBinder' :: SubstWeakTerm -> [WeakIdentPlus] -> [WeakIdentPlus] -> WithEnv ()
-simplifyBinder' sub args1 args2 =
+simplifyBinder' :: Constraint -> SubstWeakTerm -> [WeakIdentPlus] -> [WeakIdentPlus] -> WithEnv ()
+simplifyBinder' orig sub args1 args2 =
   case (args1, args2) of
     ((m1, x1, t1) : xts1, (_, x2, t2) : xts2) -> do
       t2' <- substWeakTermPlus sub t2
-      simplify [(t1, t2')]
+      simplify [((t1, t2'), orig)]
       let var1 = (m1, WeakTermVar x1)
       let sub' = IntMap.insert (asInt x2) var1 sub
-      simplifyBinder' sub' xts1 xts2
+      simplifyBinder' orig sub' xts1 xts2
     _ ->
       return ()
 

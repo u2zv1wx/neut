@@ -38,7 +38,6 @@ infer' ctx term =
       return ((m, WeakTermTau), (m, WeakTermTau))
     (m, WeakTermVar x) -> do
       t <- lookupWeakTypeEnv m x
-      -- return ((m, WeakTermVar x), t)
       return ((m, WeakTermVar x), (m, snd t))
     (m, WeakTermPi xts t) -> do
       (xts', t') <- inferPi ctx xts t
@@ -79,6 +78,7 @@ infer' ctx term =
       | otherwise -> do
         t <- lookupConstTypeEnv m x
         return ((m, WeakTermConst x), (m, snd $ weaken t))
+    -- return ((m, WeakTermConst x), weaken t)
     (m, WeakTermInt t i) -> do
       t' <- inferType' [] t -- ctx == [] since t' should be i64, i8, etc. (i.e. t must be closed)
       return ((m, WeakTermInt t' i), t')
@@ -177,6 +177,7 @@ inferArgs m args1 args2 cod =
 inferExternal :: Hint -> T.Text -> WithEnv TermPlus -> WithEnv (WeakTermPlus, WeakTermPlus)
 inferExternal m x comp = do
   t <- comp
+  -- return ((m, WeakTermConst x), weaken t)
   return ((m, WeakTermConst x), (m, snd $ weaken t))
 
 inferType' :: Context -> WeakTermPlus -> WithEnv WeakTermPlus
@@ -226,9 +227,9 @@ inferPiElim ::
 inferPiElim ctx m (e, t) ets = do
   let es = map fst ets
   case t of
-    (_, WeakTermPi xts cod)
+    (_, WeakTermPi xts (_, cod))
       | length xts == length ets -> do
-        cod' <- inferArgs m ets xts cod
+        cod' <- inferArgs m ets xts (m, cod)
         return ((m, WeakTermPiElim e es), cod')
     _ -> do
       ys <- mapM (const $ newIdentFromText "arg") es
