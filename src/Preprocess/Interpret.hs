@@ -26,20 +26,41 @@ interpretCode tree =
         leaf@(_, TreeLeaf headAtom) : rest -> do
           case headAtom of
             "lambda-meta"
-              | [(_, TreeNode xs), e] <- rest -> do
-                xs' <- mapM interpretIdent xs
-                e' <- interpretCode e
-                return (m, MetaTermImpIntro xs' Nothing e')
+              | [xs@(_, TreeNode _), e] <- rest -> do
+                h <- newText
+                interpretCode (m, TreeNode [(m, TreeLeaf "fix-meta"), (m, TreeLeaf h), xs, e])
+              -- xs' <- mapM interpretIdent xs
+              -- e' <- interpretCode e
+              -- return (m, MetaTermImpIntro xs' Nothing e')
               | otherwise ->
                 raiseSyntaxError m "(lambda-meta (LEAF*) TREE)"
+            -- "lambda-meta"
+            --   | [(_, TreeNode xs), e] <- rest -> do
+            --     h <- newText
+            --     interpretCode (m, TreeNode [leaf])
+            --     xs' <- mapM interpretIdent xs
+            --     e' <- interpretCode e
+            --     return (m, MetaTermImpIntro xs' Nothing e')
+            --   | otherwise ->
+            --     raiseSyntaxError m "(lambda-meta (LEAF*) TREE)"
             "lambda-meta-variadic"
-              | [(_, TreeNode args@(_ : _)), e] <- rest -> do
-                xs' <- mapM interpretIdent (init args)
-                rest' <- interpretIdent $ last args
-                e' <- interpretCode e
-                return (m, MetaTermImpIntro xs' (Just rest') e')
+              | [args@(_, TreeNode (_ : _)), e] <- rest -> do
+                h <- newText
+                interpretCode (m, TreeNode [(m, TreeLeaf "fix-meta-variadic"), (m, TreeLeaf h), args, e])
+              -- xs' <- mapM interpretIdent (init args)
+              -- rest' <- interpretIdent $ last args
+              -- e' <- interpretCode e
+              -- return (m, MetaTermImpIntro xs' (Just rest') e')
               | otherwise ->
                 raiseSyntaxError m "(lambda-meta-variadic (LEAF LEAF*) TREE)"
+            -- "lambda-meta-variadic"
+            --   | [(_, TreeNode args@(_ : _)), e] <- rest -> do
+            --     xs' <- mapM interpretIdent (init args)
+            --     rest' <- interpretIdent $ last args
+            --     e' <- interpretCode e
+            --     return (m, MetaTermImpIntro xs' (Just rest') e')
+            --   | otherwise ->
+            --     raiseSyntaxError m "(lambda-meta-variadic (LEAF LEAF*) TREE)"
             "apply-meta"
               | e : es <- rest -> do
                 interpretAux m e es
@@ -162,7 +183,10 @@ interpretAux m f args = do
   (xts, args') <- interpretArg args
   if null xts
     then return (m, MetaTermImpElim f' args')
-    else return (m, MetaTermImpIntro xts Nothing (m, MetaTermImpElim f' args'))
+    else -- else return (m, MetaTermImpIntro xts Nothing (m, MetaTermImpElim f' args'))
+    do
+      h <- newIdentFromText "_"
+      return (m, MetaTermFix h xts Nothing (m, MetaTermImpElim f' args'))
 
 interpretArg :: [TreePlus] -> WithEnv ([Ident], [MetaTermPlus])
 interpretArg es =
@@ -227,7 +251,9 @@ interpretWith tree =
       e' <- interpretWith (m, TreeNode (with : bind : es))
       xt' <- interpretIdent xt
       rest' <- interpretWith (m, TreeNode (with : bind : rest))
-      return (m, MetaTermImpElim bind' [e', (m, MetaTermImpIntro [xt'] Nothing rest')])
+      h <- newIdentFromText "_"
+      -- return (m, MetaTermImpElim bind' [e', (m, MetaTermImpIntro [xt'] Nothing rest')])
+      return (m, MetaTermImpElim bind' [e', (m, MetaTermFix h [xt'] Nothing rest')])
     (_, TreeNode [(_, TreeLeaf "with-meta"), _, e]) ->
       interpretCode e
     (m, TreeNode (with@(_, TreeLeaf "with-meta") : bind : e : rest)) -> do

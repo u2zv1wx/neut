@@ -100,7 +100,7 @@ handleEnd m s cont = do
 resolveSymbol :: Hint -> (T.Text -> WithEnv (Maybe b)) -> T.Text -> WithEnv (Maybe b)
 resolveSymbol m predicate name = do
   candList <- constructCandList name
-  candList' <- takeAll predicate candList
+  candList' <- takeAll predicate candList []
   case candList' of
     [] ->
       return Nothing
@@ -137,19 +137,18 @@ findNext name = do
         Nothing ->
           return []
 
-takeAll :: (T.Text -> WithEnv (Maybe b)) -> [T.Text] -> WithEnv [T.Text]
-takeAll predicate candidateList =
+takeAll :: (T.Text -> WithEnv (Maybe b)) -> [T.Text] -> [T.Text] -> WithEnv [T.Text]
+takeAll predicate candidateList acc =
   case candidateList of
     [] ->
-      return []
+      return acc
     x : xs -> do
       mv <- predicate x
-      ys <- takeAll predicate xs
       case mv of
-        Just _ -> do
-          return $ x : ys
+        Just _ ->
+          takeAll predicate xs (x : acc)
         Nothing ->
-          return ys
+          takeAll predicate xs acc
 
 {-# INLINE asVar #-}
 asVar :: Hint -> Map.HashMap T.Text Ident -> T.Text -> (Ident -> a) -> WithEnv (Maybe (Hint, a))

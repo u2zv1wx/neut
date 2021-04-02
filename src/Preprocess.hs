@@ -388,5 +388,3 @@ generateRemovePrefixStmtList = do
   let m = newHint 0 0 path
   nenv <- gets nsEnv
   return $ map (\(from, to) -> (m, TreeNode [(m, TreeLeaf "remove-prefix"), (m, TreeLeaf from), (m, TreeLeaf to)])) nenv
-
--- generateLastStmtList "unuse" prefixEnv

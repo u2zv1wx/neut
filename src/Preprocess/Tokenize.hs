@@ -242,10 +242,12 @@ updateStreamC :: Int -> T.Text -> Tokenizer ()
 updateStreamC c s =
   modify (\env -> env {text = s, column = c + column env})
 
+{-# INLINE incrementLine #-}
 incrementLine :: Tokenizer ()
 incrementLine =
   modify (\env -> env {line = 1 + line env, column = 1})
 
+{-# INLINE incrementColumn #-}
 incrementColumn :: Tokenizer ()
 incrementColumn =
   modify (\env -> env {column = 1 + column env})

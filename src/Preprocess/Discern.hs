@@ -26,9 +26,9 @@ discernMetaTerm' nenv term =
       tryCand (resolveSymbol m (asMetaVar m nenv) s) $
         tryCand (resolveSymbol m (asMetaConstant m) s) $
           raiseError m $ "undefined meta-variable: " <> s
-    (m, MetaTermImpIntro xs mf e) -> do
-      (xs', mf', e') <- discernBinder nenv xs mf e
-      return (m, MetaTermImpIntro xs' mf' e')
+    -- (m, MetaTermImpIntro xs mf e) -> do
+    --   (xs', mf', e') <- discernBinder nenv xs mf e
+    --   return (m, MetaTermImpIntro xs' mf' e')
     (m, MetaTermImpElim e es) -> do
       e' <- discernMetaTerm' nenv e
       es' <- mapM (discernMetaTerm' nenv) es

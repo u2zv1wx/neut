@@ -3,8 +3,6 @@ module Elaborate.Infer
     inferType,
     insConstraintEnv,
     insWeakTypeEnv,
-    newTypeAsterInCtx,
-    Context,
   )
 where
 

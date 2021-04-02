@@ -11,7 +11,6 @@ import Data.Maybe
 import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
 import Data.WeakTerm
-import Elaborate.Infer
 import Reduce.WeakTerm
 
 data Stuck
@@ -254,25 +253,21 @@ toPiElim e args =
       toPiElim (m, WeakTermPiElim e es) ess
 
 toVarList :: S.Set Ident -> [WeakTermPlus] -> WithEnv [WeakIdentPlus]
-toVarList =
-  toVarList' []
-
-toVarList' :: Context -> S.Set Ident -> [WeakTermPlus] -> WithEnv [WeakIdentPlus]
-toVarList' ctx xs termList =
+toVarList xs termList =
   case termList of
     [] ->
       return []
     e : es
       | (m, WeakTermVar x) <- e,
         x `S.member` xs -> do
-        t <- newTypeAsterInCtx ctx m -- don't careにしちゃだめ？
-        xts <- toVarList' (ctx ++ [(m, x, t)]) xs es
+        let t = (m, WeakTermTau) -- don't care
+        xts <- toVarList xs es
         return $ (m, x, t) : xts
       | otherwise -> do
         let m = metaOf e
-        t <- newTypeAsterInCtx ctx m
+        let t = (m, WeakTermTau) -- don't care
         x <- newIdentFromText "aster"
-        xts <- toVarList' (ctx ++ [(m, x, t)]) xs es
+        xts <- toVarList xs es
         return $ (m, x, t) : xts
 
 bindFormalArgs :: WeakTermPlus -> [[WeakIdentPlus]] -> WeakTermPlus

@@ -33,9 +33,9 @@ reduceMetaTerm term =
       e' <- reduceMetaTerm e
       es' <- mapM reduceMetaTerm es
       case e' of
-        (mImp, MetaTermImpIntro xs mRest body) -> do
-          h <- newIdentFromText "_"
-          reduceFix m (mImp, MetaTermFix h xs mRest body) es'
+        -- (mImp, MetaTermImpIntro xs mRest body) -> do
+        --   h <- newIdentFromText "_"
+        --   reduceFix m (mImp, MetaTermFix h xs mRest body) es'
         (_, MetaTermFix {}) ->
           reduceFix m e' es'
         (_, MetaTermConst c) ->

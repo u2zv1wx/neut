@@ -10,9 +10,9 @@ import Data.Tree
 -- untyped lambda calculus with AST values (node / leaf)
 data MetaTerm
   = MetaTermVar Ident
-  | MetaTermImpIntro [Ident] (Maybe Ident) MetaTermPlus -- the `Maybe Ident` part is for variadic lambda
-  | MetaTermImpElim MetaTermPlus [MetaTermPlus]
   | MetaTermFix Ident [Ident] (Maybe Ident) MetaTermPlus -- the `Maybe Ident` part is for variadic fix
+  | -- | MetaTermImpIntro [Ident] (Maybe Ident) MetaTermPlus -- the `Maybe Ident` part is for variadic lambda
+    MetaTermImpElim MetaTermPlus [MetaTermPlus]
   | MetaTermLeaf T.Text
   | MetaTermNode [MetaTermPlus]
   | MetaTermConst T.Text
@@ -42,10 +42,10 @@ substMetaTerm sub term =
         e
       | otherwise ->
         term
-    (m, MetaTermImpIntro xs mx e) -> do
-      let sub' = foldr IntMap.delete sub (map asInt (xs ++ catMaybes [mx]))
-      let e' = substMetaTerm sub' e
-      (m, MetaTermImpIntro xs mx e')
+    -- (m, MetaTermImpIntro xs mx e) -> do
+    --   let sub' = foldr IntMap.delete sub (map asInt (xs ++ catMaybes [mx]))
+    --   let e' = substMetaTerm sub' e
+    --   (m, MetaTermImpIntro xs mx e')
     (m, MetaTermImpElim e es) -> do
       let e' = substMetaTerm sub e
       let es' = map (substMetaTerm sub) es
@@ -69,6 +69,35 @@ substMetaTerm sub term =
       let onFalse' = substMetaTerm sub onFalse
       (m, MetaTermIf cond' onTrue' onFalse')
 
+substMetaTermMod :: Hint -> SubstMetaTerm -> MetaTermPlus -> MetaTermPlus
+substMetaTermMod mNew sub term =
+  case term of
+    (_, var@(MetaTermVar x))
+      | Just (_, e) <- IntMap.lookup (asInt x) sub ->
+        (mNew, e)
+      -- | Just e <- IntMap.lookup (asInt x) sub ->
+      --   e
+      | otherwise ->
+        (mNew, var)
+    (_, MetaTermImpElim e es) -> do
+      let e' = substMetaTermMod mNew sub e
+      let es' = map (substMetaTermMod mNew sub) es
+      (mNew, MetaTermImpElim e' es')
+    (_, MetaTermFix f xs mx e) -> do
+      let sub' = foldr IntMap.delete sub (map asInt (f : xs ++ catMaybes [mx]))
+      let e' = substMetaTermMod mNew sub' e
+      (mNew, MetaTermFix f xs mx e')
+    (_, MetaTermNode es) -> do
+      let es' = map (substMetaTermMod mNew sub) es
+      (mNew, MetaTermNode es')
+    (_, MetaTermIf cond onTrue onFalse) -> do
+      let cond' = substMetaTermMod mNew sub cond
+      let onTrue' = substMetaTermMod mNew sub onTrue
+      let onFalse' = substMetaTermMod mNew sub onFalse
+      (mNew, MetaTermIf cond' onTrue' onFalse')
+    (_, t) ->
+      (mNew, t)
+
 showMetaTerm :: MetaTermPlus -> T.Text
 showMetaTerm e =
   showAsSExp (toTree e)
@@ -78,14 +107,14 @@ toTree term =
   case term of
     (m, MetaTermVar x) ->
       (m, TreeLeaf $ asText' x) -- ホントはmeta専用の名前にするべき
-    (m, MetaTermImpIntro xs Nothing e) -> do
-      let e' = toTree e
-      let xs' = map (\i -> (m, TreeLeaf $ asText' i)) xs
-      (m, TreeNode [(m, TreeLeaf "lambda-meta"), (m, TreeNode xs'), e'])
-    (m, MetaTermImpIntro xs (Just rest) e) -> do
-      let e' = toTree e
-      let args = map (\i -> (m, TreeLeaf $ asText' i)) $ xs ++ [rest]
-      (m, TreeNode [(m, TreeLeaf "lambda-meta-variadic"), (m, TreeNode args), e'])
+      -- (m, MetaTermImpIntro xs Nothing e) -> do
+      --   let e' = toTree e
+      --   let xs' = map (\i -> (m, TreeLeaf $ asText' i)) xs
+      --   (m, TreeNode [(m, TreeLeaf "lambda-meta"), (m, TreeNode xs'), e'])
+      -- (m, MetaTermImpIntro xs (Just rest) e) -> do
+      --   let e' = toTree e
+      --   let args = map (\i -> (m, TreeLeaf $ asText' i)) $ xs ++ [rest]
+      --   (m, TreeNode [(m, TreeLeaf "lambda-meta-variadic"), (m, TreeNode args), e'])
     (m, MetaTermImpElim e es) -> do
       let e' = toTree e
       let es' = map toTree es

@@ -73,8 +73,6 @@ type SuspendedConstraint = (S.Set Int, Constraint)
 
 newtype SusCon = SusCon (S.Set Int, (Constraint, Constraint), Con)
 
--- newtype SusCon = SusCon (S.Set Int, Constraint, Con)
-
 instance Eq SusCon where
   (SusCon (_, _, c1)) == (SusCon (_, _, c2)) =
     conToInt c1 == conToInt c2
