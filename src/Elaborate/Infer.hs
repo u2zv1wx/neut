@@ -146,7 +146,7 @@ infer' ctx term =
                 let xs = map (\(mx, x, t) -> ((mx, WeakTermVar x), t)) xts'
                 tCons <- lookupWeakTypeEnv m name
                 (_, tPat) <- inferPiElim ctx m ((m, WeakTermVar name), tCons) (holeList ++ xs)
-                insConstraintEnv t' tPat
+                insConstraintEnv tPat t'
                 return ((name, xts'), body')
               return ((m, WeakTermCase resultType mSubject' (e', t') clauseList'), resultType)
 
