@@ -33,11 +33,31 @@ reduceMetaTerm term =
       e' <- reduceMetaTerm e
       es' <- mapM reduceMetaTerm es
       case e' of
-        -- (mImp, MetaTermImpIntro xs mRest body) -> do
-        --   h <- newIdentFromText "_"
-        --   reduceFix m (mImp, MetaTermFix h xs mRest body) es'
-        (_, MetaTermFix {}) ->
-          reduceFix m e' es'
+        (_, MetaTermImpIntro mf xs mRest (_, body))
+          | Just rest <- mRest -> do
+            if length xs > length es'
+              then raiseError m $ "the function here must be called with x (>= " <> T.pack (show (length xs)) <> ") arguments, but found " <> T.pack (show (length es'))
+              else do
+                let es1 = take (length xs) es'
+                let restArg = (m, MetaTermNode (drop (length xs) es'))
+                case mf of
+                  Nothing -> do
+                    let sub = IntMap.fromList $ zip (map asInt xs) es1 ++ [(asInt rest, restArg)]
+                    reduceMetaTerm $ substMetaTerm sub (m, body)
+                  Just f -> do
+                    let sub = IntMap.fromList $ (asInt f, e') : zip (map asInt xs) es1 ++ [(asInt rest, restArg)]
+                    reduceMetaTerm $ substMetaTerm sub (m, body)
+          | otherwise -> do
+            if length xs /= length es'
+              then raiseArityMismatch m (length xs) (length es')
+              else do
+                case mf of
+                  Nothing -> do
+                    let sub = IntMap.fromList $ zip (map asInt xs) es'
+                    reduceMetaTerm $ substMetaTerm sub (m, body)
+                  Just f -> do
+                    let sub = IntMap.fromList $ (asInt f, e') : zip (map asInt xs) es'
+                    reduceMetaTerm $ substMetaTerm sub (m, body)
         (_, MetaTermConst c) ->
           reduceConstApp m c es'
         _ -> do
@@ -54,28 +74,6 @@ reduceMetaTerm term =
           reduceMetaTerm (mIf, snd onTrue)
     _ ->
       return term
-
-{-# INLINE reduceFix #-}
-reduceFix :: Hint -> MetaTermPlus -> [MetaTermPlus] -> WithEnv MetaTermPlus
-reduceFix m e es =
-  case e of
-    (_, MetaTermFix f xs mRest (_, body))
-      | Just rest <- mRest -> do
-        if length xs > length es
-          then raiseError m $ "the function here must be called with x (>= " <> T.pack (show (length xs)) <> ") arguments, but found " <> T.pack (show (length es))
-          else do
-            let es1 = take (length xs) es
-            let restArg = (m, MetaTermNode (drop (length xs) es))
-            let sub = IntMap.fromList $ (asInt f, e) : zip (map asInt xs) es1 ++ [(asInt rest, restArg)]
-            reduceMetaTerm $ substMetaTerm sub (m, body)
-      | otherwise -> do
-        if length xs /= length es
-          then raiseArityMismatch m (length xs) (length es)
-          else do
-            let sub = IntMap.fromList $ (asInt f, e) : zip (map asInt xs) es
-            reduceMetaTerm $ substMetaTerm sub (m, body)
-    _ ->
-      raiseCritical (fst e) "unreachable"
 
 raiseArityMismatch :: Hint -> Int -> Int -> WithEnv a
 raiseArityMismatch m expected found = do

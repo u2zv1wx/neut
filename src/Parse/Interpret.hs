@@ -64,7 +64,6 @@ interpret inputTree =
             dataName' <- withSectionPrefix dataName
             consName' <- withSectionPrefix consName
             return (m, WeakTermPiIntro (Just (dataName', consName')) xts' e')
-          -- return (m, WeakTermPiIntro (Just (dataName, constructorName)) xts' e')
           | otherwise ->
             raiseSyntaxError m "(Π-introduction-constructor LEAF LEAF (TREE*) TREE)"
         "Π-elimination"
