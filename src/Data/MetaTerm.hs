@@ -69,35 +69,6 @@ substMetaTerm sub term =
       let onFalse' = substMetaTerm sub onFalse
       (m, MetaTermIf cond' onTrue' onFalse')
 
-substMetaTermMod :: Hint -> SubstMetaTerm -> MetaTermPlus -> MetaTermPlus
-substMetaTermMod mNew sub term =
-  case term of
-    (_, var@(MetaTermVar x))
-      | Just (_, e) <- IntMap.lookup (asInt x) sub ->
-        (mNew, e)
-      -- | Just e <- IntMap.lookup (asInt x) sub ->
-      --   e
-      | otherwise ->
-        (mNew, var)
-    (_, MetaTermImpElim e es) -> do
-      let e' = substMetaTermMod mNew sub e
-      let es' = map (substMetaTermMod mNew sub) es
-      (mNew, MetaTermImpElim e' es')
-    (_, MetaTermFix f xs mx e) -> do
-      let sub' = foldr IntMap.delete sub (map asInt (f : xs ++ catMaybes [mx]))
-      let e' = substMetaTermMod mNew sub' e
-      (mNew, MetaTermFix f xs mx e')
-    (_, MetaTermNode es) -> do
-      let es' = map (substMetaTermMod mNew sub) es
-      (mNew, MetaTermNode es')
-    (_, MetaTermIf cond onTrue onFalse) -> do
-      let cond' = substMetaTermMod mNew sub cond
-      let onTrue' = substMetaTermMod mNew sub onTrue
-      let onFalse' = substMetaTermMod mNew sub onFalse
-      (mNew, MetaTermIf cond' onTrue' onFalse')
-    (_, t) ->
-      (mNew, t)
-
 showMetaTerm :: MetaTermPlus -> T.Text
 showMetaTerm e =
   showAsSExp (toTree e)
