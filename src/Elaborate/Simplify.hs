@@ -80,7 +80,7 @@ simplify' constraintList =
             (es2, ks2, ts2) <- unzip3 ekts2,
             ks1 == ks2 -> do
             simplify $ map ((,) orig) ((t1, t2) : zip es1 es2 ++ zip ts1 ts2) ++ cs
-        (e1@(m1, _), e2@(m2, _)) -> do
+        (e1, e2) -> do
           sub <- gets substEnv
           let fvs1 = varWeakTermPlus e1
           let fvs2 = varWeakTermPlus e2
@@ -90,12 +90,10 @@ simplify' constraintList =
           case lookupAny (S.toList fmvs) sub of
             Just (h, e) -> do
               let s = IntMap.singleton h e
-              e1' <- substWeakTermPlus s (m1, snd e1)
-              e2' <- substWeakTermPlus s (m2, snd e2)
+              e1' <- substWeakTermPlus s e1
+              e2' <- substWeakTermPlus s e2
               simplify $ ((e1', e2'), orig) : cs
             Nothing -> do
-              let e1' = (m1, snd e1)
-              let e2' = (m2, snd e2)
               case (asStuckedTerm e1, asStuckedTerm e2) of
                 (Just (StuckPiElimAster h1 ies1), _)
                   | xs1 <- concatMap getVarList ies1,
@@ -105,10 +103,10 @@ simplify' constraintList =
                     Just es <- lookupAll zs sub ->
                     case es of
                       [] ->
-                        resolveHole h1 ies1 e2' fvs2 cs
+                        resolveHole h1 ies1 e2 fvs2 cs
                       _ -> do
-                        e2'' <- substWeakTermPlus (IntMap.fromList $ zip (map asInt zs) es) e2'
-                        simplify $ ((e1', e2''), orig) : cs
+                        e2' <- substWeakTermPlus (IntMap.fromList $ zip (map asInt zs) es) e2
+                        simplify $ ((e1, e2'), orig) : cs
                 (_, Just (StuckPiElimAster h2 ies2))
                   | xs2 <- concatMap getVarList ies2,
                     occurCheck h2 fmvs1,
@@ -117,10 +115,10 @@ simplify' constraintList =
                     Just es <- lookupAll zs sub ->
                     case es of
                       [] ->
-                        resolveHole h2 ies2 e1' fvs1 cs
+                        resolveHole h2 ies2 e1 fvs1 cs
                       _ -> do
-                        e1'' <- substWeakTermPlus (IntMap.fromList $ zip (map asInt zs) es) e1'
-                        simplify $ ((e1'', e2'), orig) : cs
+                        e1' <- substWeakTermPlus (IntMap.fromList $ zip (map asInt zs) es) e1
+                        simplify $ ((e1', e2), orig) : cs
                 (Just (StuckPiElimVarOpaque x1 mess1), Just (StuckPiElimVarOpaque x2 mess2))
                   | x1 == x2,
                     Just pairList <- asPairList (map snd mess1) (map snd mess2) ->
@@ -142,14 +140,14 @@ simplify' constraintList =
                     let susCon = SusCon (fmvs, ((e1, e2), orig), ConDelta (toPiElim lam mess1, e2))
                     modify (\env -> env {suspendedConstraintEnv = Q.insert susCon (suspendedConstraintEnv env)})
                     simplify cs
-                (Just (StuckPiElimVar x1 mess1), _)
-                  | Just lam <- lookupDefinition x1 sub -> do
-                    simplify $ ((toPiElim lam mess1, e2), orig) : cs
                 (Just (StuckPiElimAster {}), Just (StuckPiElimVar x2 mess2))
                   | Just lam <- lookupDefinition x2 sub -> do
                     let susCon = SusCon (fmvs, ((e1, e2), orig), ConDelta (e1, toPiElim lam mess2))
                     modify (\env -> env {suspendedConstraintEnv = Q.insert susCon (suspendedConstraintEnv env)})
                     simplify cs
+                (Just (StuckPiElimVar x1 mess1), _)
+                  | Just lam <- lookupDefinition x1 sub -> do
+                    simplify $ ((toPiElim lam mess1, e2), orig) : cs
                 (_, Just (StuckPiElimVar x2 mess2))
                   | Just lam <- lookupDefinition x2 sub -> do
                     simplify $ ((e1, toPiElim lam mess2), orig) : cs

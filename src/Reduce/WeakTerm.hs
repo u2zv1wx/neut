@@ -156,7 +156,6 @@ substWeakTermPlus' sub nenv term =
         return (m, WeakTermVar opacity x')
       | Just e2 <- IntMap.lookup (asInt x) sub ->
         return e2
-      -- return (supHint (metaOf term) (metaOf e2), e)
       | otherwise ->
         return term
     (m, WeakTermPi xts t) -> do
@@ -182,7 +181,6 @@ substWeakTermPlus' sub nenv term =
         Nothing ->
           return term
         Just e2 ->
-          -- return (supHint (metaOf term) (metaOf e2), e)
           return e2
     (m, WeakTermInt t x) -> do
       t' <- substWeakTermPlus' sub nenv t

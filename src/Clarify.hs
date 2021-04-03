@@ -436,15 +436,6 @@ insTypeEnv xts tenv =
     (_, x, t) : rest ->
       insTypeEnv rest $ IntMap.insert (asInt x) t tenv
 
--- lookupTypeEnv :: Hint -> Ident -> TypeEnv -> WithEnv TermPlus
--- lookupTypeEnv m (I (name, x)) tenv =
---   case IntMap.lookup x tenv of
---     Just t ->
---       return t
---     Nothing ->
---       raiseCritical m $
---         "the variable `" <> name <> "` is not found in the type environment."
-
 termSigmaIntro :: Hint -> [IdentPlus] -> WithEnv TermPlus
 termSigmaIntro m xts = do
   z <- newIdentFromText "internal.sigma-tau-tuple"
