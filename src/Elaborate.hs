@@ -61,7 +61,7 @@ elaborateStmt' stmt =
       cont' <- elaborateStmt' cont
       return $ StmtResourceType m name discarder'' copier'' : cont'
     WeakStmtOpaque name : cont -> do
-      modify (\env -> env {substEnv = IntMap.delete (asInt name) (substEnv env)})
+      -- modify (\env -> env {substEnv = IntMap.delete (asInt name) (substEnv env)})
       modify (\env -> env {opaqueEnv = S.insert name (opaqueEnv env)})
       elaborateStmt' cont
 
@@ -70,12 +70,12 @@ elaborate' term =
   case term of
     (m, WeakTermTau) ->
       return (m, TermTau)
-    (m, WeakTermVar x) -> do
+    (m, WeakTermVar opacity x) -> do
       cset <- gets constantSet
       let x' = asText x
       if S.member x' cset
         then return (m, TermConst x')
-        else return (m, TermVar x)
+        else return (m, TermVar opacity x)
     (m, WeakTermPi xts t) -> do
       xts' <- mapM elaboratePlus xts
       t' <- elaborate' t
@@ -187,7 +187,7 @@ elaborate' term =
       denv <- gets dataEnv
       oenv <- gets opaqueEnv
       case t' of
-        (_, TermPiElim (_, TermVar name) _)
+        (_, TermPiElim (_, TermVar _ name) _)
           | Just bs <- Map.lookup (asText name) denv,
             S.member name oenv -> do
             let bs' = map (\((b, _), _) -> asText b) patList

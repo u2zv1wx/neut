@@ -58,17 +58,17 @@ clarifyTerm tenv term =
   case term of
     (m, TermTau) ->
       returnImmediateS4 m
-    (m, TermVar x) -> do
-      senv <- gets substEnv
-      oenv <- gets opaqueEnv
-      if (not $ IntMap.member (asInt x) senv) && (not (S.member x oenv))
-        then return (m, CompUpIntro (m, ValueVar x))
-        else return (m, CompPiElimDownElim (m, ValueConst (toGlobalVarName x)) [])
+    (m, TermVar opacity x) -> do
+      case opacity of
+        VarOpacityOpaque ->
+          return (m, CompUpIntro (m, ValueVar x))
+        _ ->
+          return (m, CompPiElimDownElim (m, ValueConst (toGlobalVarName x)) [])
     (m, TermPi {}) ->
       returnClosureS4 m
     (m, TermPiIntro mName mxts e) -> do
       e' <- clarifyTerm (insTypeEnv mxts tenv) e
-      fvs <- nubFreeVariables <$> chainOf tenv term
+      let fvs = nubFreeVariables $ chainOf tenv term
       case mName of
         Nothing ->
           retClosure tenv ClosureNameAnonymous fvs m mxts e'
@@ -80,7 +80,7 @@ clarifyTerm tenv term =
       callClosure m e' es'
     (m, TermFix isReducible (mx, x, t) mxts e) -> do
       e' <- clarifyTerm (insTypeEnv ((mx, x, t) : mxts) tenv) e
-      fvs <- nubFreeVariables <$> chainOf tenv term
+      let fvs = nubFreeVariables $ chainOf tenv term
       if not isReducible || S.member x (varComp e')
         then retClosure tenv (ClosureNameFix x) fvs m mxts e'
         else retClosure tenv ClosureNameAnonymous fvs m mxts e'
@@ -96,7 +96,7 @@ clarifyTerm tenv term =
       return (m, CompUpIntro (m, ValueEnumIntro l))
     (m, TermEnumElim (e, _) bs) -> do
       let (cs, es) = unzip bs
-      fvs <- chainFromTermList tenv es
+      let fvs = chainFromTermList tenv es
       es' <- (mapM (clarifyTerm tenv) >=> alignFreeVariables tenv m fvs) es
       (y, e', yVar) <- clarifyPlus tenv e
       return $ bindLet [(y, e')] (m, CompEnumElim yVar (zip (map snd cs) es'))
@@ -123,11 +123,11 @@ clarifyTerm tenv term =
           tuple <- constructResultTuple tenv m borrowedVarList (m, resultVarName, resultType)
           let lamBody = bindLet (zip xs es') (m, CompUpElim resultVarName (m, CompPrimitive (PrimitiveDerangement expKind xsAsVars)) tuple)
           h <- newIdentFromText "der"
-          fvs <- nubFreeVariables <$> chainOf' tenv xts es
+          let fvs = nubFreeVariables $ chainOf' tenv xts es
           cls <- retClosure tenv (ClosureNameFix h) fvs m [] lamBody -- cls shouldn't be reduced since it can be effectful
           callClosure m cls []
     (m, TermCase resultType mSubject (e, _) patList) -> do
-      fvs <- chainFromTermList tenv $ map (caseClauseToLambda m) patList
+      let fvs = chainFromTermList tenv $ map (caseClauseToLambda m) patList
       resultArg <- clarifyPlus tenv resultType
       closure <- clarifyTerm tenv e
       ((closureVarName, closureVar), typeVarName, (envVarName, envVar), (tagVarName, tagVar)) <- newClosureNames m
@@ -215,9 +215,9 @@ clarifyBinder tenv binder =
       xts' <- clarifyBinder (IntMap.insert (asInt x) t tenv) xts
       return $ (m, x, t') : xts'
 
-chainFromTermList :: TypeEnv -> [TermPlus] -> WithEnv [IdentPlus]
+chainFromTermList :: TypeEnv -> [TermPlus] -> [IdentPlus]
 chainFromTermList tenv es =
-  nubFreeVariables <$> concat <$> mapM (chainOf tenv) es
+  nubFreeVariables $ concat $ map (chainOf tenv) es
 
 alignFreeVariables :: TypeEnv -> Hint -> [IdentPlus] -> [CompPlus] -> WithEnv [CompPlus]
 alignFreeVariables tenv m fvs es = do
@@ -355,73 +355,73 @@ callClosure m e zexes = do
           (m, CompPiElimDownElim lamVar (xs ++ [envVar]))
       )
 
-chainOf :: TypeEnv -> TermPlus -> WithEnv [IdentPlus]
+chainOf :: TypeEnv -> TermPlus -> [IdentPlus]
 chainOf tenv term =
   case term of
     (_, TermTau) ->
-      return []
-    (m, TermVar x) -> do
-      t <- lookupTypeEnv m x tenv
-      xts <- chainOf tenv t
-      senv <- gets substEnv
-      oenv <- gets opaqueEnv
-      if (not $ IntMap.member (asInt x) senv) && (not (S.member x oenv))
-        then return $ xts ++ [(m, x, t)]
-        else return $ xts
+      []
+    (m, TermVar opacity x) -> do
+      case opacity of
+        VarOpacityOpaque -> do
+          let t = (IntMap.!) tenv (asInt x)
+          let xts = chainOf tenv t
+          xts ++ [(m, x, t)]
+        _ ->
+          []
     (_, TermPi {}) ->
-      return []
+      []
     (_, TermPiIntro _ xts e) ->
       chainOf' tenv xts [e]
     (_, TermPiElim e es) -> do
-      xs1 <- chainOf tenv e
-      xs2 <- concat <$> mapM (chainOf tenv) es
-      return $ xs1 ++ xs2
+      let xs1 = chainOf tenv e
+      let xs2 = concat $ map (chainOf tenv) es
+      xs1 ++ xs2
     (_, TermFix _ (_, x, t) xts e) -> do
-      xs1 <- chainOf tenv t
-      xs2 <- chainOf' (IntMap.insert (asInt x) t tenv) xts [e]
-      return $ xs1 ++ filter (\(_, y, _) -> y /= x) xs2
+      let xs1 = chainOf tenv t
+      let xs2 = chainOf' (IntMap.insert (asInt x) t tenv) xts [e]
+      xs1 ++ filter (\(_, y, _) -> y /= x) xs2
     (_, TermConst _) ->
-      return []
+      []
     (_, TermInt _ _) ->
-      return []
+      []
     (_, TermFloat _ _) ->
-      return []
+      []
     (_, TermEnum _) ->
-      return []
+      []
     (_, TermEnumIntro _) ->
-      return []
+      []
     (_, TermEnumElim (e, t) les) -> do
-      xs0 <- chainOf tenv t
-      xs1 <- chainOf tenv e
+      let xs0 = chainOf tenv t
+      let xs1 = chainOf tenv e
       let es = map snd les
-      xs2 <- concat <$> mapM (chainOf tenv) es
-      return $ xs0 ++ xs1 ++ xs2
+      let xs2 = concat $ map (chainOf tenv) es
+      xs0 ++ xs1 ++ xs2
     (_, TermTensor ts) ->
-      concat <$> mapM (chainOf tenv) ts
+      concat $ map (chainOf tenv) ts
     (_, TermTensorIntro es) ->
-      concat <$> mapM (chainOf tenv) es
+      concat $ map (chainOf tenv) es
     (_, TermTensorElim xts e1 e2) -> do
-      xs1 <- chainOf tenv e1
-      xs2 <- chainOf' tenv xts [e2]
-      return $ xs1 ++ xs2
+      let xs1 = chainOf tenv e1
+      let xs2 = chainOf' tenv xts [e2]
+      xs1 ++ xs2
     (_, TermDerangement _ _ ekts) -> do
       let (es, _, ts) = unzip3 ekts
-      concat <$> mapM (chainOf tenv) (es ++ ts)
+      concat $ map (chainOf tenv) (es ++ ts)
     (_, TermCase _ mSubject (e, _) patList) -> do
-      xs1 <- concat <$> (mapM (chainOf tenv) $ maybeToList mSubject)
-      xs2 <- chainOf tenv e
-      xs3 <- concat <$> (forM patList $ \((_, xts), body) -> chainOf' tenv xts [body])
-      return $ xs1 ++ xs2 ++ xs3
+      let xs1 = concat $ (map (chainOf tenv) $ maybeToList mSubject)
+      let xs2 = chainOf tenv e
+      let xs3 = concat $ (flip map patList $ \((_, xts), body) -> chainOf' tenv xts [body])
+      xs1 ++ xs2 ++ xs3
 
-chainOf' :: TypeEnv -> [IdentPlus] -> [TermPlus] -> WithEnv [IdentPlus]
+chainOf' :: TypeEnv -> [IdentPlus] -> [TermPlus] -> [IdentPlus]
 chainOf' tenv binder es =
   case binder of
     [] ->
-      concat <$> mapM (chainOf tenv) es
+      concat $ map (chainOf tenv) es
     (_, x, t) : xts -> do
-      xs1 <- chainOf tenv t
-      xs2 <- chainOf' (IntMap.insert (asInt x) t tenv) xts es
-      return $ xs1 ++ filter (\(_, y, _) -> y /= x) xs2
+      let xs1 = chainOf tenv t
+      let xs2 = chainOf' (IntMap.insert (asInt x) t tenv) xts es
+      xs1 ++ filter (\(_, y, _) -> y /= x) xs2
 
 dropFst :: [(a, b, c)] -> [(b, c)]
 dropFst xyzs = do
@@ -436,21 +436,21 @@ insTypeEnv xts tenv =
     (_, x, t) : rest ->
       insTypeEnv rest $ IntMap.insert (asInt x) t tenv
 
-lookupTypeEnv :: Hint -> Ident -> TypeEnv -> WithEnv TermPlus
-lookupTypeEnv m (I (name, x)) tenv =
-  case IntMap.lookup x tenv of
-    Just t ->
-      return t
-    Nothing ->
-      raiseCritical m $
-        "the variable `" <> name <> "` is not found in the type environment."
+-- lookupTypeEnv :: Hint -> Ident -> TypeEnv -> WithEnv TermPlus
+-- lookupTypeEnv m (I (name, x)) tenv =
+--   case IntMap.lookup x tenv of
+--     Just t ->
+--       return t
+--     Nothing ->
+--       raiseCritical m $
+--         "the variable `" <> name <> "` is not found in the type environment."
 
 termSigmaIntro :: Hint -> [IdentPlus] -> WithEnv TermPlus
 termSigmaIntro m xts = do
   z <- newIdentFromText "internal.sigma-tau-tuple"
-  let vz = (m, TermVar z)
+  let vz = (m, TermVar VarOpacityOpaque z)
   k <- newIdentFromText "sigma"
-  let args = map (\(mx, x, _) -> (mx, TermVar x)) xts
+  let args = map (\(mx, x, _) -> (mx, TermVar VarOpacityOpaque x)) xts
   return
     ( m,
       TermPiIntro
@@ -458,7 +458,7 @@ termSigmaIntro m xts = do
         [ (m, z, (m, TermTau)),
           (m, k, (m, TermPi xts vz))
         ]
-        (m, TermPiElim (m, TermVar k) args)
+        (m, TermPiElim (m, TermVar VarOpacityOpaque k) args)
     )
 
 toSwitcherBranch :: Hint -> TypeEnv -> TermPlus -> WithEnv (ValuePlus -> WithEnv CompPlus)

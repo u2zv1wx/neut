@@ -247,9 +247,9 @@ substTermPlus' sub nenv term =
   case term of
     (_, TermTau) ->
       return term
-    (m, TermVar x)
+    (m, TermVar opacity x)
       | Just x' <- IntMap.lookup (asInt x) nenv ->
-        return (m, TermVar x')
+        return (m, TermVar opacity x')
       | Just e <- IntMap.lookup (asInt x) sub ->
         return e
       | otherwise ->
@@ -335,7 +335,7 @@ isValue term =
   case term of
     (_, TermTau) ->
       True
-    (_, TermVar _) ->
+    (_, TermVar _ _) ->
       True
     (_, TermPi {}) ->
       True

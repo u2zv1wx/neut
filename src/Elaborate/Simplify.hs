@@ -15,7 +15,9 @@ import Reduce.WeakTerm
 
 data Stuck
   = StuckPiElimVar Ident [(Hint, [WeakTermPlus])]
+  | StuckPiElimVarOpaque Ident [(Hint, [WeakTermPlus])]
   | StuckPiElimAster Int [[WeakTermPlus]]
+  deriving (Show)
 
 simplify :: [(Constraint, Constraint)] -> WithEnv ()
 simplify cs =
@@ -80,12 +82,8 @@ simplify' constraintList =
             simplify $ map ((,) orig) ((t1, t2) : zip es1 es2 ++ zip ts1 ts2) ++ cs
         (e1@(m1, _), e2@(m2, _)) -> do
           sub <- gets substEnv
-          oenv <- gets opaqueEnv
-          -- opaqueEnvの変数のうちvarとしてカウントされないものを明示できると便利ではある。
-          -- トップレベルの変数はvarとしてカウントしてほしくないわけで,そこを反映したい。
-          -- ここをやっておくと, clarifyでの分岐も削れて処理が高速になる。
-          let fvs1 = S.filter (\v -> S.notMember v oenv) $ varWeakTermPlus e1
-          let fvs2 = S.filter (\v -> S.notMember v oenv) $ varWeakTermPlus e2
+          let fvs1 = varWeakTermPlus e1
+          let fvs2 = varWeakTermPlus e2
           let fmvs1 = asterWeakTermPlus e1
           let fmvs2 = asterWeakTermPlus e2
           let fmvs = S.union fmvs1 fmvs2 -- fmvs: free meta-variables
@@ -123,9 +121,8 @@ simplify' constraintList =
                       _ -> do
                         e1'' <- substWeakTermPlus (IntMap.fromList $ zip (map asInt zs) es) e1'
                         simplify $ ((e1'', e2'), orig) : cs
-                (Just (StuckPiElimVar x1 mess1), Just (StuckPiElimVar x2 mess2))
+                (Just (StuckPiElimVarOpaque x1 mess1), Just (StuckPiElimVarOpaque x2 mess2))
                   | x1 == x2,
-                    Nothing <- lookupDefinition x1 sub,
                     Just pairList <- asPairList (map snd mess1) (map snd mess2) ->
                     simplify $ map ((,) orig) pairList ++ cs
                 (Just (StuckPiElimVar x1 mess1), Just (StuckPiElimVar x2 mess2))
@@ -183,7 +180,7 @@ simplifyBinder' orig sub args1 args2 =
     ((m1, x1, t1) : xts1, (_, x2, t2) : xts2) -> do
       t2' <- substWeakTermPlus sub t2
       simplify [((t1, t2'), orig)]
-      let var1 = (m1, WeakTermVar x1)
+      let var1 = (m1, WeakTermVar VarOpacityOpaque x1)
       let sub' = IntMap.insert (asInt x2) var1 sub
       simplifyBinder' orig sub' xts1 xts2
     _ ->
@@ -214,8 +211,14 @@ asPairList list1 list2 =
 asStuckedTerm :: WeakTermPlus -> Maybe Stuck
 asStuckedTerm term =
   case term of
-    (_, WeakTermVar x) ->
-      Just $ StuckPiElimVar x []
+    (_, WeakTermVar opacity x) ->
+      case opacity of
+        VarOpacityOpaque ->
+          Just $ StuckPiElimVarOpaque x []
+        VarOpacityTranslucent ->
+          Just $ StuckPiElimVarOpaque x []
+        VarOpacityTransparent ->
+          Just $ StuckPiElimVar x []
     (_, WeakTermAster h) ->
       Just $ StuckPiElimAster h []
     (m, WeakTermPiElim e es) ->
@@ -225,6 +228,8 @@ asStuckedTerm term =
             Just $ StuckPiElimAster h $ iexss ++ [es]
         Just (StuckPiElimVar x ess) ->
           Just $ StuckPiElimVar x $ ess ++ [(m, es)]
+        Just (StuckPiElimVarOpaque x ess) ->
+          Just $ StuckPiElimVarOpaque x $ ess ++ [(m, es)]
         _ ->
           Nothing
     _ ->
@@ -258,7 +263,7 @@ toVarList xs termList =
     [] ->
       return []
     e : es
-      | (m, WeakTermVar x) <- e,
+      | (m, WeakTermVar _ x) <- e,
         x `S.member` xs -> do
         let t = (m, WeakTermTau) -- don't care
         xts <- toVarList xs es
@@ -266,7 +271,7 @@ toVarList xs termList =
       | otherwise -> do
         let m = metaOf e
         let t = (m, WeakTermTau) -- don't care
-        x <- newIdentFromText "aster"
+        x <- newIdentFromText "_"
         xts <- toVarList xs es
         return $ (m, x, t) : xts
 
@@ -312,7 +317,7 @@ isEq l r =
   case (l, r) of
     ((_, WeakTermTau), (_, WeakTermTau)) ->
       return True
-    ((_, WeakTermVar x1), (_, WeakTermVar x2)) ->
+    ((_, WeakTermVar _ x1), (_, WeakTermVar _ x2)) ->
       return $ x1 == x2
     ((_, WeakTermPi xts1 cod1), (_, WeakTermPi xts2 cod2)) -> do
       isEq' xts1 cod1 xts2 cod2
@@ -388,7 +393,7 @@ isEq'' sub xts1 cod1 xts2 cod2 =
     (((m1, x1, t1) : rest1), ((_, x2, t2) : rest2)) -> do
       t2' <- substWeakTermPlus sub t2
       b1 <- isEq t1 t2'
-      let sub' = IntMap.insert (asInt x2) (m1, WeakTermVar x1) sub
+      let sub' = IntMap.insert (asInt x2) (m1, WeakTermVar VarOpacityOpaque x1) sub
       b2 <- isEq'' sub' rest1 cod1 rest2 cod2
       return $ b1 && b2
     _ ->

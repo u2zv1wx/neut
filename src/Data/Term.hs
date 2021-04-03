@@ -10,7 +10,7 @@ import Data.WeakTerm
 
 data Term
   = TermTau
-  | TermVar Ident
+  | TermVar VarOpacity Ident
   | TermPi [IdentPlus] TermPlus
   | TermPiIntro (Maybe (T.Text, T.Text)) [IdentPlus] TermPlus
   | TermPiElim TermPlus [TermPlus]
@@ -55,7 +55,7 @@ data Stmt
 asVar :: TermPlus -> Maybe Ident
 asVar term =
   case term of
-    (_, TermVar x) ->
+    (_, TermVar _ x) ->
       Just x
     _ ->
       Nothing
@@ -65,8 +65,8 @@ weaken term =
   case term of
     (m, TermTau) ->
       (m, WeakTermTau)
-    (m, TermVar x) ->
-      (m, WeakTermVar x)
+    (m, TermVar opacity x) ->
+      (m, WeakTermVar opacity x)
     (m, TermPi xts t) ->
       (m, WeakTermPi (weakenArgs xts) (weaken t))
     (m, TermPiIntro mName xts body) -> do

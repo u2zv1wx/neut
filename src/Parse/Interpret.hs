@@ -43,7 +43,7 @@ interpret inputTree =
                   h <- newAster m
                   return (m, WeakTermQuestion e h)
             | otherwise ->
-              return (m, WeakTermVar $ asIdent atom)
+              return (m, WeakTermVar VarOpacityOpaque $ asIdent atom)
     (m, TreeNode (leaf@(_, TreeLeaf headAtom) : rest)) ->
       case headAtom of
         "Π"
@@ -224,7 +224,7 @@ interpretArg es =
       case tree of
         (_, TreeLeaf "_") -> do
           xt@(m, h, _) <- interpretIdentPlus tree
-          return (xt : xts, (m, WeakTermVar h) : args)
+          return (xt : xts, (m, WeakTermVar VarOpacityOpaque h) : args)
         _ -> do
           e <- interpret tree
           return (xts, e : args)
@@ -335,7 +335,7 @@ interpretNoeticCaseBody subject nameMap body =
     ((new, orig, t) : rest) -> do
       body' <- interpretNoeticCaseBody subject rest body
       let m = fst t
-      let new' = castToNoema subject t (m, WeakTermVar $ asIdent new)
+      let new' = castToNoema subject t (m, WeakTermVar VarOpacityOpaque $ asIdent new)
       return
         ( m,
           WeakTermPiElim
@@ -549,7 +549,7 @@ castFromNoema subject baseType tree = do
   let m = fst tree
   ( m,
     WeakTermPiElim
-      (m, WeakTermVar (asIdent "unsafe.cast"))
+      (m, WeakTermVar VarOpacityOpaque (asIdent "unsafe.cast"))
       [ wrapWithNoema subject baseType,
         baseType,
         tree
@@ -561,7 +561,7 @@ castToNoema subject baseType tree = do
   let m = fst tree
   ( m,
     WeakTermPiElim
-      (m, WeakTermVar (asIdent "unsafe.cast"))
+      (m, WeakTermVar VarOpacityOpaque (asIdent "unsafe.cast"))
       [ baseType,
         wrapWithNoema subject baseType,
         tree
@@ -572,4 +572,4 @@ castToNoema subject baseType tree = do
 wrapWithNoema :: WeakTermPlus -> WeakTermPlus -> WeakTermPlus
 wrapWithNoema subject baseType = do
   let m = fst baseType
-  (m, WeakTermPiElim (m, WeakTermVar (asIdent "noema")) [subject, baseType])
+  (m, WeakTermPiElim (m, WeakTermVar VarOpacityOpaque (asIdent "noema")) [subject, baseType])

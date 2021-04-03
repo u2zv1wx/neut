@@ -42,6 +42,12 @@ data EnumCase
 type EnumCasePlus =
   (Hint, EnumCase)
 
+data VarOpacity
+  = VarOpacityOpaque
+  | VarOpacityTranslucent
+  | VarOpacityTransparent
+  deriving (Show)
+
 asText :: Ident -> T.Text
 asText (I (s, _)) =
   s

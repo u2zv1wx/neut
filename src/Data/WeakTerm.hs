@@ -11,7 +11,7 @@ import Data.Tree
 
 data WeakTerm
   = WeakTermTau
-  | WeakTermVar Ident
+  | WeakTermVar VarOpacity Ident
   | WeakTermPi [WeakIdentPlus] WeakTermPlus
   | WeakTermPiIntro (Maybe (T.Text, T.Text)) [WeakIdentPlus] WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
@@ -93,7 +93,7 @@ conToInt con =
 
 toVar :: Hint -> Ident -> WeakTermPlus
 toVar m x =
-  (m, WeakTermVar x)
+  (m, WeakTermVar VarOpacityOpaque x)
 
 i8 :: Hint -> WeakTermPlus
 i8 m =
@@ -108,8 +108,12 @@ varWeakTermPlus term =
   case term of
     (_, WeakTermTau) ->
       S.empty
-    (_, WeakTermVar x) ->
-      S.singleton x
+    (_, WeakTermVar opacity x) ->
+      case opacity of
+        VarOpacityOpaque ->
+          S.singleton x
+        _ ->
+          S.empty
     (_, WeakTermPi xts t) ->
       varWeakTermPlus' xts [t]
     (_, WeakTermPiIntro _ xts e) ->
@@ -177,7 +181,7 @@ asterWeakTermPlus term =
   case term of
     (_, WeakTermTau) ->
       S.empty
-    (_, WeakTermVar _) ->
+    (_, WeakTermVar _ _) ->
       S.empty
     (_, WeakTermPi xts t) ->
       asterWeakTermPlus' xts [t]
@@ -248,7 +252,7 @@ metaOf =
 asVar :: WeakTermPlus -> Maybe Ident
 asVar term =
   case term of
-    (_, WeakTermVar x) ->
+    (_, WeakTermVar _ x) ->
       Just x
     _ ->
       Nothing
@@ -258,7 +262,7 @@ toText term =
   case term of
     (_, WeakTermTau) ->
       "tau"
-    (_, WeakTermVar x) ->
+    (_, WeakTermVar _ x) ->
       showVariable x
     (_, WeakTermPi xts cod)
       | [(_, I ("internal.sigma-tau", _), _), (_, _, (_, WeakTermPi yts _))] <- xts ->
@@ -273,13 +277,13 @@ toText term =
       let argStr = inParen $ showItems $ map showArg xts
       showCons ["λ", argStr, toText e]
     (_, WeakTermPiElim e es) ->
-      case e of
-        (_, WeakTermAster i) ->
-          "?M" <> T.pack (show i)
-        -- (_, WeakTermAster _) ->
-        --   "*"
-        _ ->
-          showCons $ map toText $ e : es
+      -- case e of
+      --   (_, WeakTermAster i) ->
+      --     "?M" <> T.pack (show i)
+      -- (_, WeakTermAster _) ->
+      --   "*"
+      -- _ ->
+      showCons $ map toText $ e : es
     -- (_, WeakTermFix (_, x, _) _ _) -> do
     --   asText x
     (_, WeakTermFix b (_, x, _) xts e) -> do
@@ -332,7 +336,7 @@ toTree term =
   case term of
     (m, WeakTermTau) ->
       (m, TreeLeaf "tau")
-    (m, WeakTermVar x) ->
+    (m, WeakTermVar _ x) ->
       (m, TreeLeaf (showVariable x))
     (m, WeakTermPi xts cod) ->
       (m, TreeNode [(m, TreeLeaf "Π"), (m, TreeNode (map toTreeArg xts)), toTree cod])
