@@ -7,7 +7,6 @@ import Control.Monad.State.Lazy
 import Data.Basic
 import Data.Env
 import qualified Data.IntMap as IntMap
-import Data.Maybe
 import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
 import Data.WeakTerm
@@ -87,38 +86,35 @@ simplify' constraintList =
           let fmvs1 = asterWeakTermPlus e1
           let fmvs2 = asterWeakTermPlus e2
           let fmvs = S.union fmvs1 fmvs2 -- fmvs: free meta-variables
-          case lookupAny (S.toList fmvs) sub of
-            Just (h, e) -> do
-              let s = IntMap.singleton h e
-              e1' <- substWeakTermPlus s e1
-              e2' <- substWeakTermPlus s e2
+          case (lookupAny (S.toList fmvs1) sub, lookupAny (S.toList fmvs2) sub) of
+            (Just (h1, body1), Just (h2, body2)) -> do
+              let s1 = IntMap.singleton h1 body1
+              let s2 = IntMap.singleton h2 body2
+              e1' <- substWeakTermPlus s1 e1
+              e2' <- substWeakTermPlus s2 e2
               simplify $ ((e1', e2'), orig) : cs
-            Nothing -> do
+            (Just (h1, body1), Nothing) -> do
+              let s1 = IntMap.singleton h1 body1
+              e1' <- substWeakTermPlus s1 e1
+              simplify $ ((e1', e2), orig) : cs
+            (Nothing, Just (h2, body2)) -> do
+              let s2 = IntMap.singleton h2 body2
+              e2' <- substWeakTermPlus s2 e2
+              simplify $ ((e1, e2'), orig) : cs
+            (Nothing, Nothing) -> do
               case (asStuckedTerm e1, asStuckedTerm e2) of
                 (Just (StuckPiElimAster h1 ies1), _)
-                  | xs1 <- concatMap getVarList ies1,
-                    occurCheck h1 fmvs2,
-                    isLinear $ filter (`S.member` fvs2) xs1,
-                    zs <- includeCheck xs1 fvs2,
-                    Just es <- lookupAll zs sub ->
-                    case es of
-                      [] ->
-                        resolveHole h1 ies1 e2 fvs2 cs
-                      _ -> do
-                        e2' <- substWeakTermPlus (IntMap.fromList $ zip (map asInt zs) es) e2
-                        simplify $ ((e1, e2'), orig) : cs
+                  | Just xss1 <- mapM asIdentList ies1,
+                    Just argSet1 <- toLinearIdentSet xss1,
+                    h1 `S.notMember` fmvs2,
+                    fvs2 `S.isSubsetOf` argSet1 ->
+                    resolveHole h1 xss1 e2 cs
                 (_, Just (StuckPiElimAster h2 ies2))
-                  | xs2 <- concatMap getVarList ies2,
-                    occurCheck h2 fmvs1,
-                    isLinear $ filter (`S.member` fvs1) xs2,
-                    zs <- includeCheck xs2 fvs1,
-                    Just es <- lookupAll zs sub ->
-                    case es of
-                      [] ->
-                        resolveHole h2 ies2 e1 fvs1 cs
-                      _ -> do
-                        e1' <- substWeakTermPlus (IntMap.fromList $ zip (map asInt zs) es) e1
-                        simplify $ ((e1', e2), orig) : cs
+                  | Just xss2 <- mapM asIdentList ies2,
+                    Just argSet2 <- toLinearIdentSet xss2,
+                    h2 `S.notMember` fmvs1,
+                    fvs1 `S.isSubsetOf` argSet2 ->
+                    resolveHole h2 xss2 e1 cs
                 (Just (StuckPiElimVarOpaque x1 mess1), Just (StuckPiElimVarOpaque x2 mess2))
                   | x1 == x2,
                     Just pairList <- asPairList (map snd mess1) (map snd mess2) ->
@@ -131,7 +127,6 @@ simplify' constraintList =
                   | x1 /= x2,
                     Just lam1 <- lookupDefinition x1 sub,
                     Just lam2 <- lookupDefinition x2 sub -> do
-                    -- expand the definition of the variable that is defined later
                     if asInt x1 > asInt x2
                       then simplify $ ((toPiElim lam1 mess1, e2), orig) : cs
                       else simplify $ ((e1, toPiElim lam2 mess2), orig) : cs
@@ -156,12 +151,10 @@ simplify' constraintList =
                   modify (\env -> env {suspendedConstraintEnv = Q.insert susCon (suspendedConstraintEnv env)})
                   simplify cs
 
-resolveHole :: Int -> [[WeakTermPlus]] -> WeakTermPlus -> S.Set Ident -> [(Constraint, Constraint)] -> WithEnv ()
-resolveHole h1 ies1 e2' fvs2 cs = do
-  xss <- mapM (toVarList fvs2) ies1
-  let lam = bindFormalArgs e2' xss
-  modify (\env -> env {substEnv = IntMap.insert h1 lam (substEnv env)})
-  -- p $ T.unpack $ "resolve: " <> T.pack (show h1) <> " ~> " <> toText lam
+resolveHole :: Int -> [[WeakIdentPlus]] -> WeakTermPlus -> [(Constraint, Constraint)] -> WithEnv ()
+resolveHole h1 xss e2' cs = do
+  modify (\env -> env {substEnv = IntMap.insert h1 (toPiIntro xss e2') (substEnv env)})
+  -- p $ T.unpack $ "resolve: " <> T.pack (show h1) <> " ~> " <> toText (toPiIntro xss e2')
   sus <- gets suspendedConstraintEnv
   let (sus1, sus2) = Q.partition (\(SusCon (hs, _, _)) -> S.member h1 hs) sus
   modify (\env -> env {suspendedConstraintEnv = sus2})
@@ -233,19 +226,14 @@ asStuckedTerm term =
     _ ->
       Nothing
 
-{-# INLINE occurCheck #-}
-occurCheck :: Int -> S.Set Int -> Bool
-occurCheck h fmvs =
-  h `S.notMember` fmvs
-
-{-# INLINE includeCheck #-}
-includeCheck :: [Ident] -> S.Set Ident -> [Ident]
-includeCheck xs ys =
-  filter (`notElem` xs) $ S.toList ys
-
-getVarList :: [WeakTermPlus] -> [Ident]
-getVarList xs =
-  catMaybes $ map asVar xs
+toPiIntro :: [[WeakIdentPlus]] -> WeakTermPlus -> WeakTermPlus
+toPiIntro args e =
+  case args of
+    [] ->
+      e
+    xts : xtss -> do
+      let e' = toPiIntro xtss e
+      (metaOf e', WeakTermPiIntro Nothing xts e')
 
 toPiElim :: WeakTermPlus -> [(Hint, [WeakTermPlus])] -> WeakTermPlus
 toPiElim e args =
@@ -255,32 +243,36 @@ toPiElim e args =
     (m, es) : ess ->
       toPiElim (m, WeakTermPiElim e es) ess
 
-toVarList :: S.Set Ident -> [WeakTermPlus] -> WithEnv [WeakIdentPlus]
-toVarList xs termList =
+asIdentList :: [WeakTermPlus] -> Maybe [WeakIdentPlus]
+asIdentList termList =
   case termList of
     [] ->
       return []
     e : es
-      | (m, WeakTermVar _ x) <- e,
-        x `S.member` xs -> do
+      | (m, WeakTermVar _ x) <- e -> do
         let t = (m, WeakTermTau) -- don't care
-        xts <- toVarList xs es
+        xts <- asIdentList es
         return $ (m, x, t) : xts
-      | otherwise -> do
-        let m = metaOf e
-        let t = (m, WeakTermTau) -- don't care
-        x <- newIdentFromText "_"
-        xts <- toVarList xs es
-        return $ (m, x, t) : xts
+      | otherwise ->
+        Nothing
 
-bindFormalArgs :: WeakTermPlus -> [[WeakIdentPlus]] -> WeakTermPlus
-bindFormalArgs e args =
-  case args of
+{-# INLINE toLinearIdentSet #-}
+toLinearIdentSet :: [[WeakIdentPlus]] -> Maybe (S.Set Ident)
+toLinearIdentSet xtss =
+  toLinearIdentSet' xtss S.empty
+
+toLinearIdentSet' :: [[WeakIdentPlus]] -> S.Set Ident -> Maybe (S.Set Ident)
+toLinearIdentSet' xtss acc =
+  case xtss of
     [] ->
-      e
-    xts : xtss -> do
-      let e' = bindFormalArgs e xtss
-      (metaOf e', WeakTermPiIntro Nothing xts e')
+      return acc
+    [] : rest ->
+      toLinearIdentSet' rest acc
+    ((_, x, _) : rest1) : rest2
+      | x `S.member` acc ->
+        Nothing
+      | otherwise ->
+        toLinearIdentSet' (rest1 : rest2) (S.insert x acc)
 
 lookupAny :: [Int] -> IntMap.IntMap a -> Maybe (Int, a)
 lookupAny is sub =
@@ -293,16 +285,6 @@ lookupAny is sub =
           Just (j, v)
         _ ->
           lookupAny js sub
-
-lookupAll :: [Ident] -> IntMap.IntMap a -> Maybe [a]
-lookupAll is sub =
-  case is of
-    [] ->
-      return []
-    j : js -> do
-      v <- IntMap.lookup (asInt j) sub
-      vs <- lookupAll js sub
-      return $ v : vs
 
 {-# INLINE lookupDefinition #-}
 lookupDefinition :: Ident -> (IntMap.IntMap WeakTermPlus) -> Maybe WeakTermPlus

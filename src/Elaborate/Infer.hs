@@ -45,9 +45,6 @@ infer' ctx term =
           return ((m, WeakTermVar VarOpacityTranslucent x), (m, snd t))
         (False, _) ->
           return ((m, WeakTermVar VarOpacityOpaque x), (m, snd t))
-    -- if not (IntMap.member (asInt x) senv)
-    --   then return ((m, WeakTermVar VarOpacityOpaque x), (m, snd t))
-    --   else undefined
     (m, WeakTermPi xts t) -> do
       (xts', t') <- inferPi ctx xts t
       return ((m, WeakTermPi xts' t'), (m, WeakTermTau))

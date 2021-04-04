@@ -113,6 +113,3 @@ toConstructorLabelName x =
 wrapWithQuote :: T.Text -> T.Text
 wrapWithQuote x =
   "\"" <> x <> "\""
-
--- toGlobalVarName x =
---   "_" <> T.pack (show (asInt x))

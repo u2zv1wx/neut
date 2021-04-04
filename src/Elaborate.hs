@@ -61,7 +61,6 @@ elaborateStmt' stmt =
       cont' <- elaborateStmt' cont
       return $ StmtResourceType m name discarder'' copier'' : cont'
     WeakStmtOpaque name : cont -> do
-      -- modify (\env -> env {substEnv = IntMap.delete (asInt name) (substEnv env)})
       modify (\env -> env {opaqueEnv = S.insert name (opaqueEnv env)})
       elaborateStmt' cont
 

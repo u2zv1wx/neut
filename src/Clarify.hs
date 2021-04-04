@@ -124,7 +124,7 @@ clarifyTerm tenv term =
           let lamBody = bindLet (zip xs es') (m, CompUpElim resultVarName (m, CompPrimitive (PrimitiveDerangement expKind xsAsVars)) tuple)
           h <- newIdentFromText "der"
           let fvs = nubFreeVariables $ chainOf' tenv xts es
-          cls <- retClosure tenv (ClosureNameFix h) fvs m [] lamBody -- cls shouldn't be reduced since it can be effectful
+          cls <- retClosure tenv (ClosureNameFix h) fvs m [] lamBody -- cls is regarded as a fix since it shouldn't be reduced; it can be effectful
           callClosure m cls []
     (m, TermCase resultType mSubject (e, _) patList) -> do
       let fvs = chainFromTermList tenv $ map (caseClauseToLambda m) patList

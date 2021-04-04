@@ -134,7 +134,7 @@ findNext nenv name = do
       flip map nenv $ \(from, to) -> do
         case T.stripPrefix (from <> nsSep) name of
           Just suffix -> do
-            return [to <> nsSep <> suffix] -- map (<> suffix) toList
+            return [to <> nsSep <> suffix]
           Nothing ->
             return []
 

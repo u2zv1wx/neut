@@ -153,7 +153,6 @@ reduceConstApp m c es =
       | [(mNode, MetaTermNode ts)] <- es ->
         case ts of
           h : _ ->
-            -- return h
             return (m, snd h)
           _ ->
             raiseError mNode "the constant `head` cannot be applied to nil"
