@@ -10,7 +10,7 @@ import Data.Tree
 -- untyped lambda calculus with AST values (node / leaf)
 data MetaTerm
   = MetaTermVar Ident
-  | MetaTermImpIntro (Maybe Ident) [Ident] (Maybe Ident) MetaTermPlus -- the `Maybe Ident` part is for variadic fix
+  | MetaTermImpIntro (Maybe Ident) [Ident] (Maybe Ident) MetaTermPlus
   | MetaTermImpElim MetaTermPlus [MetaTermPlus]
   | MetaTermLeaf T.Text
   | MetaTermNode [MetaTermPlus]

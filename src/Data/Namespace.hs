@@ -113,29 +113,30 @@ resolveSymbol m predicate name = do
 constructCandList :: T.Text -> WithEnv [T.Text]
 constructCandList name = do
   penv <- gets prefixEnv
-  constructCandList' $ name : map (<> nsSep <> name) penv
-
-constructCandList' :: [T.Text] -> WithEnv [T.Text]
-constructCandList' nameList =
-  concat <$> mapM constructCandList'' nameList
-
-constructCandList'' :: T.Text -> WithEnv [T.Text]
-constructCandList'' name = do
-  nameList <- findNext name
-  if null nameList
-    then return [name]
-    else constructCandList' nameList
-
-findNext :: T.Text -> WithEnv [T.Text]
-findNext name = do
   nenv <- gets nsEnv
-  fmap concat $
-    forM nenv $ \(from, to) -> do
-      case T.stripPrefix (from <> nsSep) name of
-        Just suffix -> do
-          return [to <> nsSep <> suffix] -- map (<> suffix) toList
-        Nothing ->
-          return []
+  return $ constructCandList' nenv $ name : map (<> nsSep <> name) penv
+
+constructCandList' :: [(T.Text, T.Text)] -> [T.Text] -> [T.Text]
+constructCandList' nenv nameList =
+  concat $ map (constructCandList'' nenv) nameList
+
+constructCandList'' :: [(T.Text, T.Text)] -> T.Text -> [T.Text]
+constructCandList'' nenv name = do
+  let nameList = findNext nenv name
+  if null nameList
+    then [name]
+    else constructCandList' nenv nameList
+
+findNext :: [(T.Text, T.Text)] -> T.Text -> [T.Text]
+findNext nenv name = do
+  concat $
+    concat $
+      flip map nenv $ \(from, to) -> do
+        case T.stripPrefix (from <> nsSep) name of
+          Just suffix -> do
+            return [to <> nsSep <> suffix] -- map (<> suffix) toList
+          Nothing ->
+            return []
 
 takeAll :: (T.Text -> WithEnv (Maybe b)) -> [T.Text] -> [T.Text] -> WithEnv [T.Text]
 takeAll predicate candidateList acc =

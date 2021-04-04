@@ -60,14 +60,12 @@ data Env = Env
     holeEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus),
     constraintEnv :: [Constraint],
     suspendedConstraintEnv :: SusConQueue,
-    -- suspendedConstraintEnv :: [SuspendedConstraint],
     substEnv :: IntMap.IntMap WeakTermPlus,
     opaqueEnv :: S.Set Ident,
     --
     -- clarify
     --
     codeEnv :: Map.HashMap T.Text Definition,
-    -- irreducibleEnv :: S.Set T.Text,
     --
     -- LLVM
     --
