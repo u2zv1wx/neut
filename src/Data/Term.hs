@@ -131,6 +131,8 @@ weakenKind kind =
       LamKindCons t1 t2
     LamKindFix xt ->
       LamKindFix (weakenIdentPlus xt)
+    LamKindResourceHandler ->
+      LamKindResourceHandler
 
 lowTypeToType :: (MonadThrow m) => Hint -> LowType -> m TermPlus
 lowTypeToType m lowType =

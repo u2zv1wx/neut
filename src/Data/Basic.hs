@@ -51,6 +51,7 @@ data LamKind a
   = LamKindNormal
   | LamKindCons T.Text T.Text
   | LamKindFix a
+  | LamKindResourceHandler
   deriving (Show)
 
 type IsReducible =

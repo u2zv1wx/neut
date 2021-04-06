@@ -209,6 +209,8 @@ elaborateKind kind =
     LamKindFix xt -> do
       xt' <- elaborateWeakIdentPlus xt
       return $ LamKindFix xt'
+    LamKindResourceHandler ->
+      return LamKindResourceHandler
 
 checkSwitchExaustiveness :: Hint -> T.Text -> [EnumCase] -> WithEnv ()
 checkSwitchExaustiveness m x caseList = do

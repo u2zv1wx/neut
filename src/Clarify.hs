@@ -294,6 +294,16 @@ makeClosure isReducible kind mxts2 m mxts1 e = do
       e' <- substCompPlus (IntMap.fromList [(asInt name, cls)]) IntMap.empty e
       registerIfNecessary m name' False False xts1 xts2 e'
       return cls
+    LamKindResourceHandler -> do
+      when (not (null xts2)) $
+        raiseError m "this resource-lambda is not closed"
+      e' <- linearize xts1 e >>= reduceCompPlus
+      i <- newCount
+      let name = "resource-handler-" <> T.pack (show i)
+      insCompEnv (wrapWithQuote name) isReducible (map fst xts1) e'
+      return (m, ValueConst (wrapWithQuote name))
+
+-- body <- reduceCompPlus (m, CompSigmaElim False (map fst xts2) envVar e')
 
 registerIfNecessary ::
   Hint ->

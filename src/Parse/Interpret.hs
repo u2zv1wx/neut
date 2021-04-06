@@ -67,6 +67,12 @@ interpret inputTree =
             return (m, WeakTermPiIntro OpacityTransparent (LamKindCons dataName' consName') xts' e')
           | otherwise ->
             raiseSyntaxError m "(Π-introduction-constructor LEAF LEAF (TREE*) TREE)"
+        "Π-introduction-resource-handler"
+          | [(_, TreeNode xts), e] <- rest -> do
+            (xts', e') <- interpretBinder xts e
+            return (m, WeakTermPiIntro OpacityTransparent LamKindResourceHandler xts' e')
+          | otherwise ->
+            raiseSyntaxError m "(Π-introduction (TREE*) TREE)"
         "Π-elimination"
           | e : es <- rest ->
             interpretPiElim m e es
