@@ -194,28 +194,23 @@ asEnumCase name =
   findThenModify revEnumEnv name EnumCaseLabel
 
 {-# INLINE asMetaConstant #-}
-asMetaConstant :: Hint -> T.Text -> WithEnv (Maybe MetaTermPlus)
+asMetaConstant :: Hint -> T.Text -> Maybe MetaTermPlus
 asMetaConstant m name =
   if Map.member name metaConstants
-    then return $ Just (m, MetaTermConst name)
-    else return Nothing
+    then Just (m, MetaTermConst name)
+    else Nothing
 
 {-# INLINE asWeakConstant #-}
-asWeakConstant :: Hint -> T.Text -> WithEnv (Maybe WeakTermPlus)
+asWeakConstant :: Hint -> T.Text -> Maybe WeakTermPlus
 asWeakConstant m name
   | Just (LowTypeInt _) <- asLowTypeMaybe name =
-    return $ Just (m, WeakTermConst name)
+    Just (m, WeakTermConst name)
   | Just (LowTypeFloat _) <- asLowTypeMaybe name =
-    return $ Just (m, WeakTermConst name)
+    Just (m, WeakTermConst name)
   | Just _ <- asPrimOp name =
-    return $ Just (m, WeakTermConst name)
+    Just (m, WeakTermConst name)
   | otherwise =
-    return Nothing
-
--- set <- gets constantSet
--- if S.member name set
---   then return $ Just (m, WeakTermConst name)
---   else return Nothing
+    Nothing
 
 tryCand :: (Monad m) => m (Maybe a) -> m a -> m a
 tryCand comp cont = do

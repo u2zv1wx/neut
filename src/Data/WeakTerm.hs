@@ -57,8 +57,7 @@ type IdentDef =
 
 data WeakStmt
   = WeakStmtDef Hint WeakIdentPlus WeakTermPlus
-  | -- | WeakStmtResourceType Hint T.Text WeakTermPlus WeakTermPlus
-    WeakStmtOpaque Ident
+  | WeakStmtOpaque Ident
   deriving (Show)
 
 type Constraint =
@@ -268,13 +267,11 @@ toText term =
       case kind of
         LamKindFix (_, x, _) -> do
           let argStr = inParen $ showItems $ map showArg xts
-          -- showCons ["fix", showVariable x, argStr, toText e]
           if isOpaque opacity
             then showCons ["fix-irreducible", showVariable x, argStr, toText e]
             else showCons ["fix", showVariable x, argStr, toText e]
         _ -> do
           let argStr = inParen $ showItems $ map showArg xts
-          -- showCons ["λ", argStr, toText e]
           if isTransparent opacity
             then showCons ["λ", argStr, toText e]
             else showCons ["λ-irreducible", argStr, toText e]

@@ -24,7 +24,7 @@ discernMetaTerm' nenv term =
   case term of
     (m, MetaTermVar (I (s, _))) ->
       tryCand (resolveSymbol m (asMetaVar m nenv) s) $
-        tryCand (resolveSymbol m (asMetaConstant m) s) $
+        tryCand (resolveSymbol m (return . asMetaConstant m) s) $
           raiseError m $ "undefined meta-variable: " <> s
     (m, MetaTermImpIntro mf xs mx e) -> do
       case mf of

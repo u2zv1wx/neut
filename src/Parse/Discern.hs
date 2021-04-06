@@ -47,7 +47,7 @@ discern' nenv term =
       tryCand (resolveSymbol m (asWeakVar m nenv) s) $
         tryCand (resolveSymbol m (asWeakEnumValue m) s) $
           tryCand (resolveSymbol m (asWeakEnumType m) s) $
-            tryCand (resolveSymbol m (asWeakConstant m) s) $
+            tryCand (resolveSymbol m (return . asWeakConstant m) s) $
               raiseError m $ "undefined variable: " <> s
     (m, WeakTermPi xts t) -> do
       (xts', t') <- discernBinder nenv xts t

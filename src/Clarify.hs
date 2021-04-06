@@ -43,12 +43,6 @@ clarifyStmt tenv ss =
       let app = (m, CompPiElimDownElim (m, ValueConst (toGlobalVarName x)) [])
       return (m, CompUpElim holeVarName app cont')
 
--- StmtResourceType m name discarder copier : cont -> do
---   discarder' <- toSwitcherBranch m tenv discarder
---   copier' <- toSwitcherBranch m tenv copier
---   registerSwitcher m name discarder' copier'
---   clarifyStmt tenv cont
-
 clarifyTerm :: TypeEnv -> TermPlus -> WithEnv CompPlus
 clarifyTerm tenv term =
   case term of
@@ -304,8 +298,6 @@ makeClosure isReducible kind mxts2 m mxts1 e = do
       insCompEnv (wrapWithQuote name) isReducible (map fst xts1) e'
       return (m, ValueConst (wrapWithQuote name))
 
--- body <- reduceCompPlus (m, CompSigmaElim False (map fst xts2) envVar e')
-
 registerIfNecessary ::
   Hint ->
   T.Text ->
@@ -450,9 +442,3 @@ termSigmaIntro m xts = do
         ]
         (m, TermPiElim (m, TermVar OpacityOpaque k) args)
     )
-
--- toSwitcherBranch :: Hint -> TypeEnv -> TermPlus -> WithEnv (ValuePlus -> WithEnv CompPlus)
--- toSwitcherBranch m tenv d = do
---   d' <- clarifyTerm tenv d
---   (varName, var) <- newValueVarWith m "res"
---   return $ \val -> callClosure m d' [(varName, (m, CompUpIntro val), var)] >>= reduceCompPlus

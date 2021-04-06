@@ -29,10 +29,6 @@ data Primitive
   | PrimitiveDerangement Derangement [ValuePlus]
   deriving (Show)
 
--- newtype IsReducible
---   = IsReducible Bool
---   deriving (Show)
-
 data Definition
   = Definition IsReducible [Ident] CompPlus
   deriving (Show)

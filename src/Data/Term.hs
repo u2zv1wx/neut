@@ -48,7 +48,6 @@ type TypeEnv =
 
 data Stmt
   = StmtDef Hint IdentPlus TermPlus
-  -- | StmtResourceType Hint T.Text TermPlus TermPlus
   deriving (Show)
 
 asVar :: TermPlus -> Maybe Ident
