@@ -22,10 +22,16 @@ reduceCompPlus term =
       cenv <- gets codeEnv
       case v of
         (_, ValueConst x)
-          | Just (Definition (IsFixed False) xs body) <- Map.lookup x cenv,
+          | Just (Definition isReducible xs body) <- Map.lookup x cenv,
+            isReducible,
             length xs == length ds -> do
             let sub = IntMap.fromList (zip (map asInt xs) ds)
             substCompPlus sub IntMap.empty body >>= reduceCompPlus
+        -- (_, ValueConst x)
+        --   | Just (Definition (IsFixed False) xs body) <- Map.lookup x cenv,
+        --     length xs == length ds -> do
+        --     let sub = IntMap.fromList (zip (map asInt xs) ds)
+        --     substCompPlus sub IntMap.empty body >>= reduceCompPlus
         _ ->
           return (m, CompPiElimDownElim v ds)
     (m, CompSigmaElim isNoetic xs v e) ->

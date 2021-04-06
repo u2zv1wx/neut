@@ -41,10 +41,10 @@ data EnumCase
 type EnumCasePlus =
   (Hint, EnumCase)
 
-data VarOpacity
-  = VarOpacityOpaque
-  | VarOpacityTranslucent
-  | VarOpacityTransparent
+data Opacity
+  = OpacityOpaque
+  | OpacityTranslucent
+  | OpacityTransparent
   deriving (Show)
 
 data LamKind a
@@ -55,6 +55,22 @@ data LamKind a
 
 type IsReducible =
   Bool
+
+isOpaque :: Opacity -> Bool
+isOpaque o =
+  case o of
+    OpacityOpaque ->
+      True
+    _ ->
+      False
+
+isTransparent :: Opacity -> Bool
+isTransparent o =
+  case o of
+    OpacityTransparent ->
+      True
+    _ ->
+      False
 
 fromLamKind :: LamKind a -> Maybe a
 fromLamKind k =

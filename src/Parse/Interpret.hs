@@ -44,7 +44,7 @@ interpret inputTree =
                   h <- newAster m
                   return (m, WeakTermQuestion e h)
             | otherwise ->
-              return (m, WeakTermVar VarOpacityOpaque $ asIdent atom)
+              return (m, WeakTermVar OpacityOpaque $ asIdent atom)
     (m, TreeNode (leaf@(_, TreeLeaf headAtom) : rest)) ->
       case headAtom of
         "Π"
@@ -56,7 +56,7 @@ interpret inputTree =
         "Π-introduction"
           | [(_, TreeNode xts), e] <- rest -> do
             (xts', e') <- interpretBinder xts e
-            return (m, WeakTermPiIntro True LamKindNormal xts' e')
+            return (m, WeakTermPiIntro OpacityTransparent LamKindNormal xts' e')
           | otherwise ->
             raiseSyntaxError m "(Π-introduction (TREE*) TREE)"
         "Π-introduction-constructor"
@@ -64,7 +64,7 @@ interpret inputTree =
             (xts', e') <- interpretBinder xts e
             dataName' <- withSectionPrefix dataName
             consName' <- withSectionPrefix consName
-            return (m, WeakTermPiIntro True (LamKindCons dataName' consName') xts' e')
+            return (m, WeakTermPiIntro OpacityTransparent (LamKindCons dataName' consName') xts' e')
           | otherwise ->
             raiseSyntaxError m "(Π-introduction-constructor LEAF LEAF (TREE*) TREE)"
         "Π-elimination"
@@ -75,13 +75,13 @@ interpret inputTree =
         "fix"
           | [xt, xts@(_, TreeNode _), e] <- rest -> do
             (m', xt', xts', e') <- interpretFix (m, TreeNode [xt, xts, e])
-            return (m', WeakTermPiIntro True (LamKindFix xt') xts' e')
+            return (m', WeakTermPiIntro OpacityTranslucent (LamKindFix xt') xts' e')
           | otherwise ->
             raiseSyntaxError m "(fix TREE (TREE*) TREE)"
         "fix-irreducible"
           | [xt, xts@(_, TreeNode _), e] <- rest -> do
             (m', xt', xts', e') <- interpretFix (m, TreeNode [xt, xts, e])
-            return (m', WeakTermPiIntro False (LamKindFix xt') xts' e')
+            return (m', WeakTermPiIntro OpacityOpaque (LamKindFix xt') xts' e')
           | otherwise ->
             raiseSyntaxError m "(fix-irreducible TREE (TREE*) TREE)"
         "constant"
@@ -213,7 +213,7 @@ interpretPiElim m f es = do
   (xts, args) <- interpretArg es
   if null xts
     then return (m, WeakTermPiElim f' args)
-    else return (m, WeakTermPiIntro True LamKindNormal xts (m, WeakTermPiElim f' args))
+    else return (m, WeakTermPiIntro OpacityTransparent LamKindNormal xts (m, WeakTermPiElim f' args))
 
 interpretArg :: [TreePlus] -> WithEnv ([WeakIdentPlus], [WeakTermPlus])
 interpretArg es =
@@ -225,7 +225,7 @@ interpretArg es =
       case tree of
         (_, TreeLeaf "_") -> do
           xt@(m, h, _) <- interpretIdentPlus tree
-          return (xt : xts, (m, WeakTermVar VarOpacityOpaque h) : args)
+          return (xt : xts, (m, WeakTermVar OpacityOpaque h) : args)
         _ -> do
           e <- interpret tree
           return (xts, e : args)
@@ -336,11 +336,11 @@ interpretNoeticCaseBody subject nameMap body =
     ((new, orig, t) : rest) -> do
       body' <- interpretNoeticCaseBody subject rest body
       let m = fst t
-      let new' = castToNoema subject t (m, WeakTermVar VarOpacityOpaque $ asIdent new)
+      let new' = castToNoema subject t (m, WeakTermVar OpacityOpaque $ asIdent new)
       return
         ( m,
           WeakTermPiElim
-            (m, WeakTermPiIntro True LamKindNormal [(m, asIdent orig, wrapWithNoema subject t)] body')
+            (m, WeakTermPiIntro OpacityTransparent LamKindNormal [(m, asIdent orig, wrapWithNoema subject t)] body')
             [new']
         )
 
@@ -550,7 +550,7 @@ castFromNoema subject baseType tree = do
   let m = fst tree
   ( m,
     WeakTermPiElim
-      (m, WeakTermVar VarOpacityOpaque (asIdent "unsafe.cast"))
+      (m, WeakTermVar OpacityOpaque (asIdent "unsafe.cast"))
       [ wrapWithNoema subject baseType,
         baseType,
         tree
@@ -562,7 +562,7 @@ castToNoema subject baseType tree = do
   let m = fst tree
   ( m,
     WeakTermPiElim
-      (m, WeakTermVar VarOpacityOpaque (asIdent "unsafe.cast"))
+      (m, WeakTermVar OpacityOpaque (asIdent "unsafe.cast"))
       [ baseType,
         wrapWithNoema subject baseType,
         tree
@@ -573,7 +573,7 @@ castToNoema subject baseType tree = do
 wrapWithNoema :: WeakTermPlus -> WeakTermPlus -> WeakTermPlus
 wrapWithNoema subject baseType = do
   let m = fst baseType
-  (m, WeakTermPiElim (m, WeakTermVar VarOpacityOpaque (asIdent "noema")) [subject, baseType])
+  (m, WeakTermPiElim (m, WeakTermVar OpacityOpaque (asIdent "noema")) [subject, baseType])
 
 {-# INLINE isLinear #-}
 isLinear :: [Int] -> Bool

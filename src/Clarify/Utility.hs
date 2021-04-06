@@ -82,12 +82,11 @@ registerSwitcher ::
   WithEnv ()
 registerSwitcher m name aff rel = do
   (args, e) <- makeSwitcher m aff rel
-  insCompEnv name False args e
+  insCompEnv name True args e
 
 insCompEnv :: T.Text -> Bool -> [Ident] -> CompPlus -> WithEnv ()
-insCompEnv name isFixed args e = do
-  let def = Definition (IsFixed isFixed) args e
-  modify (\env -> env {codeEnv = Map.insert name def (codeEnv env)})
+insCompEnv name isReducible args e =
+  modify (\env -> env {codeEnv = Map.insert name (Definition isReducible args e) (codeEnv env)})
 
 {-# INLINE boolTrue #-}
 boolTrue :: T.Text

@@ -11,9 +11,9 @@ import Data.Tree
 
 data WeakTerm
   = WeakTermTau
-  | WeakTermVar VarOpacity Ident
+  | WeakTermVar Opacity Ident
   | WeakTermPi [WeakIdentPlus] WeakTermPlus
-  | WeakTermPiIntro IsReducible (LamKind WeakIdentPlus) [WeakIdentPlus] WeakTermPlus
+  | WeakTermPiIntro Opacity (LamKind WeakIdentPlus) [WeakIdentPlus] WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
   | WeakTermAster Int
   | WeakTermConst T.Text
@@ -92,7 +92,7 @@ conToInt con =
 
 toVar :: Hint -> Ident -> WeakTermPlus
 toVar m x =
-  (m, WeakTermVar VarOpacityOpaque x)
+  (m, WeakTermVar OpacityOpaque x)
 
 i8 :: Hint -> WeakTermPlus
 i8 m =
@@ -109,7 +109,7 @@ varWeakTermPlus term =
       S.empty
     (_, WeakTermVar opacity x) ->
       case opacity of
-        VarOpacityOpaque ->
+        OpacityOpaque ->
           S.singleton x
         _ ->
           S.empty
@@ -264,16 +264,18 @@ toText term =
             showCons ["∑", inParen $ showTypeArgs zts, toText t]
       | otherwise ->
         showCons ["Π", inParen $ showTypeArgs xts, toText cod]
-    (_, WeakTermPiIntro isReducible kind xts e) -> do
+    (_, WeakTermPiIntro opacity kind xts e) -> do
       case kind of
         LamKindFix (_, x, _) -> do
           let argStr = inParen $ showItems $ map showArg xts
-          if isReducible
-            then showCons ["fix", showVariable x, argStr, toText e]
-            else showCons ["fix-irreducible", showVariable x, argStr, toText e]
+          -- showCons ["fix", showVariable x, argStr, toText e]
+          if isOpaque opacity
+            then showCons ["fix-irreducible", showVariable x, argStr, toText e]
+            else showCons ["fix", showVariable x, argStr, toText e]
         _ -> do
           let argStr = inParen $ showItems $ map showArg xts
-          if isReducible
+          -- showCons ["λ", argStr, toText e]
+          if isTransparent opacity
             then showCons ["λ", argStr, toText e]
             else showCons ["λ-irreducible", argStr, toText e]
     (_, WeakTermPiElim e es) ->

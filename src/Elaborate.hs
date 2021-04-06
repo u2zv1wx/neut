@@ -90,7 +90,7 @@ elaborate' term =
         Nothing -> do
           p' term
           raiseError mh "couldn't instantiate the asterisk here"
-        Just (_, WeakTermPiIntro True LamKindNormal xts e)
+        Just (_, WeakTermPiIntro OpacityTransparent LamKindNormal xts e)
           | length xts == length es -> do
             let xs = map (\(_, y, _) -> asInt y) xts
             let s = IntMap.fromList $ zip xs es

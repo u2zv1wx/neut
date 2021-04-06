@@ -26,23 +26,23 @@ reduceTermPlus term =
       ts' <- mapM reduceTermPlus ts
       cod' <- reduceTermPlus cod
       return (m, TermPi (zip3 ms xs ts') cod')
-    (m, TermPiIntro isReducible kind xts e) -> do
+    (m, TermPiIntro opacity kind xts e) -> do
       let (ms, xs, ts) = unzip3 xts
       ts' <- mapM reduceTermPlus ts
       e' <- reduceTermPlus e
       case kind of
         LamKindFix (mx, x, t) -> do
           t' <- reduceTermPlus t
-          return (m, TermPiIntro isReducible (LamKindFix (mx, x, t')) (zip3 ms xs ts') e')
+          return (m, TermPiIntro opacity (LamKindFix (mx, x, t')) (zip3 ms xs ts') e')
         _ ->
-          return (m, TermPiIntro isReducible kind (zip3 ms xs ts') e')
+          return (m, TermPiIntro opacity kind (zip3 ms xs ts') e')
     (m, TermPiElim e es) -> do
       e' <- reduceTermPlus e
       es' <- mapM reduceTermPlus es
       let app = TermPiElim e' es'
       case e' of
-        (_, TermPiIntro isReducible LamKindNormal xts body)
-          | isReducible,
+        (_, TermPiIntro opacity LamKindNormal xts body)
+          | not (isOpaque opacity),
             length xts == length es' -> do
             let xs = map (\(_, x, _) -> asInt x) xts
             let sub = IntMap.fromList $ zip xs es'
@@ -98,8 +98,8 @@ reduceTermPlus term =
       let lamList = map (toLamList m) clauseList
       denv <- gets dataEnv
       case e' of
-        (_, TermPiIntro isReducible (LamKindCons dataName consName) _ _)
-          | isReducible,
+        (_, TermPiIntro opacity (LamKindCons dataName consName) _ _)
+          | not (isOpaque opacity),
             Just consNameList <- Map.lookup dataName denv,
             consName `elem` consNameList,
             checkClauseListSanity consNameList clauseList -> do
@@ -124,24 +124,24 @@ inlineTermPlus term =
       ts' <- mapM inlineTermPlus ts
       cod' <- inlineTermPlus cod
       return (m, TermPi (zip3 ms xs ts') cod')
-    (m, TermPiIntro isReducible kind xts e) -> do
+    (m, TermPiIntro opacity kind xts e) -> do
       let (ms, xs, ts) = unzip3 xts
       ts' <- mapM inlineTermPlus ts
       e' <- inlineTermPlus e
       case kind of
         LamKindFix (mx, x, t) -> do
           t' <- inlineTermPlus t
-          return (m, TermPiIntro isReducible (LamKindFix (mx, x, t')) (zip3 ms xs ts') e')
+          return (m, TermPiIntro opacity (LamKindFix (mx, x, t')) (zip3 ms xs ts') e')
         _ ->
-          return (m, TermPiIntro isReducible kind (zip3 ms xs ts') e')
+          return (m, TermPiIntro opacity kind (zip3 ms xs ts') e')
     (m, TermPiElim e es) -> do
       e' <- inlineTermPlus e
       es' <- mapM inlineTermPlus es
       let app = TermPiElim e' es'
       let valueCond = and $ map isValue es
       case e' of
-        (_, TermPiIntro isReducible LamKindNormal xts body)
-          | isReducible,
+        (_, TermPiIntro opacity LamKindNormal xts body)
+          | not (isOpaque opacity),
             length xts == length es',
             valueCond -> do
             let xs = map (\(_, x, _) -> asInt x) xts
@@ -198,8 +198,8 @@ inlineTermPlus term =
       let lamList = map (toLamList m) clauseList
       denv <- gets dataEnv
       case e' of
-        (_, TermPiIntro isReducible (LamKindCons dataName consName) _ _)
-          | isReducible,
+        (_, TermPiIntro opacity (LamKindCons dataName consName) _ _)
+          | not (isOpaque opacity),
             Just consNameList <- Map.lookup dataName denv,
             consName `elem` consNameList,
             checkClauseListSanity consNameList clauseList -> do
@@ -229,7 +229,7 @@ checkClauseListSanity consNameList clauseList =
 
 toLamList :: Hint -> (Pattern, TermPlus) -> TermPlus
 toLamList m ((_, xts), body) =
-  (m, TermPiIntro True LamKindNormal xts body)
+  (m, TermPiIntro OpacityTransparent LamKindNormal xts body)
 
 -- (m, TermPiIntro Nothing xts body)
 
@@ -259,17 +259,17 @@ substTermPlus' sub nenv term =
     (m, TermPi xts t) -> do
       (xts', t') <- substTermPlus'' sub nenv xts t
       return (m, TermPi xts' t')
-    (m, TermPiIntro isReducible kind xts e) -> do
+    (m, TermPiIntro opacity kind xts e) -> do
       case kind of
         LamKindFix (mx, x, t) -> do
           t' <- substTermPlus' sub nenv t
           x' <- newIdentFromIdent x
           let nenv' = IntMap.insert (asInt x) x' nenv
           (xts', e') <- substTermPlus'' sub nenv' xts e
-          return (m, TermPiIntro isReducible (LamKindFix (mx, x', t')) xts' e')
+          return (m, TermPiIntro opacity (LamKindFix (mx, x', t')) xts' e')
         _ -> do
           (xts', e') <- substTermPlus'' sub nenv xts e
-          return (m, TermPiIntro isReducible kind xts' e')
+          return (m, TermPiIntro opacity kind xts' e')
     (m, TermPiElim e es) -> do
       e' <- substTermPlus' sub nenv e
       es' <- mapM (substTermPlus' sub nenv) es

@@ -10,9 +10,9 @@ import Data.WeakTerm
 
 data Term
   = TermTau
-  | TermVar VarOpacity Ident
+  | TermVar Opacity Ident
   | TermPi [IdentPlus] TermPlus
-  | TermPiIntro IsReducible (LamKind IdentPlus) [IdentPlus] TermPlus
+  | TermPiIntro Opacity (LamKind IdentPlus) [IdentPlus] TermPlus
   | TermPiElim TermPlus [TermPlus]
   | TermConst T.Text
   | TermInt IntSize Integer
@@ -68,11 +68,11 @@ weaken term =
       (m, WeakTermVar opacity x)
     (m, TermPi xts t) ->
       (m, WeakTermPi (map weakenIdentPlus xts) (weaken t))
-    (m, TermPiIntro isReducible kind xts e) -> do
+    (m, TermPiIntro opacity kind xts e) -> do
       let kind' = weakenKind kind
       let xts' = map weakenIdentPlus xts
       let e' = weaken e
-      (m, WeakTermPiIntro isReducible kind' xts' e')
+      (m, WeakTermPiIntro opacity kind' xts' e')
     (m, TermPiElim e es) -> do
       let e' = weaken e
       let es' = map weaken es

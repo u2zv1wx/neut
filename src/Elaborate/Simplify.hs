@@ -173,7 +173,7 @@ simplifyBinder' orig sub args1 args2 =
     ((m1, x1, t1) : xts1, (_, x2, t2) : xts2) -> do
       t2' <- substWeakTermPlus sub t2
       simplify [((t1, t2'), orig)]
-      let var1 = (m1, WeakTermVar VarOpacityOpaque x1)
+      let var1 = (m1, WeakTermVar OpacityOpaque x1)
       let sub' = IntMap.insert (asInt x2) var1 sub
       simplifyBinder' orig sub' xts1 xts2
     _ ->
@@ -206,11 +206,11 @@ asStuckedTerm term =
   case term of
     (_, WeakTermVar opacity x) ->
       case opacity of
-        VarOpacityOpaque ->
+        OpacityOpaque ->
           Just $ StuckPiElimVarOpaque x []
-        VarOpacityTranslucent ->
+        OpacityTranslucent ->
           Just $ StuckPiElimVarOpaque x []
-        VarOpacityTransparent ->
+        OpacityTransparent ->
           Just $ StuckPiElimVar x []
     (_, WeakTermAster h) ->
       Just $ StuckPiElimAster h []
@@ -235,7 +235,7 @@ toPiIntro args e =
       e
     xts : xtss -> do
       let e' = toPiIntro xtss e
-      (metaOf e', WeakTermPiIntro True LamKindNormal xts e')
+      (metaOf e', WeakTermPiIntro OpacityTransparent LamKindNormal xts e')
 
 toPiElim :: WeakTermPlus -> [(Hint, [WeakTermPlus])] -> WeakTermPlus
 toPiElim e args =
@@ -377,7 +377,7 @@ isEq'' sub xts1 cod1 xts2 cod2 =
     (((m1, x1, t1) : rest1), ((_, x2, t2) : rest2)) -> do
       t2' <- substWeakTermPlus sub t2
       b1 <- isEq t1 t2'
-      let sub' = IntMap.insert (asInt x2) (m1, WeakTermVar VarOpacityOpaque x1) sub
+      let sub' = IntMap.insert (asInt x2) (m1, WeakTermVar OpacityOpaque x1) sub
       b2 <- isEq'' sub' rest1 cod1 rest2 cod2
       return $ b1 && b2
     _ ->
