@@ -31,12 +31,18 @@ parse stmtTreeList =
             --
             "define"
               | [xt, e] <- rest -> do
-                e' <- interpret e >>= discern
-                xt' <- prefixTextPlus xt >>= interpretIdentPlus >>= discernIdentPlus
+                def <- parseDef True m xt e
                 defList <- parse restStmtList
-                return $ WeakStmtDef m xt' e' : defList
+                return $ def : defList
               | otherwise ->
-                raiseSyntaxError m "(define LEAF TREE TREE) | (define TREE TREE)"
+                raiseSyntaxError m "(define TREE TREE)"
+            "define-opaque"
+              | [xt, e] <- rest -> do
+                def <- parseDef False m xt e
+                defList <- parse restStmtList
+                return $ def : defList
+              | otherwise ->
+                raiseSyntaxError m "(define-opaque TREE TREE)"
             "declare-enum"
               | (_, TreeLeaf name) : ts <- rest -> do
                 name' <- withSectionPrefix name
@@ -83,14 +89,6 @@ parse stmtTreeList =
             --
             -- other statements
             --
-            "set-as-opaque"
-              | [(_, TreeLeaf name)] <- rest -> do
-                name' <- withSectionPrefix name
-                name'' <- lookupTopLevelName m name'
-                ss <- parse restStmtList
-                return $ WeakStmtOpaque name'' : ss
-              | otherwise ->
-                raiseSyntaxError m "(set-as-opaque LEAF)"
             "set-as-data"
               | ((_, TreeLeaf name) : (_, TreeLeaf intStr) : constructorNameList) <- rest,
                 Just i <- readMaybe (T.unpack intStr) -> do
@@ -115,7 +113,13 @@ interpretAux headStmt restStmtList = do
   let m = metaOf e
   t <- newAster m
   defList <- parse restStmtList
-  return $ WeakStmtDef m (m, h, t) e : defList
+  return $ WeakStmtDef True m (m, h, t) e : defList
+
+parseDef :: Bool -> Hint -> TreePlus -> TreePlus -> WithEnv WeakStmt
+parseDef isReducible m xt e = do
+  e' <- interpret e >>= discern
+  xt' <- prefixTextPlus xt >>= interpretIdentPlus >>= discernIdentPlus
+  return $ WeakStmtDef isReducible m xt' e'
 
 insEnumEnv :: Hint -> T.Text -> [(T.Text, Int)] -> WithEnv ()
 insEnumEnv m name xis = do
@@ -142,12 +146,3 @@ extractLeaf t =
       return x
     _ ->
       raiseSyntaxError (fst t) "LEAF"
-
-lookupTopLevelName :: Hint -> T.Text -> WithEnv Ident
-lookupTopLevelName m s = do
-  nenv <- gets topNameEnv
-  case Map.lookup s nenv of
-    Nothing ->
-      raiseError m $ "no such top-level variable defined: " <> s
-    Just s' ->
-      return s'

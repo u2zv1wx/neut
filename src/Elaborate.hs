@@ -29,7 +29,7 @@ elaborateStmt' stmt =
   case stmt of
     [] -> do
       return []
-    WeakStmtDef m (mx, x, t) e : cont -> do
+    WeakStmtDef isReducible m (mx, x, t) e : cont -> do
       (e', te) <- infer e
       t' <- inferType t
       insConstraintEnv te t'
@@ -44,11 +44,9 @@ elaborateStmt' stmt =
       t'' <- elaborate' t' >>= reduceTermPlus
       insWeakTypeEnv x $ weaken t''
       modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e'') (substEnv env)})
+      when (not isReducible) $ modify (\env -> env {opaqueEnv = S.insert x (opaqueEnv env)})
       cont' <- elaborateStmt' cont
       return $ StmtDef m (mx, x, t'') e'' : cont'
-    WeakStmtOpaque name : cont -> do
-      modify (\env -> env {opaqueEnv = S.insert name (opaqueEnv env)})
-      elaborateStmt' cont
 
 elaborate' :: WeakTermPlus -> WithEnv TermPlus
 elaborate' term =

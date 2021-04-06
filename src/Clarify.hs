@@ -40,8 +40,13 @@ clarifyStmt tenv ss =
       insCompEnv (toGlobalVarName x) True [] e'
       cont' <- clarifyStmt (insTypeEnv [(mx, x, t)] tenv) cont
       holeVarName <- newIdentFromText "hole"
-      let app = (m, CompPiElimDownElim (m, ValueConst (toGlobalVarName x)) [])
-      return (m, CompUpElim holeVarName app cont')
+      return
+        ( m,
+          CompUpElim
+            holeVarName
+            (m, CompPiElimDownElim (m, ValueConst (toGlobalVarName x)) [])
+            cont'
+        )
 
 clarifyTerm :: TypeEnv -> TermPlus -> WithEnv CompPlus
 clarifyTerm tenv term =

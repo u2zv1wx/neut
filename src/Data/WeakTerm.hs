@@ -56,8 +56,7 @@ type IdentDef =
   (Ident, Def)
 
 data WeakStmt
-  = WeakStmtDef Hint WeakIdentPlus WeakTermPlus
-  | WeakStmtOpaque Ident
+  = WeakStmtDef Bool Hint WeakIdentPlus WeakTermPlus
   deriving (Show)
 
 type Constraint =
