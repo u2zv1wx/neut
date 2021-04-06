@@ -1,6 +1,5 @@
 module Data.Basic where
 
-import qualified Data.Set as S
 import qualified Data.Text as T
 import Path
 
@@ -68,22 +67,6 @@ asIdent s =
 asInt :: Ident -> Int
 asInt (I (_, i)) =
   i
-
-{-# INLINE isLinear #-}
-isLinear :: (Eq a, Ord a) => [a] -> Bool
-isLinear =
-  isLinear' S.empty
-
-isLinear' :: (Eq a, Ord a) => S.Set a -> [a] -> Bool
-isLinear' found input =
-  case input of
-    [] ->
-      True
-    (x : xs)
-      | x `S.member` found ->
-        False
-      | otherwise ->
-        isLinear' (S.insert x found) xs
 
 showHint :: Hint -> String
 showHint m = do

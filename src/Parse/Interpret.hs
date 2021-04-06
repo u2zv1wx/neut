@@ -11,6 +11,7 @@ import Data.Log
 import Data.LowType
 import Data.Maybe (fromMaybe)
 import Data.Namespace
+import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Tree
 import Data.WeakTerm
@@ -573,3 +574,19 @@ wrapWithNoema :: WeakTermPlus -> WeakTermPlus -> WeakTermPlus
 wrapWithNoema subject baseType = do
   let m = fst baseType
   (m, WeakTermPiElim (m, WeakTermVar VarOpacityOpaque (asIdent "noema")) [subject, baseType])
+
+{-# INLINE isLinear #-}
+isLinear :: [Int] -> Bool
+isLinear =
+  isLinear' S.empty
+
+isLinear' :: S.Set Int -> [Int] -> Bool
+isLinear' found input =
+  case input of
+    [] ->
+      True
+    (x : xs)
+      | x `S.member` found ->
+        False
+      | otherwise ->
+        isLinear' (S.insert x found) xs
