@@ -48,22 +48,22 @@ infer' ctx term =
     (m, WeakTermPi xts t) -> do
       (xts', t') <- inferPi ctx xts t
       return ((m, WeakTermPi xts' t'), (m, WeakTermTau))
-    (m, WeakTermPiIntro mName xts e) -> do
-      (xts', (e', t')) <- inferBinder ctx xts e
-      return ((m, WeakTermPiIntro mName xts' e'), (m, WeakTermPi xts' t'))
+    (m, WeakTermPiIntro isReducible kind xts e) -> do
+      case kind of
+        LamKindFix (mx, x, t) -> do
+          t' <- inferType' ctx t
+          insWeakTypeEnv x t'
+          (xts', (e', tCod)) <- inferBinder ctx xts e
+          let piType = (m, WeakTermPi xts' tCod)
+          insConstraintEnv piType t'
+          return ((m, WeakTermPiIntro isReducible (LamKindFix (mx, x, t')) xts' e'), piType)
+        _ -> do
+          (xts', (e', t')) <- inferBinder ctx xts e
+          return ((m, WeakTermPiIntro isReducible kind xts' e'), (m, WeakTermPi xts' t'))
     (m, WeakTermPiElim e es) -> do
       etls <- mapM (infer' ctx) es
       etl <- infer' ctx e
       inferPiElim ctx m etl etls
-    (m, WeakTermFix isReducible (mx, x, t) xts e) -> do
-      t' <- inferType' ctx t
-      insWeakTypeEnv x t'
-      -- Note that we cannot extend context with x. The type of e cannot be dependent on `x`.
-      -- Otherwise the type of `mu x. e` might have `x` as free variable, which is unsound.
-      (xts', (e', tCod)) <- inferBinder ctx xts e
-      let piType = (m, WeakTermPi xts' tCod)
-      insConstraintEnv piType t'
-      return ((m, WeakTermFix isReducible (mx, x, t') xts' e'), piType)
     (m, WeakTermAster x) -> do
       henv <- gets holeEnv
       case IntMap.lookup x henv of
@@ -106,7 +106,8 @@ infer' ctx term =
         else do
           let (cs, es) = unzip ces
           (cs', tcs) <- unzip <$> mapM (inferEnumCase ctx) cs
-          forM_ (zip (repeat t') tcs) $ uncurry insConstraintEnv
+          forM_ (zip tcs (repeat t')) $ uncurry insConstraintEnv
+          -- forM_ (zip (repeat t') tcs) $ uncurry insConstraintEnv
           (es', ts) <- unzip <$> mapM (infer' ctx) es
           forM_ (zip (repeat (head ts)) (tail ts)) $ uncurry insConstraintEnv
           return ((m, WeakTermEnumElim (e', t') $ zip cs' es'), head ts)

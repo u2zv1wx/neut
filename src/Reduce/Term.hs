@@ -26,31 +26,29 @@ reduceTermPlus term =
       ts' <- mapM reduceTermPlus ts
       cod' <- reduceTermPlus cod
       return (m, TermPi (zip3 ms xs ts') cod')
-    (m, TermPiIntro mName xts e) -> do
+    (m, TermPiIntro isReducible kind xts e) -> do
       let (ms, xs, ts) = unzip3 xts
       ts' <- mapM reduceTermPlus ts
       e' <- reduceTermPlus e
-      return (m, TermPiIntro mName (zip3 ms xs ts') e')
+      case kind of
+        LamKindFix (mx, x, t) -> do
+          t' <- reduceTermPlus t
+          return (m, TermPiIntro isReducible (LamKindFix (mx, x, t')) (zip3 ms xs ts') e')
+        _ ->
+          return (m, TermPiIntro isReducible kind (zip3 ms xs ts') e')
     (m, TermPiElim e es) -> do
       e' <- reduceTermPlus e
       es' <- mapM reduceTermPlus es
       let app = TermPiElim e' es'
-      -- let valueCond = and $ map isValue es
       case e' of
-        (_, TermPiIntro Nothing xts body)
-          | length xts == length es' -> do
-            -- valueCond -> do
+        (_, TermPiIntro isReducible LamKindNormal xts body)
+          | isReducible,
+            length xts == length es' -> do
             let xs = map (\(_, x, _) -> asInt x) xts
             let sub = IntMap.fromList $ zip xs es'
             substTermPlus' sub IntMap.empty (m, snd body) >>= reduceTermPlus
         _ ->
           return (m, app)
-    (m, TermFix b (mx, x, t) xts e) -> do
-      t' <- reduceTermPlus t
-      e' <- reduceTermPlus e
-      let (ms, xs, ts) = unzip3 xts
-      ts' <- mapM reduceTermPlus ts
-      return (m, TermFix b (mx, x, t') (zip3 ms xs ts') e')
     (m, TermEnumElim (e, t) les) -> do
       e' <- reduceTermPlus e
       let (ls, es) = unzip les
@@ -100,8 +98,9 @@ reduceTermPlus term =
       let lamList = map (toLamList m) clauseList
       denv <- gets dataEnv
       case e' of
-        (_, TermPiIntro (Just (dataName, consName)) _ _)
-          | Just consNameList <- Map.lookup dataName denv,
+        (_, TermPiIntro isReducible (LamKindCons dataName consName) _ _)
+          | isReducible,
+            Just consNameList <- Map.lookup dataName denv,
             consName `elem` consNameList,
             checkClauseListSanity consNameList clauseList -> do
             let app = (m, TermPiElim e' (resultType : lamList))
@@ -125,31 +124,31 @@ inlineTermPlus term =
       ts' <- mapM inlineTermPlus ts
       cod' <- inlineTermPlus cod
       return (m, TermPi (zip3 ms xs ts') cod')
-    (m, TermPiIntro mName xts e) -> do
+    (m, TermPiIntro isReducible kind xts e) -> do
       let (ms, xs, ts) = unzip3 xts
       ts' <- mapM inlineTermPlus ts
       e' <- inlineTermPlus e
-      return (m, TermPiIntro mName (zip3 ms xs ts') e')
+      case kind of
+        LamKindFix (mx, x, t) -> do
+          t' <- inlineTermPlus t
+          return (m, TermPiIntro isReducible (LamKindFix (mx, x, t')) (zip3 ms xs ts') e')
+        _ ->
+          return (m, TermPiIntro isReducible kind (zip3 ms xs ts') e')
     (m, TermPiElim e es) -> do
       e' <- inlineTermPlus e
       es' <- mapM inlineTermPlus es
       let app = TermPiElim e' es'
       let valueCond = and $ map isValue es
       case e' of
-        (_, TermPiIntro Nothing xts body)
-          | length xts == length es',
+        (_, TermPiIntro isReducible LamKindNormal xts body)
+          | isReducible,
+            length xts == length es',
             valueCond -> do
             let xs = map (\(_, x, _) -> asInt x) xts
             let sub = IntMap.fromList $ zip xs es'
             substTermPlus' sub IntMap.empty (m, snd body) >>= inlineTermPlus
         _ ->
           return (m, app)
-    (m, TermFix b (mx, x, t) xts e) -> do
-      t' <- inlineTermPlus t
-      e' <- inlineTermPlus e
-      let (ms, xs, ts) = unzip3 xts
-      ts' <- mapM inlineTermPlus ts
-      return (m, TermFix b (mx, x, t') (zip3 ms xs ts') e')
     (m, TermEnumElim (e, t) les) -> do
       e' <- inlineTermPlus e
       let (ls, es) = unzip les
@@ -199,8 +198,9 @@ inlineTermPlus term =
       let lamList = map (toLamList m) clauseList
       denv <- gets dataEnv
       case e' of
-        (_, TermPiIntro (Just (dataName, consName)) _ _)
-          | Just consNameList <- Map.lookup dataName denv,
+        (_, TermPiIntro isReducible (LamKindCons dataName consName) _ _)
+          | isReducible,
+            Just consNameList <- Map.lookup dataName denv,
             consName `elem` consNameList,
             checkClauseListSanity consNameList clauseList -> do
             let app = (m, TermPiElim e' (resultType : lamList))
@@ -229,7 +229,9 @@ checkClauseListSanity consNameList clauseList =
 
 toLamList :: Hint -> (Pattern, TermPlus) -> TermPlus
 toLamList m ((_, xts), body) =
-  (m, TermPiIntro Nothing xts body)
+  (m, TermPiIntro True LamKindNormal xts body)
+
+-- (m, TermPiIntro Nothing xts body)
 
 substTermPlus ::
   SubstTerm ->
@@ -257,19 +259,21 @@ substTermPlus' sub nenv term =
     (m, TermPi xts t) -> do
       (xts', t') <- substTermPlus'' sub nenv xts t
       return (m, TermPi xts' t')
-    (m, TermPiIntro mName xts body) -> do
-      (xts', body') <- substTermPlus'' sub nenv xts body
-      return (m, TermPiIntro mName xts' body')
+    (m, TermPiIntro isReducible kind xts e) -> do
+      case kind of
+        LamKindFix (mx, x, t) -> do
+          t' <- substTermPlus' sub nenv t
+          x' <- newIdentFromIdent x
+          let nenv' = IntMap.insert (asInt x) x' nenv
+          (xts', e') <- substTermPlus'' sub nenv' xts e
+          return (m, TermPiIntro isReducible (LamKindFix (mx, x', t')) xts' e')
+        _ -> do
+          (xts', e') <- substTermPlus'' sub nenv xts e
+          return (m, TermPiIntro isReducible kind xts' e')
     (m, TermPiElim e es) -> do
       e' <- substTermPlus' sub nenv e
       es' <- mapM (substTermPlus' sub nenv) es
       return (m, TermPiElim e' es')
-    (m, TermFix b (mx, x, t) xts e) -> do
-      t' <- substTermPlus' sub nenv t
-      x' <- newIdentFromIdent x
-      let nenv' = IntMap.insert (asInt x) x' nenv
-      (xts', e') <- substTermPlus'' sub nenv' xts e
-      return (m, TermFix b (mx, x', t') xts' e')
     (_, TermConst _) ->
       return term
     (m, TermInt size x) ->
@@ -340,8 +344,6 @@ isValue term =
     (_, TermPi {}) ->
       True
     (_, TermPiIntro {}) ->
-      True
-    (_, TermFix {}) ->
       True
     (_, TermConst x) ->
       isValueConst x

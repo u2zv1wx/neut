@@ -76,20 +76,21 @@ elaborate' term =
         then return (m, TermConst x')
         else return (m, TermVar opacity x)
     (m, WeakTermPi xts t) -> do
-      xts' <- mapM elaboratePlus xts
+      xts' <- mapM elaborateWeakIdentPlus xts
       t' <- elaborate' t
       return (m, TermPi xts' t')
-    (m, WeakTermPiIntro mName xts e) -> do
-      xts' <- mapM elaboratePlus xts
+    (m, WeakTermPiIntro isReducible kind xts e) -> do
+      kind' <- elaborateKind kind
+      xts' <- mapM elaborateWeakIdentPlus xts
       e' <- elaborate' e
-      return (m, TermPiIntro mName xts' e')
+      return (m, TermPiIntro isReducible kind' xts' e')
     (m, WeakTermPiElim (mh, WeakTermAster x) es) -> do
       sub <- gets substEnv
       case IntMap.lookup x sub of
         Nothing -> do
           p' term
           raiseError mh "couldn't instantiate the asterisk here"
-        Just (_, WeakTermPiIntro Nothing xts e)
+        Just (_, WeakTermPiIntro True LamKindNormal xts e)
           | length xts == length es -> do
             let xs = map (\(_, y, _) -> asInt y) xts
             let s = IntMap.fromList $ zip xs es
@@ -100,11 +101,6 @@ elaborate' term =
       e' <- elaborate' e
       es' <- mapM elaborate' es
       return (m, TermPiElim e' es')
-    (m, WeakTermFix isReducible (mx, x, t) xts e) -> do
-      t' <- elaborate' t
-      xts' <- mapM elaboratePlus xts
-      e' <- elaborate' e
-      return (m, TermFix isReducible (mx, x, t') xts' e')
     (m, WeakTermAster _) ->
       raiseCritical m "every meta-variable must be of the form (?M e1 ... en) where n >= 0, but the meta-variable here doesn't fit this pattern"
     (m, WeakTermConst x) ->
@@ -159,7 +155,7 @@ elaborate' term =
       es' <- mapM elaborate' es
       return (m, TermTensorIntro es')
     (m, WeakTermTensorElim xts e1 e2) -> do
-      xts' <- mapM elaboratePlus xts
+      xts' <- mapM elaborateWeakIdentPlus xts
       e1' <- elaborate' e1
       e2' <- elaborate' e2
       return (m, TermTensorElim xts' e1' e2')
@@ -180,7 +176,7 @@ elaborate' term =
       e' <- elaborate' e
       t' <- elaborate' t >>= reduceTermPlus
       patList' <- forM patList $ \((c, xts), body) -> do
-        xts' <- mapM elaboratePlus xts
+        xts' <- mapM elaborateWeakIdentPlus xts
         body' <- elaborate' body
         return ((c, xts'), body')
       denv <- gets dataEnv
@@ -198,10 +194,21 @@ elaborate' term =
         _ -> do
           raiseError (fst t) $ "the type of this term must be a data-type, but its type is:\n" <> toText (weaken t')
 
-elaboratePlus :: (Hint, a, WeakTermPlus) -> WithEnv (Hint, a, TermPlus)
-elaboratePlus (m, x, t) = do
+elaborateWeakIdentPlus :: WeakIdentPlus -> WithEnv IdentPlus
+elaborateWeakIdentPlus (m, x, t) = do
   t' <- elaborate' t
   return (m, x, t')
+
+elaborateKind :: LamKind WeakIdentPlus -> WithEnv (LamKind IdentPlus)
+elaborateKind kind =
+  case kind of
+    LamKindNormal ->
+      return LamKindNormal
+    LamKindCons t1 t2 ->
+      return $ LamKindCons t1 t2
+    LamKindFix xt -> do
+      xt' <- elaborateWeakIdentPlus xt
+      return $ LamKindFix xt'
 
 checkSwitchExaustiveness :: Hint -> T.Text -> [EnumCase] -> WithEnv ()
 checkSwitchExaustiveness m x caseList = do

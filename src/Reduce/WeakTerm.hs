@@ -23,33 +23,33 @@ reduceWeakTermPlus term =
       ts' <- mapM reduceWeakTermPlus ts
       cod' <- reduceWeakTermPlus cod
       return (m, WeakTermPi (zip3 ms xs ts') cod')
-    (m, WeakTermPiIntro mName xts e) -> do
-      let (ms, xs, ts) = unzip3 xts
-      ts' <- mapM reduceWeakTermPlus ts
-      e' <- reduceWeakTermPlus e
-      return (m, WeakTermPiIntro mName (zip3 ms xs ts') e')
+    (m, WeakTermPiIntro isReducible kind xts e)
+      | LamKindFix (_, x, _) <- kind,
+        x `notElem` varWeakTermPlus e,
+        isReducible ->
+        reduceWeakTermPlus (m, WeakTermPiIntro isReducible LamKindNormal xts e)
+      | otherwise -> do
+        let (ms, xs, ts) = unzip3 xts
+        ts' <- mapM reduceWeakTermPlus ts
+        e' <- reduceWeakTermPlus e
+        case kind of
+          LamKindFix (mx, x, t) -> do
+            t' <- reduceWeakTermPlus t
+            return (m, WeakTermPiIntro isReducible (LamKindFix (mx, x, t')) (zip3 ms xs ts') e')
+          _ ->
+            return (m, WeakTermPiIntro isReducible kind (zip3 ms xs ts') e')
     (m, WeakTermPiElim e es) -> do
       e' <- reduceWeakTermPlus e
       es' <- mapM reduceWeakTermPlus es
       let app = WeakTermPiElim e' es'
       case e' of
-        (_, WeakTermPiIntro Nothing xts body)
+        (_, WeakTermPiIntro True LamKindNormal xts body)
           | length xts == length es' -> do
             let xs = map (\(_, x, _) -> asInt x) xts
             let sub = IntMap.fromList $ zip xs es'
             substWeakTermPlus' sub IntMap.empty (m, snd body) >>= reduceWeakTermPlus
         _ ->
           return (m, app)
-    (m, WeakTermFix isReducible (mx, x, t) xts e)
-      | x `notElem` varWeakTermPlus e,
-        isReducible ->
-        reduceWeakTermPlus (m, WeakTermPiIntro Nothing xts e)
-      | otherwise -> do
-        t' <- reduceWeakTermPlus t
-        e' <- reduceWeakTermPlus e
-        let (ms, xs, ts) = unzip3 xts
-        ts' <- mapM reduceWeakTermPlus ts
-        return (m, WeakTermFix isReducible (mx, x, t') (zip3 ms xs ts') e')
     (m, WeakTermEnumElim (e, t) les) -> do
       e' <- reduceWeakTermPlus e
       let (ls, es) = unzip les
@@ -101,8 +101,9 @@ reduceWeakTermPlus term =
       let lamList = map (toLamList m) clauseList
       denv <- gets dataEnv
       case e' of
-        (_, WeakTermPiIntro (Just (dataName, consName)) _ _)
-          | Just consNameList <- Map.lookup dataName denv,
+        (_, WeakTermPiIntro isReducible (LamKindCons dataName consName) _ _)
+          | isReducible,
+            Just consNameList <- Map.lookup dataName denv,
             consName `elem` consNameList,
             checkClauseListSanity consNameList clauseList -> do
             let app = (m, WeakTermPiElim e' (resultType : lamList))
@@ -131,7 +132,9 @@ checkClauseListSanity consNameList clauseList =
 
 toLamList :: Hint -> (WeakPattern, WeakTermPlus) -> WeakTermPlus
 toLamList m ((_, xts), body) =
-  (m, WeakTermPiIntro Nothing xts body)
+  (m, WeakTermPiIntro True LamKindNormal xts body)
+
+-- (m, WeakTermPiIntro Nothing xts body)
 
 substWeakTermPlus ::
   SubstWeakTerm ->
@@ -161,19 +164,21 @@ substWeakTermPlus' sub nenv term =
     (m, WeakTermPi xts t) -> do
       (xts', t') <- substWeakTermPlus'' sub nenv xts t
       return (m, WeakTermPi xts' t')
-    (m, WeakTermPiIntro mName xts body) -> do
-      (xts', body') <- substWeakTermPlus'' sub nenv xts body
-      return (m, WeakTermPiIntro mName xts' body')
+    (m, WeakTermPiIntro isReducible kind xts e) -> do
+      case kind of
+        LamKindFix (mx, x, t) -> do
+          t' <- substWeakTermPlus' sub nenv t
+          x' <- newIdentFromIdent x
+          let nenv' = IntMap.insert (asInt x) x' nenv
+          (xts', e') <- substWeakTermPlus'' sub nenv' xts e
+          return (m, WeakTermPiIntro isReducible (LamKindFix (mx, x', t')) xts' e')
+        _ -> do
+          (xts', e') <- substWeakTermPlus'' sub nenv xts e
+          return (m, WeakTermPiIntro isReducible kind xts' e')
     (m, WeakTermPiElim e es) -> do
       e' <- substWeakTermPlus' sub nenv e
       es' <- mapM (substWeakTermPlus' sub nenv) es
       return (m, WeakTermPiElim e' es')
-    (m, WeakTermFix b (mx, x, t) xts e) -> do
-      t' <- substWeakTermPlus' sub nenv t
-      x' <- newIdentFromIdent x
-      let nenv' = IntMap.insert (asInt x) x' nenv
-      (xts', e') <- substWeakTermPlus'' sub nenv' xts e
-      return (m, WeakTermFix b (mx, x', t') xts' e')
     (_, WeakTermConst _) ->
       return term
     (_, WeakTermAster x) ->

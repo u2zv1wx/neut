@@ -66,24 +66,22 @@ clarifyTerm tenv term =
           return (m, CompPiElimDownElim (m, ValueConst (toGlobalVarName x)) [])
     (m, TermPi {}) ->
       returnClosureS4 m
-    (m, TermPiIntro mName mxts e) -> do
-      e' <- clarifyTerm (insTypeEnv mxts tenv) e
+    (m, TermPiIntro isReducible kind mxts e) -> do
+      e' <- clarifyTerm (insTypeEnv (catMaybes [fromLamKind kind] ++ mxts) tenv) e
       let fvs = nubFreeVariables $ chainOf tenv term
-      case mName of
-        Nothing ->
+      case kind of
+        LamKindNormal ->
           retClosure tenv ClosureNameAnonymous fvs m mxts e'
-        Just (_, consName) ->
+        LamKindCons _ consName ->
           retClosure tenv (ClosureNameConstructor consName) fvs m mxts e'
+        LamKindFix (_, x, _) -> do
+          if not isReducible || S.member x (varComp e')
+            then retClosure tenv (ClosureNameFix x) fvs m mxts e'
+            else retClosure tenv ClosureNameAnonymous fvs m mxts e'
     (m, TermPiElim e es) -> do
       es' <- mapM (clarifyPlus tenv) es
       e' <- clarifyTerm tenv e
       callClosure m e' es'
-    (m, TermFix isReducible (mx, x, t) mxts e) -> do
-      e' <- clarifyTerm (insTypeEnv ((mx, x, t) : mxts) tenv) e
-      let fvs = nubFreeVariables $ chainOf tenv term
-      if not isReducible || S.member x (varComp e')
-        then retClosure tenv (ClosureNameFix x) fvs m mxts e'
-        else retClosure tenv ClosureNameAnonymous fvs m mxts e'
     (m, TermConst x) ->
       clarifyConst tenv m x
     (m, TermInt size l) ->
@@ -173,7 +171,7 @@ caseClauseToLambda :: Hint -> (Pattern, TermPlus) -> TermPlus
 caseClauseToLambda m pat =
   case pat of
     ((_, xts), body) ->
-      (m, TermPiIntro Nothing xts body)
+      (m, TermPiIntro True LamKindNormal xts body)
 
 constructClauseArguments :: CompPlus -> Int -> Int -> WithEnv [(Ident, CompPlus, ValuePlus)]
 constructClauseArguments cls clsIndex upperBound = do
@@ -370,16 +368,12 @@ chainOf tenv term =
           []
     (_, TermPi {}) ->
       []
-    (_, TermPiIntro _ xts e) ->
-      chainOf' tenv xts [e]
+    (_, TermPiIntro _ kind xts e) ->
+      chainOf' tenv (catMaybes [fromLamKind kind] ++ xts) [e]
     (_, TermPiElim e es) -> do
       let xs1 = chainOf tenv e
       let xs2 = concat $ map (chainOf tenv) es
       xs1 ++ xs2
-    (_, TermFix _ (_, x, t) xts e) -> do
-      let xs1 = chainOf tenv t
-      let xs2 = chainOf' (IntMap.insert (asInt x) t tenv) xts [e]
-      xs1 ++ filter (\(_, y, _) -> y /= x) xs2
     (_, TermConst _) ->
       []
     (_, TermInt _ _) ->
@@ -445,7 +439,8 @@ termSigmaIntro m xts = do
   return
     ( m,
       TermPiIntro
-        Nothing
+        True
+        LamKindNormal
         [ (m, z, (m, TermTau)),
           (m, k, (m, TermPi xts vz))
         ]

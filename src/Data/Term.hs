@@ -12,9 +12,8 @@ data Term
   = TermTau
   | TermVar VarOpacity Ident
   | TermPi [IdentPlus] TermPlus
-  | TermPiIntro (Maybe (T.Text, T.Text)) [IdentPlus] TermPlus
+  | TermPiIntro IsReducible (LamKind IdentPlus) [IdentPlus] TermPlus
   | TermPiElim TermPlus [TermPlus]
-  | TermFix Bool IdentPlus [IdentPlus] TermPlus
   | TermConst T.Text
   | TermInt IntSize Integer
   | TermFloat FloatSize Double
@@ -68,19 +67,16 @@ weaken term =
     (m, TermVar opacity x) ->
       (m, WeakTermVar opacity x)
     (m, TermPi xts t) ->
-      (m, WeakTermPi (weakenArgs xts) (weaken t))
-    (m, TermPiIntro mName xts body) -> do
-      let xts' = weakenArgs xts
-      (m, WeakTermPiIntro mName xts' (weaken body))
+      (m, WeakTermPi (map weakenIdentPlus xts) (weaken t))
+    (m, TermPiIntro isReducible kind xts e) -> do
+      let kind' = weakenKind kind
+      let xts' = map weakenIdentPlus xts
+      let e' = weaken e
+      (m, WeakTermPiIntro isReducible kind' xts' e')
     (m, TermPiElim e es) -> do
       let e' = weaken e
       let es' = map weaken es
       (m, WeakTermPiElim e' es')
-    (m, TermFix b (mx, x, t) xts e) -> do
-      let t' = weaken t
-      let xts' = weakenArgs xts
-      let e' = weaken e
-      (m, WeakTermFix b (mx, x, t') xts' e')
     (m, TermConst x) ->
       (m, WeakTermConst x)
     (m, TermInt size x) ->
@@ -104,7 +100,7 @@ weaken term =
       let es' = map weaken es
       (m, WeakTermTensorIntro es')
     (m, TermTensorElim xts e1 e2) -> do
-      let xts' = weakenArgs xts
+      let xts' = map weakenIdentPlus xts
       let e1' = weaken e1
       let e2' = weaken e2
       (m, WeakTermTensorElim xts' e1' e2')
@@ -119,13 +115,22 @@ weaken term =
       let mSubject' = fmap weaken mSubject
       let e' = weaken e
       let t' = weaken t
-      let patList' = map (\((p, xts), body) -> ((p, weakenArgs xts), weaken body)) patList
+      let patList' = map (\((p, xts), body) -> ((p, map weakenIdentPlus xts), weaken body)) patList
       (m, WeakTermCase resultType' mSubject' (e', t') patList')
 
-weakenArgs :: [(Hint, Ident, TermPlus)] -> [(Hint, Ident, WeakTermPlus)]
-weakenArgs xts = do
-  let (ms, xs, ts) = unzip3 xts
-  zip3 ms xs (map weaken ts)
+weakenIdentPlus :: (Hint, Ident, TermPlus) -> (Hint, Ident, WeakTermPlus)
+weakenIdentPlus (m, x, t) =
+  (m, x, weaken t)
+
+weakenKind :: LamKind IdentPlus -> LamKind WeakIdentPlus
+weakenKind kind =
+  case kind of
+    LamKindNormal ->
+      LamKindNormal
+    LamKindCons t1 t2 ->
+      LamKindCons t1 t2
+    LamKindFix xt ->
+      LamKindFix (weakenIdentPlus xt)
 
 lowTypeToType :: (MonadThrow m) => Hint -> LowType -> m TermPlus
 lowTypeToType m lowType =

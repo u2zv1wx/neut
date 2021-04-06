@@ -7,6 +7,7 @@ import Control.Monad.State.Lazy
 import Data.Basic
 import Data.Env
 import qualified Data.IntMap as IntMap
+import Data.Maybe (catMaybes)
 import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
 import Data.WeakTerm
@@ -44,19 +45,20 @@ simplify' constraintList =
             xt2 <- asWeakIdentPlus m2 cod2
             simplifyBinder orig (xts1 ++ [xt1]) (xts2 ++ [xt2])
             simplify cs
-        ((m1, WeakTermPiIntro mName1 xts1 e1), (m2, WeakTermPiIntro mName2 xts2 e2))
-          | mName1 == mName2,
-            length xts1 == length xts2 -> do
-            xt1 <- asWeakIdentPlus m1 e1
-            xt2 <- asWeakIdentPlus m2 e2
-            simplifyBinder orig (xts1 ++ [xt1]) (xts2 ++ [xt2])
-            simplify cs
-        ((m1, WeakTermFix _ xt1@(_, x1, _) xts1 e1), (m2, WeakTermFix _ xt2@(_, x2, _) xts2 e2))
-          | x1 == x2,
+        ((m1, WeakTermPiIntro _ kind1 xts1 e1), (m2, WeakTermPiIntro _ kind2 xts2 e2))
+          | LamKindFix xt1@(_, x1, _) <- kind1,
+            LamKindFix xt2@(_, x2, _) <- kind2,
+            x1 == x2,
             length xts1 == length xts2 -> do
             yt1 <- asWeakIdentPlus m1 e1
             yt2 <- asWeakIdentPlus m2 e2
             simplifyBinder orig (xt1 : xts1 ++ [yt1]) (xt2 : xts2 ++ [yt2])
+            simplify cs
+          | lamKindWeakEq kind1 kind2,
+            length xts1 == length xts2 -> do
+            xt1 <- asWeakIdentPlus m1 e1
+            xt2 <- asWeakIdentPlus m2 e2
+            simplifyBinder orig (xts1 ++ [xt1]) (xts2 ++ [xt2])
             simplify cs
         ((_, WeakTermInt t1 l1), (_, WeakTermInt t2 l2))
           | l1 == l2 ->
@@ -233,7 +235,7 @@ toPiIntro args e =
       e
     xts : xtss -> do
       let e' = toPiIntro xtss e
-      (metaOf e', WeakTermPiIntro Nothing xts e')
+      (metaOf e', WeakTermPiIntro True LamKindNormal xts e')
 
 toPiElim :: WeakTermPlus -> [(Hint, [WeakTermPlus])] -> WeakTermPlus
 toPiElim e args =
@@ -301,15 +303,17 @@ isEq l r =
       return $ x1 == x2
     ((_, WeakTermPi xts1 cod1), (_, WeakTermPi xts2 cod2)) -> do
       isEq' xts1 cod1 xts2 cod2
-    ((_, WeakTermPiIntro mName1 xts1 e1), (_, WeakTermPiIntro mName2 xts2 e2))
-      | mName1 == mName2 ->
-        isEq' xts1 e1 xts2 e2
+    ((_, WeakTermPiIntro _ kind1 xts1 e1), (_, WeakTermPiIntro _ kind2 xts2 e2)) ->
+      isEq' (catMaybes [fromLamKind kind1] ++ xts1) e1 (catMaybes [fromLamKind kind2] ++ xts2) e2
+    -- ((_, WeakTermPiIntro mName1 xts1 e1), (_, WeakTermPiIntro mName2 xts2 e2))
+    --   | mName1 == mName2 ->
+    --     isEq' xts1 e1 xts2 e2
     ((_, WeakTermPiElim e1 es1), (_, WeakTermPiElim e2 es2)) -> do
       b1 <- isEq e1 e2
       b2 <- and <$> zipWithM isEq es1 es2
       return $ b1 && b2
-    ((_, WeakTermFix _ self1 xts1 e1), (_, WeakTermFix _ self2 xts2 e2)) ->
-      isEq' (self1 : xts1) e1 (self2 : xts2) e2
+    -- ((_, WeakTermFix _ self1 xts1 e1), (_, WeakTermFix _ self2 xts2 e2)) ->
+    --   isEq' (self1 : xts1) e1 (self2 : xts2) e2
     ((_, WeakTermAster h1), (_, WeakTermAster h2)) ->
       return $ h1 == h2
     ((_, WeakTermConst a1), (_, WeakTermConst a2)) ->

@@ -56,7 +56,7 @@ interpret inputTree =
         "Π-introduction"
           | [(_, TreeNode xts), e] <- rest -> do
             (xts', e') <- interpretBinder xts e
-            return (m, WeakTermPiIntro Nothing xts' e')
+            return (m, WeakTermPiIntro True LamKindNormal xts' e')
           | otherwise ->
             raiseSyntaxError m "(Π-introduction (TREE*) TREE)"
         "Π-introduction-constructor"
@@ -64,7 +64,7 @@ interpret inputTree =
             (xts', e') <- interpretBinder xts e
             dataName' <- withSectionPrefix dataName
             consName' <- withSectionPrefix consName
-            return (m, WeakTermPiIntro (Just (dataName', consName')) xts' e')
+            return (m, WeakTermPiIntro True (LamKindCons dataName' consName') xts' e')
           | otherwise ->
             raiseSyntaxError m "(Π-introduction-constructor LEAF LEAF (TREE*) TREE)"
         "Π-elimination"
@@ -75,13 +75,13 @@ interpret inputTree =
         "fix"
           | [xt, xts@(_, TreeNode _), e] <- rest -> do
             (m', xt', xts', e') <- interpretFix (m, TreeNode [xt, xts, e])
-            return (m', WeakTermFix True xt' xts' e')
+            return (m', WeakTermPiIntro True (LamKindFix xt') xts' e')
           | otherwise ->
             raiseSyntaxError m "(fix TREE (TREE*) TREE)"
         "fix-irreducible"
           | [xt, xts@(_, TreeNode _), e] <- rest -> do
             (m', xt', xts', e') <- interpretFix (m, TreeNode [xt, xts, e])
-            return (m', WeakTermFix False xt' xts' e')
+            return (m', WeakTermPiIntro False (LamKindFix xt') xts' e')
           | otherwise ->
             raiseSyntaxError m "(fix-irreducible TREE (TREE*) TREE)"
         "constant"
@@ -213,7 +213,7 @@ interpretPiElim m f es = do
   (xts, args) <- interpretArg es
   if null xts
     then return (m, WeakTermPiElim f' args)
-    else return (m, WeakTermPiIntro Nothing xts (m, WeakTermPiElim f' args))
+    else return (m, WeakTermPiIntro True LamKindNormal xts (m, WeakTermPiElim f' args))
 
 interpretArg :: [TreePlus] -> WithEnv ([WeakIdentPlus], [WeakTermPlus])
 interpretArg es =
@@ -340,7 +340,7 @@ interpretNoeticCaseBody subject nameMap body =
       return
         ( m,
           WeakTermPiElim
-            (m, WeakTermPiIntro Nothing [(m, asIdent orig, wrapWithNoema subject t)] body')
+            (m, WeakTermPiIntro True LamKindNormal [(m, asIdent orig, wrapWithNoema subject t)] body')
             [new']
         )
 

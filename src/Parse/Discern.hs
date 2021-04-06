@@ -52,16 +52,18 @@ discern' nenv term =
     (m, WeakTermPi xts t) -> do
       (xts', t') <- discernBinder nenv xts t
       return (m, WeakTermPi xts' t')
-    (m, WeakTermPiIntro mName xts e) -> do
-      (xts', e') <- discernBinder nenv xts e
-      return (m, WeakTermPiIntro mName xts' e')
+    (m, WeakTermPiIntro isReducible kind xts e) -> do
+      case kind of
+        LamKindFix xt -> do
+          (xt', xts', e') <- discernFix nenv xt xts e
+          return (m, WeakTermPiIntro isReducible (LamKindFix xt') xts' e')
+        _ -> do
+          (xts', e') <- discernBinder nenv xts e
+          return (m, WeakTermPiIntro isReducible kind xts' e')
     (m, WeakTermPiElim e es) -> do
       es' <- mapM (discern' nenv) es
       e' <- discern' nenv e
       return (m, WeakTermPiElim e' es')
-    (m, WeakTermFix b (mx, x, t) xts e) -> do
-      (xt', xts', e') <- discernFix nenv (mx, x, t) xts e
-      return (m, WeakTermFix b xt' xts' e')
     (m, WeakTermConst x) ->
       return (m, WeakTermConst x)
     (m, WeakTermAster h) ->

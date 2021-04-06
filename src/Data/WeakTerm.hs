@@ -3,7 +3,7 @@ module Data.WeakTerm where
 import Data.Basic
 import qualified Data.IntMap as IntMap
 import Data.LowType
-import Data.Maybe (maybeToList)
+import Data.Maybe (catMaybes, maybeToList)
 import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -13,9 +13,8 @@ data WeakTerm
   = WeakTermTau
   | WeakTermVar VarOpacity Ident
   | WeakTermPi [WeakIdentPlus] WeakTermPlus
-  | WeakTermPiIntro (Maybe (T.Text, T.Text)) [WeakIdentPlus] WeakTermPlus
+  | WeakTermPiIntro IsReducible (LamKind WeakIdentPlus) [WeakIdentPlus] WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
-  | WeakTermFix Bool WeakIdentPlus [WeakIdentPlus] WeakTermPlus
   | WeakTermAster Int
   | WeakTermConst T.Text
   | WeakTermInt WeakTermPlus Integer
@@ -116,16 +115,12 @@ varWeakTermPlus term =
           S.empty
     (_, WeakTermPi xts t) ->
       varWeakTermPlus' xts [t]
-    (_, WeakTermPiIntro _ xts e) ->
-      varWeakTermPlus' xts [e]
+    (_, WeakTermPiIntro _ k xts e) ->
+      varWeakTermPlus' (catMaybes [fromLamKind k] ++ xts) [e]
     (_, WeakTermPiElim e es) -> do
       let xs = varWeakTermPlus e
       let ys = S.unions $ map varWeakTermPlus es
       S.union xs ys
-    (_, WeakTermFix _ (_, x, t) xts e) -> do
-      let set1 = varWeakTermPlus t
-      let set2 = S.filter (/= x) (varWeakTermPlus' xts [e])
-      S.union set1 set2
     (_, WeakTermConst _) ->
       S.empty
     (_, WeakTermAster _) ->
@@ -185,15 +180,11 @@ asterWeakTermPlus term =
       S.empty
     (_, WeakTermPi xts t) ->
       asterWeakTermPlus' xts [t]
-    (_, WeakTermPiIntro _ xts e) ->
+    (_, WeakTermPiIntro _ _ xts e) ->
       asterWeakTermPlus' xts [e]
     (_, WeakTermPiElim e es) -> do
       let set1 = asterWeakTermPlus e
       let set2 = S.unions $ map asterWeakTermPlus es
-      S.union set1 set2
-    (_, WeakTermFix _ (_, _, t) xts e) -> do
-      let set1 = asterWeakTermPlus t
-      let set2 = asterWeakTermPlus' xts [e]
       S.union set1 set2
     (_, WeakTermAster h) ->
       S.singleton h
@@ -273,9 +264,18 @@ toText term =
             showCons ["∑", inParen $ showTypeArgs zts, toText t]
       | otherwise ->
         showCons ["Π", inParen $ showTypeArgs xts, toText cod]
-    (_, WeakTermPiIntro _ xts e) -> do
-      let argStr = inParen $ showItems $ map showArg xts
-      showCons ["λ", argStr, toText e]
+    (_, WeakTermPiIntro isReducible kind xts e) -> do
+      case kind of
+        LamKindFix (_, x, _) -> do
+          let argStr = inParen $ showItems $ map showArg xts
+          if isReducible
+            then showCons ["fix", showVariable x, argStr, toText e]
+            else showCons ["fix-irreducible", showVariable x, argStr, toText e]
+        _ -> do
+          let argStr = inParen $ showItems $ map showArg xts
+          if isReducible
+            then showCons ["λ", argStr, toText e]
+            else showCons ["λ-irreducible", argStr, toText e]
     (_, WeakTermPiElim e es) ->
       -- case e of
       --   (_, WeakTermAster i) ->
@@ -284,13 +284,6 @@ toText term =
       --   "*"
       -- _ ->
       showCons $ map toText $ e : es
-    -- (_, WeakTermFix (_, x, _) _ _) -> do
-    --   asText x
-    (_, WeakTermFix b (_, x, _) xts e) -> do
-      let argStr = inParen $ showItems $ map showArg xts
-      if b
-        then showCons ["fix", showVariable x, argStr, toText e]
-        else showCons ["fix-irreducible", showVariable x, argStr, toText e]
     (_, WeakTermConst x) ->
       x
     -- (_, WeakTermAster _) ->
@@ -340,18 +333,20 @@ toTree term =
       (m, TreeLeaf (showVariable x))
     (m, WeakTermPi xts cod) ->
       (m, TreeNode [(m, TreeLeaf "Π"), (m, TreeNode (map toTreeArg xts)), toTree cod])
-    (m, WeakTermPiIntro _ xts e) -> do
-      (m, TreeNode [(m, TreeLeaf "λ"), (m, TreeNode (map toTreeArg xts)), toTree e])
+    (m, WeakTermPiIntro {}) -> do
+      (m, TreeLeaf "<lam>")
+    -- (m, WeakTermPiIntro _ xts e) -> do
+    --   (m, TreeNode [(m, TreeLeaf "λ"), (m, TreeNode (map toTreeArg xts)), toTree e])
     (m, WeakTermPiElim e es) ->
       case e of
         (_, WeakTermAster _) ->
           (m, TreeLeaf "*")
         _ ->
           (m, TreeNode (map toTree $ e : es))
-    (m, WeakTermFix b (_, x, _) xts e) -> do
-      if b
-        then (m, TreeNode [(m, TreeLeaf "fix"), (m, TreeLeaf (showVariable x)), (m, TreeNode (map toTreeArg xts)), toTree e])
-        else (m, TreeNode [(m, TreeLeaf "fix-irreducible"), (m, TreeLeaf (showVariable x)), (m, TreeNode (map toTreeArg xts)), toTree e])
+    -- (m, WeakTermFix b (_, x, _) xts e) -> do
+    --   if b
+    --     then (m, TreeNode [(m, TreeLeaf "fix"), (m, TreeLeaf (showVariable x)), (m, TreeNode (map toTreeArg xts)), toTree e])
+    --     else (m, TreeNode [(m, TreeLeaf "fix-irreducible"), (m, TreeLeaf (showVariable x)), (m, TreeNode (map toTreeArg xts)), toTree e])
     (m, WeakTermConst x) ->
       (m, TreeLeaf x)
     (m, WeakTermAster _) ->
