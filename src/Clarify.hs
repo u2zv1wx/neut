@@ -42,11 +42,12 @@ clarifyStmt tenv ss =
       holeVarName <- newIdentFromText "hole"
       let app = (m, CompPiElimDownElim (m, ValueConst (toGlobalVarName x)) [])
       return (m, CompUpElim holeVarName app cont')
-    StmtResourceType m name discarder copier : cont -> do
-      discarder' <- toSwitcherBranch m tenv discarder
-      copier' <- toSwitcherBranch m tenv copier
-      registerSwitcher m name discarder' copier'
-      clarifyStmt tenv cont
+
+-- StmtResourceType m name discarder copier : cont -> do
+--   discarder' <- toSwitcherBranch m tenv discarder
+--   copier' <- toSwitcherBranch m tenv copier
+--   registerSwitcher m name discarder' copier'
+--   clarifyStmt tenv cont
 
 clarifyTerm :: TypeEnv -> TermPlus -> WithEnv CompPlus
 clarifyTerm tenv term =
@@ -450,8 +451,8 @@ termSigmaIntro m xts = do
         (m, TermPiElim (m, TermVar OpacityOpaque k) args)
     )
 
-toSwitcherBranch :: Hint -> TypeEnv -> TermPlus -> WithEnv (ValuePlus -> WithEnv CompPlus)
-toSwitcherBranch m tenv d = do
-  d' <- clarifyTerm tenv d
-  (varName, var) <- newValueVarWith m "res"
-  return $ \val -> callClosure m d' [(varName, (m, CompUpIntro val), var)] >>= reduceCompPlus
+-- toSwitcherBranch :: Hint -> TypeEnv -> TermPlus -> WithEnv (ValuePlus -> WithEnv CompPlus)
+-- toSwitcherBranch m tenv d = do
+--   d' <- clarifyTerm tenv d
+--   (varName, var) <- newValueVarWith m "res"
+--   return $ \val -> callClosure m d' [(varName, (m, CompUpIntro val), var)] >>= reduceCompPlus

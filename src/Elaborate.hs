@@ -11,7 +11,7 @@ import qualified Data.IntMap as IntMap
 import Data.List (nub)
 import Data.Log
 import Data.LowType
-import Data.Namespace
+-- import Data.Namespace
 import qualified Data.Set as S
 import Data.Term
 import qualified Data.Text as T
@@ -47,19 +47,19 @@ elaborateStmt' stmt =
       modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e'') (substEnv env)})
       cont' <- elaborateStmt' cont
       return $ StmtDef m (mx, x, t'') e'' : cont'
-    WeakStmtResourceType m name discarder copier : cont -> do
-      insConstTypeEnv name (m, TermTau)
-      (discarder', tDiscarder) <- infer discarder
-      (copier', tCopier) <- infer copier
-      let tPtr = (m, WeakTermEnum (nsUnsafe <> "pointer"))
-      h <- newIdentFromText "res"
-      insConstraintEnv (m, WeakTermPi [(m, h, tPtr)] (m, WeakTermTensor [])) tDiscarder
-      insConstraintEnv (m, WeakTermPi [(m, h, tPtr)] tPtr) tCopier
-      unify
-      discarder'' <- elaborate' discarder' >>= inlineTermPlus
-      copier'' <- elaborate' copier' >>= inlineTermPlus
-      cont' <- elaborateStmt' cont
-      return $ StmtResourceType m name discarder'' copier'' : cont'
+    -- WeakStmtResourceType m name discarder copier : cont -> do
+    --   insConstTypeEnv name (m, TermTau)
+    --   (discarder', tDiscarder) <- infer discarder
+    --   (copier', tCopier) <- infer copier
+    --   let tPtr = (m, WeakTermEnum (nsUnsafe <> "pointer"))
+    --   h <- newIdentFromText "res"
+    --   insConstraintEnv (m, WeakTermPi [(m, h, tPtr)] (m, WeakTermTensor [])) tDiscarder
+    --   insConstraintEnv (m, WeakTermPi [(m, h, tPtr)] tPtr) tCopier
+    --   unify
+    --   discarder'' <- elaborate' discarder' >>= inlineTermPlus
+    --   copier'' <- elaborate' copier' >>= inlineTermPlus
+    --   cont' <- elaborateStmt' cont
+    --   return $ StmtResourceType m name discarder'' copier'' : cont'
     WeakStmtOpaque name : cont -> do
       modify (\env -> env {opaqueEnv = S.insert name (opaqueEnv env)})
       elaborateStmt' cont
@@ -70,11 +70,12 @@ elaborate' term =
     (m, WeakTermTau) ->
       return (m, TermTau)
     (m, WeakTermVar opacity x) -> do
-      cset <- gets constantSet
-      let x' = asText x
-      if S.member x' cset
-        then return (m, TermConst x')
-        else return (m, TermVar opacity x)
+      return (m, TermVar opacity x)
+    -- cset <- gets constantSet
+    -- let x' = asText x
+    -- if S.member x' cset
+    --   then return (m, TermConst x')
+    --   else return (m, TermVar opacity x)
     (m, WeakTermPi xts t) -> do
       xts' <- mapM elaborateWeakIdentPlus xts
       t' <- elaborate' t
@@ -229,6 +230,6 @@ lookupEnumSet m name = do
     Just xis ->
       return $ map fst xis
 
-insConstTypeEnv :: T.Text -> TermPlus -> WithEnv ()
-insConstTypeEnv x t =
-  modify (\e -> e {constTypeEnv = Map.insert x t (constTypeEnv e)})
+-- insConstTypeEnv :: T.Text -> TermPlus -> WithEnv ()
+-- insConstTypeEnv x t =
+--   modify (\e -> e {constTypeEnv = Map.insert x t (constTypeEnv e)})

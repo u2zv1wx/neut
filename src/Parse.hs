@@ -10,7 +10,7 @@ import qualified Data.HashMap.Lazy as Map
 import Data.List (find)
 import Data.Log
 import Data.Namespace
-import qualified Data.Set as S
+-- import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Tree
 import Data.WeakTerm
@@ -46,16 +46,16 @@ parse stmtTreeList =
                 parse restStmtList
               | otherwise ->
                 raiseSyntaxError m "(declare-enum LEAF TREE ... TREE)"
-            "define-resource-type"
-              | [(_, TreeLeaf name), discarder, copier] <- rest -> do
-                name' <- withSectionPrefix name
-                discarder' <- interpret discarder >>= discern
-                copier' <- interpret copier >>= discern
-                insertConstant m name'
-                defList <- parse restStmtList
-                return $ WeakStmtResourceType m name' discarder' copier' : defList
-              | otherwise ->
-                raiseSyntaxError m "(define-resource-type LEAF TREE TREE)"
+            -- "define-resource-type"
+            --   | [(_, TreeLeaf name), discarder, copier] <- rest -> do
+            --     name' <- withSectionPrefix name
+            --     discarder' <- interpret discarder >>= discern
+            --     copier' <- interpret copier >>= discern
+            --     insertConstant m name'
+            --     defList <- parse restStmtList
+            --     return $ WeakStmtResourceType m name' discarder' copier' : defList
+            --   | otherwise ->
+            --     raiseSyntaxError m "(define-resource-type LEAF TREE TREE)"
             --
             -- namespace-related statements
             --
@@ -128,12 +128,12 @@ interpretAux headStmt restStmtList = do
   defList <- parse restStmtList
   return $ WeakStmtDef m (m, h, t) e : defList
 
-insertConstant :: Hint -> T.Text -> WithEnv ()
-insertConstant m x = do
-  cset <- gets constantSet
-  if S.member x cset
-    then raiseError m $ "the constant `" <> x <> "` is already defined"
-    else modify (\env -> env {constantSet = S.insert x (constantSet env)})
+-- insertConstant :: Hint -> T.Text -> WithEnv ()
+-- insertConstant m x = do
+--   cset <- gets constantSet
+--   if S.member x cset
+--     then raiseError m $ "the constant `" <> x <> "` is already defined"
+--     else modify (\env -> env {constantSet = S.insert x (constantSet env)})
 
 insEnumEnv :: Hint -> T.Text -> [(T.Text, Int)] -> WithEnv ()
 insEnumEnv m name xis = do

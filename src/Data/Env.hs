@@ -39,7 +39,7 @@ data Env = Env
     --
     -- parse
     --
-    constantSet :: S.Set T.Text,
+    -- constantSet :: S.Set T.Text,
     fileEnv :: Map.HashMap (Path Abs File) VisitInfo,
     traceEnv :: [Path Abs File],
     -- [("choice", [("left", 0), ("right", 1)]), ...]
@@ -83,7 +83,7 @@ initialEnv =
       endOfEntry = "",
       topMetaNameEnv = Map.empty,
       metaTermCtx = IntMap.empty,
-      constantSet = S.empty,
+      -- constantSet = S.empty,
       nsEnv = [],
       enumEnv = Map.empty,
       fileEnv = Map.empty,
