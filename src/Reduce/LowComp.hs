@@ -42,7 +42,7 @@ reduceLowComp sub sizeMap llvm = do
             reduceLowComp sub' sizeMap' cont
         _ -> do
           x' <- newIdentFromIdent x
-          let sub' = IntMap.insert (asInt x) (LowValueLocal x') sub
+          let sub' = IntMap.insert (asInt x) (LowValueVarLocal x') sub
           cont' <- reduceLowComp sub' sizeMap cont
           return $ LowCompLet x' (substLowOp sub op) cont'
     LowCompCont op@(LowOpFree d size j) cont -> do

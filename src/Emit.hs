@@ -28,7 +28,7 @@ emit mainTerm = do
   lenv <- gets lowCompEnv
   xs <-
     forM (HashMap.toList lenv) $ \(name, (args, body)) -> do
-      let args' = map (showLowValue . LowValueLocal) args
+      let args' = map (showLowValue . LowValueVarLocal) args
       body' <- reduceLowComp IntMap.empty Map.empty body
       emitDefinition "i8*" (TE.encodeUtf8Builder name) args' body'
   return $ unlinesL $ g : zs <> concat xs
@@ -75,12 +75,12 @@ emitLowComp retType llvm =
       op <-
         emitOp $
           unwordsL
-            [ showLowValue (LowValueLocal tmp),
+            [ showLowValue (LowValueVarLocal tmp),
               "=",
               "tail call fastcc i8*",
               showLowValue f <> showArgs args
             ]
-      a <- emitRet retType (LowValueLocal tmp)
+      a <- emitRet retType (LowValueVarLocal tmp)
       return $ op <> a
     LowCompSwitch (d, lowType) defaultBranch branchList -> do
       defaultLabel <- newIdentFromText "default"
@@ -92,7 +92,7 @@ emitLowComp retType llvm =
               showLowType lowType,
               showLowValue d <> ",",
               "label",
-              showLowValue (LowValueLocal defaultLabel),
+              showLowValue (LowValueVarLocal defaultLabel),
               showBranchList lowType $ zip (map fst branchList) labelList
             ]
       let asmList = map snd branchList
@@ -107,7 +107,7 @@ emitLowComp retType llvm =
       return $ str <> a
     LowCompLet x op cont -> do
       s <- emitLowOp op
-      str <- emitOp $ showLowValue (LowValueLocal x) <> " = " <> s
+      str <- emitOp $ showLowValue (LowValueVarLocal x) <> " = " <> s
       a <- emitLowComp retType cont
       return $ str <> a
     LowCompUnreachable ->
@@ -256,7 +256,7 @@ showBranch lowType i label =
     <> " "
     <> intDec i
     <> ", label "
-    <> showLowValue (LowValueLocal label)
+    <> showLowValue (LowValueVarLocal label)
 
 showArg :: LowValue -> Builder
 showArg d =
@@ -335,9 +335,9 @@ showLowType lowType =
 showLowValue :: LowValue -> Builder
 showLowValue llvmValue =
   case llvmValue of
-    LowValueLocal (I (_, i)) ->
+    LowValueVarLocal (I (_, i)) ->
       "%_" <> intDec i
-    LowValueGlobal x ->
+    LowValueVarGlobal x ->
       "@" <> TE.encodeUtf8Builder x
     LowValueInt i ->
       integerDec i

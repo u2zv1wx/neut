@@ -7,8 +7,8 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 
 data Value
-  = ValueConst T.Text
-  | ValueVar Ident
+  = ValueVarLocal Ident
+  | ValueVarGlobal T.Text
   | ValueSigmaIntro [ValuePlus]
   | ValueInt IntSize Integer
   | ValueFloat FloatSize Double
@@ -16,12 +16,12 @@ data Value
   deriving (Show)
 
 data Comp
-  = CompPrimitive Primitive
-  | CompPiElimDownElim ValuePlus [ValuePlus] -- ((force v) v1 ... vn)
+  = CompPiElimDownElim ValuePlus [ValuePlus] -- ((force v) v1 ... vn)
   | CompSigmaElim Bool [Ident] ValuePlus CompPlus
   | CompUpIntro ValuePlus
   | CompUpElim Ident CompPlus CompPlus
   | CompEnumElim ValuePlus [(EnumCase, CompPlus)]
+  | CompPrimitive Primitive
   deriving (Show)
 
 data Primitive
@@ -45,7 +45,7 @@ type SubstValuePlus =
 varValue :: ValuePlus -> S.Set Ident
 varValue v =
   case v of
-    (_, ValueVar x) ->
+    (_, ValueVarLocal x) ->
       S.singleton x
     (_, ValueSigmaIntro vs) ->
       S.unions $ map varValue vs
@@ -55,12 +55,6 @@ varValue v =
 varComp :: CompPlus -> S.Set Ident
 varComp c =
   case c of
-    (_, CompPrimitive prim) ->
-      case prim of
-        PrimitivePrimOp _ vs ->
-          S.unions $ map varValue vs
-        PrimitiveDerangement _ vs ->
-          S.unions $ map varValue vs
     (_, CompPiElimDownElim v vs) ->
       S.unions $ map varValue (v : vs)
     (_, CompSigmaElim _ xs v e) -> do
@@ -78,3 +72,9 @@ varComp c =
       let (_, es) = unzip caseList
       let s2 = S.unions (map varComp es)
       S.union s1 s2
+    (_, CompPrimitive prim) ->
+      case prim of
+        PrimitivePrimOp _ vs ->
+          S.unions $ map varValue vs
+        PrimitiveDerangement _ vs ->
+          S.unions $ map varValue vs

@@ -10,7 +10,7 @@ import Data.WeakTerm
 
 data Term
   = TermTau
-  | TermVar Opacity Ident
+  | TermVar VarKind Ident
   | TermPi [IdentPlus] TermPlus
   | TermPiIntro Opacity (LamKind IdentPlus) [IdentPlus] TermPlus
   | TermPiElim TermPlus [TermPlus]
@@ -47,7 +47,7 @@ type TypeEnv =
   IntMap.IntMap TermPlus
 
 data Stmt
-  = StmtDef Hint IdentPlus TermPlus
+  = StmtDef Bool Hint IdentPlus TermPlus
   deriving (Show)
 
 asVar :: TermPlus -> Maybe Ident
@@ -63,8 +63,8 @@ weaken term =
   case term of
     (m, TermTau) ->
       (m, WeakTermTau)
-    (m, TermVar opacity x) ->
-      (m, WeakTermVar opacity x)
+    (m, TermVar kind x) ->
+      (m, WeakTermVar kind x)
     (m, TermPi xts t) ->
       (m, WeakTermPi (map weakenIdentPlus xts) (weaken t))
     (m, TermPiIntro opacity kind xts e) -> do

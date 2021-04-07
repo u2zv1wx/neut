@@ -21,13 +21,13 @@ reduceCompPlus term =
     (m, CompPiElimDownElim v ds) -> do
       cenv <- gets codeEnv
       case v of
-        (_, ValueConst x)
+        (_, ValueVarGlobal x)
           | Just (Definition isReducible xs body) <- Map.lookup x cenv,
             isReducible,
             length xs == length ds -> do
             let sub = IntMap.fromList (zip (map asInt xs) ds)
             substCompPlus sub IntMap.empty body >>= reduceCompPlus
-        -- (_, ValueConst x)
+        -- (_, ValueGlobal x)
         --   | Just (Definition (IsFixed False) xs body) <- Map.lookup x cenv,
         --     length xs == length ds -> do
         --     let sub = IntMap.fromList (zip (map asInt xs) ds)
@@ -68,7 +68,7 @@ reduceCompPlus term =
         _ -> do
           e2' <- reduceCompPlus e2
           case e2' of
-            (_, CompUpIntro (_, ValueVar y))
+            (_, CompUpIntro (_, ValueVarLocal y))
               | x == y ->
                 return e1' -- eta-reduce
             _ ->
@@ -88,13 +88,13 @@ reduceCompPlus term =
 substValuePlus :: SubstValuePlus -> NameEnv -> ValuePlus -> ValuePlus
 substValuePlus sub nenv term =
   case term of
-    (m, ValueVar x)
+    (m, ValueVarLocal x)
       | Just x' <- IntMap.lookup (asInt x) nenv ->
-        (m, ValueVar x')
+        (m, ValueVarLocal x')
       | Just e <- IntMap.lookup (asInt x) sub ->
         e
       | otherwise ->
-        (m, ValueVar x)
+        (m, ValueVarLocal x)
     (m, ValueSigmaIntro vs) -> do
       let vs' = map (substValuePlus sub nenv) vs
       (m, ValueSigmaIntro vs')
@@ -145,7 +145,7 @@ substPrimitive sub nenv c =
 asIdent :: ValuePlus -> Maybe Ident
 asIdent term =
   case term of
-    (_, ValueVar x) ->
+    (_, ValueVarLocal x) ->
       Just x
     _ ->
       Nothing

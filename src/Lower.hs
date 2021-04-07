@@ -17,7 +17,7 @@ lower :: CompPlus -> WithEnv LowComp
 lower mainTerm@(m, _) = do
   mainTerm'' <- lowerComp mainTerm
   -- the result of "main" must be i64, not i8*
-  (result, resultVar) <- newValueVarWith m "result"
+  (result, resultVar) <- newValueVarLocalWith m "result"
   (cast, castThen) <- llvmCast (Just "cast") resultVar (LowTypeInt 64)
   castResult <- castThen (LowCompReturn cast)
   -- let result: i8* := (main-term) in {cast result to i64}
@@ -41,7 +41,7 @@ lowerComp term =
       loadContent isNoetic v basePtrType (zip idxList (zip ys xts')) e
     (_, CompUpIntro d) -> do
       result <- newIdentFromText $ takeBaseName d
-      lowerValueLet result d $ LowCompReturn $ LowValueLocal result
+      lowerValueLet result d $ LowCompReturn $ LowValueVarLocal result
     (_, CompUpElim x e1 e2) -> do
       e1' <- lowerComp e1
       e2' <- lowerComp e2
@@ -63,14 +63,14 @@ uncastList args e =
       lowerComp e
     ((y, (x, et)) : yxs) -> do
       e' <- uncastList yxs e
-      llvmUncastLet x (LowValueLocal y) et e'
+      llvmUncastLet x (LowValueVarLocal y) et e'
 
 takeBaseName :: ValuePlus -> T.Text
 takeBaseName term =
   case term of
-    (_, ValueConst s) ->
+    (_, ValueVarGlobal s) ->
       s
-    (_, ValueVar (I (s, _))) ->
+    (_, ValueVarLocal (I (s, _))) ->
       s
     (_, ValueSigmaIntro ds) ->
       "array" <> T.pack (show (length ds))
@@ -88,9 +88,9 @@ takeBaseName term =
 takeBaseName' :: LowValue -> T.Text
 takeBaseName' lowerValue =
   case lowerValue of
-    LowValueLocal (I (s, _)) ->
+    LowValueVarLocal (I (s, _)) ->
       s
-    LowValueGlobal s ->
+    LowValueVarGlobal s ->
       s
     LowValueInt _ ->
       "int"
@@ -138,7 +138,7 @@ loadContent' isNoetic bp bt values cont =
         l <- llvmUncast (Just $ takeBaseName' bp) bp bt
         tmp <- newNameWith'' $ Just $ takeBaseName' bp
         j <- newCount
-        commConv tmp l $ LowCompCont (LowOpFree (LowValueLocal tmp) bt j) cont
+        commConv tmp l $ LowCompCont (LowOpFree (LowValueVarLocal tmp) bt j) cont
     (i, (x, et)) : xis -> do
       cont' <- loadContent' isNoetic bp bt xis cont
       (posName, pos) <- newValueLocal' (Just $ asText x)
@@ -164,7 +164,7 @@ lowerCompPrimitive m codeOp =
           res <- newIdentFromText "result"
           lowerValueLet' (zip xs args) $
             LowCompLet res (LowOpSyscall i vs) $
-              LowCompReturn (LowValueLocal res)
+              LowCompReturn (LowValueVarLocal res)
         DerangementExternal name -> do
           (xs, vs) <- unzip <$> mapM (const $ newValueLocal "ext-call-arg") args
           denv <- gets declEnv
@@ -172,12 +172,12 @@ lowerCompPrimitive m codeOp =
             let dom = map (const voidPtr) vs
             let cod = voidPtr
             modify (\env -> env {declEnv = Map.insert name (dom, cod) denv})
-          lowerValueLet' (zip xs args) $ LowCompCall (LowValueGlobal name) vs
+          lowerValueLet' (zip xs args) $ LowCompCall (LowValueVarGlobal name) vs
         DerangementLoad valueLowType -> do
           let ptr = args !! 0
           (ptrVar, castPtrThen) <- llvmCast (Just $ takeBaseName ptr) ptr (LowTypePointer valueLowType)
           resName <- newIdentFromText "result"
-          uncast <- llvmUncast (Just $ asText resName) (LowValueLocal resName) valueLowType
+          uncast <- llvmUncast (Just $ asText resName) (LowValueVarLocal resName) valueLowType
           castPtrThen $
             LowCompLet resName (LowOpLoad ptrVar valueLowType) uncast
         DerangementStore valueLowType -> do
@@ -192,18 +192,18 @@ lowerCompPrimitive m codeOp =
           let arrayType = AggPtrTypeArray (length args) elemType
           let argTypeList = zip args (repeat elemType)
           resName <- newIdentFromText "result"
-          storeContent m resName arrayType argTypeList (LowCompReturn (LowValueLocal resName))
+          storeContent m resName arrayType argTypeList (LowCompReturn (LowValueVarLocal resName))
         DerangementCreateStruct elemTypeList -> do
           let structType = AggPtrTypeStruct elemTypeList
           let argTypeList = zip args elemTypeList
           resName <- newIdentFromText "result"
-          storeContent m resName structType argTypeList (LowCompReturn (LowValueLocal resName))
+          storeContent m resName structType argTypeList (LowCompReturn (LowValueVarLocal resName))
 
 lowerCompPrimOp :: PrimOp -> [ValuePlus] -> WithEnv LowComp
 lowerCompPrimOp op@(PrimOp _ domList cod) vs = do
   (argVarList, castArgsThen) <- llvmCastPrimArgs $ zip vs domList
   result <- newIdentFromText "prim-op-result"
-  uncast <- llvmUncast (Just $ asText result) (LowValueLocal result) cod
+  uncast <- llvmUncast (Just $ asText result) (LowValueVarLocal result) cod
   castArgsThen $ LowCompLet result (LowOpPrimOp op argVarList) uncast
 
 llvmCastPrimArgs :: [(ValuePlus, LowType)] -> WithEnv ([LowValue], LowComp -> WithEnv LowComp)
@@ -231,9 +231,9 @@ llvmCast mName v lowType =
       tmp <- newNameWith'' mName
       x <- newNameWith'' mName
       return
-        ( LowValueLocal x,
+        ( LowValueVarLocal x,
           lowerValueLet tmp v
-            . LowCompLet x (LowOpBitcast (LowValueLocal tmp) voidPtr lowType)
+            . LowCompLet x (LowOpBitcast (LowValueVarLocal tmp) voidPtr lowType)
         )
 
 llvmCastInt ::
@@ -245,11 +245,11 @@ llvmCastInt mName v lowType = do
   x <- newNameWith'' mName
   y <- newNameWith'' mName
   return
-    ( LowValueLocal y,
+    ( LowValueVarLocal y,
       lowerValueLet x v
         . LowCompLet
           y
-          (LowOpPointerToInt (LowValueLocal x) voidPtr lowType)
+          (LowOpPointerToInt (LowValueVarLocal x) voidPtr lowType)
     )
 
 llvmCastFloat ::
@@ -264,7 +264,7 @@ llvmCastFloat mName v size = do
   (yName, y) <- newValueLocal' mName
   z <- newNameWith'' mName
   return
-    ( LowValueLocal z,
+    ( LowValueVarLocal z,
       lowerValueLet xName v
         . LowCompLet yName (LowOpPointerToInt x voidPtr intType)
         . LowCompLet z (LowOpBitcast y intType floatType)
@@ -282,14 +282,14 @@ llvmUncast mName result lowType =
       x <- newNameWith'' mName
       return $
         LowCompLet x (LowOpBitcast result lowType voidPtr) $
-          LowCompReturn (LowValueLocal x)
+          LowCompReturn (LowValueVarLocal x)
 
 llvmUncastInt :: Maybe T.Text -> LowValue -> LowType -> WithEnv LowComp
 llvmUncastInt mName result lowType = do
   x <- newNameWith'' mName
   return $
     LowCompLet x (LowOpIntToPointer result lowType voidPtr) $
-      LowCompReturn (LowValueLocal x)
+      LowCompReturn (LowValueVarLocal x)
 
 llvmUncastFloat :: Maybe T.Text -> LowValue -> FloatSize -> WithEnv LowComp
 llvmUncastFloat mName floatResult i = do
@@ -299,8 +299,8 @@ llvmUncastFloat mName floatResult i = do
   x <- newNameWith'' mName
   return $
     LowCompLet tmp (LowOpBitcast floatResult floatType intType) $
-      LowCompLet x (LowOpIntToPointer (LowValueLocal tmp) intType voidPtr) $
-        LowCompReturn (LowValueLocal x)
+      LowCompLet x (LowOpIntToPointer (LowValueVarLocal tmp) intType voidPtr) $
+        LowCompReturn (LowValueVarLocal x)
 
 llvmUncastLet :: Ident -> LowValue -> LowType -> LowComp -> WithEnv LowComp
 llvmUncastLet x@(I (s, _)) d lowType cont = do
@@ -312,7 +312,7 @@ llvmUncastLet x@(I (s, _)) d lowType cont = do
 lowerValueLet :: Ident -> ValuePlus -> LowComp -> WithEnv LowComp
 lowerValueLet x lowerValue cont =
   case lowerValue of
-    (m, ValueConst y) -> do
+    (m, ValueVarGlobal y) -> do
       cenv <- gets codeEnv
       lenv <- gets lowCompEnv
       case Map.lookup y cenv of
@@ -323,11 +323,11 @@ lowerValueLet x lowerValue cont =
             insLowCompEnv y args LowCompUnreachable
             llvm <- lowerComp e
             insLowCompEnv y args llvm
-            llvmUncastLet x (LowValueGlobal y) (toFunPtrType args) cont
+            llvmUncastLet x (LowValueVarGlobal y) (toFunPtrType args) cont
           | otherwise ->
-            llvmUncastLet x (LowValueGlobal y) (toFunPtrType args) cont
-    (_, ValueVar y) ->
-      llvmUncastLet x (LowValueLocal y) voidPtr cont
+            llvmUncastLet x (LowValueVarGlobal y) (toFunPtrType args) cont
+    (_, ValueVarLocal y) ->
+      llvmUncastLet x (LowValueVarLocal y) voidPtr cont
     (m, ValueSigmaIntro ds) -> do
       let arrayType = AggPtrTypeArray (length ds) voidPtr
       let dts = zip ds (repeat voidPtr)
@@ -391,7 +391,7 @@ storeContent ::
   WithEnv LowComp
 storeContent m reg aggPtrType dts cont = do
   let lowType = toLowType aggPtrType
-  (cast, castThen) <- llvmCast (Just $ asText reg) (m, ValueVar reg) lowType
+  (cast, castThen) <- llvmCast (Just $ asText reg) (m, ValueVarLocal reg) lowType
   storeThenCont <- storeContent' cast lowType (zip [0 ..] dts) cont
   castThenStoreThenCont <- castThen storeThenCont
   case aggPtrType of
@@ -450,12 +450,12 @@ toFunPtrType xs =
 newValueLocal :: T.Text -> WithEnv (Ident, LowValue)
 newValueLocal name = do
   x <- newIdentFromText name
-  return (x, LowValueLocal x)
+  return (x, LowValueVarLocal x)
 
 newValueLocal' :: Maybe T.Text -> WithEnv (Ident, LowValue)
 newValueLocal' mName = do
   x <- newNameWith'' mName
-  return (x, LowValueLocal x)
+  return (x, LowValueVarLocal x)
 
 newNameWith'' :: Maybe T.Text -> WithEnv Ident
 newNameWith'' mName =

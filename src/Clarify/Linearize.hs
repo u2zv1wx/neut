@@ -31,7 +31,7 @@ insertFooter x t e@(m, _) = do
   ans <- newIdentFromText "answer"
   hole <- newIdentFromText "unit"
   discardUnusedVar <- toAffineApp m x t
-  return (m, CompUpElim ans e (m, CompUpElim hole discardUnusedVar (m, CompUpIntro (m, ValueVar ans))))
+  return (m, CompUpElim ans e (m, CompUpElim hole discardUnusedVar (m, CompUpIntro (m, ValueVarLocal ans))))
 
 insertHeader ::
   Ident ->
@@ -43,7 +43,7 @@ insertHeader ::
 insertHeader x z1 zs t e@(m, _) = do
   case zs of
     [] ->
-      return (m, CompUpElim z1 (m, CompUpIntro (m, ValueVar x)) e)
+      return (m, CompUpElim z1 (m, CompUpIntro (m, ValueVarLocal x)) e)
     z2 : rest -> do
       e' <- insertHeader x z2 rest t e
       copyRelevantVar <- toRelevantApp m x t
@@ -52,12 +52,12 @@ insertHeader x z1 zs t e@(m, _) = do
 distinguishValue :: Ident -> ValuePlus -> WithEnv ([Ident], ValuePlus)
 distinguishValue z term =
   case term of
-    (m, ValueVar x) ->
+    (m, ValueVarLocal x) ->
       if x /= z
         then return ([], term)
         else do
           x' <- newIdentFromIdent x
-          return ([x'], (m, ValueVar x'))
+          return ([x'], (m, ValueVarLocal x'))
     (m, ValueSigmaIntro ds) -> do
       (vss, ds') <- unzip <$> mapM (distinguishValue z) ds
       return (concat vss, (m, ValueSigmaIntro ds'))

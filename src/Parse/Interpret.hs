@@ -44,7 +44,7 @@ interpret inputTree =
                   h <- newAster m
                   return (m, WeakTermQuestion e h)
             | otherwise ->
-              return (m, WeakTermVar OpacityOpaque $ asIdent atom)
+              return (m, WeakTermVar VarKindLocal $ asIdent atom)
     (m, TreeNode (leaf@(_, TreeLeaf headAtom) : rest)) ->
       case headAtom of
         "Π"
@@ -231,7 +231,7 @@ interpretArg es =
       case tree of
         (_, TreeLeaf "_") -> do
           xt@(m, h, _) <- interpretIdentPlus tree
-          return (xt : xts, (m, WeakTermVar OpacityOpaque h) : args)
+          return (xt : xts, (m, WeakTermVar VarKindLocal h) : args)
         _ -> do
           e <- interpret tree
           return (xts, e : args)
@@ -342,7 +342,7 @@ interpretNoeticCaseBody subject nameMap body =
     ((new, orig, t) : rest) -> do
       body' <- interpretNoeticCaseBody subject rest body
       let m = fst t
-      let new' = castToNoema subject t (m, WeakTermVar OpacityOpaque $ asIdent new)
+      let new' = castToNoema subject t (m, WeakTermVar VarKindLocal $ asIdent new)
       return
         ( m,
           WeakTermPiElim
@@ -556,7 +556,7 @@ castFromNoema subject baseType tree = do
   let m = fst tree
   ( m,
     WeakTermPiElim
-      (m, WeakTermVar OpacityOpaque (asIdent "unsafe.cast"))
+      (m, WeakTermVar VarKindLocal (asIdent "unsafe.cast"))
       [ wrapWithNoema subject baseType,
         baseType,
         tree
@@ -568,7 +568,7 @@ castToNoema subject baseType tree = do
   let m = fst tree
   ( m,
     WeakTermPiElim
-      (m, WeakTermVar OpacityOpaque (asIdent "unsafe.cast"))
+      (m, WeakTermVar VarKindLocal (asIdent "unsafe.cast"))
       [ baseType,
         wrapWithNoema subject baseType,
         tree
@@ -579,7 +579,7 @@ castToNoema subject baseType tree = do
 wrapWithNoema :: WeakTermPlus -> WeakTermPlus -> WeakTermPlus
 wrapWithNoema subject baseType = do
   let m = fst baseType
-  (m, WeakTermPiElim (m, WeakTermVar OpacityOpaque (asIdent "noema")) [subject, baseType])
+  (m, WeakTermPiElim (m, WeakTermVar VarKindLocal (asIdent "noema")) [subject, baseType])
 
 {-# INLINE isLinear #-}
 isLinear :: [Int] -> Bool

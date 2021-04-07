@@ -163,7 +163,7 @@ asMetaVar m nenv var =
 {-# INLINE asWeakVar #-}
 asWeakVar :: Hint -> Map.HashMap T.Text Ident -> T.Text -> WithEnv (Maybe WeakTermPlus)
 asWeakVar m nenv var =
-  asVar m nenv var (WeakTermVar OpacityOpaque)
+  asVar m nenv var (WeakTermVar VarKindLocal)
 
 {-# INLINE asItself #-}
 asItself :: Hint -> Map.HashMap T.Text Ident -> T.Text -> WithEnv (Maybe (Hint, Ident))

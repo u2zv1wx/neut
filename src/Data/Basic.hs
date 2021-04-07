@@ -47,6 +47,12 @@ data Opacity
   | OpacityTransparent
   deriving (Show)
 
+data VarKind
+  = VarKindLocal
+  | VarKindGlobalOpaque
+  | VarKindGlobalTransparent
+  deriving (Show)
+
 data LamKind a
   = LamKindNormal
   | LamKindCons T.Text T.Text

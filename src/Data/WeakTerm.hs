@@ -11,7 +11,7 @@ import Data.Tree
 
 data WeakTerm
   = WeakTermTau
-  | WeakTermVar Opacity Ident
+  | WeakTermVar VarKind Ident
   | WeakTermPi [WeakIdentPlus] WeakTermPlus
   | WeakTermPiIntro Opacity (LamKind WeakIdentPlus) [WeakIdentPlus] WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
@@ -90,7 +90,7 @@ conToInt con =
 
 toVar :: Hint -> Ident -> WeakTermPlus
 toVar m x =
-  (m, WeakTermVar OpacityOpaque x)
+  (m, WeakTermVar VarKindLocal x)
 
 i8 :: Hint -> WeakTermPlus
 i8 m =
@@ -107,7 +107,7 @@ varWeakTermPlus term =
       S.empty
     (_, WeakTermVar opacity x) ->
       case opacity of
-        OpacityOpaque ->
+        VarKindLocal ->
           S.singleton x
         _ ->
           S.empty

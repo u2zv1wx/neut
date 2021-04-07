@@ -157,11 +157,11 @@ newAster m = do
   i <- newCount
   return (m, WeakTermAster i)
 
-{-# INLINE newValueVarWith #-}
-newValueVarWith :: Hint -> T.Text -> WithEnv (Ident, ValuePlus)
-newValueVarWith m name = do
+{-# INLINE newValueVarLocalWith #-}
+newValueVarLocalWith :: Hint -> T.Text -> WithEnv (Ident, ValuePlus)
+newValueVarLocalWith m name = do
   x <- newIdentFromText name
-  return (x, (m, ValueVar x))
+  return (x, (m, ValueVarLocal x))
 
 --
 -- obtain information from the environment

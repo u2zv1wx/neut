@@ -10,7 +10,7 @@ import qualified Data.Text as T
 
 toApp :: T.Text -> Hint -> Ident -> CompPlus -> WithEnv CompPlus
 toApp switcher m x t = do
-  (expVarName, expVar) <- newValueVarWith m "exp"
+  (expVarName, expVar) <- newValueVarLocalWith m "exp"
   return
     ( m,
       CompUpElim
@@ -19,7 +19,7 @@ toApp switcher m x t = do
         ( m,
           CompPiElimDownElim
             expVar
-            [(m, ValueEnumIntro switcher), (m, ValueVar x)]
+            [(m, ValueEnumIntro switcher), (m, ValueVarLocal x)]
         )
     )
 
@@ -53,7 +53,7 @@ tryCache :: Hint -> T.Text -> WithEnv () -> WithEnv ValuePlus
 tryCache m key doInsertion = do
   cenv <- gets codeEnv
   when (not $ Map.member key cenv) doInsertion
-  return (m, ValueConst key)
+  return (m, ValueVarGlobal key)
 
 makeSwitcher ::
   Hint ->
@@ -61,8 +61,8 @@ makeSwitcher ::
   (ValuePlus -> WithEnv CompPlus) ->
   WithEnv ([Ident], CompPlus)
 makeSwitcher m compAff compRel = do
-  (switchVarName, switchVar) <- newValueVarWith m "switch"
-  (argVarName, argVar) <- newValueVarWith m "arg"
+  (switchVarName, switchVar) <- newValueVarLocalWith m "switch"
+  (argVarName, argVar) <- newValueVarLocalWith m "arg"
   aff <- compAff argVar
   rel <- compRel argVar
   return

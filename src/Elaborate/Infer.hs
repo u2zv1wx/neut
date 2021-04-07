@@ -40,11 +40,11 @@ infer' ctx term =
       oenv <- gets opaqueEnv
       case (IntMap.member (asInt x) senv, S.member x oenv) of
         (True, False) ->
-          return ((m, WeakTermVar OpacityTransparent x), (m, snd t))
+          return ((m, WeakTermVar VarKindGlobalTransparent x), (m, snd t))
         (True, True) ->
-          return ((m, WeakTermVar OpacityTranslucent x), (m, snd t))
+          return ((m, WeakTermVar VarKindGlobalOpaque x), (m, snd t))
         (False, _) ->
-          return ((m, WeakTermVar OpacityOpaque x), (m, snd t))
+          return ((m, WeakTermVar VarKindLocal x), (m, snd t))
     (m, WeakTermPi xts t) -> do
       (xts', t') <- inferPi ctx xts t
       return ((m, WeakTermPi xts' t'), (m, WeakTermTau))
@@ -150,9 +150,9 @@ infer' ctx term =
               clauseList' <- forM clauseList $ \((name, xts), body) -> do
                 (xts', (body', tBody)) <- inferBinder ctx xts body
                 insConstraintEnv resultType tBody
-                let xs = map (\(mx, x, t) -> ((mx, WeakTermVar OpacityOpaque x), t)) xts'
+                let xs = map (\(mx, x, t) -> ((mx, WeakTermVar VarKindLocal x), t)) xts'
                 tCons <- lookupWeakTypeEnv m name
-                (_, tPat) <- inferPiElim ctx m ((m, WeakTermVar OpacityOpaque name), tCons) (holeList ++ xs)
+                (_, tPat) <- inferPiElim ctx m ((m, WeakTermVar VarKindLocal name), tCons) (holeList ++ xs)
                 insConstraintEnv tPat t'
                 return ((name, xts'), body')
               return ((m, WeakTermCase resultType mSubject' (e', t') clauseList'), resultType)
@@ -255,7 +255,7 @@ inferPiElim ctx m (e, t) ets = do
 newAsterInCtx :: Context -> Hint -> WithEnv (WeakTermPlus, WeakTermPlus)
 newAsterInCtx ctx m = do
   higherAster <- newAster m
-  let varSeq = map (\(mx, x, _) -> (mx, WeakTermVar OpacityOpaque x)) ctx
+  let varSeq = map (\(mx, x, _) -> (mx, WeakTermVar VarKindLocal x)) ctx
   -- let varSeq = map (\(_, x, _) -> (m, WeakTermVar x)) ctx
   let higherApp = (m, WeakTermPiElim higherAster varSeq)
   aster <- newAster m
@@ -267,7 +267,7 @@ newAsterInCtx ctx m = do
 -- and return ?M @ (x1, ..., xn) : Univ{i}.
 newTypeAsterInCtx :: Context -> Hint -> WithEnv WeakTermPlus
 newTypeAsterInCtx ctx m = do
-  let varSeq = map (\(mx, x, _) -> (mx, WeakTermVar OpacityOpaque x)) ctx
+  let varSeq = map (\(mx, x, _) -> (mx, WeakTermVar VarKindLocal x)) ctx
   -- let varSeq = map (\(_, x, _) -> (m, WeakTermVar x)) ctx
   aster <- newAster m
   return (m, WeakTermPiElim aster varSeq)
@@ -366,7 +366,7 @@ takeBorrowedTypes tks =
 weakTermSigma :: Hint -> [WeakIdentPlus] -> WithEnv WeakTermPlus
 weakTermSigma m xts = do
   z <- newIdentFromText "internal.sigma-tau"
-  let vz = (m, WeakTermVar OpacityOpaque z)
+  let vz = (m, WeakTermVar VarKindLocal z)
   k <- newIdentFromText "sigma"
   return (m, WeakTermPi [(m, z, (m, WeakTermTau)), (m, k, (m, WeakTermPi xts vz))] vz)
 

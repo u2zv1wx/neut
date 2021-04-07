@@ -6,8 +6,8 @@ import Data.LowType
 import qualified Data.Text as T
 
 data LowValue
-  = LowValueLocal Ident
-  | LowValueGlobal T.Text
+  = LowValueVarLocal Ident
+  | LowValueVarGlobal T.Text
   | LowValueInt Integer
   | LowValueFloat FloatSize Double
   | LowValueNull
@@ -54,12 +54,12 @@ type SubstLowComp =
 substLowValue :: SubstLowComp -> LowValue -> LowValue
 substLowValue sub llvmValue =
   case llvmValue of
-    LowValueLocal x ->
+    LowValueVarLocal x ->
       case IntMap.lookup (asInt x) sub of
         Just d ->
           d
         Nothing ->
-          LowValueLocal x
+          LowValueVarLocal x
     _ ->
       llvmValue
 

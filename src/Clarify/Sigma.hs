@@ -39,7 +39,7 @@ sigmaS4 mName m mxts =
     Nothing -> do
       h <- toGlobalVarName <$> newIdentFromText "sigma"
       registerSwitcher m h (sigmaT m mxts) (sigma4 m mxts)
-      return (m, ValueConst h)
+      return (m, ValueVarGlobal h)
     Just name ->
       tryCache m name $ registerSwitcher m name (sigmaT m mxts) (sigma4 m mxts)
 
@@ -94,7 +94,7 @@ sigma4 m mxts argVar = do
   xts <- mapM supplyName mxts
   -- as == [APP-1, ..., APP-n]
   as <- forM xts $ \(x, t) -> toRelevantApp m x t
-  (varNameList, varList) <- unzip <$> mapM (const $ newValueVarWith m "pair") xts
+  (varNameList, varList) <- unzip <$> mapM (const $ newValueVarLocalWith m "pair") xts
   body' <- linearize xts $ bindLet (zip varNameList as) (m, CompUpIntro (m, ValueSigmaIntro varList))
   return (m, CompSigmaElim True (map fst xts) argVar body')
 
@@ -109,7 +109,7 @@ supplyName mName =
 
 returnClosureS4 :: Hint -> WithEnv CompPlus
 returnClosureS4 m = do
-  (env, envVar) <- newValueVarWith m "env"
+  (env, envVar) <- newValueVarLocalWith m "env"
   retImmS4 <- returnImmediateS4 m
   t <-
     sigmaS4

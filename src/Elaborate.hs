@@ -46,7 +46,7 @@ elaborateStmt' stmt =
       modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e'') (substEnv env)})
       when (not isReducible) $ modify (\env -> env {opaqueEnv = S.insert x (opaqueEnv env)})
       cont' <- elaborateStmt' cont
-      return $ StmtDef m (mx, x, t'') e'' : cont'
+      return $ StmtDef isReducible m (mx, x, t'') e'' : cont'
 
 elaborate' :: WeakTermPlus -> WithEnv TermPlus
 elaborate' term =
@@ -198,7 +198,7 @@ checkSwitchExaustiveness m x caseList = do
   enumSet <- lookupEnumSet m x
   let len = toInteger $ length (nub caseList)
   when (not ((toInteger (length enumSet)) <= len || b)) $
-    raiseError m "this switch here is ill-constructed in that it is not exhaustive"
+    raiseError m "this switch is ill-constructed in that it is not exhaustive"
 
 lookupEnumSet :: Hint -> T.Text -> WithEnv [T.Text]
 lookupEnumSet m name = do
