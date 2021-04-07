@@ -25,9 +25,8 @@ import qualified Data.Text as T
 import Reduce.Comp
 
 clarify :: [Stmt] -> WithEnv CompPlus
-clarify ss = do
-  e <- clarifyStmt IntMap.empty ss
-  reduceCompPlus e
+clarify =
+  clarifyStmt IntMap.empty >=> reduceCompPlus
 
 clarifyStmt :: TypeEnv -> [Stmt] -> WithEnv CompPlus
 clarifyStmt tenv ss =
@@ -35,18 +34,21 @@ clarifyStmt tenv ss =
     [] -> do
       m <- newHint 1 1 <$> getCurrentFilePath
       return (m, CompUpIntro (m, ValueInt 64 0))
-    StmtDef isReducible m (mx, x, t) e : cont -> do
+    StmtDef _ _ (mx, x, t) e : cont -> do
       e' <- clarifyTerm tenv e >>= reduceCompPlus
-      insCompEnv (toGlobalVarName x) isReducible [] e' -- implicit S4 box introduction
-      cont' <- clarifyStmt (insTypeEnv [(mx, x, t)] tenv) cont
-      holeVarName <- newIdentFromText "hole"
-      return
-        ( m,
-          CompUpElim
-            holeVarName
-            (m, CompPiElimDownElim (m, ValueVarGlobal (toGlobalVarName x)) [])
-            cont'
-        )
+      insCompEnv (toGlobalVarName x) True [] e' -- implicit S4 box introduction
+      clarifyStmt (insTypeEnv [(mx, x, t)] tenv) cont
+    StmtReduce m e : cont -> do
+      e' <- clarifyTerm tenv e >>= reduceCompPlus
+      h <- newIdentFromText "hole"
+      cont' <- clarifyStmt tenv cont
+      return (m, CompUpElim h e' cont')
+
+-- StmtResourceType m name discarder copier : cont -> do
+--   discarder' <- toSwitcherBranch m tenv discarder
+--   copier' <- toSwitcherBranch m tenv copier
+--   registerSwitcher m name discarder' copier'
+--   clarifyStmt tenv cont
 
 clarifyTerm :: TypeEnv -> TermPlus -> WithEnv CompPlus
 clarifyTerm tenv term =
@@ -90,16 +92,16 @@ clarifyTerm tenv term =
       es' <- (mapM (clarifyTerm tenv) >=> alignFreeVariables tenv m fvs) es
       (y, e', yVar) <- clarifyPlus tenv e
       return $ bindLet [(y, e')] (m, CompEnumElim yVar (zip (map snd cs) es'))
-    (m, TermTensor {}) ->
-      returnImmediateS4 m -- `tensor`s must be used linearly
-    (m, TermTensorIntro es) -> do
-      (zs, es', xs) <- unzip3 <$> mapM (clarifyPlus tenv) es
-      return $ bindLet (zip zs es') (m, CompUpIntro (m, ValueSigmaIntro xs))
-    (m, TermTensorElim xts e1 e2) -> do
-      (zName, e1', z) <- clarifyPlus tenv e1
-      e2' <- clarifyTerm (insTypeEnv xts tenv) e2
-      let (_, xs, _) = unzip3 xts
-      return $ bindLet [(zName, e1')] (m, CompSigmaElim False xs z e2')
+    -- (m, TermTensor {}) ->
+    --   returnImmediateS4 m -- `tensor`s must be used linearly
+    -- (m, TermTensorIntro es) -> do
+    --   (zs, es', xs) <- unzip3 <$> mapM (clarifyPlus tenv) es
+    --   return $ bindLet (zip zs es') (m, CompUpIntro (m, ValueSigmaIntro xs))
+    -- (m, TermTensorElim xts e1 e2) -> do
+    --   (zName, e1', z) <- clarifyPlus tenv e1
+    --   e2' <- clarifyTerm (insTypeEnv xts tenv) e2
+    --   let (_, xs, _) = unzip3 xts
+    --   return $ bindLet [(zName, e1')] (m, CompSigmaElim False xs z e2')
     (m, TermDerangement expKind resultType ekts) -> do
       case (expKind, ekts) of
         (DerangementNop, [(e, _, _)]) ->
@@ -223,8 +225,12 @@ clarifyConst tenv m constName
     clarifyPrimOp tenv op m
   | Just _ <- asLowTypeMaybe constName =
     returnImmediateS4 m
-  | otherwise =
-    raiseCritical m $ "undefined constant: " <> constName
+  | otherwise = do
+    -- raiseCritical m $ "undefined constant: " <> constName
+    cenv <- gets codeEnv
+    if Map.member constName cenv
+      then return (m, CompUpIntro (m, ValueVarGlobal constName))
+      else raiseError m $ "undefined constant: " <> constName
 
 clarifyPrimOp :: TypeEnv -> PrimOp -> Hint -> WithEnv CompPlus
 clarifyPrimOp tenv op@(PrimOp _ domList _) m = do
@@ -388,14 +394,14 @@ chainOf tenv term =
       let es = map snd les
       let xs2 = concat $ map (chainOf tenv) es
       xs0 ++ xs1 ++ xs2
-    (_, TermTensor ts) ->
-      concat $ map (chainOf tenv) ts
-    (_, TermTensorIntro es) ->
-      concat $ map (chainOf tenv) es
-    (_, TermTensorElim xts e1 e2) -> do
-      let xs1 = chainOf tenv e1
-      let xs2 = chainOf' tenv xts [e2]
-      xs1 ++ xs2
+    -- (_, TermTensor ts) ->
+    --   concat $ map (chainOf tenv) ts
+    -- (_, TermTensorIntro es) ->
+    --   concat $ map (chainOf tenv) es
+    -- (_, TermTensorElim xts e1 e2) -> do
+    --   let xs1 = chainOf tenv e1
+    --   let xs2 = chainOf' tenv xts [e2]
+    --   xs1 ++ xs2
     (_, TermDerangement _ _ ekts) -> do
       let (es, _, ts) = unzip3 ekts
       concat $ map (chainOf tenv) (es ++ ts)
@@ -444,3 +450,9 @@ termSigmaIntro m xts = do
         ]
         (m, TermPiElim (m, TermVar VarKindLocal k) args)
     )
+
+-- toSwitcherBranch :: Hint -> TypeEnv -> TermPlus -> WithEnv (ValuePlus -> WithEnv CompPlus)
+-- toSwitcherBranch m tenv d = do
+--   d' <- clarifyTerm tenv d
+--   (varName, var) <- newValueVarLocalWith m "res"
+--   return $ \val -> callClosure m d' [(varName, (m, CompUpIntro val), var)] >>= reduceCompPlus

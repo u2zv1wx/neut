@@ -20,9 +20,9 @@ data Term
   | TermEnum T.Text
   | TermEnumIntro T.Text
   | TermEnumElim (TermPlus, TermPlus) [(EnumCasePlus, TermPlus)]
-  | TermTensor [TermPlus]
-  | TermTensorIntro [TermPlus]
-  | TermTensorElim [IdentPlus] TermPlus TermPlus
+  -- | TermTensor [TermPlus]
+  -- | TermTensorIntro [TermPlus]
+  -- | TermTensorElim [IdentPlus] TermPlus TermPlus
   | TermDerangement Derangement TermPlus [(TermPlus, DerangementArg, TermPlus)]
   | TermCase
       TermPlus -- result type
@@ -48,6 +48,8 @@ type TypeEnv =
 
 data Stmt
   = StmtDef Bool Hint IdentPlus TermPlus
+  | StmtReduce Hint TermPlus
+  -- | StmtResourceType Hint T.Text TermPlus TermPlus
   deriving (Show)
 
 asVar :: TermPlus -> Maybe Ident
@@ -92,17 +94,17 @@ weaken term =
       let (caseList, es) = unzip branchList
       let es' = map weaken es
       (m, WeakTermEnumElim (e', t') (zip caseList es'))
-    (m, TermTensor ts) -> do
-      let ts' = map weaken ts
-      (m, WeakTermTensor ts')
-    (m, TermTensorIntro es) -> do
-      let es' = map weaken es
-      (m, WeakTermTensorIntro es')
-    (m, TermTensorElim xts e1 e2) -> do
-      let xts' = map weakenIdentPlus xts
-      let e1' = weaken e1
-      let e2' = weaken e2
-      (m, WeakTermTensorElim xts' e1' e2')
+    -- (m, TermTensor ts) -> do
+    --   let ts' = map weaken ts
+    --   (m, WeakTermTensor ts')
+    -- (m, TermTensorIntro es) -> do
+    --   let es' = map weaken es
+    --   (m, WeakTermTensorIntro es')
+    -- (m, TermTensorElim xts e1 e2) -> do
+    --   let xts' = map weakenIdentPlus xts
+    --   let e1' = weaken e1
+    --   let e2' = weaken e2
+    --   (m, WeakTermTensorElim xts' e1' e2')
     (m, TermDerangement i resultType ekts) -> do
       let (es, ks, ts) = unzip3 ekts
       let es' = map weaken es

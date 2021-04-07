@@ -66,12 +66,12 @@ simplify' constraintList =
         ((_, WeakTermFloat t1 l1), (_, WeakTermFloat t2 l2))
           | l1 == l2 ->
             simplify $ ((t1, t2), orig) : cs
-        ((_, WeakTermTensor ts1), (_, WeakTermTensor ts2))
-          | length ts1 == length ts2 ->
-            simplify $ map (\item -> (item, orig)) (zip ts1 ts2) ++ cs
-        ((_, WeakTermTensorIntro es1), (_, WeakTermTensorIntro es2))
-          | length es1 == length es2 ->
-            simplify $ map ((,) orig) (zip es1 es2) ++ cs
+        -- ((_, WeakTermTensor ts1), (_, WeakTermTensor ts2))
+        --   | length ts1 == length ts2 ->
+        --     simplify $ map (\item -> (item, orig)) (zip ts1 ts2) ++ cs
+        -- ((_, WeakTermTensorIntro es1), (_, WeakTermTensorIntro es2))
+        --   | length es1 == length es2 ->
+        --     simplify $ map ((,) orig) (zip es1 es2) ++ cs
         ((_, WeakTermQuestion e1 t1), (_, WeakTermQuestion e2 t2)) ->
           simplify $ ((e1, e2), orig) : ((t1, t2), orig) : cs
         ((_, WeakTermDerangement i1 t1 ekts1), (_, WeakTermDerangement i2 t2 ekts2))
@@ -337,16 +337,16 @@ isEq l r =
         let b3 = map snd cs1 == map snd cs2
         b4 <- and <$> zipWithM isEq es1 es2
         return $ b1 && b2 && b3 && b4
-    ((_, WeakTermTensor ts1), (_, WeakTermTensor ts2))
-      | length ts1 == length ts2 ->
-        and <$> zipWithM isEq ts1 ts2
-    ((_, WeakTermTensorIntro es1), (_, WeakTermTensorIntro es2))
-      | length es1 == length es2 ->
-        and <$> zipWithM isEq es1 es2
-    ((_, WeakTermTensorElim xts1 e11 e12), (_, WeakTermTensorElim xts2 e21 e22)) -> do
-      b1 <- isEq e11 e21
-      b2 <- isEq' xts1 e12 xts2 e22
-      return $ b1 && b2
+    -- ((_, WeakTermTensor ts1), (_, WeakTermTensor ts2))
+    --   | length ts1 == length ts2 ->
+    --     and <$> zipWithM isEq ts1 ts2
+    -- ((_, WeakTermTensorIntro es1), (_, WeakTermTensorIntro es2))
+    --   | length es1 == length es2 ->
+    --     and <$> zipWithM isEq es1 es2
+    -- ((_, WeakTermTensorElim xts1 e11 e12), (_, WeakTermTensorElim xts2 e21 e22)) -> do
+    --   b1 <- isEq e11 e21
+    --   b2 <- isEq' xts1 e12 xts2 e22
+    --   return $ b1 && b2
     ((_, WeakTermQuestion e1 t1), (_, WeakTermQuestion e2 t2)) -> do
       b1 <- isEq e1 e2
       b2 <- isEq t1 t2

@@ -43,6 +43,23 @@ parse stmtTreeList =
                 return $ def : defList
               | otherwise ->
                 raiseSyntaxError m "(define-opaque TREE TREE)"
+            "reduce"
+              | [e] <- rest -> do
+                e' <- interpret e >>= discern
+                defList <- parse restStmtList
+                return $ WeakStmtReduce m e' : defList
+              | otherwise ->
+                raiseSyntaxError m "(reduce TREE)"
+            -- "define-resource-type"
+            --   | [(_, TreeLeaf name), discarder, copier] <- rest -> do
+            --     name' <- withSectionPrefix name
+            --     discarder' <- interpret discarder >>= discern
+            --     copier' <- interpret copier >>= discern
+            --     insertConstant m name'
+            --     defList <- parse restStmtList
+            --     return $ WeakStmtResourceType m name' discarder' copier' : defList
+            --   | otherwise ->
+            --     raiseSyntaxError m "(define-resource-type LEAF TREE TREE)"
             "declare-enum"
               | (_, TreeLeaf name) : ts <- rest -> do
                 name' <- withSectionPrefix name
@@ -146,3 +163,10 @@ extractLeaf t =
       return x
     _ ->
       raiseSyntaxError (fst t) "LEAF"
+
+-- insertConstant :: Hint -> T.Text -> WithEnv ()
+-- insertConstant m x = do
+--   cset <- gets constantSet
+--   if S.member x cset
+--     then raiseError m $ "the constant `" <> x <> "` is already defined"
+--     else modify (\env -> env {constantSet = S.insert x (constantSet env)})

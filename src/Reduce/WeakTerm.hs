@@ -70,25 +70,25 @@ reduceWeakTermPlus term =
                   return (m, WeakTermEnumElim (e', t') les')
         _ ->
           return (m, WeakTermEnumElim (e', t') les')
-    (m, WeakTermTensor ts) -> do
-      ts' <- mapM reduceWeakTermPlus ts
-      return (m, WeakTermTensor ts')
-    (m, WeakTermTensorIntro es) -> do
-      es' <- mapM reduceWeakTermPlus es
-      return (m, WeakTermTensorIntro es')
-    (m, WeakTermTensorElim xts e1 e2) -> do
-      e1' <- reduceWeakTermPlus e1
-      case e1' of
-        (_, WeakTermTensorIntro es)
-          | length es == length xts -> do
-            let xs = map (\(_, x, _) -> asInt x) xts
-            let sub = IntMap.fromList $ zip xs es
-            substWeakTermPlus' sub IntMap.empty (m, snd e2) >>= reduceWeakTermPlus
-        _ -> do
-          e2' <- reduceWeakTermPlus e2
-          let (ms, xs, ts) = unzip3 xts
-          ts' <- mapM reduceWeakTermPlus ts
-          return (m, WeakTermTensorElim (zip3 ms xs ts') e1' e2')
+    -- (m, WeakTermTensor ts) -> do
+    --   ts' <- mapM reduceWeakTermPlus ts
+    --   return (m, WeakTermTensor ts')
+    -- (m, WeakTermTensorIntro es) -> do
+    --   es' <- mapM reduceWeakTermPlus es
+    --   return (m, WeakTermTensorIntro es')
+    -- (m, WeakTermTensorElim xts e1 e2) -> do
+    --   e1' <- reduceWeakTermPlus e1
+    --   case e1' of
+    --     (_, WeakTermTensorIntro es)
+    --       | length es == length xts -> do
+    --         let xs = map (\(_, x, _) -> asInt x) xts
+    --         let sub = IntMap.fromList $ zip xs es
+    --         substWeakTermPlus' sub IntMap.empty (m, snd e2) >>= reduceWeakTermPlus
+    --     _ -> do
+    --       e2' <- reduceWeakTermPlus e2
+    --       let (ms, xs, ts) = unzip3 xts
+    --       ts' <- mapM reduceWeakTermPlus ts
+    --       return (m, WeakTermTensorElim (zip3 ms xs ts') e1' e2')
     (m, WeakTermQuestion e _) ->
       reduceWeakTermPlus (m, snd e)
     (m, WeakTermDerangement i t ekts) -> do
@@ -203,16 +203,16 @@ substWeakTermPlus' sub nenv term =
       let (caseList, es) = unzip branchList
       es' <- mapM (substWeakTermPlus' sub nenv) es
       return (m, WeakTermEnumElim (e', t') (zip caseList es'))
-    (m, WeakTermTensor ts) -> do
-      ts' <- mapM (substWeakTermPlus' sub nenv) ts
-      return (m, WeakTermTensor ts')
-    (m, WeakTermTensorIntro es) -> do
-      es' <- mapM (substWeakTermPlus' sub nenv) es
-      return (m, WeakTermTensorIntro es')
-    (m, WeakTermTensorElim xts e1 e2) -> do
-      e1' <- substWeakTermPlus' sub nenv e1
-      (xts', e2') <- substWeakTermPlus'' sub nenv xts e2
-      return (m, WeakTermTensorElim xts' e1' e2')
+    -- (m, WeakTermTensor ts) -> do
+    --   ts' <- mapM (substWeakTermPlus' sub nenv) ts
+    --   return (m, WeakTermTensor ts')
+    -- (m, WeakTermTensorIntro es) -> do
+    --   es' <- mapM (substWeakTermPlus' sub nenv) es
+    --   return (m, WeakTermTensorIntro es')
+    -- (m, WeakTermTensorElim xts e1 e2) -> do
+    --   e1' <- substWeakTermPlus' sub nenv e1
+    --   (xts', e2') <- substWeakTermPlus'' sub nenv xts e2
+    --   return (m, WeakTermTensorElim xts' e1' e2')
     (m, WeakTermQuestion e t) -> do
       e' <- substWeakTermPlus' sub nenv e
       t' <- substWeakTermPlus' sub nenv t

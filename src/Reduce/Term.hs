@@ -69,25 +69,25 @@ reduceTermPlus term =
                   return (m, TermEnumElim (e', t') les')
         _ ->
           return (m, TermEnumElim (e', t') les')
-    (m, TermTensor ts) -> do
-      ts' <- mapM reduceTermPlus ts
-      return (m, TermTensor ts')
-    (m, TermTensorIntro es) -> do
-      es' <- mapM reduceTermPlus es
-      return (m, TermTensorIntro es')
-    (m, TermTensorElim xts e1 e2) -> do
-      e1' <- reduceTermPlus e1
-      case e1' of
-        (_, TermTensorIntro es)
-          | length es == length xts -> do
-            let xs = map (\(_, x, _) -> asInt x) xts
-            let sub = IntMap.fromList $ zip xs es
-            substTermPlus' sub IntMap.empty (m, snd e2) >>= reduceTermPlus
-        _ -> do
-          e2' <- reduceTermPlus e2
-          let (ms, xs, ts) = unzip3 xts
-          ts' <- mapM reduceTermPlus ts
-          return (m, TermTensorElim (zip3 ms xs ts') e1' e2')
+    -- (m, TermTensor ts) -> do
+    --   ts' <- mapM reduceTermPlus ts
+    --   return (m, TermTensor ts')
+    -- (m, TermTensorIntro es) -> do
+    --   es' <- mapM reduceTermPlus es
+    --   return (m, TermTensorIntro es')
+    -- (m, TermTensorElim xts e1 e2) -> do
+    --   e1' <- reduceTermPlus e1
+    --   case e1' of
+    --     (_, TermTensorIntro es)
+    --       | length es == length xts -> do
+    --         let xs = map (\(_, x, _) -> asInt x) xts
+    --         let sub = IntMap.fromList $ zip xs es
+    --         substTermPlus' sub IntMap.empty (m, snd e2) >>= reduceTermPlus
+    --     _ -> do
+    --       e2' <- reduceTermPlus e2
+    --       let (ms, xs, ts) = unzip3 xts
+    --       ts' <- mapM reduceTermPlus ts
+    --       return (m, TermTensorElim (zip3 ms xs ts') e1' e2')
     (m, TermDerangement i t ekts) -> do
       let (es, ks, ts) = unzip3 ekts
       es' <- mapM reduceTermPlus es
@@ -169,25 +169,25 @@ inlineTermPlus term =
                   return (m, TermEnumElim (e', t') les')
         _ ->
           return (m, TermEnumElim (e', t') les')
-    (m, TermTensor ts) -> do
-      ts' <- mapM inlineTermPlus ts
-      return (m, TermTensor ts')
-    (m, TermTensorIntro es) -> do
-      es' <- mapM inlineTermPlus es
-      return (m, TermTensorIntro es')
-    (m, TermTensorElim xts e1 e2) -> do
-      e1' <- inlineTermPlus e1
-      case e1' of
-        (_, TermTensorIntro es)
-          | length es == length xts -> do
-            let xs = map (\(_, x, _) -> asInt x) xts
-            let sub = IntMap.fromList $ zip xs es
-            substTermPlus' sub IntMap.empty (m, snd e2) >>= inlineTermPlus
-        _ -> do
-          e2' <- inlineTermPlus e2
-          let (ms, xs, ts) = unzip3 xts
-          ts' <- mapM inlineTermPlus ts
-          return (m, TermTensorElim (zip3 ms xs ts') e1' e2')
+    -- (m, TermTensor ts) -> do
+    --   ts' <- mapM inlineTermPlus ts
+    --   return (m, TermTensor ts')
+    -- (m, TermTensorIntro es) -> do
+    --   es' <- mapM inlineTermPlus es
+    --   return (m, TermTensorIntro es')
+    -- (m, TermTensorElim xts e1 e2) -> do
+    --   e1' <- inlineTermPlus e1
+    --   case e1' of
+    --     (_, TermTensorIntro es)
+    --       | length es == length xts -> do
+    --         let xs = map (\(_, x, _) -> asInt x) xts
+    --         let sub = IntMap.fromList $ zip xs es
+    --         substTermPlus' sub IntMap.empty (m, snd e2) >>= inlineTermPlus
+    --     _ -> do
+    --       e2' <- inlineTermPlus e2
+    --       let (ms, xs, ts) = unzip3 xts
+    --       ts' <- mapM inlineTermPlus ts
+    --       return (m, TermTensorElim (zip3 ms xs ts') e1' e2')
     (m, TermDerangement i t ekts) -> do
       let (es, ks, ts) = unzip3 ekts
       es' <- mapM inlineTermPlus es
@@ -290,16 +290,16 @@ substTermPlus' sub nenv term =
       let (caseList, es) = unzip branchList
       es' <- mapM (substTermPlus' sub nenv) es
       return (m, TermEnumElim (e', t') (zip caseList es'))
-    (m, TermTensor ts) -> do
-      ts' <- mapM (substTermPlus' sub nenv) ts
-      return (m, TermTensor ts')
-    (m, TermTensorIntro es) -> do
-      es' <- mapM (substTermPlus' sub nenv) es
-      return (m, TermTensorIntro es')
-    (m, TermTensorElim xts e1 e2) -> do
-      e1' <- substTermPlus' sub nenv e1
-      (xts', e2') <- substTermPlus'' sub nenv xts e2
-      return (m, TermTensorElim xts' e1' e2')
+    -- (m, TermTensor ts) -> do
+    --   ts' <- mapM (substTermPlus' sub nenv) ts
+    --   return (m, TermTensor ts')
+    -- (m, TermTensorIntro es) -> do
+    --   es' <- mapM (substTermPlus' sub nenv) es
+    --   return (m, TermTensorIntro es')
+    -- (m, TermTensorElim xts e1 e2) -> do
+    --   e1' <- substTermPlus' sub nenv e1
+    --   (xts', e2') <- substTermPlus'' sub nenv xts e2
+    --   return (m, TermTensorElim xts' e1' e2')
     (m, TermDerangement i resultType ekts) -> do
       resultType' <- substTermPlus' sub nenv resultType
       let (es, ks, ts) = unzip3 ekts

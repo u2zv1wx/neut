@@ -27,11 +27,6 @@ reduceCompPlus term =
             length xs == length ds -> do
             let sub = IntMap.fromList (zip (map asInt xs) ds)
             substCompPlus sub IntMap.empty body >>= reduceCompPlus
-        -- (_, ValueGlobal x)
-        --   | Just (Definition (IsFixed False) xs body) <- Map.lookup x cenv,
-        --     length xs == length ds -> do
-        --     let sub = IntMap.fromList (zip (map asInt xs) ds)
-        --     substCompPlus sub IntMap.empty body >>= reduceCompPlus
         _ ->
           return (m, CompPiElimDownElim v ds)
     (m, CompSigmaElim isNoetic xs v e) ->

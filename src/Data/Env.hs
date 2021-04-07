@@ -41,6 +41,7 @@ data Env = Env
     --
     fileEnv :: Map.HashMap (Path Abs File) VisitInfo,
     traceEnv :: [Path Abs File],
+    constantSet :: S.Set T.Text,
     -- [("choice", [("left", 0), ("right", 1)]), ...]
     enumEnv :: Map.HashMap T.Text [(T.Text, Int)],
     -- [("left", ("choice", 0)), ("right", ("choice", 1)), ...]
@@ -84,6 +85,7 @@ initialEnv =
       metaTermCtx = IntMap.empty,
       nsEnv = [],
       enumEnv = Map.empty,
+      constantSet = S.empty,
       fileEnv = Map.empty,
       holeEnv = IntMap.empty,
       traceEnv = [],

@@ -47,6 +47,28 @@ elaborateStmt' stmt =
       when (not isReducible) $ modify (\env -> env {opaqueEnv = S.insert x (opaqueEnv env)})
       cont' <- elaborateStmt' cont
       return $ StmtDef isReducible m (mx, x, t'') e'' : cont'
+    WeakStmtReduce m e : cont -> do
+      (e', te) <- infer e
+      insConstraintEnv te (m, WeakTermEnum "top")
+      unify
+      e'' <- elaborate' e' >>= inlineTermPlus
+      cont' <- elaborateStmt' cont
+      return $ StmtReduce m e'' : cont'
+
+-- WeakStmtResourceType m name discarder copier : cont -> do
+--   insConstTypeEnv name (m, TermTau)
+--   (discarder', tDiscarder) <- infer discarder
+--   (copier', tCopier) <- infer copier
+--   let tPtr = (m, WeakTermEnum (nsUnsafe <> "pointer"))
+--   h <- newIdentFromText "res"
+--   -- insConstraintEnv (m, WeakTermPi [(m, h, tPtr)] (m, WeakTermTensor [])) tDiscarder
+--   insConstraintEnv (m, WeakTermPi [(m, h, tPtr)] (m, WeakTermEnum "top")) tDiscarder
+--   insConstraintEnv (m, WeakTermPi [(m, h, tPtr)] tPtr) tCopier
+--   unify
+--   discarder'' <- elaborate' discarder' >>= inlineTermPlus
+--   copier'' <- elaborate' copier' >>= inlineTermPlus
+--   cont' <- elaborateStmt' cont
+--   return $ StmtResourceType m name discarder'' copier'' : cont'
 
 elaborate' :: WeakTermPlus -> WithEnv TermPlus
 elaborate' term =
@@ -54,7 +76,12 @@ elaborate' term =
     (m, WeakTermTau) ->
       return (m, TermTau)
     (m, WeakTermVar opacity x) -> do
-      return (m, TermVar opacity x)
+      -- return (m, TermVar opacity x)
+      cset <- gets constantSet
+      let x' = asText x
+      if S.member x' cset
+        then return (m, TermConst x')
+        else return (m, TermVar opacity x)
     (m, WeakTermPi xts t) -> do
       xts' <- mapM elaborateWeakIdentPlus xts
       t' <- elaborate' t
@@ -128,17 +155,17 @@ elaborate' term =
               <> toText (weaken e')
               <> "` must be an enum type, but is:\n"
               <> toText (weaken t')
-    (m, WeakTermTensor ts) -> do
-      ts' <- mapM elaborate' ts
-      return (m, TermTensor ts')
-    (m, WeakTermTensorIntro es) -> do
-      es' <- mapM elaborate' es
-      return (m, TermTensorIntro es')
-    (m, WeakTermTensorElim xts e1 e2) -> do
-      xts' <- mapM elaborateWeakIdentPlus xts
-      e1' <- elaborate' e1
-      e2' <- elaborate' e2
-      return (m, TermTensorElim xts' e1' e2')
+    -- (m, WeakTermTensor ts) -> do
+    --   ts' <- mapM elaborate' ts
+    --   return (m, TermTensor ts')
+    -- (m, WeakTermTensorIntro es) -> do
+    --   es' <- mapM elaborate' es
+    --   return (m, TermTensorIntro es')
+    -- (m, WeakTermTensorElim xts e1 e2) -> do
+    --   xts' <- mapM elaborateWeakIdentPlus xts
+    --   e1' <- elaborate' e1
+    --   e2' <- elaborate' e2
+    --   return (m, TermTensorElim xts' e1' e2')
     (m, WeakTermQuestion e t) -> do
       e' <- elaborate' e
       t' <- elaborate' t
@@ -208,3 +235,7 @@ lookupEnumSet m name = do
       raiseError m $ "no such enum defined: " <> name
     Just xis ->
       return $ map fst xis
+
+-- insConstTypeEnv :: T.Text -> TermPlus -> WithEnv ()
+-- insConstTypeEnv x t =
+--   modify (\e -> e {constTypeEnv = Map.insert x t (constTypeEnv e)})

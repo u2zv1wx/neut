@@ -47,7 +47,7 @@ discern' nenv term =
       tryCand (resolveSymbol m (asWeakVar m nenv) s) $
         tryCand (resolveSymbol m (asWeakEnumValue m) s) $
           tryCand (resolveSymbol m (asWeakEnumType m) s) $
-            tryCand (resolveSymbol m (return . asWeakConstant m) s) $
+            tryCand (resolveSymbol m (asWeakConstant m) s) $
               raiseError m $ "undefined variable: " <> s
     (m, WeakTermPi xts t) -> do
       (xts', t') <- discernBinder nenv xts t
@@ -87,16 +87,16 @@ discern' nenv term =
           body' <- discern' nenv body
           return ((mCase, l'), body')
       return (m, WeakTermEnumElim (e', t') caseList')
-    (m, WeakTermTensor ts) -> do
-      ts' <- mapM (discern' nenv) ts
-      return (m, WeakTermTensor ts')
-    (m, WeakTermTensorIntro es) -> do
-      es' <- mapM (discern' nenv) es
-      return (m, WeakTermTensorIntro es')
-    (m, WeakTermTensorElim xts e1 e2) -> do
-      e1' <- discern' nenv e1
-      (xts', e2') <- discernBinder nenv xts e2
-      return (m, WeakTermTensorElim xts' e1' e2')
+    -- (m, WeakTermTensor ts) -> do
+    --   ts' <- mapM (discern' nenv) ts
+    --   return (m, WeakTermTensor ts')
+    -- (m, WeakTermTensorIntro es) -> do
+    --   es' <- mapM (discern' nenv) es
+    --   return (m, WeakTermTensorIntro es')
+    -- (m, WeakTermTensorElim xts e1 e2) -> do
+    --   e1' <- discern' nenv e1
+    --   (xts', e2') <- discernBinder nenv xts e2
+    --   return (m, WeakTermTensorElim xts' e1' e2')
     (m, WeakTermQuestion e t) -> do
       e' <- discern' nenv e
       t' <- discern' nenv t
