@@ -7,7 +7,6 @@ import qualified Data.HashMap.Lazy as Map
 import Data.Log
 import Data.LowType
 import Data.MetaTerm
-import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Tree
 import Data.WeakTerm hiding (asVar)
@@ -211,22 +210,7 @@ asWeakConstant m name
   | Just _ <- asPrimOp name =
     return $ Just (m, WeakTermConst name)
   | otherwise = do
-    set <- gets constantSet
-    if S.member name set
-      then return $ Just (m, WeakTermConst name)
-      else return Nothing
-
--- {-# INLINE asWeakConstant #-}
--- asWeakConstant :: Hint -> T.Text -> Maybe WeakTermPlus
--- asWeakConstant m name
---   | Just (LowTypeInt _) <- asLowTypeMaybe name =
---     Just (m, WeakTermConst name)
---   | Just (LowTypeFloat _) <- asLowTypeMaybe name =
---     Just (m, WeakTermConst name)
---   | Just _ <- asPrimOp name =
---     Just (m, WeakTermConst name)
---   | otherwise =
---     Nothing
+    return Nothing
 
 tryCand :: (Monad m) => m (Maybe a) -> m a -> m a
 tryCand comp cont = do

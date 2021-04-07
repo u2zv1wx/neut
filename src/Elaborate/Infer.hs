@@ -84,7 +84,6 @@ infer' ctx term =
       | otherwise -> do
         t <- lookupConstTypeEnv m x
         return ((m, WeakTermConst x), (m, snd $ weaken t))
-    -- return ((m, WeakTermConst x), weaken t)
     (m, WeakTermInt t i) -> do
       t' <- inferType' [] t -- ctx == [] since t' should be i64, i8, etc. (i.e. t must be closed)
       return ((m, WeakTermInt t' i), t')
@@ -111,18 +110,6 @@ infer' ctx term =
           (es', ts) <- unzip <$> mapM (infer' ctx) es
           forM_ (zip (repeat (head ts)) (tail ts)) $ uncurry insConstraintEnv
           return ((m, WeakTermEnumElim (e', t') $ zip cs' es'), head ts)
-    -- (m, WeakTermTensor ts) -> do
-    --   ts' <- mapM (inferType' ctx) ts
-    --   return ((m, WeakTermTensor ts'), (m, WeakTermTau))
-    -- (m, WeakTermTensorIntro es) -> do
-    --   (es', ts') <- unzip <$> mapM (infer' ctx) es
-    --   return ((m, WeakTermTensorIntro es'), (m, WeakTermTensor ts'))
-    -- (m, WeakTermTensorElim xts e1 e2) -> do
-    --   (e1', t1) <- infer' ctx e1
-    --   (xts', (e2', t2)) <- inferBinder ctx xts e2
-    --   let ts = map (\(_, _, t) -> t) xts'
-    --   insConstraintEnv (m, WeakTermTensor ts) t1
-    --   return ((m, WeakTermTensorElim xts' e1' e2'), t2)
     (m, WeakTermQuestion e _) -> do
       (e', te) <- infer' ctx e
       return ((m, WeakTermQuestion e' te), te)
@@ -184,7 +171,6 @@ inferArgs m args1 args2 cod =
 inferExternal :: Hint -> T.Text -> WithEnv TermPlus -> WithEnv (WeakTermPlus, WeakTermPlus)
 inferExternal m x comp = do
   t <- comp
-  -- return ((m, WeakTermConst x), weaken t)
   return ((m, WeakTermConst x), (m, snd $ weaken t))
 
 inferType' :: Context -> WeakTermPlus -> WithEnv WeakTermPlus
