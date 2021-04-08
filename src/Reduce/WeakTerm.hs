@@ -72,11 +72,9 @@ reduceWeakTermPlus term =
           return (m, WeakTermEnumElim (e', t') les')
     (m, WeakTermQuestion e _) ->
       reduceWeakTermPlus (m, snd e)
-    (m, WeakTermDerangement i t ekts) -> do
-      let (es, ks, ts) = unzip3 ekts
+    (m, WeakTermDerangement i t es) -> do
       es' <- mapM reduceWeakTermPlus es
-      ts' <- mapM reduceWeakTermPlus ts
-      return (m, WeakTermDerangement i t (zip3 es' ks ts'))
+      return (m, WeakTermDerangement i t es')
     (m, WeakTermCase resultType mSubject (e, t) clauseList) -> do
       e' <- reduceWeakTermPlus e
       let lamList = map (toLamList m) clauseList
@@ -186,12 +184,10 @@ substWeakTermPlus' sub nenv term =
       e' <- substWeakTermPlus' sub nenv e
       t' <- substWeakTermPlus' sub nenv t
       return (m, WeakTermQuestion e' t')
-    (m, WeakTermDerangement i resultType ekts) -> do
+    (m, WeakTermDerangement i resultType es) -> do
       resultType' <- substWeakTermPlus' sub nenv resultType
-      let (es, ks, ts) = unzip3 ekts
       es' <- mapM (substWeakTermPlus' sub nenv) es
-      ts' <- mapM (substWeakTermPlus' sub nenv) ts
-      return (m, WeakTermDerangement i resultType' (zip3 es' ks ts'))
+      return (m, WeakTermDerangement i resultType' es')
     (m, WeakTermCase resultType mSubject (e, t) clauseList) -> do
       resultType' <- substWeakTermPlus' sub nenv resultType
       mSubject' <- mapM (substWeakTermPlus' sub nenv) mSubject

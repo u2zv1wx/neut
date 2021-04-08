@@ -86,21 +86,24 @@ clarifyTerm tenv term =
       es' <- (mapM (clarifyTerm tenv) >=> alignFreeVariables tenv m fvs) es
       (y, e', yVar) <- clarifyPlus tenv e
       return $ bindLet [(y, e')] (m, CompEnumElim yVar (zip (map snd cs) es'))
-    (m, TermDerangement expKind resultType ekts) -> do
-      case (expKind, ekts) of
-        (DerangementNop, [(e, _, _)]) ->
+    (m, TermDerangement expKind _ es) -> do
+      case (expKind, es) of
+        (DerangementNop, [e]) ->
           clarifyTerm tenv e
         _ -> do
-          let (es, ks, ts) = unzip3 ekts
+          -- let (es, _) = unzip ets
           (xs, es', xsAsVars) <- unzip3 <$> mapM (clarifyPlus tenv) es
-          let xts = zipWith (\x t -> (fst t, x, t)) xs ts
-          let borrowedVarList = catMaybes $ map takeIffLinear (zip xts ks)
-          resultVarName <- newIdentFromText "result"
-          tuple <- constructResultTuple tenv m borrowedVarList (m, resultVarName, resultType)
-          let lamBody = bindLet (zip xs es') (m, CompUpElim resultVarName (m, CompPrimitive (PrimitiveDerangement expKind xsAsVars)) tuple)
-          let fvs = nubFreeVariables $ chainOf' tenv xts es
-          cls <- retClosure tenv False LamKindNormal fvs m [] lamBody -- cls shouldn't be reduced since it can be effectful
-          callClosure m cls []
+          -- let xts = zipWith (\x t -> (fst t, x, t)) xs ts
+          -- let borrowedVarList = catMaybes $ map takeIffLinear (zip xts ks)
+          -- resultVarName <- newIdentFromText "result"
+          -- let tuple = (m, CompUpIntro (m, ValueVarLocal resultVarName))
+          -- tuple <- constructResultTuple tenv m borrowedVarList (m, resultVarName, resultType)
+          -- let lamBody = bindLet (zip xs es') (m, CompUpElim resultVarName (m, CompPrimitive (PrimitiveDerangement expKind xsAsVars)) tuple)
+          return $ bindLet (zip xs es') (m, CompPrimitive (PrimitiveDerangement expKind xsAsVars))
+    -- let lamBody = bindLet (zip xs es') (m, CompPrimitive (PrimitiveDerangement expKind xsAsVars))
+    -- let fvs = nubFreeVariables $ chainOf' tenv xts es
+    -- cls <- retClosure tenv False LamKindNormal fvs m [] lamBody -- cls shouldn't be reduced since it can be effectful
+    -- callClosure m cls []
     (m, TermCase resultType mSubject (e, _) patList) -> do
       let fvs = chainFromTermList tenv $ map (caseClauseToLambda m) patList
       resultArg <- clarifyPlus tenv resultType
@@ -219,29 +222,40 @@ clarifyPrimOp tenv op@(PrimOp _ domList _) m = do
   let mxts = zipWith (\x t -> (m, x, t)) xs argTypeList
   retClosure tenv True LamKindNormal [] m mxts (m, CompPrimitive (PrimitivePrimOp op varList))
 
-takeIffLinear :: (IdentPlus, DerangementArg) -> Maybe IdentPlus
-takeIffLinear (xt, k) =
-  case k of
-    DerangementArgAffine ->
-      Nothing
-    DerangementArgLinear ->
-      Just xt
+-- takeIffLinear :: (IdentPlus, DerangementArg) -> Maybe IdentPlus
+-- takeIffLinear (xt, k) =
+
+-- takeIffLinear :: (IdentPlus, DerangementArg) -> Maybe IdentPlus
+-- takeIffLinear _ =
+--   Nothing
+
+-- case k of
+--   DerangementArgAffine ->
+--     Nothing
+
+-- DerangementArgLinear ->
+--   Just xt
 
 -- generate tuple like (borrowed-1, ..., borrowed-n, result)
-constructResultTuple ::
-  TypeEnv ->
-  Hint ->
-  [IdentPlus] ->
-  IdentPlus ->
-  WithEnv CompPlus
-constructResultTuple tenv m borrowedVarTypeList result@(_, resultVarName, _) =
-  if null borrowedVarTypeList
-    then return (m, CompUpIntro (m, ValueVarLocal resultVarName))
-    else do
-      let tupleTypeInfo = borrowedVarTypeList ++ [result]
-      tuple <- termSigmaIntro m tupleTypeInfo
-      let tenv' = insTypeEnv tupleTypeInfo tenv
-      clarifyTerm tenv' tuple
+-- constructResultTuple ::
+--   TypeEnv ->
+--   Hint ->
+--   [IdentPlus] ->
+--   IdentPlus ->
+--   WithEnv CompPlus
+-- constructResultTuple _ m _ (_, resultVarName, _) =
+--   return (m, CompUpIntro (m, ValueVarLocal resultVarName))
+
+-- constructResultTuple tenv m borrowedVarTypeList result@(_, resultVarName, _) =
+--   return (m, CompUpIntro (m, ValueVarLocal resultVarName))
+
+-- if null borrowedVarTypeList
+--   then return (m, CompUpIntro (m, ValueVarLocal resultVarName))
+--   else do
+--     let tupleTypeInfo = borrowedVarTypeList ++ [result]
+--     tuple <- termSigmaIntro m tupleTypeInfo
+--     let tenv' = insTypeEnv tupleTypeInfo tenv
+--     clarifyTerm tenv' tuple
 
 retClosure ::
   TypeEnv ->
@@ -374,9 +388,8 @@ chainOf tenv term =
       let es = map snd les
       let xs2 = concat $ map (chainOf tenv) es
       xs0 ++ xs1 ++ xs2
-    (_, TermDerangement _ _ ekts) -> do
-      let (es, _, ts) = unzip3 ekts
-      concat $ map (chainOf tenv) (es ++ ts)
+    (_, TermDerangement _ _ es) ->
+      concat $ map (chainOf tenv) es
     (_, TermCase _ mSubject (e, _) patList) -> do
       let xs1 = concat $ (map (chainOf tenv) $ maybeToList mSubject)
       let xs2 = chainOf tenv e
@@ -406,19 +419,19 @@ insTypeEnv xts tenv =
     (_, x, t) : rest ->
       insTypeEnv rest $ IntMap.insert (asInt x) t tenv
 
-termSigmaIntro :: Hint -> [IdentPlus] -> WithEnv TermPlus
-termSigmaIntro m xts = do
-  z <- newIdentFromText "internal.sigma-tau-tuple"
-  let vz = (m, TermVar VarKindLocal z)
-  k <- newIdentFromText "sigma"
-  let args = map (\(mx, x, _) -> (mx, TermVar VarKindLocal x)) xts
-  return
-    ( m,
-      TermPiIntro
-        OpacityTransparent
-        LamKindNormal
-        [ (m, z, (m, TermTau)),
-          (m, k, (m, TermPi xts vz))
-        ]
-        (m, TermPiElim (m, TermVar VarKindLocal k) args)
-    )
+-- termSigmaIntro :: Hint -> [IdentPlus] -> WithEnv TermPlus
+-- termSigmaIntro m xts = do
+--   z <- newIdentFromText "internal.sigma-tau-tuple"
+--   let vz = (m, TermVar VarKindLocal z)
+--   k <- newIdentFromText "sigma"
+--   let args = map (\(mx, x, _) -> (mx, TermVar VarKindLocal x)) xts
+--   return
+--     ( m,
+--       TermPiIntro
+--         OpacityTransparent
+--         LamKindNormal
+--         [ (m, z, (m, TermTau)),
+--           (m, k, (m, TermPi xts vz))
+--         ]
+--         (m, TermPiElim (m, TermVar VarKindLocal k) args)
+--     )

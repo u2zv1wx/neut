@@ -69,11 +69,9 @@ reduceTermPlus term =
                   return (m, TermEnumElim (e', t') les')
         _ ->
           return (m, TermEnumElim (e', t') les')
-    (m, TermDerangement i t ekts) -> do
-      let (es, ks, ts) = unzip3 ekts
+    (m, TermDerangement i t es) -> do
       es' <- mapM reduceTermPlus es
-      ts' <- mapM reduceTermPlus ts
-      return (m, TermDerangement i t (zip3 es' ks ts'))
+      return (m, TermDerangement i t es')
     (m, TermCase resultType mSubject (e, t) clauseList) -> do
       e' <- reduceTermPlus e
       let lamList = map (toLamList m) clauseList
@@ -150,11 +148,9 @@ inlineTermPlus term =
                   return (m, TermEnumElim (e', t') les')
         _ ->
           return (m, TermEnumElim (e', t') les')
-    (m, TermDerangement i t ekts) -> do
-      let (es, ks, ts) = unzip3 ekts
+    (m, TermDerangement i t es) -> do
       es' <- mapM inlineTermPlus es
-      ts' <- mapM inlineTermPlus ts
-      return (m, TermDerangement i t (zip3 es' ks ts'))
+      return (m, TermDerangement i t es')
     (m, TermCase resultType mSubject (e, t) clauseList) -> do
       e' <- inlineTermPlus e
       let lamList = map (toLamList m) clauseList
@@ -250,12 +246,10 @@ substTermPlus' sub nenv term =
       let (caseList, es) = unzip branchList
       es' <- mapM (substTermPlus' sub nenv) es
       return (m, TermEnumElim (e', t') (zip caseList es'))
-    (m, TermDerangement i resultType ekts) -> do
+    (m, TermDerangement i resultType es) -> do
       resultType' <- substTermPlus' sub nenv resultType
-      let (es, ks, ts) = unzip3 ekts
       es' <- mapM (substTermPlus' sub nenv) es
-      ts' <- mapM (substTermPlus' sub nenv) ts
-      return (m, TermDerangement i resultType' (zip3 es' ks ts'))
+      return (m, TermDerangement i resultType' es')
     (m, TermCase resultType mSubject (e, t) clauseList) -> do
       resultType' <- substTermPlus' sub nenv resultType
       mSubject' <- mapM (substTermPlus' sub nenv) mSubject

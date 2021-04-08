@@ -148,14 +148,16 @@ interpret inputTree =
           | otherwise ->
             raiseSyntaxError m "(question TREE)"
         "derangement"
-          | derangement : resultType : eks <- rest -> do
+          | derangement : resultType : es <- rest -> do
             derangement' <- interpretDerangement derangement
-            checkDerangementArity m derangement' eks
+            checkDerangementArity m derangement' es
             resultType' <- interpret resultType
-            eks' <- mapM interpretDerangementItem eks
-            let (es, ks) = unzip eks'
-            hs <- mapM (\(me, _) -> newAster me) es
-            return (m, WeakTermDerangement derangement' resultType' (zip3 es ks hs))
+            es' <- mapM interpret es
+            -- eks' <- mapM interpretDerangementItem eks
+            -- let (es, ks) = unzip eks'
+            -- hs <- mapM (\(me, _) -> newAster me) es'
+            -- return (m, WeakTermDerangement derangement' resultType' (zip3 es ks hs))
+            return (m, WeakTermDerangement derangement' resultType' es')
           | otherwise ->
             raiseSyntaxError m "(derangement LEAF TREE TREE*)"
         "case"
@@ -398,28 +400,28 @@ readValueInt t x
   | otherwise =
     Nothing
 
-interpretDerangementItem :: TreePlus -> WithEnv (WeakTermPlus, DerangementArg)
-interpretDerangementItem tree =
-  case tree of
-    (_, TreeNode [k, e]) -> do
-      k' <- asDerangementArg k
-      e' <- interpret e
-      return (e', k')
-    e ->
-      raiseSyntaxError (fst e) "(TREE TREE)"
+-- interpretDerangementItem :: TreePlus -> WithEnv (WeakTermPlus, DerangementArg)
+-- interpretDerangementItem tree =
+--   case tree of
+--     (_, TreeNode [k, e]) -> do
+--       k' <- asDerangementArg k
+--       e' <- interpret e
+--       return (e', k')
+--     e ->
+--       raiseSyntaxError (fst e) "(TREE TREE)"
 
-asDerangementArg :: TreePlus -> WithEnv DerangementArg
-asDerangementArg tree =
-  case tree of
-    (m, TreeLeaf x)
-      | x == "linear" ->
-        return DerangementArgLinear
-      | x == "affine" ->
-        return DerangementArgAffine
-      | otherwise ->
-        raiseSyntaxError m "linear | affine"
-    (m, _) ->
-      raiseSyntaxError m "LEAF"
+-- asDerangementArg :: TreePlus -> WithEnv DerangementArg
+-- asDerangementArg tree =
+--   case tree of
+--     (m, TreeLeaf x)
+--       -- | x == "linear" ->
+--       --   return DerangementArgLinear
+--       | x == "affine" ->
+--         return DerangementArgAffine
+--       | otherwise ->
+--         raiseSyntaxError m "linear | affine"
+--     (m, _) ->
+--       raiseSyntaxError m "LEAF"
 
 interpretDerangement :: TreePlus -> WithEnv Derangement
 interpretDerangement tree =

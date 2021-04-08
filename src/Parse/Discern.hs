@@ -91,12 +91,10 @@ discern' nenv term =
       e' <- discern' nenv e
       t' <- discern' nenv t
       return (m, WeakTermQuestion e' t')
-    (m, WeakTermDerangement i resultType ekts) -> do
+    (m, WeakTermDerangement i resultType es) -> do
       resultType' <- discern' nenv resultType
-      let (es, ks, ts) = unzip3 ekts
       es' <- mapM (discern' nenv) es
-      ts' <- mapM (discern' nenv) ts
-      return (m, WeakTermDerangement i resultType' (zip3 es' ks ts'))
+      return (m, WeakTermDerangement i resultType' es')
     (m, WeakTermCase resultType mSubject (e, t) clauseList) -> do
       resultType' <- discern' nenv resultType
       mSubject' <- mapM (discern' nenv) mSubject

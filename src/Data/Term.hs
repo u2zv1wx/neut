@@ -23,7 +23,7 @@ data Term
   -- | TermTensor [TermPlus]
   -- | TermTensorIntro [TermPlus]
   -- | TermTensorElim [IdentPlus] TermPlus TermPlus
-  | TermDerangement Derangement TermPlus [(TermPlus, DerangementArg, TermPlus)]
+  | TermDerangement Derangement TermPlus [TermPlus]
   | TermCase
       TermPlus -- result type
       (Maybe TermPlus) -- noetic subject (this is for `case-noetic`)
@@ -105,12 +105,10 @@ weaken term =
     --   let e1' = weaken e1
     --   let e2' = weaken e2
     --   (m, WeakTermTensorElim xts' e1' e2')
-    (m, TermDerangement i resultType ekts) -> do
-      let (es, ks, ts) = unzip3 ekts
+    (m, TermDerangement i resultType es) -> do
       let es' = map weaken es
-      let ts' = map weaken ts
       let resultType' = weaken resultType
-      (m, WeakTermDerangement i resultType' (zip3 es' ks ts'))
+      (m, WeakTermDerangement i resultType' es')
     (m, TermCase resultType mSubject (e, t) patList) -> do
       let resultType' = weaken resultType
       let mSubject' = fmap weaken mSubject

@@ -37,10 +37,14 @@ data Derangement
   | DerangementNop
   deriving (Show, Eq)
 
-data DerangementArg
-  = DerangementArgLinear
-  | DerangementArgAffine
-  deriving (Show, Eq)
+-- data DerangementArg
+--   = DerangementArgAffine
+--   deriving (Show, Eq)
+
+-- data DerangementArg
+--   = DerangementArgLinear
+--   | DerangementArgAffine
+--   deriving (Show, Eq)
 
 asLowTypeMaybe :: T.Text -> Maybe LowType
 asLowTypeMaybe name

@@ -113,13 +113,14 @@ infer' ctx term =
     (m, WeakTermQuestion e _) -> do
       (e', te) <- infer' ctx e
       return ((m, WeakTermQuestion e' te), te)
-    (m, WeakTermDerangement kind resultType ekts) -> do
+    (m, WeakTermDerangement kind resultType es) -> do
       resultType' <- inferType' ctx resultType
-      let (es, ks, _) = unzip3 ekts
-      (es', ts') <- unzip <$> mapM (infer' ctx) es
-      let borrowedTypes = takeBorrowedTypes $ zip ts' ks
-      productType <- productTypeOf m (borrowedTypes ++ [resultType'])
-      return ((m, WeakTermDerangement kind resultType' (zip3 es' ks ts')), productType)
+      -- let (es, _) = unzip ets
+      (es', _) <- unzip <$> mapM (infer' ctx) es
+      -- let borrowedTypes = takeBorrowedTypes $ zip ts' ks
+      return ((m, WeakTermDerangement kind resultType' es'), resultType)
+    -- productType <- productTypeOf m (borrowedTypes ++ [resultType'])
+    -- return ((m, WeakTermDerangement kind resultType' (zip3 es' ks ts')), productType)
     (m, WeakTermCase _ mSubject (e, _) clauseList) -> do
       resultType <- newTypeAsterInCtx ctx m
       (e', t') <- infer' ctx e
@@ -327,34 +328,36 @@ lookupKind m name = do
       return j
 
 -- A1 * ... * An := Pi (z : tau, k : Pi (_ : A1, ..., _ : An).Z). Z
-productTypeOf :: Hint -> [WeakTermPlus] -> WithEnv WeakTermPlus
-productTypeOf m ts =
-  case ts of
-    [t] ->
-      return t
-    _ -> do
-      xs <- mapM (const $ newIdentFromText "_") ts
-      let xts = zipWith (\x t -> (m, x, t)) xs ts
-      weakTermSigma m xts
+-- productTypeOf :: Hint -> [WeakTermPlus] -> WithEnv WeakTermPlus
+-- productTypeOf m ts =
+--   case ts of
+--     [t] ->
+--       return t
+--     _ -> do
+--       xs <- mapM (const $ newIdentFromText "_") ts
+--       let xts = zipWith (\x t -> (m, x, t)) xs ts
+--       weakTermSigma m xts
 
-takeBorrowedTypes :: [(WeakTermPlus, DerangementArg)] -> [WeakTermPlus]
-takeBorrowedTypes tks =
-  case tks of
-    [] ->
-      []
-    ((t, k) : rest) ->
-      case k of
-        DerangementArgLinear ->
-          t : takeBorrowedTypes rest
-        DerangementArgAffine ->
-          takeBorrowedTypes rest
+-- takeBorrowedTypes :: [(WeakTermPlus, DerangementArg)] -> [WeakTermPlus]
+-- takeBorrowedTypes _ =
+--   []
 
-weakTermSigma :: Hint -> [WeakIdentPlus] -> WithEnv WeakTermPlus
-weakTermSigma m xts = do
-  z <- newIdentFromText "internal.sigma-tau"
-  let vz = (m, WeakTermVar VarKindLocal z)
-  k <- newIdentFromText "sigma"
-  return (m, WeakTermPi [(m, z, (m, WeakTermTau)), (m, k, (m, WeakTermPi xts vz))] vz)
+-- case tks of
+--   [] ->
+--     []
+--   ((t, k) : rest) ->
+--     case k of
+--       -- DerangementArgLinear ->
+--       --   t : takeBorrowedTypes rest
+--       DerangementArgAffine ->
+--         takeBorrowedTypes rest
+
+-- weakTermSigma :: Hint -> [WeakIdentPlus] -> WithEnv WeakTermPlus
+-- weakTermSigma m xts = do
+--   z <- newIdentFromText "internal.sigma-tau"
+--   let vz = (m, WeakTermVar VarKindLocal z)
+--   k <- newIdentFromText "sigma"
+--   return (m, WeakTermPi [(m, z, (m, WeakTermTau)), (m, k, (m, WeakTermPi xts vz))] vz)
 
 lookupConstTypeEnv :: Hint -> T.Text -> WithEnv TermPlus
 lookupConstTypeEnv m x

@@ -68,13 +68,10 @@ simplify' constraintList =
             simplify $ ((t1, t2), orig) : cs
         ((_, WeakTermQuestion e1 t1), (_, WeakTermQuestion e2 t2)) ->
           simplify $ ((e1, e2), orig) : ((t1, t2), orig) : cs
-        ((_, WeakTermDerangement i1 t1 ekts1), (_, WeakTermDerangement i2 t2 ekts2))
-          | length ekts1 == length ekts2,
-            i1 == i2,
-            (es1, ks1, ts1) <- unzip3 ekts1,
-            (es2, ks2, ts2) <- unzip3 ekts2,
-            ks1 == ks2 -> do
-            simplify $ map ((,) orig) ((t1, t2) : zip es1 es2 ++ zip ts1 ts2) ++ cs
+        ((_, WeakTermDerangement i1 t1 es1), (_, WeakTermDerangement i2 t2 es2))
+          | length es1 == length es2,
+            i1 == i2 -> do
+            simplify $ map ((,) orig) ((t1, t2) : zip es1 es2) ++ cs
         (e1, e2) -> do
           sub <- gets substEnv
           let fvs1 = varWeakTermPlus e1
@@ -330,16 +327,16 @@ isEq l r =
       b1 <- isEq e1 e2
       b2 <- isEq t1 t2
       return $ b1 && b2
-    ((_, WeakTermDerangement d1 e1 args1), (_, WeakTermDerangement d2 e2 args2))
-      | length args1 == length args2 -> do
+    ((_, WeakTermDerangement d1 e1 es1), (_, WeakTermDerangement d2 e2 es2))
+      | length es1 == length es2 -> do
         let b1 = d1 == d2
         b2 <- isEq e1 e2
-        let (es1, ks1, ts1) = unzip3 args1
-        let (es2, ks2, ts2) = unzip3 args2
+        -- let (es1, ts1) = unzip args1
+        -- let (es2, ts2) = unzip args2
         b3 <- and <$> zipWithM isEq es1 es2
-        let b4 = ks1 == ks2
-        b5 <- and <$> zipWithM isEq ts1 ts2
-        return $ b1 && b2 && b3 && b4 && b5
+        -- let b4 = ks1 == ks2
+        -- b4 <- and <$> zipWithM isEq ts1 ts2
+        return $ b1 && b2 && b3
     _ ->
       return False
 
