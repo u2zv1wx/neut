@@ -251,7 +251,6 @@ newAsterInCtx ctx m = do
 newTypeAsterInCtx :: Context -> Hint -> WithEnv WeakTermPlus
 newTypeAsterInCtx ctx m = do
   let varSeq = map (\(mx, x, _) -> (mx, WeakTermVar VarKindLocal x)) ctx
-  -- let varSeq = map (\(_, x, _) -> (m, WeakTermVar x)) ctx
   aster <- newAster m
   return (m, WeakTermPiElim aster varSeq)
 
