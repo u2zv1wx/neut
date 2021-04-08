@@ -148,12 +148,11 @@ interpret inputTree =
           | otherwise ->
             raiseSyntaxError m "(question TREE)"
         "derangement"
-          | derangement : resultType : es <- rest -> do
+          | derangement : es <- rest -> do
             derangement' <- interpretDerangement derangement
             checkDerangementArity m derangement' es
-            resultType' <- interpret resultType
             es' <- mapM interpret es
-            return (m, WeakTermDerangement derangement' resultType' es')
+            return (m, WeakTermDerangement derangement' es')
           | otherwise ->
             raiseSyntaxError m "(derangement LEAF TREE TREE*)"
         "case"
@@ -455,17 +454,17 @@ checkDerangementArity m k args =
       | length args == 1 ->
         return ()
       | otherwise ->
-        raiseError m $ "the arity of `nop` is 2, but found " <> T.pack (show (length args + 1)) <> " arguments"
+        raiseError m $ "the arity of `nop` is 1, but found " <> T.pack (show (length args)) <> " arguments"
     DerangementLoad _
       | length args == 1 ->
         return ()
       | otherwise ->
-        raiseError m $ "the arity of `load` is 2, but found " <> T.pack (show (length args + 1)) <> " arguments"
+        raiseError m $ "the arity of `load` is 1, but found " <> T.pack (show (length args)) <> " arguments"
     DerangementStore _
       | length args == 2 ->
         return ()
       | otherwise ->
-        raiseError m $ "the arity of `store` is 3, but found " <> T.pack (show (length args + 1)) <> " arguments"
+        raiseError m $ "the arity of `store` is 2, but found " <> T.pack (show (length args)) <> " arguments"
     DerangementCreateStruct ts
       | length args == length ts ->
         return ()

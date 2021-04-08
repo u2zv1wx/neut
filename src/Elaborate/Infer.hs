@@ -113,10 +113,10 @@ infer' ctx term =
     (m, WeakTermQuestion e _) -> do
       (e', te) <- infer' ctx e
       return ((m, WeakTermQuestion e' te), te)
-    (m, WeakTermDerangement kind resultType es) -> do
-      resultType' <- inferType' ctx resultType
+    (m, WeakTermDerangement kind es) -> do
+      resultType <- newTypeAsterInCtx ctx m
       (es', _) <- unzip <$> mapM (infer' ctx) es
-      return ((m, WeakTermDerangement kind resultType' es'), resultType)
+      return ((m, WeakTermDerangement kind es'), resultType)
     (m, WeakTermCase _ mSubject (e, _) clauseList) -> do
       resultType <- newTypeAsterInCtx ctx m
       (e', t') <- infer' ctx e

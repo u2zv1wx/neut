@@ -23,7 +23,7 @@ data WeakTerm
   | WeakTermEnumIntro T.Text
   | WeakTermEnumElim (WeakTermPlus, WeakTermPlus) [(EnumCasePlus, WeakTermPlus)]
   | WeakTermQuestion WeakTermPlus WeakTermPlus -- e : t (output the type `t` as note)
-  | WeakTermDerangement Derangement WeakTermPlus [WeakTermPlus] -- (derangement NUM result-type arg-1 ... arg-n)
+  | WeakTermDerangement Derangement [WeakTermPlus] -- (derangement kind arg-1 ... arg-n)
   | WeakTermCase
       WeakTermPlus -- result type
       (Maybe WeakTermPlus) -- noetic subject (this is for `case-noetic`)
@@ -138,8 +138,8 @@ varWeakTermPlus term =
       let set1 = varWeakTermPlus e
       let set2 = varWeakTermPlus t
       S.union set1 set2
-    (_, WeakTermDerangement _ t es) ->
-      S.unions $ varWeakTermPlus t : map varWeakTermPlus es
+    (_, WeakTermDerangement _ es) ->
+      S.unions $ map varWeakTermPlus es
     (_, WeakTermCase resultType mSubject (e, t) patList) -> do
       let xs1 = varWeakTermPlus resultType
       let xs2 = S.unions $ map varWeakTermPlus $ maybeToList mSubject
@@ -192,8 +192,8 @@ asterWeakTermPlus term =
       let set1 = asterWeakTermPlus e
       let set2 = asterWeakTermPlus t
       S.union set1 set2
-    (_, WeakTermDerangement _ t es) ->
-      S.unions $ asterWeakTermPlus t : map asterWeakTermPlus es
+    (_, WeakTermDerangement _ es) ->
+      S.unions $ map asterWeakTermPlus es
     (_, WeakTermCase resultType mSubject (e, t) patList) -> do
       let xs1 = asterWeakTermPlus resultType
       let xs2 = S.unions $ map asterWeakTermPlus $ maybeToList mSubject
@@ -280,11 +280,9 @@ toText term =
       showCons ["switch", toText e, showItems (map showClause les)]
     (_, WeakTermQuestion e _) ->
       toText e
-    (_, WeakTermDerangement i resultType es) -> do
-      let resultType' = toText resultType
-      -- let (es, _) = unzip ets
+    (_, WeakTermDerangement i es) -> do
       let es' = map toText es
-      showCons $ "derangement" : T.pack (show i) : resultType' : es'
+      showCons $ "derangement" : T.pack (show i) : es'
     (_, WeakTermCase _ mSubject (e, _) caseClause) -> do
       case mSubject of
         Nothing -> do
@@ -333,8 +331,8 @@ toTree term =
       (m, TreeNode ((m, TreeLeaf "switch") : toTree e : (map toTreeClause les)))
     (_, WeakTermQuestion e _) ->
       toTree e
-    (m, WeakTermDerangement i resultType es) ->
-      (m, TreeNode ((m, TreeLeaf "derangement") : (m, TreeLeaf (T.pack (show i))) : toTree resultType : map toTree es))
+    (m, WeakTermDerangement i es) ->
+      (m, TreeNode ((m, TreeLeaf "derangement") : (m, TreeLeaf (T.pack (show i))) : map toTree es))
     (m, WeakTermCase _ mSubject (e, _) caseClause) -> do
       case mSubject of
         Nothing -> do

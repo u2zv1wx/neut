@@ -86,7 +86,7 @@ clarifyTerm tenv term =
       es' <- (mapM (clarifyTerm tenv) >=> alignFreeVariables tenv m fvs) es
       (y, e', yVar) <- clarifyPlus tenv e
       return $ bindLet [(y, e')] (m, CompEnumElim yVar (zip (map snd cs) es'))
-    (m, TermDerangement expKind _ es) -> do
+    (m, TermDerangement expKind es) -> do
       case (expKind, es) of
         (DerangementNop, [e]) ->
           clarifyTerm tenv e
@@ -342,7 +342,7 @@ chainOf tenv term =
       let es = map snd les
       let xs2 = concat $ map (chainOf tenv) es
       xs0 ++ xs1 ++ xs2
-    (_, TermDerangement _ _ es) ->
+    (_, TermDerangement _ es) ->
       concat $ map (chainOf tenv) es
     (_, TermCase _ mSubject (e, _) patList) -> do
       let xs1 = concat $ (map (chainOf tenv) $ maybeToList mSubject)

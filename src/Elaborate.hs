@@ -140,10 +140,9 @@ elaborate' term =
       t' <- elaborate' t
       note m $ toText (weaken t')
       return e'
-    (m, WeakTermDerangement i resultType es) -> do
-      resultType' <- elaborate' resultType
+    (m, WeakTermDerangement i es) -> do
       es' <- mapM elaborate' es
-      return (m, TermDerangement i resultType' es')
+      return (m, TermDerangement i es')
     (m, WeakTermCase resultType mSubject (e, t) patList) -> do
       resultType' <- elaborate' resultType
       mSubject' <- mapM elaborate' mSubject

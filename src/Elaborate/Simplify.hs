@@ -68,10 +68,10 @@ simplify' constraintList =
             simplify $ ((t1, t2), orig) : cs
         ((_, WeakTermQuestion e1 t1), (_, WeakTermQuestion e2 t2)) ->
           simplify $ ((e1, e2), orig) : ((t1, t2), orig) : cs
-        ((_, WeakTermDerangement i1 t1 es1), (_, WeakTermDerangement i2 t2 es2))
+        ((_, WeakTermDerangement i1 es1), (_, WeakTermDerangement i2 es2))
           | length es1 == length es2,
             i1 == i2 -> do
-            simplify $ map ((,) orig) ((t1, t2) : zip es1 es2) ++ cs
+            simplify $ map ((,) orig) (zip es1 es2) ++ cs
         (e1, e2) -> do
           sub <- gets substEnv
           let fvs1 = varWeakTermPlus e1
@@ -327,12 +327,11 @@ isEq l r =
       b1 <- isEq e1 e2
       b2 <- isEq t1 t2
       return $ b1 && b2
-    ((_, WeakTermDerangement d1 e1 es1), (_, WeakTermDerangement d2 e2 es2))
+    ((_, WeakTermDerangement d1 es1), (_, WeakTermDerangement d2 es2))
       | length es1 == length es2 -> do
         let b1 = d1 == d2
-        b2 <- isEq e1 e2
-        b3 <- and <$> zipWithM isEq es1 es2
-        return $ b1 && b2 && b3
+        b2 <- and <$> zipWithM isEq es1 es2
+        return $ b1 && b2
     _ ->
       return False
 

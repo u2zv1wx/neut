@@ -20,7 +20,7 @@ data Term
   | TermEnum T.Text
   | TermEnumIntro T.Text
   | TermEnumElim (TermPlus, TermPlus) [(EnumCasePlus, TermPlus)]
-  | TermDerangement Derangement TermPlus [TermPlus]
+  | TermDerangement Derangement [TermPlus]
   | TermCase
       TermPlus -- result type
       (Maybe TermPlus) -- noetic subject (this is for `case-noetic`)
@@ -90,10 +90,9 @@ weaken term =
       let (caseList, es) = unzip branchList
       let es' = map weaken es
       (m, WeakTermEnumElim (e', t') (zip caseList es'))
-    (m, TermDerangement i resultType es) -> do
+    (m, TermDerangement i es) -> do
       let es' = map weaken es
-      let resultType' = weaken resultType
-      (m, WeakTermDerangement i resultType' es')
+      (m, WeakTermDerangement i es')
     (m, TermCase resultType mSubject (e, t) patList) -> do
       let resultType' = weaken resultType
       let mSubject' = fmap weaken mSubject
