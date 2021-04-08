@@ -414,14 +414,6 @@ showCase c =
     EnumCaseInt i ->
       T.pack (show i)
 
--- showDerangementArgKind :: DerangementArg -> T.Text
--- showDerangementArgKind k =
---   case k of
---     -- DerangementArgLinear ->
---     --   "linear"
---     DerangementArgAffine ->
---       "affine"
-
 showItems :: [T.Text] -> T.Text
 showItems =
   T.intercalate " "

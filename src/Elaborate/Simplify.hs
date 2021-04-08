@@ -331,11 +331,7 @@ isEq l r =
       | length es1 == length es2 -> do
         let b1 = d1 == d2
         b2 <- isEq e1 e2
-        -- let (es1, ts1) = unzip args1
-        -- let (es2, ts2) = unzip args2
         b3 <- and <$> zipWithM isEq es1 es2
-        -- let b4 = ks1 == ks2
-        -- b4 <- and <$> zipWithM isEq ts1 ts2
         return $ b1 && b2 && b3
     _ ->
       return False

@@ -115,12 +115,8 @@ infer' ctx term =
       return ((m, WeakTermQuestion e' te), te)
     (m, WeakTermDerangement kind resultType es) -> do
       resultType' <- inferType' ctx resultType
-      -- let (es, _) = unzip ets
       (es', _) <- unzip <$> mapM (infer' ctx) es
-      -- let borrowedTypes = takeBorrowedTypes $ zip ts' ks
       return ((m, WeakTermDerangement kind resultType' es'), resultType)
-    -- productType <- productTypeOf m (borrowedTypes ++ [resultType'])
-    -- return ((m, WeakTermDerangement kind resultType' (zip3 es' ks ts')), productType)
     (m, WeakTermCase _ mSubject (e, _) clauseList) -> do
       resultType <- newTypeAsterInCtx ctx m
       (e', t') <- infer' ctx e
@@ -326,38 +322,6 @@ lookupKind m name = do
       raiseError m $ "no such enum-intro is defined: " <> name
     Just (j, _) ->
       return j
-
--- A1 * ... * An := Pi (z : tau, k : Pi (_ : A1, ..., _ : An).Z). Z
--- productTypeOf :: Hint -> [WeakTermPlus] -> WithEnv WeakTermPlus
--- productTypeOf m ts =
---   case ts of
---     [t] ->
---       return t
---     _ -> do
---       xs <- mapM (const $ newIdentFromText "_") ts
---       let xts = zipWith (\x t -> (m, x, t)) xs ts
---       weakTermSigma m xts
-
--- takeBorrowedTypes :: [(WeakTermPlus, DerangementArg)] -> [WeakTermPlus]
--- takeBorrowedTypes _ =
---   []
-
--- case tks of
---   [] ->
---     []
---   ((t, k) : rest) ->
---     case k of
---       -- DerangementArgLinear ->
---       --   t : takeBorrowedTypes rest
---       DerangementArgAffine ->
---         takeBorrowedTypes rest
-
--- weakTermSigma :: Hint -> [WeakIdentPlus] -> WithEnv WeakTermPlus
--- weakTermSigma m xts = do
---   z <- newIdentFromText "internal.sigma-tau"
---   let vz = (m, WeakTermVar VarKindLocal z)
---   k <- newIdentFromText "sigma"
---   return (m, WeakTermPi [(m, z, (m, WeakTermTau)), (m, k, (m, WeakTermPi xts vz))] vz)
 
 lookupConstTypeEnv :: Hint -> T.Text -> WithEnv TermPlus
 lookupConstTypeEnv m x

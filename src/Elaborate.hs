@@ -142,9 +142,7 @@ elaborate' term =
       return e'
     (m, WeakTermDerangement i resultType es) -> do
       resultType' <- elaborate' resultType
-      -- let (es, ts) = unzip ets
       es' <- mapM elaborate' es
-      -- ts' <- mapM (elaborate' >=> reduceTermPlus) ts
       return (m, TermDerangement i resultType' es')
     (m, WeakTermCase resultType mSubject (e, t) patList) -> do
       resultType' <- elaborate' resultType
