@@ -40,7 +40,7 @@ elaborateStmt' stmt =
       --   p $ T.unpack $ toText e2
       --   p "---------------------"
       unify
-      e'' <- elaborate' e' >>= inlineTermPlus
+      e'' <- elaborate' e' >>= reduceTermPlus
       t'' <- elaborate' t' >>= reduceTermPlus
       insWeakTypeEnv x $ weaken t''
       modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e'') (substEnv env)})
@@ -51,7 +51,7 @@ elaborateStmt' stmt =
       (e', te) <- infer e
       insConstraintEnv te (m, WeakTermEnum "top")
       unify
-      e'' <- elaborate' e' >>= inlineTermPlus
+      e'' <- elaborate' e' >>= reduceTermPlus
       cont' <- elaborateStmt' cont
       return $ StmtReduce m e'' : cont'
 
