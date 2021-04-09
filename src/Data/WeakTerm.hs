@@ -161,9 +161,9 @@ asterWeakTermPlus term =
     (_, WeakTermVar _ _) ->
       S.empty
     (_, WeakTermPi xts t) ->
-      asterWeakTermPlus' xts [t]
+      asterWeakTermPlus' xts t
     (_, WeakTermPiIntro _ _ xts e) ->
-      asterWeakTermPlus' xts [e]
+      asterWeakTermPlus' xts e
     (_, WeakTermPiElim e es) ->
       S.unions $ map asterWeakTermPlus $ e : es
     (_, WeakTermAster h) ->
@@ -194,17 +194,17 @@ asterWeakTermPlus term =
       let xs2 = S.unions $ map asterWeakTermPlus $ maybeToList mSubject
       let xs3 = asterWeakTermPlus e
       let xs4 = asterWeakTermPlus t
-      let xs5 = S.unions $ map (\((_, xts), body) -> asterWeakTermPlus' xts [body]) patList
+      let xs5 = S.unions $ map (\((_, xts), body) -> asterWeakTermPlus' xts body) patList
       S.unions [xs1, xs2, xs3, xs4, xs5]
 
-asterWeakTermPlus' :: [WeakIdentPlus] -> [WeakTermPlus] -> S.Set Int
-asterWeakTermPlus' binder es =
+asterWeakTermPlus' :: [WeakIdentPlus] -> WeakTermPlus -> S.Set Int
+asterWeakTermPlus' binder e =
   case binder of
     [] ->
-      S.unions $ map asterWeakTermPlus es
+      asterWeakTermPlus e
     ((_, _, t) : xts) -> do
       let set1 = asterWeakTermPlus t
-      let set2 = asterWeakTermPlus' xts es
+      let set2 = asterWeakTermPlus' xts e
       S.union set1 set2
 
 metaOf :: WeakTermPlus -> Hint
@@ -361,9 +361,11 @@ showTypeArgs args =
 
 showVariable :: Ident -> T.Text
 showVariable x =
-  if T.any (\c -> c `S.member` S.fromList "()") $ asText x
-    then "_"
-    else asText x
+  asText' x
+
+-- if T.any (\c -> c `S.member` S.fromList "()") $ asText x
+--   then "_"
+--   else asText x
 
 showCaseClause :: (WeakPattern, WeakTermPlus) -> T.Text
 showCaseClause (pat, e) =

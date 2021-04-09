@@ -41,6 +41,10 @@ throwTypeErrors :: WithEnv ()
 throwTypeErrors = do
   q <- gets suspendedConstraintEnv
   sub <- gets substEnv
+  -- errorList <- forM (Q.toList q) $ \(SuspendedConstraint (_, _, ((expected, actual), _))) -> do
+  --   expected' <- substWeakTermPlus sub expected >>= reduceWeakTermPlus
+  --   actual' <- substWeakTermPlus sub actual >>= reduceWeakTermPlus
+  --   return $ logError (getPosInfo (fst actual)) $ constructErrorMsg actual' expected'
   errorList <- forM (Q.toList q) $ \(SuspendedConstraint (_, _, (_, (expected, actual)))) -> do
     expected' <- substWeakTermPlus sub expected >>= reduceWeakTermPlus
     actual' <- substWeakTermPlus sub actual >>= reduceWeakTermPlus

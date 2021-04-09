@@ -139,12 +139,9 @@ substTermPlus' sub nenv term =
       return (m, TermPi xts' t')
     (m, TermPiIntro opacity kind xts e) -> do
       case kind of
-        LamKindFix (mx, x, t) -> do
-          t' <- substTermPlus' sub nenv t
-          x' <- newIdentFromIdent x
-          let nenv' = IntMap.insert (asInt x) x' nenv
-          (xts', e') <- substTermPlus'' sub nenv' xts e
-          return (m, TermPiIntro opacity (LamKindFix (mx, x', t')) xts' e')
+        LamKindFix xt -> do
+          (xt' : xts', e') <- substTermPlus'' sub nenv (xt : xts) e
+          return (m, TermPiIntro opacity (LamKindFix xt') xts' e')
         _ -> do
           (xts', e') <- substTermPlus'' sub nenv xts e
           return (m, TermPiIntro opacity kind xts' e')
