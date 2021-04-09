@@ -63,9 +63,9 @@ clarifyTerm tenv term =
       case (opacity, kind) of
         (OpacityTranslucent, LamKindFix (_, x, _))
           | not (S.member x (varComp e')) ->
-            retClosure tenv True LamKindNormal fvs m mxts e'
+            returnClosure tenv True LamKindNormal fvs m mxts e'
         _ ->
-          retClosure tenv (isTransparent opacity) kind fvs m mxts e'
+          returnClosure tenv (isTransparent opacity) kind fvs m mxts e'
     (m, TermPiElim e es) -> do
       es' <- mapM (clarifyPlus tenv) es
       e' <- clarifyTerm tenv e
@@ -100,7 +100,7 @@ clarifyTerm tenv term =
       ((closureVarName, closureVar), typeVarName, (envVarName, envVar), (tagVarName, tagVar)) <- newClosureNames m
       branchList <- forM (zip patList [0 ..]) $ \(((constructorName, xts), body), i) -> do
         body' <- clarifyTerm (insTypeEnv xts tenv) body
-        clauseClosure <- retClosure tenv True LamKindNormal fvs m xts body'
+        clauseClosure <- returnClosure tenv True LamKindNormal fvs m xts body'
         closureArgs <- constructClauseArguments clauseClosure i $ length patList
         let (argVarNameList, argList, argVarList) = unzip3 (resultArg : closureArgs)
         let consName = wrapWithQuote $ if isJust mSubject then asText constructorName <> ";noetic" else asText constructorName
@@ -188,7 +188,7 @@ chainFromTermList tenv es =
 
 alignFreeVariables :: TypeEnv -> Hint -> [IdentPlus] -> [CompPlus] -> WithEnv [CompPlus]
 alignFreeVariables tenv m fvs es = do
-  es' <- mapM (retClosure tenv True LamKindNormal fvs m []) es
+  es' <- mapM (returnClosure tenv True LamKindNormal fvs m []) es
   mapM (\cls -> callClosure m cls []) es'
 
 nubFreeVariables :: [IdentPlus] -> [IdentPlus]
@@ -209,9 +209,9 @@ clarifyPrimOp tenv op@(PrimOp _ domList _) m = do
   argTypeList <- mapM (lowTypeToType m) domList
   (xs, varList) <- unzip <$> mapM (const (newValueVarLocalWith m "prim")) domList
   let mxts = zipWith (\x t -> (m, x, t)) xs argTypeList
-  retClosure tenv True LamKindNormal [] m mxts (m, CompPrimitive (PrimitivePrimOp op varList))
+  returnClosure tenv True LamKindNormal [] m mxts (m, CompPrimitive (PrimitivePrimOp op varList))
 
-retClosure ::
+returnClosure ::
   TypeEnv ->
   Bool -> -- whether the closure is reducible
   LamKind IdentPlus -> -- the name of newly created closure
@@ -220,54 +220,41 @@ retClosure ::
   [IdentPlus] -> -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
   CompPlus -> -- the `e` in `lam (x1, ..., xn). e`
   WithEnv CompPlus
-retClosure tenv isReducible kind fvs m xts e = do
+returnClosure tenv isReducible kind fvs m xts e = do
   fvs' <- clarifyBinder tenv fvs
   xts' <- clarifyBinder tenv xts
-  cls <- makeClosure isReducible kind fvs' m xts' e
-  return (m, CompUpIntro cls)
-
-makeClosure ::
-  Bool -> -- whether the closure is reducible
-  LamKind IdentPlus ->
-  [(Hint, Ident, CompPlus)] -> -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
-  Hint -> -- meta of lambda
-  [(Hint, Ident, CompPlus)] -> -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
-  CompPlus -> -- the `e` in `lam (x1, ..., xn). e`
-  WithEnv ValuePlus
-makeClosure isReducible kind mxts2 m mxts1 e = do
-  let xts1 = dropFst mxts1
-  let xts2 = dropFst mxts2
-  envExp <- sigmaS4 Nothing m $ map Right xts2
-  let vs = map (\(mx, x, _) -> (mx, ValueVarLocal x)) mxts2
-  let fvEnv = (m, ValueSigmaIntro vs)
+  let xts'' = dropFst xts'
+  let fvs'' = dropFst fvs'
+  fvEnvSigma <- sigmaS4 Nothing m $ map Right fvs''
+  let fvEnv = (m, ValueSigmaIntro (map (\(mx, x, _) -> (mx, ValueVarLocal x)) fvs'))
   case kind of
     LamKindNormal -> do
       i <- newCount
       let name = "thunk-" <> T.pack (show i)
-      registerIfNecessary m name isReducible False xts1 xts2 e
-      return (m, ValueSigmaIntro [envExp, fvEnv, (m, ValueVarGlobal (wrapWithQuote name))])
+      registerIfNecessary m name isReducible False xts'' fvs'' e
+      return (m, CompUpIntro (m, ValueSigmaIntro [fvEnvSigma, fvEnv, (m, ValueVarGlobal (wrapWithQuote name))]))
     LamKindCons _ consName -> do
       cenv <- gets constructorEnv
       case Map.lookup consName cenv of
         Just (_, constructorNumber) -> do
-          registerIfNecessary m consName isReducible True xts1 xts2 e
-          return $ (m, ValueSigmaIntro [envExp, fvEnv, (m, ValueInt 64 (toInteger constructorNumber))])
+          registerIfNecessary m consName isReducible True xts'' fvs'' e
+          return (m, CompUpIntro (m, ValueSigmaIntro [fvEnvSigma, fvEnv, (m, ValueInt 64 (toInteger constructorNumber))]))
         Nothing ->
           raiseCritical m $ "no such constructor is registered: `" <> consName <> "`"
     LamKindFix (_, name, _) -> do
       let name' = asText' name
-      let cls = (m, ValueSigmaIntro [envExp, fvEnv, (m, ValueVarGlobal (wrapWithQuote name'))])
+      let cls = (m, ValueSigmaIntro [fvEnvSigma, fvEnv, (m, ValueVarGlobal (wrapWithQuote name'))])
       e' <- substCompPlus (IntMap.fromList [(asInt name, cls)]) IntMap.empty e
-      registerIfNecessary m name' False False xts1 xts2 e'
-      return cls
+      registerIfNecessary m name' False False xts'' fvs'' e'
+      return (m, CompUpIntro cls)
     LamKindResourceHandler -> do
-      when (not (null xts2)) $
+      when (not (null fvs'')) $
         raiseError m "this resource-lambda is not closed"
-      e' <- linearize xts1 e >>= reduceCompPlus
+      e' <- linearize xts'' e >>= reduceCompPlus
       i <- newCount
       let name = "resource-handler-" <> T.pack (show i)
-      insDefEnv (wrapWithQuote name) isReducible (map fst xts1) e'
-      return (m, ValueVarGlobal (wrapWithQuote name))
+      insDefEnv (wrapWithQuote name) isReducible (map fst xts'') e'
+      return (m, CompUpIntro (m, ValueVarGlobal (wrapWithQuote name)))
 
 registerIfNecessary ::
   Hint ->
