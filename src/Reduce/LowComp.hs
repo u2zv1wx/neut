@@ -15,7 +15,7 @@ import qualified Data.Set as S
 type SizeMap =
   Map.Map SizeInfo [(Int, LowValue)]
 
-reduceLowComp :: SubstLowComp -> SizeMap -> LowComp -> WithEnv LowComp
+reduceLowComp :: SubstLowComp -> SizeMap -> LowComp -> Compiler LowComp
 reduceLowComp sub sizeMap llvm = do
   cancelAllocFlag <- gets shouldCancelAlloc
   case llvm of

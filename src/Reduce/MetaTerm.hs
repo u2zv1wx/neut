@@ -19,7 +19,7 @@ import qualified Data.Text as T
 import Data.Tree
 import Text.Read (readMaybe)
 
-reduceMetaTerm :: MetaTermPlus -> WithEnv MetaTermPlus
+reduceMetaTerm :: MetaTermPlus -> Compiler MetaTermPlus
 reduceMetaTerm term =
   case term of
     (_, MetaTermVar x) -> do
@@ -75,7 +75,7 @@ reduceMetaTerm term =
     _ ->
       return term
 
-raiseArityMismatch :: Hint -> Int -> Int -> WithEnv a
+raiseArityMismatch :: Hint -> Int -> Int -> Compiler a
 raiseArityMismatch m expected found = do
   case expected of
     0 ->
@@ -85,7 +85,7 @@ raiseArityMismatch m expected found = do
     _ ->
       raiseError m $ "the function here must be called with " <> T.pack (show expected) <> " arguments, but found " <> T.pack (show found)
 
-reduceConstApp :: Hint -> T.Text -> [MetaTermPlus] -> WithEnv MetaTermPlus
+reduceConstApp :: Hint -> T.Text -> [MetaTermPlus] -> Compiler MetaTermPlus
 reduceConstApp m c es =
   case c of
     "meta.dump"
@@ -235,7 +235,7 @@ reduceConstApp m c es =
       | otherwise -> do
         raiseConstAppError m c es
 
-takeNode :: MetaTermPlus -> WithEnv [MetaTermPlus]
+takeNode :: MetaTermPlus -> Compiler [MetaTermPlus]
 takeNode t =
   case t of
     (_, MetaTermNode ts) ->
@@ -244,7 +244,7 @@ takeNode t =
       let err = toConstError ArgNode t
       throw $ Error [err]
 
-runTakeWhile :: MetaTermPlus -> [MetaTermPlus] -> WithEnv [MetaTermPlus]
+runTakeWhile :: MetaTermPlus -> [MetaTermPlus] -> Compiler [MetaTermPlus]
 runTakeWhile predicate ts =
   case ts of
     [] ->
@@ -257,7 +257,7 @@ runTakeWhile predicate ts =
           return $ t : rest'
         else return []
 
-runDropWhile :: MetaTermPlus -> [MetaTermPlus] -> WithEnv [MetaTermPlus]
+runDropWhile :: MetaTermPlus -> [MetaTermPlus] -> Compiler [MetaTermPlus]
 runDropWhile predicate ts =
   case ts of
     [] ->
@@ -268,7 +268,7 @@ runDropWhile predicate ts =
         then runDropWhile predicate rest
         else return rest
 
-raiseConstAppError :: Hint -> T.Text -> [MetaTermPlus] -> WithEnv a
+raiseConstAppError :: Hint -> T.Text -> [MetaTermPlus] -> Compiler a
 raiseConstAppError m c es = do
   case Map.lookup c metaConstants of
     Nothing ->

@@ -171,7 +171,7 @@ run cmd =
   case cmd of
     Build inputPathStr mOutputPathStr outputKind cancelAllocFlag -> do
       inputPath <- resolveFile' inputPathStr
-      resultOrErr <- evalWithEnv (runBuild inputPath) $ initialEnv {shouldCancelAlloc = cancelAllocFlag}
+      resultOrErr <- runCompiler (runBuild inputPath) $ initialEnv {shouldCancelAlloc = cancelAllocFlag}
       (basename, _) <- splitExtension $ filename inputPath
       mOutputPath <- mapM resolveFile' mOutputPathStr
       outputPath <- constructOutputPath basename mOutputPath outputKind
@@ -193,7 +193,7 @@ run cmd =
     Check inputPathStr colorizeFlag eoe -> do
       inputPath <- resolveFile' inputPathStr
       resultOrErr <-
-        evalWithEnv (runCheck inputPath) $
+        runCompiler (runCheck inputPath) $
           initialEnv {shouldColorize = colorizeFlag, endOfEntry = eoe}
       case resultOrErr of
         Right _ ->
@@ -236,11 +236,11 @@ constructOutputArchivePath inputPath mPath =
     Nothing ->
       resolveFile' (fromRelDir $ dirname inputPath) >>= addExtension ".tar" >>= addExtension ".gz"
 
-runBuild :: Path Abs File -> WithEnv Builder
+runBuild :: Path Abs File -> Compiler Builder
 runBuild =
   preprocess >=> parse >=> elaborate >=> clarify >=> lower >=> emit
 
-runCheck :: Path Abs File -> WithEnv ()
+runCheck :: Path Abs File -> Compiler ()
 runCheck =
   preprocess >=> parse >=> elaborate >=> \_ -> return ()
 

@@ -21,15 +21,15 @@ import Reduce.WeakTerm
 
 type Context = [WeakIdentPlus]
 
-infer :: WeakTermPlus -> WithEnv (WeakTermPlus, WeakTermPlus)
+infer :: WeakTermPlus -> Compiler (WeakTermPlus, WeakTermPlus)
 infer =
   infer' []
 
-inferType :: WeakTermPlus -> WithEnv WeakTermPlus
+inferType :: WeakTermPlus -> Compiler WeakTermPlus
 inferType =
   inferType' []
 
-infer' :: Context -> WeakTermPlus -> WithEnv (WeakTermPlus, WeakTermPlus)
+infer' :: Context -> WeakTermPlus -> Compiler (WeakTermPlus, WeakTermPlus)
 infer' ctx term =
   case term of
     (m, WeakTermTau) ->
@@ -140,7 +140,7 @@ infer' ctx term =
                 return ((name, xts'), body')
               return ((m, WeakTermCase resultType mSubject' (e', t') clauseList'), resultType)
 
-inferSubject :: Hint -> Context -> WeakTermPlus -> WithEnv WeakTermPlus
+inferSubject :: Hint -> Context -> WeakTermPlus -> Compiler WeakTermPlus
 inferSubject m ctx subject = do
   (subject', tSub) <- infer' ctx subject
   insConstraintEnv (m, WeakTermTau) tSub
@@ -152,7 +152,7 @@ inferArgs ::
   [(WeakTermPlus, WeakTermPlus)] ->
   [WeakIdentPlus] ->
   WeakTermPlus ->
-  WithEnv WeakTermPlus
+  Compiler WeakTermPlus
 inferArgs sub m args1 args2 cod =
   case (args1, args2) of
     ([], []) ->
@@ -165,12 +165,12 @@ inferArgs sub m args1 args2 cod =
     _ ->
       raiseCritical m "invalid argument passed to inferArgs"
 
-inferExternal :: Hint -> T.Text -> WithEnv TermPlus -> WithEnv (WeakTermPlus, WeakTermPlus)
+inferExternal :: Hint -> T.Text -> Compiler TermPlus -> Compiler (WeakTermPlus, WeakTermPlus)
 inferExternal m x comp = do
   t <- comp
   return ((m, WeakTermConst x), (m, snd $ weaken t))
 
-inferType' :: Context -> WeakTermPlus -> WithEnv WeakTermPlus
+inferType' :: Context -> WeakTermPlus -> Compiler WeakTermPlus
 inferType' ctx t = do
   (t', u) <- infer' ctx t
   insConstraintEnv (metaOf t, WeakTermTau) u
@@ -180,7 +180,7 @@ inferPi ::
   Context ->
   [WeakIdentPlus] ->
   WeakTermPlus ->
-  WithEnv ([WeakIdentPlus], WeakTermPlus)
+  Compiler ([WeakIdentPlus], WeakTermPlus)
 inferPi ctx binder cod =
   case binder of
     [] -> do
@@ -196,7 +196,7 @@ inferBinder ::
   Context ->
   [WeakIdentPlus] ->
   WeakTermPlus ->
-  WithEnv ([WeakIdentPlus], (WeakTermPlus, WeakTermPlus))
+  Compiler ([WeakIdentPlus], (WeakTermPlus, WeakTermPlus))
 inferBinder ctx binder e =
   case binder of
     [] -> do
@@ -213,7 +213,7 @@ inferPiElim ::
   Hint ->
   (WeakTermPlus, WeakTermPlus) ->
   [(WeakTermPlus, WeakTermPlus)] ->
-  WithEnv (WeakTermPlus, WeakTermPlus)
+  Compiler (WeakTermPlus, WeakTermPlus)
 inferPiElim ctx m (e, t) ets = do
   let es = map fst ets
   case t of
@@ -235,7 +235,7 @@ inferPiElim ctx m (e, t) ets = do
 -- and return ?M @ (x1, ..., xn) : ?Mt @ (x1, ..., xn).
 -- Note that we can't just set `?M : Pi (x1 : A1, ..., xn : An). Univ` since
 -- WeakTermAster might be used as an ordinary term, that is, a term which is not a type.
-newAsterInCtx :: Context -> Hint -> WithEnv (WeakTermPlus, WeakTermPlus)
+newAsterInCtx :: Context -> Hint -> Compiler (WeakTermPlus, WeakTermPlus)
 newAsterInCtx ctx m = do
   higherAster <- newAster m
   let varSeq = map (\(mx, x, _) -> (mx, WeakTermVar VarKindLocal x)) ctx
@@ -247,7 +247,7 @@ newAsterInCtx ctx m = do
 -- In a context (x1 : A1, ..., xn : An), this function creates a metavariable
 --   ?M  : Pi (x1 : A1, ..., xn : An). Univ{i}
 -- and return ?M @ (x1, ..., xn) : Univ{i}.
-newTypeAsterInCtx :: Context -> Hint -> WithEnv WeakTermPlus
+newTypeAsterInCtx :: Context -> Hint -> Compiler WeakTermPlus
 newTypeAsterInCtx ctx m = do
   let varSeq = map (\(mx, x, _) -> (mx, WeakTermVar VarKindLocal x)) ctx
   aster <- newAster m
@@ -262,7 +262,7 @@ newTypeAsterInCtx ctx m = do
 --    (y{m}, ?M{m} @ (x1, ..., xn, y1, ..., y{m-1}))]
 --
 -- inserting type information `yi : ?Mi @ (x1, ..., xn, y1, ..., y{i-1})
-newTypeAsterListInCtx :: Context -> [(Ident, Hint)] -> WithEnv [WeakIdentPlus]
+newTypeAsterListInCtx :: Context -> [(Ident, Hint)] -> Compiler [WeakIdentPlus]
 newTypeAsterListInCtx ctx ids =
   case ids of
     [] ->
@@ -273,7 +273,7 @@ newTypeAsterListInCtx ctx ids =
       ts <- newTypeAsterListInCtx (ctx ++ [(m, x, t)]) rest
       return $ (m, x, t) : ts
 
-inferEnumCase :: Context -> EnumCasePlus -> WithEnv (EnumCasePlus, WeakTermPlus)
+inferEnumCase :: Context -> EnumCasePlus -> Compiler (EnumCasePlus, WeakTermPlus)
 inferEnumCase ctx weakCase =
   case weakCase of
     (m, EnumCaseLabel name) -> do
@@ -285,15 +285,15 @@ inferEnumCase ctx weakCase =
     (m, EnumCaseInt _) -> do
       raiseCritical m "enum-case-int shouldn't be used in the target language"
 
-insConstraintEnv :: WeakTermPlus -> WeakTermPlus -> WithEnv ()
+insConstraintEnv :: WeakTermPlus -> WeakTermPlus -> Compiler ()
 insConstraintEnv t1 t2 =
   modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
 
-insWeakTypeEnv :: Ident -> WeakTermPlus -> WithEnv ()
+insWeakTypeEnv :: Ident -> WeakTermPlus -> Compiler ()
 insWeakTypeEnv (I (_, i)) t =
   modify (\e -> e {weakTypeEnv = IntMap.insert i t (weakTypeEnv e)})
 
-lookupWeakTypeEnv :: Hint -> Ident -> WithEnv WeakTermPlus
+lookupWeakTypeEnv :: Hint -> Ident -> Compiler WeakTermPlus
 lookupWeakTypeEnv m s = do
   mt <- lookupWeakTypeEnvMaybe s
   case mt of
@@ -303,7 +303,7 @@ lookupWeakTypeEnv m s = do
       raiseCritical m $
         asText' s <> " is not found in the weak type environment."
 
-lookupWeakTypeEnvMaybe :: Ident -> WithEnv (Maybe WeakTermPlus)
+lookupWeakTypeEnvMaybe :: Ident -> Compiler (Maybe WeakTermPlus)
 lookupWeakTypeEnvMaybe (I (_, s)) = do
   wtenv <- gets weakTypeEnv
   case IntMap.lookup s wtenv of
@@ -312,7 +312,7 @@ lookupWeakTypeEnvMaybe (I (_, s)) = do
     Just t ->
       return $ Just t
 
-lookupKind :: Hint -> T.Text -> WithEnv T.Text
+lookupKind :: Hint -> T.Text -> Compiler T.Text
 lookupKind m name = do
   renv <- gets revEnumEnv
   case Map.lookup name renv of
@@ -321,7 +321,7 @@ lookupKind m name = do
     Just (j, _) ->
       return j
 
-lookupConstTypeEnv :: Hint -> T.Text -> WithEnv TermPlus
+lookupConstTypeEnv :: Hint -> T.Text -> Compiler TermPlus
 lookupConstTypeEnv m x
   | Just _ <- asLowTypeMaybe x =
     return (m, TermTau)
@@ -336,7 +336,7 @@ lookupConstTypeEnv m x
         raiseCritical m $
           "the constant `" <> x <> "` is not found in the type environment."
 
-primOpToType :: Hint -> PrimOp -> WithEnv TermPlus
+primOpToType :: Hint -> PrimOp -> Compiler TermPlus
 primOpToType m (PrimOp op domList cod) = do
   domList' <- mapM (lowTypeToType m) domList
   xs <- mapM (const (newIdentFromText "_")) domList'

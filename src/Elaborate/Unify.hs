@@ -21,17 +21,17 @@ data Stuck
   | StuckPiElimAster Int [[WeakTermPlus]]
   deriving (Show)
 
-unify :: WithEnv ()
+unify :: Compiler ()
 unify =
   analyze >> synthesize
 
-analyze :: WithEnv ()
+analyze :: Compiler ()
 analyze = do
   cs <- gets constraintEnv
   modify (\env -> env {constraintEnv = []})
   simplify $ zip cs cs
 
-synthesize :: WithEnv ()
+synthesize :: Compiler ()
 synthesize = do
   cs <- gets suspendedConstraintEnv
   case Q.minView cs of
@@ -44,7 +44,7 @@ synthesize = do
     Just ((SuspendedConstraint (_, ConstraintKindOther, _)), _) ->
       throwTypeErrors
 
-throwTypeErrors :: WithEnv a
+throwTypeErrors :: Compiler a
 throwTypeErrors = do
   q <- gets suspendedConstraintEnv
   sub <- gets substEnv
@@ -61,7 +61,7 @@ constructErrorMsg e1 e2 =
     <> "\n- "
     <> toText e2
 
-simplify :: [(Constraint, Constraint)] -> WithEnv ()
+simplify :: [(Constraint, Constraint)] -> Compiler ()
 simplify constraintList =
   case constraintList of
     [] ->
@@ -194,7 +194,7 @@ simplify constraintList =
                   simplify cs
 
 {-# INLINE resolveHole #-}
-resolveHole :: Int -> [[WeakIdentPlus]] -> WeakTermPlus -> [(Constraint, Constraint)] -> WithEnv ()
+resolveHole :: Int -> [[WeakIdentPlus]] -> WeakTermPlus -> [(Constraint, Constraint)] -> Compiler ()
 resolveHole h1 xss e2' cs = do
   modify (\env -> env {substEnv = IntMap.insert h1 (toPiIntro xss e2') (substEnv env)})
   sus <- gets suspendedConstraintEnv
@@ -203,11 +203,11 @@ resolveHole h1 xss e2' cs = do
   let sus1' = map (\(SuspendedConstraint (_, _, c)) -> c) $ Q.toList sus1
   simplify $ sus1' ++ cs
 
-simplifyBinder :: Constraint -> [WeakIdentPlus] -> [WeakIdentPlus] -> WithEnv [(Constraint, Constraint)]
+simplifyBinder :: Constraint -> [WeakIdentPlus] -> [WeakIdentPlus] -> Compiler [(Constraint, Constraint)]
 simplifyBinder orig =
   simplifyBinder' orig IntMap.empty
 
-simplifyBinder' :: Constraint -> SubstWeakTerm -> [WeakIdentPlus] -> [WeakIdentPlus] -> WithEnv [(Constraint, Constraint)]
+simplifyBinder' :: Constraint -> SubstWeakTerm -> [WeakIdentPlus] -> [WeakIdentPlus] -> Compiler [(Constraint, Constraint)]
 simplifyBinder' orig sub args1 args2 =
   case (args1, args2) of
     ((m1, x1, t1) : xts1, (_, x2, t2) : xts2) -> do
@@ -218,7 +218,7 @@ simplifyBinder' orig sub args1 args2 =
     _ ->
       return []
 
-asWeakIdentPlus :: Hint -> WeakTermPlus -> WithEnv WeakIdentPlus
+asWeakIdentPlus :: Hint -> WeakTermPlus -> Compiler WeakIdentPlus
 asWeakIdentPlus m t = do
   h <- newIdentFromText "aster"
   return (m, h, t)

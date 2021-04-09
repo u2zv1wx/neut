@@ -27,7 +27,7 @@ type Tokenizer a = StateT TEnv IO a
 type EscapeFlag =
   Bool
 
-tokenize :: T.Text -> WithEnv [TreePlus]
+tokenize :: T.Text -> Compiler [TreePlus]
 tokenize input = do
   modify (\env -> env {count = 1 + count env})
   path <- getCurrentFilePath

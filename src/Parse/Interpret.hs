@@ -17,7 +17,7 @@ import Data.Tree
 import Data.WeakTerm
 import Text.Read (readMaybe)
 
-interpret :: TreePlus -> WithEnv WeakTermPlus
+interpret :: TreePlus -> Compiler WeakTermPlus
 interpret inputTree =
   case inputTree of
     (m, TreeLeaf atom)
@@ -189,7 +189,7 @@ interpret inputTree =
     (m, TreeNode es) ->
       interpretAux m es
 
-interpretAux :: Hint -> [TreePlus] -> WithEnv WeakTermPlus
+interpretAux :: Hint -> [TreePlus] -> Compiler WeakTermPlus
 interpretAux m es =
   case es of
     [] ->
@@ -197,7 +197,7 @@ interpretAux m es =
     f : args ->
       interpretPiElim m f args
 
-interpretPiElim :: Hint -> TreePlus -> [TreePlus] -> WithEnv WeakTermPlus
+interpretPiElim :: Hint -> TreePlus -> [TreePlus] -> Compiler WeakTermPlus
 interpretPiElim m f es = do
   f' <- interpret f
   (xts, args) <- interpretArg es
@@ -205,7 +205,7 @@ interpretPiElim m f es = do
     then return (m, WeakTermPiElim f' args)
     else return (m, WeakTermPiIntro OpacityTransparent LamKindNormal xts (m, WeakTermPiElim f' args))
 
-interpretArg :: [TreePlus] -> WithEnv ([WeakIdentPlus], [WeakTermPlus])
+interpretArg :: [TreePlus] -> Compiler ([WeakIdentPlus], [WeakTermPlus])
 interpretArg es =
   case es of
     [] ->
@@ -220,7 +220,7 @@ interpretArg es =
           e <- interpret tree
           return (xts, e : args)
 
-interpretWeakIdentPlus :: TreePlus -> WithEnv WeakIdentPlus
+interpretWeakIdentPlus :: TreePlus -> Compiler WeakIdentPlus
 interpretWeakIdentPlus tree =
   case tree of
     leaf@(_, TreeLeaf _) -> do
@@ -234,7 +234,7 @@ interpretWeakIdentPlus tree =
     t ->
       raiseSyntaxError (fst t) "(LEAF TREE)"
 
-interpretFix :: TreePlus -> WithEnv Def
+interpretFix :: TreePlus -> Compiler Def
 interpretFix tree =
   case tree of
     (m, TreeNode [xt, (_, TreeNode xts), e]) -> do
@@ -244,7 +244,7 @@ interpretFix tree =
     t ->
       raiseSyntaxError (fst t) "(TREE (TREE ... TREE) TREE)"
 
-interpretLeaf :: TreePlus -> WithEnv (Hint, Ident)
+interpretLeaf :: TreePlus -> Compiler (Hint, Ident)
 interpretLeaf tree =
   case tree of
     (m, TreeLeaf "_") -> do
@@ -255,7 +255,7 @@ interpretLeaf tree =
     t ->
       raiseSyntaxError (fst t) "LEAF"
 
-interpretIdentPlus :: TreePlus -> WithEnv WeakIdentPlus
+interpretIdentPlus :: TreePlus -> Compiler WeakIdentPlus
 interpretIdentPlus tree =
   case tree of
     leaf@(_, TreeLeaf _) -> do
@@ -269,7 +269,7 @@ interpretIdentPlus tree =
     t ->
       raiseSyntaxError (fst t) "(LEAF TREE)"
 
-interpretLeafText :: TreePlus -> WithEnv (Hint, T.Text)
+interpretLeafText :: TreePlus -> Compiler (Hint, T.Text)
 interpretLeafText tree =
   case tree of
     (m, TreeLeaf "_") -> do
@@ -280,13 +280,13 @@ interpretLeafText tree =
     t ->
       raiseSyntaxError (fst t) "LEAF"
 
-interpretBinder :: [TreePlus] -> TreePlus -> WithEnv ([WeakIdentPlus], WeakTermPlus)
+interpretBinder :: [TreePlus] -> TreePlus -> Compiler ([WeakIdentPlus], WeakTermPlus)
 interpretBinder xts t = do
   xts' <- mapM interpretWeakIdentPlus xts
   t' <- interpret t
   return (xts', t')
 
-interpretClause :: TreePlus -> WithEnv (EnumCasePlus, WeakTermPlus)
+interpretClause :: TreePlus -> Compiler (EnumCasePlus, WeakTermPlus)
 interpretClause tree =
   case tree of
     (_, TreeNode [c, e]) -> do
@@ -296,7 +296,7 @@ interpretClause tree =
     e ->
       raiseSyntaxError (fst e) "(TREE TREE)"
 
-interpretEnumCase :: TreePlus -> WithEnv EnumCasePlus
+interpretEnumCase :: TreePlus -> Compiler EnumCasePlus
 interpretEnumCase tree =
   case tree of
     (m, TreeNode [(_, TreeLeaf "enum-introduction"), (_, TreeLeaf l)]) ->
@@ -308,7 +308,7 @@ interpretEnumCase tree =
     (m, _) ->
       raiseSyntaxError m "default | LEAF"
 
-interpretNoeticCaseClause :: WeakTermPlus -> TreePlus -> WithEnv (WeakPattern, WeakTermPlus)
+interpretNoeticCaseClause :: WeakTermPlus -> TreePlus -> Compiler (WeakPattern, WeakTermPlus)
 interpretNoeticCaseClause subject tree =
   case tree of
     (_, TreeNode [c, e]) -> do
@@ -318,7 +318,7 @@ interpretNoeticCaseClause subject tree =
     e ->
       raiseSyntaxError (fst e) "(TREE TREE)"
 
-interpretNoeticCaseBody :: WeakTermPlus -> [(T.Text, T.Text, WeakTermPlus)] -> TreePlus -> WithEnv WeakTermPlus
+interpretNoeticCaseBody :: WeakTermPlus -> [(T.Text, T.Text, WeakTermPlus)] -> TreePlus -> Compiler WeakTermPlus
 interpretNoeticCaseBody subject nameMap body =
   case nameMap of
     [] ->
@@ -334,7 +334,7 @@ interpretNoeticCaseBody subject nameMap body =
             [new']
         )
 
-interpretNoeticPattern :: TreePlus -> WithEnv (WeakPattern, [(T.Text, T.Text, WeakTermPlus)])
+interpretNoeticPattern :: TreePlus -> Compiler (WeakPattern, [(T.Text, T.Text, WeakTermPlus)])
 interpretNoeticPattern tree =
   case tree of
     (_, TreeNode ((_, TreeLeaf patName) : xts)) -> do
@@ -343,7 +343,7 @@ interpretNoeticPattern tree =
     _ ->
       raiseSyntaxError (fst tree) "(LEAF TREE*)"
 
-interpretNoeticWeakIdentPlus :: TreePlus -> WithEnv (WeakIdentPlus, (T.Text, T.Text, WeakTermPlus))
+interpretNoeticWeakIdentPlus :: TreePlus -> Compiler (WeakIdentPlus, (T.Text, T.Text, WeakTermPlus))
 interpretNoeticWeakIdentPlus tree =
   case tree of
     (mLeaf, TreeLeaf x) -> do
@@ -357,7 +357,7 @@ interpretNoeticWeakIdentPlus tree =
     t ->
       raiseSyntaxError (fst t) "(LEAF TREE)"
 
-interpretNoeticLeaf :: T.Text -> WithEnv (T.Text, T.Text)
+interpretNoeticLeaf :: T.Text -> Compiler (T.Text, T.Text)
 interpretNoeticLeaf x =
   case x of
     "_" -> do
@@ -368,7 +368,7 @@ interpretNoeticLeaf x =
       x' <- newText
       return (x', x)
 
-interpretCaseClause :: TreePlus -> WithEnv (WeakPattern, WeakTermPlus)
+interpretCaseClause :: TreePlus -> Compiler (WeakPattern, WeakTermPlus)
 interpretCaseClause tree =
   case tree of
     (_, TreeNode [c, e]) -> do
@@ -378,7 +378,7 @@ interpretCaseClause tree =
     e ->
       raiseSyntaxError (fst e) "(TREE TREE)"
 
-interpretPattern :: TreePlus -> WithEnv WeakPattern
+interpretPattern :: TreePlus -> Compiler WeakPattern
 interpretPattern tree =
   case tree of
     (_, TreeNode ((_, TreeLeaf patName) : xts)) -> do
@@ -395,7 +395,7 @@ readValueInt t x
   | otherwise =
     Nothing
 
-interpretDerangement :: TreePlus -> WithEnv Derangement
+interpretDerangement :: TreePlus -> Compiler Derangement
 interpretDerangement tree =
   case tree of
     (_, TreeLeaf "nop") ->
@@ -423,7 +423,7 @@ interpretDerangement tree =
     _ ->
       raiseSyntaxError (fst tree) "nop | (syscall LEAF) | (exteral LEAF) | (load TREE) | (store TREE) | (create-array TREE) | (create-struct TREE*)"
 
-interpretLowType :: TreePlus -> WithEnv LowType
+interpretLowType :: TreePlus -> Compiler LowType
 interpretLowType tree =
   case tree of
     (_, TreeLeaf s)
@@ -447,7 +447,7 @@ interpretLowType tree =
     _ ->
       raiseSyntaxError (fst tree) "INT_TYPE | FLOAT_TYPE | (pointer TREE) | (array INT TREE) | (struct TREE*)"
 
-checkDerangementArity :: Hint -> Derangement -> [TreePlus] -> WithEnv ()
+checkDerangementArity :: Hint -> Derangement -> [TreePlus] -> Compiler ()
 checkDerangementArity m k args =
   case k of
     DerangementNop
@@ -473,14 +473,14 @@ checkDerangementArity m k args =
     _ ->
       return ()
 
-interpretEnumItem :: Hint -> T.Text -> [TreePlus] -> WithEnv [(T.Text, Int)]
+interpretEnumItem :: Hint -> T.Text -> [TreePlus] -> Compiler [(T.Text, Int)]
 interpretEnumItem m name ts = do
   xis <- interpretEnumItem' name $ reverse ts
   if isLinear (map snd xis)
     then return $ reverse xis
     else raiseError m "found a collision of discriminant"
 
-interpretEnumItem' :: T.Text -> [TreePlus] -> WithEnv [(T.Text, Int)]
+interpretEnumItem' :: T.Text -> [TreePlus] -> Compiler [(T.Text, Int)]
 interpretEnumItem' name treeList =
   case treeList of
     [] ->
@@ -493,7 +493,7 @@ interpretEnumItem' name treeList =
       (s, mj) <- interpretEnumItem'' t
       return $ (name <> nsSep <> s, fromMaybe (1 + headDiscriminantOf ts') mj) : ts'
 
-interpretEnumItem'' :: TreePlus -> WithEnv (T.Text, Maybe Int)
+interpretEnumItem'' :: TreePlus -> Compiler (T.Text, Maybe Int)
 interpretEnumItem'' tree =
   case tree of
     (_, TreeLeaf s) ->

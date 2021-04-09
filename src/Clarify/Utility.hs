@@ -8,7 +8,7 @@ import qualified Data.HashMap.Lazy as Map
 import Data.Namespace
 import qualified Data.Text as T
 
-toApp :: T.Text -> Hint -> Ident -> CompPlus -> WithEnv CompPlus
+toApp :: T.Text -> Hint -> Ident -> CompPlus -> Compiler CompPlus
 toApp switcher m x t = do
   (expVarName, expVar) <- newValueVarLocalWith m "exp"
   return
@@ -26,14 +26,14 @@ toApp switcher m x t = do
 -- toAffineApp meta x t ~>
 --   bind exp := t in
 --   exp @ (0, x)
-toAffineApp :: Hint -> Ident -> CompPlus -> WithEnv CompPlus
+toAffineApp :: Hint -> Ident -> CompPlus -> Compiler CompPlus
 toAffineApp =
   toApp boolFalse
 
 -- toRelevantApp meta x t ~>
 --   bind exp := t in
 --   exp @ (1, x)
-toRelevantApp :: Hint -> Ident -> CompPlus -> WithEnv CompPlus
+toRelevantApp :: Hint -> Ident -> CompPlus -> Compiler CompPlus
 toRelevantApp =
   toApp boolTrue
 
@@ -49,7 +49,7 @@ switch :: CompPlus -> CompPlus -> [(EnumCase, CompPlus)]
 switch e1 e2 =
   [(EnumCaseLabel boolFalse, e1), (EnumCaseDefault, e2)]
 
-tryCache :: Hint -> T.Text -> WithEnv () -> WithEnv ValuePlus
+tryCache :: Hint -> T.Text -> Compiler () -> Compiler ValuePlus
 tryCache m key doInsertion = do
   denv <- gets defEnv
   when (not $ Map.member key denv) doInsertion
@@ -57,9 +57,9 @@ tryCache m key doInsertion = do
 
 makeSwitcher ::
   Hint ->
-  (ValuePlus -> WithEnv CompPlus) ->
-  (ValuePlus -> WithEnv CompPlus) ->
-  WithEnv ([Ident], CompPlus)
+  (ValuePlus -> Compiler CompPlus) ->
+  (ValuePlus -> Compiler CompPlus) ->
+  Compiler ([Ident], CompPlus)
 makeSwitcher m compAff compRel = do
   (switchVarName, switchVar) <- newValueVarLocalWith m "switch"
   (argVarName, argVar) <- newValueVarLocalWith m "arg"
@@ -77,14 +77,14 @@ makeSwitcher m compAff compRel = do
 registerSwitcher ::
   Hint ->
   T.Text ->
-  (ValuePlus -> WithEnv CompPlus) ->
-  (ValuePlus -> WithEnv CompPlus) ->
-  WithEnv ()
+  (ValuePlus -> Compiler CompPlus) ->
+  (ValuePlus -> Compiler CompPlus) ->
+  Compiler ()
 registerSwitcher m name aff rel = do
   (args, e) <- makeSwitcher m aff rel
   insDefEnv name True args e
 
-insDefEnv :: T.Text -> Bool -> [Ident] -> CompPlus -> WithEnv ()
+insDefEnv :: T.Text -> Bool -> [Ident] -> CompPlus -> Compiler ()
 insDefEnv name isReducible args e =
   modify (\env -> env {defEnv = Map.insert name (isReducible, args, e) (defEnv env)})
 

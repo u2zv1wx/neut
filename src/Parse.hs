@@ -17,7 +17,7 @@ import Parse.Discern
 import Parse.Interpret
 import Text.Read (readMaybe)
 
-parse :: [TreePlus] -> WithEnv [WeakStmt]
+parse :: [TreePlus] -> Compiler [WeakStmt]
 parse stmtTreeList =
   case stmtTreeList of
     [] ->
@@ -113,7 +113,7 @@ parse stmtTreeList =
         _ ->
           interpretAux headStmt restStmtList
 
-interpretAux :: TreePlus -> [TreePlus] -> WithEnv [WeakStmt]
+interpretAux :: TreePlus -> [TreePlus] -> Compiler [WeakStmt]
 interpretAux headStmt restStmtList = do
   e <- interpret headStmt >>= discern
   h <- newIdentFromText "_"
@@ -122,13 +122,13 @@ interpretAux headStmt restStmtList = do
   defList <- parse restStmtList
   return $ WeakStmtDef True m (m, h, t) e : defList
 
-parseDef :: Bool -> Hint -> TreePlus -> TreePlus -> WithEnv WeakStmt
+parseDef :: Bool -> Hint -> TreePlus -> TreePlus -> Compiler WeakStmt
 parseDef isReducible m xt e = do
   e' <- interpret e >>= discern
   xt' <- prefixTextPlus xt >>= interpretIdentPlus >>= discernIdentPlus
   return $ WeakStmtDef isReducible m xt' e'
 
-insEnumEnv :: Hint -> T.Text -> [(T.Text, Int)] -> WithEnv ()
+insEnumEnv :: Hint -> T.Text -> [(T.Text, Int)] -> Compiler ()
 insEnumEnv m name xis = do
   eenv <- gets enumEnv
   let definedEnums = Map.keys eenv ++ map fst (concat (Map.elems eenv))
@@ -146,7 +146,7 @@ insEnumEnv m name xis = do
               }
         )
 
-extractLeaf :: TreePlus -> WithEnv T.Text
+extractLeaf :: TreePlus -> Compiler T.Text
 extractLeaf t =
   case t of
     (_, TreeLeaf x) ->

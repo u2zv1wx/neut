@@ -14,12 +14,12 @@ import qualified Data.Text as T
 
 type NameEnv = Map.HashMap T.Text Ident
 
-discernMetaTerm :: MetaTermPlus -> WithEnv MetaTermPlus
+discernMetaTerm :: MetaTermPlus -> Compiler MetaTermPlus
 discernMetaTerm e = do
   nenv <- gets topMetaNameEnv
   discernMetaTerm' nenv e
 
-discernMetaTerm' :: NameEnv -> MetaTermPlus -> WithEnv MetaTermPlus
+discernMetaTerm' :: NameEnv -> MetaTermPlus -> Compiler MetaTermPlus
 discernMetaTerm' nenv term =
   case term of
     (m, MetaTermVar (I (s, _))) ->
@@ -58,7 +58,7 @@ discernBinder ::
   [Ident] ->
   Maybe Ident ->
   MetaTermPlus ->
-  WithEnv ([Ident], Maybe Ident, MetaTermPlus)
+  Compiler ([Ident], Maybe Ident, MetaTermPlus)
 discernBinder nenv binder mf e =
   case binder of
     [] -> do

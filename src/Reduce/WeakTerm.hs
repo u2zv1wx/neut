@@ -12,7 +12,7 @@ import qualified Data.IntMap as IntMap
 import qualified Data.Text as T
 import Data.WeakTerm
 
-reduceWeakTermPlus :: WeakTermPlus -> WithEnv WeakTermPlus
+reduceWeakTermPlus :: WeakTermPlus -> Compiler WeakTermPlus
 reduceWeakTermPlus term =
   case term of
     (m, WeakTermPi xts cod) -> do
@@ -112,7 +112,7 @@ toLamList m ((_, xts), body) =
 substWeakTermPlus ::
   SubstWeakTerm ->
   WeakTermPlus ->
-  WithEnv WeakTermPlus
+  Compiler WeakTermPlus
 substWeakTermPlus sub term =
   case term of
     (_, WeakTermTau) ->
@@ -182,7 +182,7 @@ substWeakTermPlus' ::
   SubstWeakTerm ->
   [WeakIdentPlus] ->
   WeakTermPlus ->
-  WithEnv ([WeakIdentPlus], WeakTermPlus)
+  Compiler ([WeakIdentPlus], WeakTermPlus)
 substWeakTermPlus' sub binder e =
   case binder of
     [] -> do

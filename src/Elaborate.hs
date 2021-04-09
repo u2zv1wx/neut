@@ -20,11 +20,11 @@ import Elaborate.Unify
 import Reduce.Term
 import Reduce.WeakTerm
 
-elaborate :: [WeakStmt] -> WithEnv [Stmt]
+elaborate :: [WeakStmt] -> Compiler [Stmt]
 elaborate ss =
   elaborateStmt' ss
 
-elaborateStmt' :: [WeakStmt] -> WithEnv [Stmt]
+elaborateStmt' :: [WeakStmt] -> Compiler [Stmt]
 elaborateStmt' stmt =
   case stmt of
     [] -> do
@@ -55,7 +55,7 @@ elaborateStmt' stmt =
       cont' <- elaborateStmt' cont
       return $ StmtReduce m e'' : cont'
 
-elaborate' :: WeakTermPlus -> WithEnv TermPlus
+elaborate' :: WeakTermPlus -> Compiler TermPlus
 elaborate' term =
   case term of
     (m, WeakTermTau) ->
@@ -167,12 +167,12 @@ elaborate' term =
         _ -> do
           raiseError (fst t) $ "the type of this term must be a data-type, but its type is:\n" <> toText (weaken t')
 
-elaborateWeakIdentPlus :: WeakIdentPlus -> WithEnv IdentPlus
+elaborateWeakIdentPlus :: WeakIdentPlus -> Compiler IdentPlus
 elaborateWeakIdentPlus (m, x, t) = do
   t' <- elaborate' t
   return (m, x, t')
 
-elaborateKind :: LamKind WeakIdentPlus -> WithEnv (LamKind IdentPlus)
+elaborateKind :: LamKind WeakIdentPlus -> Compiler (LamKind IdentPlus)
 elaborateKind kind =
   case kind of
     LamKindNormal ->
@@ -185,7 +185,7 @@ elaborateKind kind =
     LamKindResourceHandler ->
       return LamKindResourceHandler
 
-checkSwitchExaustiveness :: Hint -> T.Text -> [EnumCase] -> WithEnv ()
+checkSwitchExaustiveness :: Hint -> T.Text -> [EnumCase] -> Compiler ()
 checkSwitchExaustiveness m x caseList = do
   let b = EnumCaseDefault `elem` caseList
   enumSet <- lookupEnumSet m x
@@ -193,7 +193,7 @@ checkSwitchExaustiveness m x caseList = do
   when (not ((toInteger (length enumSet)) <= len || b)) $
     raiseError m "this switch is ill-constructed in that it is not exhaustive"
 
-lookupEnumSet :: Hint -> T.Text -> WithEnv [T.Text]
+lookupEnumSet :: Hint -> T.Text -> Compiler [T.Text]
 lookupEnumSet m name = do
   eenv <- gets enumEnv
   case Map.lookup name eenv of

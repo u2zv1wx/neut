@@ -30,20 +30,20 @@ nsOS :: T.Text
 nsOS =
   "os" <> nsSep
 
-use :: T.Text -> WithEnv ()
+use :: T.Text -> Compiler ()
 use s =
   modify (\e -> e {prefixEnv = s : prefixEnv e})
 
-unuse :: T.Text -> WithEnv ()
+unuse :: T.Text -> Compiler ()
 unuse s =
   modify (\e -> e {prefixEnv = filter (/= s) (prefixEnv e)})
 
-withSectionPrefix :: T.Text -> WithEnv T.Text
+withSectionPrefix :: T.Text -> Compiler T.Text
 withSectionPrefix x = do
   ns <- gets sectionEnv
   return $ foldl (\acc n -> n <> nsSep <> acc) x ns
 
-getCurrentSection :: WithEnv T.Text
+getCurrentSection :: Compiler T.Text
 getCurrentSection = do
   ns <- gets sectionEnv
   return $ getCurrentSection' ns
@@ -58,7 +58,7 @@ getCurrentSection' nameStack =
     (n : ns) ->
       getCurrentSection' ns <> nsSep <> n
 
-prefixTextPlus :: TreePlus -> WithEnv TreePlus
+prefixTextPlus :: TreePlus -> Compiler TreePlus
 prefixTextPlus tree =
   case tree of
     (_, TreeLeaf "_") ->
@@ -74,13 +74,13 @@ prefixTextPlus tree =
     t ->
       raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
 
-handleSection :: T.Text -> WithEnv a -> WithEnv a
+handleSection :: T.Text -> Compiler a -> Compiler a
 handleSection s cont = do
   modify (\e -> e {sectionEnv = s : sectionEnv e})
   getCurrentSection >>= use
   cont
 
-handleEnd :: Hint -> T.Text -> WithEnv a -> WithEnv a
+handleEnd :: Hint -> T.Text -> Compiler a -> Compiler a
 handleEnd m s cont = do
   ns <- gets sectionEnv
   case ns of
@@ -96,7 +96,7 @@ handleEnd m s cont = do
           "the innermost section is not `" <> s <> "`, but is `" <> s' <> "`"
 
 {-# INLINE resolveSymbol #-}
-resolveSymbol :: Hint -> (T.Text -> Maybe b) -> T.Text -> WithEnv (Maybe b)
+resolveSymbol :: Hint -> (T.Text -> Maybe b) -> T.Text -> Compiler (Maybe b)
 resolveSymbol m predicate name = do
   candList <- constructCandList name
   case takeAll predicate candList [] of
@@ -108,7 +108,7 @@ resolveSymbol m predicate name = do
       let candInfo = T.concat $ map (\cand -> "\n- " <> cand) candList'
       raiseError m $ "this `" <> name <> "` is ambiguous since it could refer to:" <> candInfo
 
-constructCandList :: T.Text -> WithEnv [T.Text]
+constructCandList :: T.Text -> Compiler [T.Text]
 constructCandList name = do
   penv <- gets prefixEnv
   nenv <- gets nsEnv

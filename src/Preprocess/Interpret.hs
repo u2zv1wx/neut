@@ -11,7 +11,7 @@ import qualified Data.Text as T
 import Data.Tree
 import Text.Read (readMaybe)
 
-interpretCode :: TreePlus -> WithEnv MetaTermPlus
+interpretCode :: TreePlus -> Compiler MetaTermPlus
 interpretCode tree =
   case tree of
     (m, TreeLeaf atom)
@@ -107,7 +107,7 @@ interpretCode tree =
         leaf : rest ->
           interpretAux m leaf rest
 
-interpretData :: TreePlus -> WithEnv MetaTermPlus
+interpretData :: TreePlus -> Compiler MetaTermPlus
 interpretData tree = do
   case tree of
     (m, TreeLeaf atom) ->
@@ -142,7 +142,7 @@ containsSpliceArg ts =
     _ : rest ->
       containsSpliceArg rest
 
-interpretSpliceArg :: [TreePlus] -> WithEnv [MetaTermPlus]
+interpretSpliceArg :: [TreePlus] -> Compiler [MetaTermPlus]
 interpretSpliceArg ts =
   case ts of
     [] ->
@@ -156,7 +156,7 @@ interpretSpliceArg ts =
       rest' <- interpretSpliceArg rest
       return $ (fst t', MetaTermNode [t']) : rest'
 
-interpretAux :: Hint -> TreePlus -> [TreePlus] -> WithEnv MetaTermPlus
+interpretAux :: Hint -> TreePlus -> [TreePlus] -> Compiler MetaTermPlus
 interpretAux m f args = do
   f' <- interpretCode f
   (xts, args') <- interpretArg args
@@ -164,7 +164,7 @@ interpretAux m f args = do
     then return (m, MetaTermImpElim f' args')
     else return (m, MetaTermImpIntro Nothing xts Nothing (m, MetaTermImpElim f' args'))
 
-interpretArg :: [TreePlus] -> WithEnv ([Ident], [MetaTermPlus])
+interpretArg :: [TreePlus] -> Compiler ([Ident], [MetaTermPlus])
 interpretArg es =
   case es of
     [] ->
@@ -179,12 +179,12 @@ interpretArg es =
           e <- interpretCode tree
           return (xts, e : args)
 
-interpretIdent :: TreePlus -> WithEnv Ident
+interpretIdent :: TreePlus -> Compiler Ident
 interpretIdent tree = do
   x' <- interpretLeafText tree
   return $ asIdent x'
 
-interpretLeafText :: TreePlus -> WithEnv T.Text
+interpretLeafText :: TreePlus -> Compiler T.Text
 interpretLeafText tree =
   case tree of
     (_, TreeLeaf "_") -> do
@@ -203,7 +203,7 @@ condToIfSeq m condBodyList defaultBody =
     (cond, body) : rest -> do
       (m, MetaTermIf cond body (condToIfSeq m rest defaultBody))
 
-interpretCondArgs :: Hint -> [TreePlus] -> WithEnv ([(MetaTermPlus, MetaTermPlus)], MetaTermPlus)
+interpretCondArgs :: Hint -> [TreePlus] -> Compiler ([(MetaTermPlus, MetaTermPlus)], MetaTermPlus)
 interpretCondArgs mCond treeList =
   case treeList of
     [] ->
@@ -219,7 +219,7 @@ interpretCondArgs mCond treeList =
     (m, _) : _ ->
       raiseSyntaxError m "(TREE TREE)"
 
-interpretWith :: TreePlus -> WithEnv MetaTermPlus
+interpretWith :: TreePlus -> Compiler MetaTermPlus
 interpretWith tree =
   case tree of
     (m, TreeNode (with@(_, TreeLeaf "with-meta") : bind : (_, TreeNode ((_, TreeLeaf "let") : xt : es)) : rest)) -> do

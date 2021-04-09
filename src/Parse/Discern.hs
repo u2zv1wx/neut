@@ -15,12 +15,12 @@ import Data.WeakTerm
 
 type NameEnv = Map.HashMap T.Text Ident
 
-discern :: WeakTermPlus -> WithEnv WeakTermPlus
+discern :: WeakTermPlus -> Compiler WeakTermPlus
 discern e = do
   nenv <- gets topNameEnv
   discern' nenv e
 
-discernIdentPlus :: WeakIdentPlus -> WithEnv WeakIdentPlus
+discernIdentPlus :: WeakIdentPlus -> Compiler WeakIdentPlus
 discernIdentPlus (m, x, t) = do
   nenv <- gets topNameEnv
   when (Map.member (asText x) nenv) $
@@ -31,7 +31,7 @@ discernIdentPlus (m, x, t) = do
   return (m, x', t')
 
 -- Alpha-convert all the variables so that different variables have different names.
-discern' :: NameEnv -> WeakTermPlus -> WithEnv WeakTermPlus
+discern' :: NameEnv -> WeakTermPlus -> Compiler WeakTermPlus
 discern' nenv term =
   case term of
     (m, WeakTermTau) ->
@@ -108,7 +108,7 @@ discernBinder ::
   NameEnv ->
   [WeakIdentPlus] ->
   WeakTermPlus ->
-  WithEnv ([WeakIdentPlus], WeakTermPlus)
+  Compiler ([WeakIdentPlus], WeakTermPlus)
 discernBinder nenv binder e =
   case binder of
     [] -> do
@@ -120,7 +120,7 @@ discernBinder nenv binder e =
       (xts', e') <- discernBinder (Map.insert (asText x) x' nenv) xts e
       return ((mx, x', t') : xts', e')
 
-discernEnumCase :: Hint -> EnumCase -> WithEnv EnumCase
+discernEnumCase :: Hint -> EnumCase -> Compiler EnumCase
 discernEnumCase m weakCase =
   case weakCase of
     EnumCaseLabel l -> do

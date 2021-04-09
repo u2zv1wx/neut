@@ -13,7 +13,7 @@ import qualified Data.IntMap as IntMap
 
 type NameEnv = IntMap.IntMap Ident
 
-reduceCompPlus :: CompPlus -> WithEnv CompPlus
+reduceCompPlus :: CompPlus -> Compiler CompPlus
 reduceCompPlus term =
   case term of
     (_, CompPrimitive _) ->
@@ -96,7 +96,7 @@ substValuePlus sub nenv term =
     _ ->
       term
 
-substCompPlus :: SubstValuePlus -> NameEnv -> CompPlus -> WithEnv CompPlus
+substCompPlus :: SubstValuePlus -> NameEnv -> CompPlus -> Compiler CompPlus
 substCompPlus sub nenv term =
   case term of
     (m, CompPrimitive theta) -> do

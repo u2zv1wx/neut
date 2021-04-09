@@ -14,7 +14,7 @@ import Data.Namespace
 import Data.Term
 import qualified Data.Text as T
 
-reduceTermPlus :: TermPlus -> WithEnv TermPlus
+reduceTermPlus :: TermPlus -> Compiler TermPlus
 reduceTermPlus term =
   case term of
     (m, TermPi xts cod) -> do
@@ -108,7 +108,7 @@ toLamList :: Hint -> (Pattern, TermPlus) -> TermPlus
 toLamList m ((_, xts), body) =
   (m, TermPiIntro OpacityTransparent LamKindNormal xts body)
 
-substTermPlus :: SubstTerm -> TermPlus -> WithEnv TermPlus
+substTermPlus :: SubstTerm -> TermPlus -> Compiler TermPlus
 substTermPlus sub term =
   case term of
     (_, TermTau) ->
@@ -166,7 +166,7 @@ substTermPlus' ::
   SubstTerm ->
   [IdentPlus] ->
   TermPlus ->
-  WithEnv ([IdentPlus], TermPlus)
+  Compiler ([IdentPlus], TermPlus)
 substTermPlus' sub binder e =
   case binder of
     [] -> do

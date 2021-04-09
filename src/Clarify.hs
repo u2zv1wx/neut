@@ -24,11 +24,11 @@ import Data.Term
 import qualified Data.Text as T
 import Reduce.Comp
 
-clarify :: [Stmt] -> WithEnv CompPlus
+clarify :: [Stmt] -> Compiler CompPlus
 clarify =
   clarifyStmt IntMap.empty >=> reduceCompPlus
 
-clarifyStmt :: TypeEnv -> [Stmt] -> WithEnv CompPlus
+clarifyStmt :: TypeEnv -> [Stmt] -> Compiler CompPlus
 clarifyStmt tenv ss =
   case ss of
     [] -> do
@@ -44,7 +44,7 @@ clarifyStmt tenv ss =
       cont' <- clarifyStmt tenv cont
       return (m, CompUpElim h e' cont')
 
-clarifyTerm :: TypeEnv -> TermPlus -> WithEnv CompPlus
+clarifyTerm :: TypeEnv -> TermPlus -> Compiler CompPlus
 clarifyTerm tenv term =
   case term of
     (m, TermTau) ->
@@ -128,7 +128,7 @@ clarifyTerm tenv term =
             )
         )
 
-newClosureNames :: Hint -> WithEnv ((Ident, ValuePlus), Ident, (Ident, ValuePlus), (Ident, ValuePlus))
+newClosureNames :: Hint -> Compiler ((Ident, ValuePlus), Ident, (Ident, ValuePlus), (Ident, ValuePlus))
 newClosureNames m = do
   closureVarInfo <- newValueVarLocalWith m "closure"
   typeVarName <- newIdentFromText "exp"
@@ -142,12 +142,12 @@ caseClauseToLambda m pat =
     ((_, xts), body) ->
       (m, TermPiIntro OpacityTransparent LamKindNormal xts body)
 
-constructClauseArguments :: CompPlus -> Int -> Int -> WithEnv [(Ident, CompPlus, ValuePlus)]
+constructClauseArguments :: CompPlus -> Int -> Int -> Compiler [(Ident, CompPlus, ValuePlus)]
 constructClauseArguments cls clsIndex upperBound = do
   (innerClsVarName, innerClsVar) <- newValueVarLocalWith (fst cls) "var"
   constructClauseArguments' (innerClsVarName, cls, innerClsVar) clsIndex 0 upperBound
 
-constructClauseArguments' :: (Ident, CompPlus, ValuePlus) -> Int -> Int -> Int -> WithEnv [(Ident, CompPlus, ValuePlus)]
+constructClauseArguments' :: (Ident, CompPlus, ValuePlus) -> Int -> Int -> Int -> Compiler [(Ident, CompPlus, ValuePlus)]
 constructClauseArguments' clsInfo clsIndex cursor upperBound = do
   if cursor == upperBound
     then return []
@@ -161,18 +161,18 @@ constructClauseArguments' clsInfo clsIndex cursor upperBound = do
           fakeClosure <- makeFakeClosure m
           return $ (argVarName, (m, CompUpIntro fakeClosure), argVar) : rest
 
-makeFakeClosure :: Hint -> WithEnv ValuePlus
+makeFakeClosure :: Hint -> Compiler ValuePlus
 makeFakeClosure m = do
   imm <- immediateS4 m
   return (m, ValueSigmaIntro [imm, (m, ValueInt 64 0), (m, ValueInt 64 0)])
 
-clarifyPlus :: TypeEnv -> TermPlus -> WithEnv (Ident, CompPlus, ValuePlus)
+clarifyPlus :: TypeEnv -> TermPlus -> Compiler (Ident, CompPlus, ValuePlus)
 clarifyPlus tenv e@(m, _) = do
   e' <- clarifyTerm tenv e
   (varName, var) <- newValueVarLocalWith m "var"
   return (varName, e', var)
 
-clarifyBinder :: TypeEnv -> [IdentPlus] -> WithEnv [(Hint, Ident, CompPlus)]
+clarifyBinder :: TypeEnv -> [IdentPlus] -> Compiler [(Hint, Ident, CompPlus)]
 clarifyBinder tenv binder =
   case binder of
     [] ->
@@ -186,7 +186,7 @@ chainFromTermList :: TypeEnv -> [TermPlus] -> [IdentPlus]
 chainFromTermList tenv es =
   nubFreeVariables $ concat $ map (chainOf tenv) es
 
-alignFreeVariables :: TypeEnv -> Hint -> [IdentPlus] -> [CompPlus] -> WithEnv [CompPlus]
+alignFreeVariables :: TypeEnv -> Hint -> [IdentPlus] -> [CompPlus] -> Compiler [CompPlus]
 alignFreeVariables tenv m fvs es = do
   es' <- mapM (returnClosure tenv True LamKindNormal fvs m []) es
   mapM (\cls -> callClosure m cls []) es'
@@ -195,7 +195,7 @@ nubFreeVariables :: [IdentPlus] -> [IdentPlus]
 nubFreeVariables =
   nubBy (\(_, x, _) (_, y, _) -> x == y)
 
-clarifyConst :: TypeEnv -> Hint -> T.Text -> WithEnv CompPlus
+clarifyConst :: TypeEnv -> Hint -> T.Text -> Compiler CompPlus
 clarifyConst tenv m constName
   | Just op <- asPrimOp constName =
     clarifyPrimOp tenv op m
@@ -204,7 +204,7 @@ clarifyConst tenv m constName
   | otherwise = do
     raiseCritical m $ "undefined constant: " <> constName
 
-clarifyPrimOp :: TypeEnv -> PrimOp -> Hint -> WithEnv CompPlus
+clarifyPrimOp :: TypeEnv -> PrimOp -> Hint -> Compiler CompPlus
 clarifyPrimOp tenv op@(PrimOp _ domList _) m = do
   argTypeList <- mapM (lowTypeToType m) domList
   (xs, varList) <- unzip <$> mapM (const (newValueVarLocalWith m "prim")) domList
@@ -219,7 +219,7 @@ returnClosure ::
   Hint -> -- meta of lambda
   [IdentPlus] -> -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
   CompPlus -> -- the `e` in `lam (x1, ..., xn). e`
-  WithEnv CompPlus
+  Compiler CompPlus
 returnClosure tenv isReducible kind fvs m xts e = do
   fvs' <- clarifyBinder tenv fvs
   xts' <- clarifyBinder tenv xts
@@ -264,7 +264,7 @@ registerIfNecessary ::
   [(Ident, CompPlus)] ->
   [(Ident, CompPlus)] ->
   CompPlus ->
-  WithEnv ()
+  Compiler ()
 registerIfNecessary m name isReducible isNoetic xts1 xts2 e = do
   denv <- gets defEnv
   when (not $ name `Map.member` denv) $ do
@@ -277,7 +277,7 @@ registerIfNecessary m name isReducible isNoetic xts1 xts2 e = do
       bodyNoetic <- reduceCompPlus (m, CompSigmaElim True (map fst xts2) envVar e')
       insDefEnv (wrapWithQuote $ name <> ";noetic") isReducible args bodyNoetic
 
-callClosure :: Hint -> CompPlus -> [(Ident, CompPlus, ValuePlus)] -> WithEnv CompPlus
+callClosure :: Hint -> CompPlus -> [(Ident, CompPlus, ValuePlus)] -> Compiler CompPlus
 callClosure m e zexes = do
   let (zs, es', xs) = unzip3 zexes
   ((closureVarName, closureVar), typeVarName, (envVarName, envVar), (lamVarName, lamVar)) <- newClosureNames m

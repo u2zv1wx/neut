@@ -109,11 +109,11 @@ initialEnv =
       nopFreeSet = S.empty
     }
 
-type WithEnv a =
+type Compiler a =
   StateT Env IO a
 
-evalWithEnv :: WithEnv a -> Env -> IO (Either Error a)
-evalWithEnv c env = do
+runCompiler :: Compiler a -> Env -> IO (Either Error a)
+runCompiler c env = do
   resultOrErr <- try $ runStateT c env
   case resultOrErr of
     Left err ->
@@ -126,7 +126,7 @@ evalWithEnv c env = do
 --
 
 {-# INLINE newCount #-}
-newCount :: WithEnv Int
+newCount :: Compiler Int
 newCount = do
   i <- gets count
   modify (\e -> e {count = i + 1})
@@ -135,30 +135,30 @@ newCount = do
     else return i
 
 {-# INLINE newIdentFromText #-}
-newIdentFromText :: T.Text -> WithEnv Ident
+newIdentFromText :: T.Text -> Compiler Ident
 newIdentFromText s = do
   i <- newCount
   return $ I (s, i)
 
 {-# INLINE newIdentFromIdent #-}
-newIdentFromIdent :: Ident -> WithEnv Ident
+newIdentFromIdent :: Ident -> Compiler Ident
 newIdentFromIdent x =
   newIdentFromText (asText x)
 
 {-# INLINE newText #-}
-newText :: WithEnv T.Text
+newText :: Compiler T.Text
 newText = do
   i <- newCount
   return $ ";" <> T.pack (show i)
 
 {-# INLINE newAster #-}
-newAster :: Hint -> WithEnv WeakTermPlus
+newAster :: Hint -> Compiler WeakTermPlus
 newAster m = do
   i <- newCount
   return (m, WeakTermAster i)
 
 {-# INLINE newValueVarLocalWith #-}
-newValueVarLocalWith :: Hint -> T.Text -> WithEnv (Ident, ValuePlus)
+newValueVarLocalWith :: Hint -> T.Text -> Compiler (Ident, ValuePlus)
 newValueVarLocalWith m name = do
   x <- newIdentFromText name
   return (x, (m, ValueVarLocal x))
@@ -167,22 +167,22 @@ newValueVarLocalWith m name = do
 -- obtain information from the environment
 --
 
-getCurrentFilePath :: WithEnv (Path Abs File)
+getCurrentFilePath :: Compiler (Path Abs File)
 getCurrentFilePath = do
   tenv <- gets traceEnv
   return $ head tenv
 
-getCurrentDirPath :: WithEnv (Path Abs Dir)
+getCurrentDirPath :: Compiler (Path Abs Dir)
 getCurrentDirPath =
   parent <$> getCurrentFilePath
 
-getLibraryDirPath :: WithEnv (Path Abs Dir)
+getLibraryDirPath :: Compiler (Path Abs Dir)
 getLibraryDirPath = do
   let ver = showVersion version
   relLibPath <- parseRelDir $ ".local/share/neut/" <> ver <> "/library"
   getDirPath relLibPath
 
-getDirPath :: Path Rel Dir -> WithEnv (Path Abs Dir)
+getDirPath :: Path Rel Dir -> Compiler (Path Abs Dir)
 getDirPath base = do
   homeDirPath <- getHomeDir
   let path = homeDirPath </> base
@@ -193,34 +193,34 @@ getDirPath base = do
 -- output
 --
 
-note :: Hint -> T.Text -> WithEnv ()
+note :: Hint -> T.Text -> Compiler ()
 note m str = do
   b <- gets shouldColorize
   eoe <- gets endOfEntry
   liftIO $ outputLog b eoe $ logNote (getPosInfo m) str
 
-note' :: T.Text -> WithEnv ()
+note' :: T.Text -> Compiler ()
 note' str = do
   b <- gets shouldColorize
   eoe <- gets endOfEntry
   liftIO $ outputLog b eoe $ logNote' str
 
-note'' :: T.Text -> WithEnv ()
+note'' :: T.Text -> Compiler ()
 note'' str = do
   b <- gets shouldColorize
   liftIO $ outputLog' b $ logNote' str
 
-warn :: PosInfo -> T.Text -> WithEnv ()
+warn :: PosInfo -> T.Text -> Compiler ()
 warn pos str = do
   b <- gets shouldColorize
   eoe <- gets endOfEntry
   liftIO $ outputLog b eoe $ logWarning pos str
 
 -- for debug
-p :: String -> WithEnv ()
+p :: String -> Compiler ()
 p s =
   liftIO $ putStrLn s
 
-p' :: (Show a) => a -> WithEnv ()
+p' :: (Show a) => a -> Compiler ()
 p' s =
   liftIO $ putStrLn $ Pr.ppShow s

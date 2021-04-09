@@ -23,7 +23,7 @@ import qualified System.Info as System
 import System.Process hiding (env)
 import Text.Read (readMaybe)
 
-preprocess :: Path Abs File -> WithEnv [TreePlus]
+preprocess :: Path Abs File -> Compiler [TreePlus]
 preprocess mainFilePath = do
   pushTrace mainFilePath
   -- out <- visit mainFilePath
@@ -32,29 +32,29 @@ preprocess mainFilePath = do
   -- _ <- liftIO $ exitWith ExitSuccess
   visit mainFilePath
 
-visit :: Path Abs File -> WithEnv [TreePlus]
+visit :: Path Abs File -> Compiler [TreePlus]
 visit path = do
   pushTrace path
   modify (\env -> env {fileEnv = Map.insert path VisitInfoActive (fileEnv env)})
   content <- liftIO $ TIO.readFile $ toFilePath path
   tokenize content >>= preprocess'
 
-leave :: WithEnv [TreePlus]
+leave :: Compiler [TreePlus]
 leave = do
   path <- getCurrentFilePath
   modify (\env -> env {fileEnv = Map.insert path VisitInfoFinish (fileEnv env)})
   popTrace
   return []
 
-pushTrace :: Path Abs File -> WithEnv ()
+pushTrace :: Path Abs File -> Compiler ()
 pushTrace path =
   modify (\env -> env {traceEnv = path : traceEnv env})
 
-popTrace :: WithEnv ()
+popTrace :: Compiler ()
 popTrace =
   modify (\env -> env {traceEnv = tail (traceEnv env)})
 
-preprocess' :: [TreePlus] -> WithEnv [TreePlus]
+preprocess' :: [TreePlus] -> Compiler [TreePlus]
 preprocess' stmtList = do
   case stmtList of
     [] -> do
@@ -200,13 +200,13 @@ preprocess' stmtList = do
         _ ->
           preprocessAux headStmt restStmtList
 
-preprocessAux :: TreePlus -> [TreePlus] -> WithEnv [TreePlus]
+preprocessAux :: TreePlus -> [TreePlus] -> Compiler [TreePlus]
 preprocessAux headStmt restStmtList = do
   headStmt' <- autoQuote headStmt >>= evaluate >>= specialize
   treeList <- preprocess' restStmtList
   return $ headStmt' : treeList
 
-evaluate :: TreePlus -> WithEnv MetaTermPlus
+evaluate :: TreePlus -> Compiler MetaTermPlus
 evaluate e =
   interpretCode e >>= discernMetaTerm >>= reduceMetaTerm
 
@@ -215,7 +215,7 @@ includeFile ::
   Hint ->
   T.Text ->
   [TreePlus] ->
-  WithEnv [TreePlus]
+  Compiler [TreePlus]
 includeFile m mPath pathString as = do
   ensureEnvSanity m
   path <- readStrOrThrow mPath pathString
@@ -239,7 +239,7 @@ includeFile m mPath pathString as = do
       treeList2 <- preprocess' as
       return $ treeList1 ++ treeList2
 
-readStrOrThrow :: (Read a) => Hint -> T.Text -> WithEnv a
+readStrOrThrow :: (Read a) => Hint -> T.Text -> Compiler a
 readStrOrThrow m quotedStr =
   case readMaybe (T.unpack quotedStr) of
     Nothing ->
@@ -247,7 +247,7 @@ readStrOrThrow m quotedStr =
     Just str ->
       return str
 
-raiseIfFailure :: Hint -> String -> ExitCode -> Handle -> Path Abs Dir -> WithEnv ()
+raiseIfFailure :: Hint -> String -> ExitCode -> Handle -> Path Abs Dir -> Compiler ()
 raiseIfFailure m procName exitCode h pkgDirPath =
   case exitCode of
     ExitSuccess ->
@@ -257,7 +257,7 @@ raiseIfFailure m procName exitCode h pkgDirPath =
       errStr <- liftIO $ hGetContents h
       raiseError m $ T.pack $ "the child process `" ++ procName ++ "` failed with the following message (exitcode = " ++ show i ++ "):\n" ++ errStr
 
-ensureEnvSanity :: Hint -> WithEnv ()
+ensureEnvSanity :: Hint -> Compiler ()
 ensureEnvSanity m = do
   penv <- gets prefixEnv
   if null penv
@@ -284,14 +284,14 @@ showCyclicPath' pathList =
     (path : ps) ->
       "\n  ~> " <> T.pack (toFilePath path) <> showCyclicPath' ps
 
-ensureFileExistence :: Hint -> Path Abs File -> WithEnv ()
+ensureFileExistence :: Hint -> Path Abs File -> Compiler ()
 ensureFileExistence m path = do
   b <- doesFileExist path
   if b
     then return ()
     else raiseError m $ "no such file: " <> T.pack (toFilePath path)
 
-specialize :: MetaTermPlus -> WithEnv TreePlus
+specialize :: MetaTermPlus -> Compiler TreePlus
 specialize term =
   case term of
     (m, MetaTermLeaf x) ->
@@ -303,7 +303,7 @@ specialize term =
       p' term
       raiseError m $ "meta-reduction of this term resulted in a non-quoted term"
 
-preprocessStmtClause :: TreePlus -> WithEnv (T.Text, [TreePlus])
+preprocessStmtClause :: TreePlus -> Compiler (T.Text, [TreePlus])
 preprocessStmtClause tree =
   case tree of
     (_, TreeNode ((_, TreeLeaf x) : stmtList)) ->
@@ -311,7 +311,7 @@ preprocessStmtClause tree =
     (m, _) ->
       raiseSyntaxError m "(LEAF TREE*)"
 
-retrieveCompileTimeVarValue :: Hint -> T.Text -> WithEnv T.Text
+retrieveCompileTimeVarValue :: Hint -> T.Text -> Compiler T.Text
 retrieveCompileTimeVarValue m var =
   case var of
     "OS" ->
@@ -321,12 +321,12 @@ retrieveCompileTimeVarValue m var =
     _ ->
       raiseError m $ "no such compile-time variable defined: " <> var
 
-autoQuote :: TreePlus -> WithEnv TreePlus
+autoQuote :: TreePlus -> Compiler TreePlus
 autoQuote tree = do
   nenv <- gets topMetaNameEnv
   autoQuote' nenv tree
 
-autoQuote' :: Map.HashMap T.Text Ident -> TreePlus -> WithEnv TreePlus
+autoQuote' :: Map.HashMap T.Text Ident -> TreePlus -> Compiler TreePlus
 autoQuote' nenv tree =
   case tree of
     (_, TreeLeaf _) ->
@@ -338,21 +338,21 @@ autoQuote' nenv tree =
       ts'' <- mapM (modifier nenv) ts'
       return (m, TreeNode ts'')
 
-quoteData :: Map.HashMap T.Text Ident -> TreePlus -> WithEnv TreePlus
+quoteData :: Map.HashMap T.Text Ident -> TreePlus -> Compiler TreePlus
 quoteData nenv tree@(m, _) = do
   b <- isSpecialForm nenv tree
   if b
     then return tree
     else return (m, TreeNode [(m, TreeLeaf "quote"), tree])
 
-unquoteCode :: Map.HashMap T.Text Ident -> TreePlus -> WithEnv TreePlus
+unquoteCode :: Map.HashMap T.Text Ident -> TreePlus -> Compiler TreePlus
 unquoteCode nenv tree@(m, _) = do
   b <- isSpecialForm nenv tree
   if b
     then return (m, TreeNode [(m, TreeLeaf "unquote"), tree])
     else return tree
 
-isSpecialForm :: Map.HashMap T.Text Ident -> TreePlus -> WithEnv Bool
+isSpecialForm :: Map.HashMap T.Text Ident -> TreePlus -> Compiler Bool
 isSpecialForm nenv tree = do
   case tree of
     (m, TreeLeaf x) -> do
@@ -367,22 +367,22 @@ isSpecialForm nenv tree = do
     _ ->
       return False
 
-generateLastStmtList :: T.Text -> (Env -> [T.Text]) -> WithEnv [TreePlus]
+generateLastStmtList :: T.Text -> (Env -> [T.Text]) -> Compiler [TreePlus]
 generateLastStmtList atom accessor = do
   path <- getCurrentFilePath
   env <- gets accessor
   let m = newHint 0 0 path
   return $ map (\x -> (m, TreeNode [(m, TreeLeaf atom), (m, TreeLeaf x)])) env
 
-generateUnuseStmtList :: WithEnv [TreePlus]
+generateUnuseStmtList :: Compiler [TreePlus]
 generateUnuseStmtList =
   generateLastStmtList "unuse" prefixEnv
 
-generateEndStmtList :: WithEnv [TreePlus]
+generateEndStmtList :: Compiler [TreePlus]
 generateEndStmtList =
   generateLastStmtList "end" sectionEnv
 
-generateRemovePrefixStmtList :: WithEnv [TreePlus]
+generateRemovePrefixStmtList :: Compiler [TreePlus]
 generateRemovePrefixStmtList = do
   path <- getCurrentFilePath
   let m = newHint 0 0 path
