@@ -1,7 +1,6 @@
 module Reduce.Term
   ( reduceTermPlus,
     substTermPlus,
-    substTermPlus'',
   )
 where
 
@@ -14,8 +13,6 @@ import Data.LowType
 import Data.Namespace
 import Data.Term
 import qualified Data.Text as T
-
-type NameEnv = IntMap.IntMap Ident
 
 reduceTermPlus :: TermPlus -> WithEnv TermPlus
 reduceTermPlus term =
@@ -47,7 +44,7 @@ reduceTermPlus term =
             valueCond -> do
             let xs = map (\(_, x, _) -> asInt x) xts
             let sub = IntMap.fromList $ zip xs es'
-            substTermPlus' sub IntMap.empty (m, snd body) >>= reduceTermPlus
+            substTermPlus sub (m, snd body) >>= reduceTermPlus
         _ ->
           return (m, app)
     (m, TermEnumElim (e, t) les) -> do
@@ -111,89 +108,75 @@ toLamList :: Hint -> (Pattern, TermPlus) -> TermPlus
 toLamList m ((_, xts), body) =
   (m, TermPiIntro OpacityTransparent LamKindNormal xts body)
 
-substTermPlus ::
-  SubstTerm ->
-  TermPlus ->
-  WithEnv TermPlus
+substTermPlus :: SubstTerm -> TermPlus -> WithEnv TermPlus
 substTermPlus sub term =
-  substTermPlus' sub IntMap.empty term
-
-substTermPlus' ::
-  SubstTerm ->
-  NameEnv ->
-  TermPlus ->
-  WithEnv TermPlus
-substTermPlus' sub nenv term =
   case term of
     (_, TermTau) ->
       return term
-    (m, TermVar opacity x)
-      | Just x' <- IntMap.lookup (asInt x) nenv ->
-        return (m, TermVar opacity x')
+    (_, TermVar _ x)
       | Just e <- IntMap.lookup (asInt x) sub ->
         return e
       | otherwise ->
         return term
     (m, TermPi xts t) -> do
-      (xts', t') <- substTermPlus'' sub nenv xts t
+      (xts', t') <- substTermPlus' sub xts t
       return (m, TermPi xts' t')
     (m, TermPiIntro opacity kind xts e) -> do
       case kind of
         LamKindFix xt -> do
-          (xt' : xts', e') <- substTermPlus'' sub nenv (xt : xts) e
+          (xt' : xts', e') <- substTermPlus' sub (xt : xts) e
           return (m, TermPiIntro opacity (LamKindFix xt') xts' e')
         _ -> do
-          (xts', e') <- substTermPlus'' sub nenv xts e
+          (xts', e') <- substTermPlus' sub xts e
           return (m, TermPiIntro opacity kind xts' e')
     (m, TermPiElim e es) -> do
-      e' <- substTermPlus' sub nenv e
-      es' <- mapM (substTermPlus' sub nenv) es
+      e' <- substTermPlus sub e
+      es' <- mapM (substTermPlus sub) es
       return (m, TermPiElim e' es')
     (_, TermConst _) ->
       return term
-    (m, TermInt size x) ->
-      return (m, TermInt size x)
-    (m, TermFloat size x) ->
-      return (m, TermFloat size x)
-    (m, TermEnum x) ->
-      return (m, TermEnum x)
-    (m, TermEnumIntro l) ->
-      return (m, TermEnumIntro l)
+    (_, TermInt {}) ->
+      return term
+    (_, TermFloat {}) ->
+      return term
+    (_, TermEnum _) ->
+      return term
+    (_, TermEnumIntro _) ->
+      return term
     (m, TermEnumElim (e, t) branchList) -> do
-      t' <- substTermPlus' sub nenv t
-      e' <- substTermPlus' sub nenv e
+      t' <- substTermPlus sub t
+      e' <- substTermPlus sub e
       let (caseList, es) = unzip branchList
-      es' <- mapM (substTermPlus' sub nenv) es
+      es' <- mapM (substTermPlus sub) es
       return (m, TermEnumElim (e', t') (zip caseList es'))
     (m, TermDerangement i es) -> do
-      es' <- mapM (substTermPlus' sub nenv) es
+      es' <- mapM (substTermPlus sub) es
       return (m, TermDerangement i es')
     (m, TermCase resultType mSubject (e, t) clauseList) -> do
-      resultType' <- substTermPlus' sub nenv resultType
-      mSubject' <- mapM (substTermPlus' sub nenv) mSubject
-      e' <- substTermPlus' sub nenv e
-      t' <- substTermPlus' sub nenv t
+      resultType' <- substTermPlus sub resultType
+      mSubject' <- mapM (substTermPlus sub) mSubject
+      e' <- substTermPlus sub e
+      t' <- substTermPlus sub t
       clauseList' <- forM clauseList $ \((name, xts), body) -> do
-        (xts', body') <- substTermPlus'' sub nenv xts body
+        (xts', body') <- substTermPlus' sub xts body
         return ((name, xts'), body')
       return (m, TermCase resultType' mSubject' (e', t') clauseList')
 
-substTermPlus'' ::
+substTermPlus' ::
   SubstTerm ->
-  NameEnv ->
   [IdentPlus] ->
   TermPlus ->
   WithEnv ([IdentPlus], TermPlus)
-substTermPlus'' sub nenv binder e =
+substTermPlus' sub binder e =
   case binder of
     [] -> do
-      e' <- substTermPlus' sub nenv e
+      e' <- substTermPlus sub e
       return ([], e')
     ((m, x, t) : xts) -> do
+      t' <- substTermPlus sub t
       x' <- newIdentFromIdent x
-      let nenv' = IntMap.insert (asInt x) x' nenv
-      (xts', e') <- substTermPlus'' sub nenv' xts e
-      t' <- substTermPlus' sub nenv t
+      let sub' = IntMap.insert (asInt x) (m, TermVar VarKindLocal x') sub
+      (xts', e') <- substTermPlus' sub' xts e
       return ((m, x', t') : xts', e')
 
 isValue :: TermPlus -> Bool
