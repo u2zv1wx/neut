@@ -19,22 +19,14 @@ data Stuck
   deriving (Show)
 
 simplify :: [(Constraint, Constraint)] -> WithEnv ()
-simplify cs =
-  case cs of
-    [] ->
-      return ()
-    ((e1, e2), orig) : rest -> do
-      e1' <- reduceWeakTermPlus e1
-      e2' <- reduceWeakTermPlus e2
-      simplify' $ ((e1', e2'), orig) : rest
-
-simplify' :: [(Constraint, Constraint)] -> WithEnv ()
-simplify' constraintList =
+simplify constraintList =
   case constraintList of
     [] ->
       return ()
-    headConstraint@(c, orig) : cs ->
-      case c of
+    headConstraint@(c, orig) : cs -> do
+      expected <- reduceWeakTermPlus $ fst c
+      actual <- reduceWeakTermPlus $ snd c
+      case (expected, actual) of
         ((_, WeakTermTau), (_, WeakTermTau)) ->
           simplify cs
         ((_, WeakTermVar kind1 x1), (_, WeakTermVar kind2 x2))
@@ -158,6 +150,7 @@ simplify' constraintList =
                   modify (\env -> env {suspendedConstraintEnv = Q.insert uc (suspendedConstraintEnv env)})
                   simplify cs
 
+{-# INLINE resolveHole #-}
 resolveHole :: Int -> [[WeakIdentPlus]] -> WeakTermPlus -> [(Constraint, Constraint)] -> WithEnv ()
 resolveHole h1 xss e2' cs = do
   modify (\env -> env {substEnv = IntMap.insert h1 (toPiIntro xss e2') (substEnv env)})
