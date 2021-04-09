@@ -7,7 +7,6 @@ import Control.Exception.Safe
 import Control.Monad.State.Lazy
 import Data.Basic
 import Data.Env
-import qualified Data.IntMap as IntMap
 import Data.Log
 import qualified Data.PQueue.Min as Q
 import qualified Data.Text as T
@@ -15,26 +14,26 @@ import Data.WeakTerm
 import Elaborate.Simplify
 import Reduce.WeakTerm
 
-unify :: WithEnv SubstWeakTerm
+unify :: WithEnv ()
 unify =
-  analyze >>= synthesize
+  analyze >> synthesize
 
-analyze :: WithEnv SubstWeakTerm
+analyze :: WithEnv ()
 analyze = do
   cs <- gets constraintEnv
   modify (\env -> env {constraintEnv = []})
   simplify $ zip cs cs
 
-synthesize :: SubstWeakTerm -> WithEnv SubstWeakTerm
-synthesize sub = do
+synthesize :: WithEnv ()
+synthesize = do
   cs <- gets suspendedConstraintEnv
   case Q.minView cs of
     Nothing ->
-      return sub
+      return ()
     Just ((SuspendedConstraint (_, ConstraintKindDelta, (c, orig))), cs') -> do
-      p "DELTA"
       modify (\env -> env {suspendedConstraintEnv = cs'})
-      simplify [(c, orig)] >>= synthesize
+      simplify [(c, orig)]
+      synthesize
     Just ((SuspendedConstraint (_, ConstraintKindOther, _)), _) ->
       throwTypeErrors
 

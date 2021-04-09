@@ -9,7 +9,6 @@ import Data.Env
 import qualified Data.IntMap as IntMap
 import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
-import qualified Data.Text as T
 import Data.WeakTerm
 import Reduce.WeakTerm
 
@@ -19,21 +18,21 @@ data Stuck
   | StuckPiElimAster Int [[WeakTermPlus]]
   deriving (Show)
 
-simplify :: [(Constraint, Constraint)] -> WithEnv SubstWeakTerm
+simplify :: [(Constraint, Constraint)] -> WithEnv ()
 simplify cs =
   case cs of
     [] ->
-      return IntMap.empty
+      return ()
     ((e1, e2), orig) : rest -> do
       e1' <- reduceWeakTermPlus e1
       e2' <- reduceWeakTermPlus e2
       simplify' $ ((e1', e2'), orig) : rest
 
-simplify' :: [(Constraint, Constraint)] -> WithEnv SubstWeakTerm
+simplify' :: [(Constraint, Constraint)] -> WithEnv ()
 simplify' constraintList =
   case constraintList of
     [] ->
-      return IntMap.empty
+      return ()
     headConstraint@(c, orig) : cs ->
       case c of
         ((_, WeakTermTau), (_, WeakTermTau)) ->
@@ -94,97 +93,79 @@ simplify' constraintList =
           let fmvs1 = asterWeakTermPlus e1
           let fmvs2 = asterWeakTermPlus e2
           let fmvs = S.union fmvs1 fmvs2 -- fmvs: free meta-variables
-          -- case (lookupAny (S.toList fmvs1) sub, lookupAny (S.toList fmvs2) sub) of
-          --   (Just (h1, body1), Just (h2, body2)) -> do
-          --     let s1 = IntMap.singleton h1 body1
-          --     let s2 = IntMap.singleton h2 body2
-          --     e1' <- substWeakTermPlus s1 e1
-          --     e2' <- substWeakTermPlus s2 e2
-          --     simplify $ ((e1', e2'), orig) : cs
-          --   (Just (h1, body1), Nothing) -> do
-          --     let s1 = IntMap.singleton h1 body1
-          --     e1' <- substWeakTermPlus s1 e1
-          --     simplify $ ((e1', e2), orig) : cs
-          --   (Nothing, Just (h2, body2)) -> do
-          --     let s2 = IntMap.singleton h2 body2
-          --     e2' <- substWeakTermPlus s2 e2
-          --     simplify $ ((e1, e2'), orig) : cs
-          --   (Nothing, Nothing) -> do
-          case (asStuckedTerm e1, asStuckedTerm e2) of
-            (Just (StuckPiElimAster h1 ies1), _)
-              | Just xss1 <- mapM asIdentList ies1,
-                Just argSet1 <- toLinearIdentSet xss1,
-                h1 `S.notMember` fmvs2,
-                fvs2 `S.isSubsetOf` argSet1 ->
-                resolveHole h1 xss1 e2 cs
-            (_, Just (StuckPiElimAster h2 ies2))
-              | Just xss2 <- mapM asIdentList ies2,
-                Just argSet2 <- toLinearIdentSet xss2,
-                h2 `S.notMember` fmvs1,
-                fvs1 `S.isSubsetOf` argSet2 ->
-                resolveHole h2 xss2 e1 cs
-            (Just (StuckPiElimVarOpaque x1 mess1), Just (StuckPiElimVarOpaque x2 mess2))
-              | x1 == x2,
-                Just pairList <- asPairList (map snd mess1) (map snd mess2) -> do
-                simplify $ map (\pair -> (pair, orig)) pairList ++ cs
-            (Just (StuckPiElimVar x1 mess1), Just (StuckPiElimVar x2 mess2))
-              | x1 == x2,
-                Just lam <- lookupDefinition x1 sub -> do
-                simplify $ ((toPiElim lam mess1, toPiElim lam mess2), orig) : cs
-            (Just (StuckPiElimVar x1 mess1), Just (StuckPiElimVar x2 mess2))
-              | x1 /= x2,
-                Just lam1 <- lookupDefinition x1 sub,
-                Just lam2 <- lookupDefinition x2 sub -> do
-                if asInt x1 > asInt x2
-                  then simplify $ ((toPiElim lam1 mess1, e2), orig) : cs
-                  else simplify $ ((e1, toPiElim lam2 mess2), orig) : cs
-            (Just (StuckPiElimVar x1 mess1), Just (StuckPiElimAster {}))
-              | Just lam <- lookupDefinition x1 sub -> do
-                let uc = SuspendedConstraint (fmvs, ConstraintKindDelta, ((toPiElim lam mess1, e2), orig))
-                modify (\env -> env {suspendedConstraintEnv = Q.insert uc (suspendedConstraintEnv env)})
-                simplify cs
-            (Just (StuckPiElimAster {}), Just (StuckPiElimVar x2 mess2))
-              | Just lam <- lookupDefinition x2 sub -> do
-                let uc = SuspendedConstraint (fmvs, ConstraintKindDelta, ((e1, toPiElim lam mess2), orig)) -- このdeltaだとsuspendで解決できても結局定義を展開してしまうのでダメそう。
-                modify (\env -> env {suspendedConstraintEnv = Q.insert uc (suspendedConstraintEnv env)})
-                simplify cs
-            (Just (StuckPiElimVar x1 mess1), _)
-              | Just lam <- lookupDefinition x1 sub -> do
-                simplify $ ((toPiElim lam mess1, e2), orig) : cs
-            (_, Just (StuckPiElimVar x2 mess2))
-              | Just lam <- lookupDefinition x2 sub -> do
-                simplify $ ((e1, toPiElim lam mess2), orig) : cs
-            _ -> do
-              let uc = SuspendedConstraint (fmvs, ConstraintKindOther, headConstraint)
-              modify (\env -> env {suspendedConstraintEnv = Q.insert uc (suspendedConstraintEnv env)})
-              simplify cs
+          case (lookupAny (S.toList fmvs1) sub, lookupAny (S.toList fmvs2) sub) of
+            (Just (h1, body1), Just (h2, body2)) -> do
+              let s1 = IntMap.singleton h1 body1
+              let s2 = IntMap.singleton h2 body2
+              e1' <- substWeakTermPlus s1 e1
+              e2' <- substWeakTermPlus s2 e2
+              simplify $ ((e1', e2'), orig) : cs
+            (Just (h1, body1), Nothing) -> do
+              let s1 = IntMap.singleton h1 body1
+              e1' <- substWeakTermPlus s1 e1
+              simplify $ ((e1', e2), orig) : cs
+            (Nothing, Just (h2, body2)) -> do
+              let s2 = IntMap.singleton h2 body2
+              e2' <- substWeakTermPlus s2 e2
+              simplify $ ((e1, e2'), orig) : cs
+            (Nothing, Nothing) -> do
+              case (asStuckedTerm e1, asStuckedTerm e2) of
+                (Just (StuckPiElimAster h1 ies1), _)
+                  | Just xss1 <- mapM asIdentList ies1,
+                    Just argSet1 <- toLinearIdentSet xss1,
+                    h1 `S.notMember` fmvs2,
+                    fvs2 `S.isSubsetOf` argSet1 ->
+                    resolveHole h1 xss1 e2 cs
+                (_, Just (StuckPiElimAster h2 ies2))
+                  | Just xss2 <- mapM asIdentList ies2,
+                    Just argSet2 <- toLinearIdentSet xss2,
+                    h2 `S.notMember` fmvs1,
+                    fvs1 `S.isSubsetOf` argSet2 ->
+                    resolveHole h2 xss2 e1 cs
+                (Just (StuckPiElimVarOpaque x1 mess1), Just (StuckPiElimVarOpaque x2 mess2))
+                  | x1 == x2,
+                    Just pairList <- asPairList (map snd mess1) (map snd mess2) -> do
+                    simplify $ map (\pair -> (pair, orig)) pairList ++ cs
+                (Just (StuckPiElimVar x1 mess1), Just (StuckPiElimVar x2 mess2))
+                  | x1 == x2,
+                    Just lam <- lookupDefinition x1 sub -> do
+                    simplify $ ((toPiElim lam mess1, toPiElim lam mess2), orig) : cs
+                (Just (StuckPiElimVar x1 mess1), Just (StuckPiElimVar x2 mess2))
+                  | x1 /= x2,
+                    Just lam1 <- lookupDefinition x1 sub,
+                    Just lam2 <- lookupDefinition x2 sub -> do
+                    if asInt x1 > asInt x2
+                      then simplify $ ((toPiElim lam1 mess1, e2), orig) : cs
+                      else simplify $ ((e1, toPiElim lam2 mess2), orig) : cs
+                (Just (StuckPiElimVar x1 mess1), Just (StuckPiElimAster {}))
+                  | Just lam <- lookupDefinition x1 sub -> do
+                    let uc = SuspendedConstraint (fmvs, ConstraintKindDelta, ((toPiElim lam mess1, e2), orig))
+                    modify (\env -> env {suspendedConstraintEnv = Q.insert uc (suspendedConstraintEnv env)})
+                    simplify cs
+                (Just (StuckPiElimAster {}), Just (StuckPiElimVar x2 mess2))
+                  | Just lam <- lookupDefinition x2 sub -> do
+                    let uc = SuspendedConstraint (fmvs, ConstraintKindDelta, ((e1, toPiElim lam mess2), orig)) -- このdeltaだとsuspendで解決できても結局定義を展開してしまうのでダメそう。
+                    modify (\env -> env {suspendedConstraintEnv = Q.insert uc (suspendedConstraintEnv env)})
+                    simplify cs
+                (Just (StuckPiElimVar x1 mess1), _)
+                  | Just lam <- lookupDefinition x1 sub -> do
+                    simplify $ ((toPiElim lam mess1, e2), orig) : cs
+                (_, Just (StuckPiElimVar x2 mess2))
+                  | Just lam <- lookupDefinition x2 sub -> do
+                    simplify $ ((e1, toPiElim lam mess2), orig) : cs
+                _ -> do
+                  let uc = SuspendedConstraint (fmvs, ConstraintKindOther, headConstraint)
+                  modify (\env -> env {suspendedConstraintEnv = Q.insert uc (suspendedConstraintEnv env)})
+                  simplify cs
 
-resolveHole :: Int -> [[WeakIdentPlus]] -> WeakTermPlus -> [(Constraint, Constraint)] -> WithEnv SubstWeakTerm
+resolveHole :: Int -> [[WeakIdentPlus]] -> WeakTermPlus -> [(Constraint, Constraint)] -> WithEnv ()
 resolveHole h1 xss e2' cs = do
-  let newSub = IntMap.singleton h1 $ toPiIntro xss e2'
-  -- p $ T.unpack $ "resolve: " <> T.pack (show h1) <> " ~> " <> toText (toPiIntro xss e2')
+  modify (\env -> env {substEnv = IntMap.insert h1 (toPiIntro xss e2') (substEnv env)})
   sus <- gets suspendedConstraintEnv
   let (sus1, sus2) = Q.partition (\(SuspendedConstraint (hs, _, _)) -> S.member h1 hs) sus
   modify (\env -> env {suspendedConstraintEnv = sus2})
   let sus1' = map (\(SuspendedConstraint (_, _, c)) -> c) $ Q.toList sus1
-  sub <- mapM (substConstraint newSub) (sus1' ++ cs) >>= simplify
-  compose sub newSub
-
--- simplify $ sus1' ++ cs
-
--- -- ここで compose (unify rest{h1 := rest}) (h1 ~> lam)みたいにするのか？
--- -- susConからとりだしたsus1 ++ csのほうからもh1 ~> lamをやるべき,という？
--- resolveHole :: Int -> [[WeakIdentPlus]] -> WeakTermPlus -> [(Constraint, Constraint)] -> WithEnv ()
--- resolveHole h1 xss e2' cs = do
---   modify (\env -> env {substEnv = IntMap.insert h1 (toPiIntro xss e2') (substEnv env)})
---   -- p $ T.unpack $ "resolve: " <> T.pack (show h1) <> " ~> " <> toText (toPiIntro xss e2')
---   sus <- gets suspendedConstraintEnv
---   let (sus1, sus2) = Q.partition (\(SuspendedConstraint (hs, _, _)) -> S.member h1 hs) sus
---   modify (\env -> env {suspendedConstraintEnv = sus2})
---   let sus1' = map (\(SuspendedConstraint (_, _, c)) -> c) $ Q.toList sus1
---   -- ここでsus1' ++ csに{h1 := lam}を適用？
---   -- で, 結果をcomposeするの？
---   simplify $ sus1' ++ cs
+  simplify $ sus1' ++ cs
 
 simplifyBinder :: Constraint -> [WeakIdentPlus] -> [WeakIdentPlus] -> WithEnv [(Constraint, Constraint)]
 simplifyBinder orig =
@@ -200,23 +181,6 @@ simplifyBinder' orig sub args1 args2 =
       return $ ((t1, t2'), orig) : rest
     _ ->
       return []
-
--- simplifyBinder :: Constraint -> [WeakIdentPlus] -> [WeakIdentPlus] -> WithEnv [(Constraint, Constraint)]
--- simplifyBinder orig =
---   simplifyBinder' orig IntMap.empty
-
--- simplifyBinder' :: Constraint -> SubstWeakTerm -> [WeakIdentPlus] -> [WeakIdentPlus] -> WithEnv [(Constraint, Constraint)]
--- simplifyBinder' orig sub args1 args2 =
---   case (args1, args2) of
---     ((m1, x1, t1) : xts1, (_, x2, t2) : xts2) -> do
---       t2' <- substWeakTermPlus sub t2
---       -- simplify [((t1, t2'), orig)]
---       let var1 = (m1, WeakTermVar VarKindLocal x1)
---       let sub' = IntMap.insert (asInt x2) var1 sub
---       rest <- simplifyBinder' orig sub' xts1 xts2
---       return $ ((t1, t2'), orig) : rest
---     _ ->
---       return []
 
 asWeakIdentPlus :: Hint -> WeakTermPlus -> WithEnv WeakIdentPlus
 asWeakIdentPlus m t = do
@@ -315,31 +279,19 @@ toLinearIdentSet' xtss acc =
       | otherwise ->
         toLinearIdentSet' (rest1 : rest2) (S.insert x acc)
 
--- lookupAny :: [Int] -> IntMap.IntMap a -> Maybe (Int, a)
--- lookupAny is sub =
---   case is of
---     [] ->
---       Nothing
---     j : js ->
---       case IntMap.lookup j sub of
---         Just v ->
---           Just (j, v)
---         _ ->
---           lookupAny js sub
+lookupAny :: [Int] -> IntMap.IntMap a -> Maybe (Int, a)
+lookupAny is sub =
+  case is of
+    [] ->
+      Nothing
+    j : js ->
+      case IntMap.lookup j sub of
+        Just v ->
+          Just (j, v)
+        _ ->
+          lookupAny js sub
 
 {-# INLINE lookupDefinition #-}
 lookupDefinition :: Ident -> (IntMap.IntMap WeakTermPlus) -> Maybe WeakTermPlus
 lookupDefinition x sub =
   IntMap.lookup (asInt x) sub
-
-substConstraint :: SubstWeakTerm -> (Constraint, Constraint) -> WithEnv (Constraint, Constraint)
-substConstraint sub ((e1, e2), orig) = do
-  e1' <- substWeakTermPlus sub e1
-  e2' <- substWeakTermPlus sub e2
-  return ((e1', e2'), orig)
-
--- subst (compose sub2 sub1) e == subst sub2 (subst sub1 e)
-compose :: SubstWeakTerm -> SubstWeakTerm -> WithEnv SubstWeakTerm
-compose sub2 sub1 = do
-  sub1' <- mapM (substWeakTermPlus sub2) sub1
-  return $ IntMap.union sub1' sub2
