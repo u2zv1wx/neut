@@ -158,7 +158,6 @@ lowerCompPrimitive m codeOp =
         DerangementNop -> do
           (x, v) <- newValueLocal "nop-arg"
           lowerValueLet x (args !! 0) $ LowCompReturn v
-        -- return $ LowCompReturn (LowValueInt 0)
         DerangementSyscall i -> do
           (xs, vs) <- unzip <$> mapM (const $ newValueLocal "sys-call-arg") args
           res <- newIdentFromText "result"
