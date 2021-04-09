@@ -312,16 +312,16 @@ lowerValueLet :: Ident -> ValuePlus -> LowComp -> WithEnv LowComp
 lowerValueLet x lowerValue cont =
   case lowerValue of
     (m, ValueVarGlobal y) -> do
-      cenv <- gets codeEnv
-      lenv <- gets lowCompEnv
-      case Map.lookup y cenv of
+      denv <- gets defEnv
+      lenv <- gets lowDefEnv
+      case Map.lookup y denv of
         Nothing ->
           raiseCritical m $ "no such global label defined: " <> y
-        Just (Definition _ args e)
+        Just (_, args, e)
           | not (Map.member y lenv) -> do
-            insLowCompEnv y args LowCompUnreachable
+            insLowDefEnv y args LowCompUnreachable
             llvm <- lowerComp e
-            insLowCompEnv y args llvm
+            insLowDefEnv y args llvm
             llvmUncastLet x (LowValueVarGlobal y) (toFunPtrType args) cont
           | otherwise ->
             llvmUncastLet x (LowValueVarGlobal y) (toFunPtrType args) cont
@@ -477,9 +477,9 @@ getEnumNum m label = do
     Just (_, i) ->
       return i
 
-insLowCompEnv :: T.Text -> [Ident] -> LowComp -> WithEnv ()
-insLowCompEnv funName args e =
-  modify (\env -> env {lowCompEnv = Map.insert funName (args, e) (lowCompEnv env)})
+insLowDefEnv :: T.Text -> [Ident] -> LowComp -> WithEnv ()
+insLowDefEnv funName args e =
+  modify (\env -> env {lowDefEnv = Map.insert funName (args, e) (lowDefEnv env)})
 
 commConv :: Ident -> LowComp -> LowComp -> WithEnv LowComp
 commConv x llvm cont2 =

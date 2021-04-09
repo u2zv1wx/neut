@@ -36,7 +36,7 @@ clarifyStmt tenv ss =
       return (m, CompUpIntro (m, ValueInt 64 0))
     StmtDef _ _ (mx, x, t) e : cont -> do
       e' <- clarifyTerm tenv e >>= reduceCompPlus
-      insCompEnv (toGlobalVarName x) True [] e' -- implicit S4 box introduction
+      insDefEnv (toGlobalVarName x) True [] e' -- implicit S4 box introduction
       clarifyStmt (insTypeEnv [(mx, x, t)] tenv) cont
     StmtReduce m e : cont -> do
       e' <- clarifyTerm tenv e
@@ -266,7 +266,7 @@ makeClosure isReducible kind mxts2 m mxts1 e = do
       e' <- linearize xts1 e >>= reduceCompPlus
       i <- newCount
       let name = "resource-handler-" <> T.pack (show i)
-      insCompEnv (wrapWithQuote name) isReducible (map fst xts1) e'
+      insDefEnv (wrapWithQuote name) isReducible (map fst xts1) e'
       return (m, ValueVarGlobal (wrapWithQuote name))
 
 registerIfNecessary ::
@@ -279,16 +279,16 @@ registerIfNecessary ::
   CompPlus ->
   WithEnv ()
 registerIfNecessary m name isReducible isNoetic xts1 xts2 e = do
-  cenv <- gets codeEnv
-  when (not $ name `Map.member` cenv) $ do
+  denv <- gets defEnv
+  when (not $ name `Map.member` denv) $ do
     e' <- linearize (xts2 ++ xts1) e
     (envVarName, envVar) <- newValueVarLocalWith m "env"
     let args = map fst xts1 ++ [envVarName]
     body <- reduceCompPlus (m, CompSigmaElim False (map fst xts2) envVar e')
-    insCompEnv (wrapWithQuote name) isReducible args body
+    insDefEnv (wrapWithQuote name) isReducible args body
     when isNoetic $ do
       bodyNoetic <- reduceCompPlus (m, CompSigmaElim True (map fst xts2) envVar e')
-      insCompEnv (wrapWithQuote $ name <> ";noetic") isReducible args bodyNoetic
+      insDefEnv (wrapWithQuote $ name <> ";noetic") isReducible args bodyNoetic
 
 callClosure :: Hint -> CompPlus -> [(Ident, CompPlus, ValuePlus)] -> WithEnv CompPlus
 callClosure m e zexes = do

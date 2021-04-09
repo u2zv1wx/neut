@@ -29,9 +29,9 @@ data Primitive
   | PrimitiveDerangement Derangement [ValuePlus]
   deriving (Show)
 
-data Definition
-  = Definition IsReducible [Ident] CompPlus
-  deriving (Show)
+-- data Definition
+--   = Definition IsReducible [Ident] CompPlus
+--   deriving (Show)
 
 type ValuePlus =
   (Hint, Value)

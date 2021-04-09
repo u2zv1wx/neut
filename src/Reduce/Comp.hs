@@ -19,10 +19,10 @@ reduceCompPlus term =
     (m, CompPrimitive c) ->
       return (m, CompPrimitive c)
     (m, CompPiElimDownElim v ds) -> do
-      cenv <- gets codeEnv
+      denv <- gets defEnv
       case v of
         (_, ValueVarGlobal x)
-          | Just (Definition isReducible xs body) <- Map.lookup x cenv,
+          | Just (isReducible, xs, body) <- Map.lookup x denv,
             isReducible,
             length xs == length ds -> do
             let sub = IntMap.fromList (zip (map asInt xs) ds)

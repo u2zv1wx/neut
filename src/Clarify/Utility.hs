@@ -51,8 +51,8 @@ switch e1 e2 =
 
 tryCache :: Hint -> T.Text -> WithEnv () -> WithEnv ValuePlus
 tryCache m key doInsertion = do
-  cenv <- gets codeEnv
-  when (not $ Map.member key cenv) doInsertion
+  denv <- gets defEnv
+  when (not $ Map.member key denv) doInsertion
   return (m, ValueVarGlobal key)
 
 makeSwitcher ::
@@ -82,11 +82,11 @@ registerSwitcher ::
   WithEnv ()
 registerSwitcher m name aff rel = do
   (args, e) <- makeSwitcher m aff rel
-  insCompEnv name True args e
+  insDefEnv name True args e
 
-insCompEnv :: T.Text -> Bool -> [Ident] -> CompPlus -> WithEnv ()
-insCompEnv name isReducible args e =
-  modify (\env -> env {codeEnv = Map.insert name (Definition isReducible args e) (codeEnv env)})
+insDefEnv :: T.Text -> Bool -> [Ident] -> CompPlus -> WithEnv ()
+insDefEnv name isReducible args e =
+  modify (\env -> env {defEnv = Map.insert name (isReducible, args, e) (defEnv env)})
 
 {-# INLINE boolTrue #-}
 boolTrue :: T.Text

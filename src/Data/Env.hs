@@ -64,11 +64,11 @@ data Env = Env
     --
     -- clarify
     --
-    codeEnv :: Map.HashMap T.Text Definition,
+    defEnv :: Map.HashMap T.Text (IsReducible, [Ident], CompPlus),
     --
     -- LLVM
     --
-    lowCompEnv :: Map.HashMap T.Text ([Ident], LowComp),
+    lowDefEnv :: Map.HashMap T.Text ([Ident], LowComp),
     declEnv :: Map.HashMap T.Text ([LowType], LowType),
     nopFreeSet :: S.Set Int
   }
@@ -95,8 +95,8 @@ initialEnv =
       sectionEnv = [],
       weakTypeEnv = IntMap.empty,
       constTypeEnv = Map.empty,
-      codeEnv = Map.empty,
-      lowCompEnv = Map.empty,
+      defEnv = Map.empty,
+      lowDefEnv = Map.empty,
       declEnv =
         Map.fromList
           [ ("malloc", ([voidPtr], voidPtr)),

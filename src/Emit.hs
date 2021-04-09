@@ -25,7 +25,7 @@ emit mainTerm = do
   g <- emitDeclarations
   mainTerm' <- reduceLowComp IntMap.empty Map.empty mainTerm
   zs <- emitDefinition "i64" "main" [] mainTerm'
-  lenv <- gets lowCompEnv
+  lenv <- gets lowDefEnv
   xs <-
     forM (HashMap.toList lenv) $ \(name, (args, body)) -> do
       let args' = map (showLowValue . LowValueVarLocal) args
