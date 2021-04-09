@@ -51,7 +51,7 @@ data VarKind
   = VarKindLocal
   | VarKindGlobalOpaque
   | VarKindGlobalTransparent
-  deriving (Show)
+  deriving (Show, Eq)
 
 data LamKind a
   = LamKindNormal

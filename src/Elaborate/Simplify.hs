@@ -7,7 +7,6 @@ import Control.Monad.State.Lazy
 import Data.Basic
 import Data.Env
 import qualified Data.IntMap as IntMap
-import Data.Maybe (catMaybes)
 import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
 import Data.WeakTerm
@@ -27,10 +26,7 @@ simplify cs =
     ((e1, e2), orig) : rest -> do
       e1' <- reduceWeakTermPlus e1
       e2' <- reduceWeakTermPlus e2
-      b <- isEq e1' e2'
-      if b
-        then simplify rest
-        else simplify' $ ((e1', e2'), orig) : rest
+      simplify' $ ((e1', e2'), orig) : rest
 
 simplify' :: [(Constraint, Constraint)] -> WithEnv ()
 simplify' constraintList =
@@ -39,6 +35,12 @@ simplify' constraintList =
       return ()
     headConstraint@(c, orig) : cs ->
       case c of
+        ((_, WeakTermTau), (_, WeakTermTau)) ->
+          simplify cs
+        ((_, WeakTermVar kind1 x1), (_, WeakTermVar kind2 x2))
+          | kind1 == kind2,
+            x1 == x2 ->
+            simplify cs
         ((m1, WeakTermPi xts1 cod1), (m2, WeakTermPi xts2 cod2))
           | length xts1 == length xts2 -> do
             xt1 <- asWeakIdentPlus m1 cod1
@@ -60,12 +62,24 @@ simplify' constraintList =
             xt2 <- asWeakIdentPlus m2 e2
             simplifyBinder orig (xts1 ++ [xt1]) (xts2 ++ [xt2])
             simplify cs
+        ((_, WeakTermAster h1), (_, WeakTermAster h2))
+          | h1 == h2 ->
+            simplify cs
+        ((_, WeakTermConst a1), (_, WeakTermConst a2))
+          | a1 == a2 ->
+            simplify cs
         ((_, WeakTermInt t1 l1), (_, WeakTermInt t2 l2))
           | l1 == l2 ->
             simplify $ ((t1, t2), orig) : cs
         ((_, WeakTermFloat t1 l1), (_, WeakTermFloat t2 l2))
           | l1 == l2 ->
             simplify $ ((t1, t2), orig) : cs
+        ((_, WeakTermEnum a1), (_, WeakTermEnum a2))
+          | a1 == a2 ->
+            simplify cs
+        ((_, WeakTermEnumIntro a1), (_, WeakTermEnumIntro a2))
+          | a1 == a2 ->
+            simplify cs
         ((_, WeakTermQuestion e1 t1), (_, WeakTermQuestion e2 t2)) ->
           simplify $ ((e1, e2), orig) : ((t1, t2), orig) : cs
         ((_, WeakTermDerangement i1 es1), (_, WeakTermDerangement i2 es2))
@@ -283,73 +297,3 @@ lookupAny is sub =
 lookupDefinition :: Ident -> (IntMap.IntMap WeakTermPlus) -> Maybe WeakTermPlus
 lookupDefinition x sub =
   IntMap.lookup (asInt x) sub
-
--- term equality up to alpha-equivalence
-isEq :: WeakTermPlus -> WeakTermPlus -> WithEnv Bool
-isEq l r =
-  case (l, r) of
-    ((_, WeakTermTau), (_, WeakTermTau)) ->
-      return True
-    ((_, WeakTermVar _ x1), (_, WeakTermVar _ x2)) ->
-      return $ x1 == x2
-    ((_, WeakTermPi xts1 cod1), (_, WeakTermPi xts2 cod2)) -> do
-      isEq' xts1 cod1 xts2 cod2
-    ((_, WeakTermPiIntro _ kind1 xts1 e1), (_, WeakTermPiIntro _ kind2 xts2 e2)) ->
-      isEq' (catMaybes [fromLamKind kind1] ++ xts1) e1 (catMaybes [fromLamKind kind2] ++ xts2) e2
-    ((_, WeakTermPiElim e1 es1), (_, WeakTermPiElim e2 es2)) -> do
-      b1 <- isEq e1 e2
-      b2 <- and <$> zipWithM isEq es1 es2
-      return $ b1 && b2
-    ((_, WeakTermAster h1), (_, WeakTermAster h2)) ->
-      return $ h1 == h2
-    ((_, WeakTermConst a1), (_, WeakTermConst a2)) ->
-      return $ a1 == a2
-    ((_, WeakTermInt t1 i1), (_, WeakTermInt t2 i2)) -> do
-      b <- isEq t1 t2
-      return $ b && i1 == i2
-    ((_, WeakTermFloat t1 f1), (_, WeakTermFloat t2 f2)) -> do
-      b <- isEq t1 t2
-      return $ b && f1 == f2
-    ((_, WeakTermEnum a1), (_, WeakTermEnum a2)) ->
-      return $ a1 == a2
-    ((_, WeakTermEnumIntro a1), (_, WeakTermEnumIntro a2)) ->
-      return $ a1 == a2
-    ((_, WeakTermEnumElim (e1, t1) caseList1), (_, WeakTermEnumElim (e2, t2) caseList2))
-      | length caseList1 == length caseList2 -> do
-        b1 <- isEq e1 e2
-        b2 <- isEq t1 t2
-        let (cs1, es1) = unzip caseList1
-        let (cs2, es2) = unzip caseList2
-        let b3 = map snd cs1 == map snd cs2
-        b4 <- and <$> zipWithM isEq es1 es2
-        return $ b1 && b2 && b3 && b4
-    ((_, WeakTermQuestion e1 t1), (_, WeakTermQuestion e2 t2)) -> do
-      b1 <- isEq e1 e2
-      b2 <- isEq t1 t2
-      return $ b1 && b2
-    ((_, WeakTermDerangement d1 es1), (_, WeakTermDerangement d2 es2))
-      | length es1 == length es2 -> do
-        let b1 = d1 == d2
-        b2 <- and <$> zipWithM isEq es1 es2
-        return $ b1 && b2
-    _ ->
-      return False
-
-isEq' :: [WeakIdentPlus] -> WeakTermPlus -> [WeakIdentPlus] -> WeakTermPlus -> WithEnv Bool
-isEq' =
-  isEq'' IntMap.empty
-
-isEq'' :: SubstWeakTerm -> [WeakIdentPlus] -> WeakTermPlus -> [WeakIdentPlus] -> WeakTermPlus -> WithEnv Bool
-isEq'' sub xts1 cod1 xts2 cod2 =
-  case (xts1, xts2) of
-    ([], []) -> do
-      cod2' <- substWeakTermPlus sub cod2
-      isEq cod1 cod2'
-    (((m1, x1, t1) : rest1), ((_, x2, t2) : rest2)) -> do
-      t2' <- substWeakTermPlus sub t2
-      b1 <- isEq t1 t2'
-      let sub' = IntMap.insert (asInt x2) (m1, WeakTermVar VarKindLocal x1) sub
-      b2 <- isEq'' sub' rest1 cod1 rest2 cod2
-      return $ b1 && b2
-    _ ->
-      return False
