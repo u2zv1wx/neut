@@ -96,16 +96,15 @@ handleEnd m s cont = do
           "the innermost section is not `" <> s <> "`, but is `" <> s' <> "`"
 
 {-# INLINE resolveSymbol #-}
-resolveSymbol :: Hint -> (T.Text -> WithEnv (Maybe b)) -> T.Text -> WithEnv (Maybe b)
+resolveSymbol :: Hint -> (T.Text -> Maybe b) -> T.Text -> WithEnv (Maybe b)
 resolveSymbol m predicate name = do
   candList <- constructCandList name
-  candList' <- takeAll predicate candList []
-  case candList' of
+  case takeAll predicate candList [] of
     [] ->
       return Nothing
     [prefixedName] ->
-      predicate prefixedName
-    _ -> do
+      return $ predicate prefixedName
+    candList' -> do
       let candInfo = T.concat $ map (\cand -> "\n- " <> cand) candList'
       raiseError m $ "this `" <> name <> "` is ambiguous since it could refer to:" <> candInfo
 
@@ -137,61 +136,44 @@ findNext nenv name = do
           Nothing ->
             return []
 
-takeAll :: (T.Text -> WithEnv (Maybe b)) -> [T.Text] -> [T.Text] -> WithEnv [T.Text]
+takeAll :: (T.Text -> Maybe b) -> [T.Text] -> [T.Text] -> [T.Text]
 takeAll predicate candidateList acc =
   case candidateList of
     [] ->
-      return acc
+      acc
     x : xs -> do
-      mv <- predicate x
-      case mv of
+      case predicate x of
         Just _ ->
           takeAll predicate xs (x : acc)
         Nothing ->
           takeAll predicate xs acc
 
 {-# INLINE asVar #-}
-asVar :: Hint -> Map.HashMap T.Text Ident -> T.Text -> (Ident -> a) -> WithEnv (Maybe (Hint, a))
+asVar :: Hint -> Map.HashMap T.Text Ident -> T.Text -> (Ident -> a) -> Maybe (Hint, a)
 asVar m nenv var f =
-  return $ Map.lookup var nenv >>= \x -> return (m, f x)
+  Map.lookup var nenv >>= \x -> return (m, f x)
 
 {-# INLINE asMetaVar #-}
-asMetaVar :: Hint -> Map.HashMap T.Text Ident -> T.Text -> WithEnv (Maybe MetaTermPlus)
+asMetaVar :: Hint -> Map.HashMap T.Text Ident -> T.Text -> Maybe MetaTermPlus
 asMetaVar m nenv var =
   asVar m nenv var MetaTermVar
 
 {-# INLINE asWeakVar #-}
-asWeakVar :: Hint -> Map.HashMap T.Text Ident -> T.Text -> WithEnv (Maybe WeakTermPlus)
+asWeakVar :: Hint -> Map.HashMap T.Text Ident -> T.Text -> Maybe WeakTermPlus
 asWeakVar m nenv var =
   asVar m nenv var (WeakTermVar VarKindLocal)
 
 {-# INLINE asItself #-}
-asItself :: Hint -> Map.HashMap T.Text Ident -> T.Text -> WithEnv (Maybe (Hint, Ident))
+asItself :: Hint -> Map.HashMap T.Text Ident -> T.Text -> Maybe (Hint, Ident)
 asItself m nenv var =
   asVar m nenv var id
 
 {-# INLINE findThenModify #-}
-findThenModify :: (Env -> Map.HashMap T.Text t) -> T.Text -> (T.Text -> a) -> WithEnv (Maybe a)
-findThenModify info name f = do
-  env <- gets info
+findThenModify :: Map.HashMap T.Text t -> (T.Text -> a) -> T.Text -> Maybe a
+findThenModify env f name = do
   if name `Map.member` env
-    then return $ Just $ f name
-    else return Nothing
-
-{-# INLINE asWeakEnumValue #-}
-asWeakEnumValue :: Hint -> T.Text -> WithEnv (Maybe WeakTermPlus)
-asWeakEnumValue m name = do
-  findThenModify revEnumEnv name (\x -> (m, WeakTermEnumIntro x))
-
-{-# INLINE asWeakEnumType #-}
-asWeakEnumType :: Hint -> T.Text -> WithEnv (Maybe WeakTermPlus)
-asWeakEnumType m name = do
-  findThenModify enumEnv name (\x -> (m, WeakTermEnum x))
-
-{-# INLINE asEnumCase #-}
-asEnumCase :: T.Text -> WithEnv (Maybe EnumCase)
-asEnumCase name =
-  findThenModify revEnumEnv name EnumCaseLabel
+    then Just $ f name
+    else Nothing
 
 {-# INLINE asMetaConstant #-}
 asMetaConstant :: Hint -> T.Text -> Maybe MetaTermPlus
@@ -201,16 +183,16 @@ asMetaConstant m name =
     else Nothing
 
 {-# INLINE asWeakConstant #-}
-asWeakConstant :: Hint -> T.Text -> WithEnv (Maybe WeakTermPlus)
+asWeakConstant :: Hint -> T.Text -> Maybe WeakTermPlus
 asWeakConstant m name
   | Just (LowTypeInt _) <- asLowTypeMaybe name =
-    return $ Just (m, WeakTermConst name)
+    Just (m, WeakTermConst name)
   | Just (LowTypeFloat _) <- asLowTypeMaybe name =
-    return $ Just (m, WeakTermConst name)
+    Just (m, WeakTermConst name)
   | Just _ <- asPrimOp name =
-    return $ Just (m, WeakTermConst name)
+    Just (m, WeakTermConst name)
   | otherwise = do
-    return Nothing
+    Nothing
 
 tryCand :: (Monad m) => m (Maybe a) -> m a -> m a
 tryCand comp cont = do
