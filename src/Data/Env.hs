@@ -22,6 +22,9 @@ import Paths_neut (version)
 import System.Directory (createDirectoryIfMissing)
 import qualified Text.Show.Pretty as Pr
 
+type Compiler a =
+  StateT Env IO a
+
 data VisitInfo
   = VisitInfoActive
   | VisitInfoFinish
@@ -108,9 +111,6 @@ initialEnv =
       opaqueEnv = S.empty,
       nopFreeSet = S.empty
     }
-
-type Compiler a =
-  StateT Env IO a
 
 runCompiler :: Compiler a -> Env -> IO (Either Error a)
 runCompiler c env = do

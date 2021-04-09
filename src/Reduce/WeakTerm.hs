@@ -109,10 +109,7 @@ toLamList :: Hint -> (WeakPattern, WeakTermPlus) -> WeakTermPlus
 toLamList m ((_, xts), body) =
   (m, WeakTermPiIntro OpacityTransparent LamKindNormal xts body)
 
-substWeakTermPlus ::
-  SubstWeakTerm ->
-  WeakTermPlus ->
-  Compiler WeakTermPlus
+substWeakTermPlus :: SubstWeakTerm -> WeakTermPlus -> Compiler WeakTermPlus
 substWeakTermPlus sub term =
   case term of
     (_, WeakTermTau) ->
