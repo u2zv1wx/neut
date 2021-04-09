@@ -1,7 +1,6 @@
 module Parse.Discern
   ( discern,
     discernIdentPlus,
-    discernDef,
   )
 where
 
@@ -30,12 +29,6 @@ discernIdentPlus (m, x, t) = do
   x' <- newIdentFromIdent x
   modify (\env -> env {topNameEnv = Map.insert (asText x) x' nenv})
   return (m, x', t')
-
-discernDef :: Def -> WithEnv Def
-discernDef (m, xt, xts, e) = do
-  nenv <- gets topNameEnv
-  (xt' : xts', e') <- discernBinder nenv (xt : xts) e
-  return (m, xt', xts', e')
 
 -- Alpha-convert all the variables so that different variables have different names.
 discern' :: NameEnv -> WeakTermPlus -> WithEnv WeakTermPlus
