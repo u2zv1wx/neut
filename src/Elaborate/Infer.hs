@@ -106,7 +106,6 @@ infer' ctx term =
           let (cs, es) = unzip ces
           (cs', tcs) <- unzip <$> mapM (inferEnumCase ctx) cs
           forM_ (zip tcs (repeat t')) $ uncurry insConstraintEnv
-          -- forM_ (zip (repeat t') tcs) $ uncurry insConstraintEnv
           (es', ts) <- unzip <$> mapM (infer' ctx) es
           forM_ (zip (repeat (head ts)) (tail ts)) $ uncurry insConstraintEnv
           return ((m, WeakTermEnumElim (e', t') $ zip cs' es'), head ts)
@@ -240,7 +239,6 @@ newAsterInCtx :: Context -> Hint -> WithEnv (WeakTermPlus, WeakTermPlus)
 newAsterInCtx ctx m = do
   higherAster <- newAster m
   let varSeq = map (\(mx, x, _) -> (mx, WeakTermVar VarKindLocal x)) ctx
-  -- let varSeq = map (\(_, x, _) -> (m, WeakTermVar x)) ctx
   let higherApp = (m, WeakTermPiElim higherAster varSeq)
   aster <- newAster m
   let app = (m, WeakTermPiElim aster varSeq)
