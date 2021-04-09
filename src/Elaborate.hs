@@ -30,6 +30,7 @@ elaborateStmt' stmt =
     [] -> do
       return []
     WeakStmtDef isReducible m (mx, x, t) e : cont -> do
+      -- p "------------------------"
       (e', te) <- infer e
       t' <- inferType t
       insConstraintEnv te t'
@@ -39,21 +40,35 @@ elaborateStmt' stmt =
       --   p $ T.unpack $ toText e1
       --   p $ T.unpack $ toText e2
       --   p "---------------------"
-      unify
-      e'' <- elaborate' e' >>= reduceTermPlus
-      t'' <- elaborate' t' >>= reduceTermPlus
+      sub <- unify
+      e'' <- substWeakTermPlus sub e' >>= elaborate' >>= reduceTermPlus
+      t'' <- substWeakTermPlus sub t' >>= elaborate' >>= reduceTermPlus
       insWeakTypeEnv x $ weaken t''
       modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e'') (substEnv env)})
       when (not isReducible) $ modify (\env -> env {opaqueEnv = S.insert x (opaqueEnv env)})
       cont' <- elaborateStmt' cont
       return $ StmtDef isReducible m (mx, x, t'') e'' : cont'
+    -- e'' <- elaborate' e' >>= reduceTermPlus
+    -- t'' <- elaborate' t' >>= reduceTermPlus
+    -- insWeakTypeEnv x $ weaken t''
+    -- modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e'') (substEnv env)})
+    -- when (not isReducible) $ modify (\env -> env {opaqueEnv = S.insert x (opaqueEnv env)})
+    -- cont' <- elaborateStmt' cont
+    -- return $ StmtDef isReducible m (mx, x, t'') e'' : cont'
     WeakStmtReduce m e : cont -> do
       (e', te) <- infer e
       insConstraintEnv te (m, WeakTermEnum "top")
-      unify
-      e'' <- elaborate' e' >>= reduceTermPlus
+      sub <- unify
+      e'' <- substWeakTermPlus sub e' >>= elaborate' >>= reduceTermPlus
       cont' <- elaborateStmt' cont
       return $ StmtReduce m e'' : cont'
+
+-- (e', te) <- infer e
+-- insConstraintEnv te (m, WeakTermEnum "top")
+-- unify
+-- e'' <- elaborate' e' >>= reduceTermPlus
+-- cont' <- elaborateStmt' cont
+-- return $ StmtReduce m e'' : cont'
 
 elaborate' :: WeakTermPlus -> WithEnv TermPlus
 elaborate' term =
