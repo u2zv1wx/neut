@@ -34,7 +34,7 @@ discernIdentPlus (m, x, t) = do
 discernDef :: Def -> WithEnv Def
 discernDef (m, xt, xts, e) = do
   nenv <- gets topNameEnv
-  (xt', xts', e') <- discernFix nenv xt xts e
+  (xt' : xts', e') <- discernBinder nenv (xt : xts) e
   return (m, xt', xts', e')
 
 -- Alpha-convert all the variables so that different variables have different names.
@@ -57,7 +57,7 @@ discern' nenv term =
     (m, WeakTermPiIntro opacity kind xts e) -> do
       case kind of
         LamKindFix xt -> do
-          (xt', xts', e') <- discernFix nenv xt xts e
+          (xt' : xts', e') <- discernBinder nenv (xt : xts) e
           return (m, WeakTermPiIntro opacity (LamKindFix xt') xts' e')
         _ -> do
           (xts', e') <- discernBinder nenv xts e
@@ -126,16 +126,6 @@ discernBinder nenv binder e =
       x' <- newIdentFromIdent x
       (xts', e') <- discernBinder (Map.insert (asText x) x' nenv) xts e
       return ((mx, x', t') : xts', e')
-
-discernFix ::
-  NameEnv ->
-  WeakIdentPlus ->
-  [WeakIdentPlus] ->
-  WeakTermPlus ->
-  WithEnv (WeakIdentPlus, [WeakIdentPlus], WeakTermPlus)
-discernFix nenv self binder e = do
-  (binder', e') <- discernBinder nenv (self : binder) e
-  return (head binder', tail binder', e')
 
 discernEnumCase :: Hint -> EnumCase -> WithEnv EnumCase
 discernEnumCase m weakCase =
