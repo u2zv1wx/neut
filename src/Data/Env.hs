@@ -58,7 +58,8 @@ data Env = Env
     constTypeEnv :: Map.HashMap T.Text TermPlus,
     holeEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus),
     constraintEnv :: [Constraint],
-    suspendedConstraintEnv :: SusConQueue,
+    -- suspendedConstraintEnv :: SusConQueue,
+    suspendedConstraintEnv :: SuspendedConstraintQueue,
     substEnv :: IntMap.IntMap WeakTermPlus,
     opaqueEnv :: S.Set Ident,
     --

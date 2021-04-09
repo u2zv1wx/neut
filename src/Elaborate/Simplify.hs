@@ -37,7 +37,7 @@ simplify' constraintList =
   case constraintList of
     [] ->
       return ()
-    (c, orig) : cs ->
+    headConstraint@(c, orig) : cs ->
       case c of
         ((m1, WeakTermPi xts1 cod1), (m2, WeakTermPi xts2 cod2))
           | length xts1 == length xts2 -> do
@@ -125,13 +125,13 @@ simplify' constraintList =
                       else simplify $ ((e1, toPiElim lam2 mess2), orig) : cs
                 (Just (StuckPiElimVar x1 mess1), Just (StuckPiElimAster {}))
                   | Just lam <- lookupDefinition x1 sub -> do
-                    let susCon = SusCon (fmvs, ((e1, e2), orig), ConDelta (toPiElim lam mess1, e2))
-                    modify (\env -> env {suspendedConstraintEnv = Q.insert susCon (suspendedConstraintEnv env)})
+                    let uc = SuspendedConstraint (fmvs, ConstraintKindDelta, ((toPiElim lam mess1, e2), orig))
+                    modify (\env -> env {suspendedConstraintEnv = Q.insert uc (suspendedConstraintEnv env)})
                     simplify cs
                 (Just (StuckPiElimAster {}), Just (StuckPiElimVar x2 mess2))
                   | Just lam <- lookupDefinition x2 sub -> do
-                    let susCon = SusCon (fmvs, ((e1, e2), orig), ConDelta (e1, toPiElim lam mess2))
-                    modify (\env -> env {suspendedConstraintEnv = Q.insert susCon (suspendedConstraintEnv env)})
+                    let uc = SuspendedConstraint (fmvs, ConstraintKindDelta, ((e1, toPiElim lam mess2), orig))
+                    modify (\env -> env {suspendedConstraintEnv = Q.insert uc (suspendedConstraintEnv env)})
                     simplify cs
                 (Just (StuckPiElimVar x1 mess1), _)
                   | Just lam <- lookupDefinition x1 sub -> do
@@ -140,8 +140,8 @@ simplify' constraintList =
                   | Just lam <- lookupDefinition x2 sub -> do
                     simplify $ ((e1, toPiElim lam mess2), orig) : cs
                 _ -> do
-                  let susCon = SusCon (fmvs, ((e1, e2), orig), ConOther)
-                  modify (\env -> env {suspendedConstraintEnv = Q.insert susCon (suspendedConstraintEnv env)})
+                  let uc = SuspendedConstraint (fmvs, ConstraintKindOther, headConstraint)
+                  modify (\env -> env {suspendedConstraintEnv = Q.insert uc (suspendedConstraintEnv env)})
                   simplify cs
 
 resolveHole :: Int -> [[WeakIdentPlus]] -> WeakTermPlus -> [(Constraint, Constraint)] -> WithEnv ()
@@ -149,9 +149,9 @@ resolveHole h1 xss e2' cs = do
   modify (\env -> env {substEnv = IntMap.insert h1 (toPiIntro xss e2') (substEnv env)})
   -- p $ T.unpack $ "resolve: " <> T.pack (show h1) <> " ~> " <> toText (toPiIntro xss e2')
   sus <- gets suspendedConstraintEnv
-  let (sus1, sus2) = Q.partition (\(SusCon (hs, _, _)) -> S.member h1 hs) sus
+  let (sus1, sus2) = Q.partition (\(SuspendedConstraint (hs, _, _)) -> S.member h1 hs) sus
   modify (\env -> env {suspendedConstraintEnv = sus2})
-  let sus1' = map (\(SusCon (_, c, _)) -> c) $ Q.toList sus1
+  let sus1' = map (\(SuspendedConstraint (_, _, c)) -> c) $ Q.toList sus1
   simplify $ sus1' ++ cs
 
 simplifyBinder :: Constraint -> [WeakIdentPlus] -> [WeakIdentPlus] -> WithEnv ()

@@ -60,31 +60,26 @@ data WeakStmt
 type Constraint =
   (WeakTermPlus, WeakTermPlus) -- (expected-type, actual-type)
 
-data Con
-  = ConDelta (WeakTermPlus, WeakTermPlus) -- 展開したあとのやつ
-  | ConOther
+type MetaVarSet =
+  S.Set Int
 
-type SuspendedConstraint = (S.Set Int, Constraint)
+data ConstraintKind
+  = ConstraintKindDelta
+  | ConstraintKindOther
+  deriving (Enum)
 
-newtype SusCon = SusCon (S.Set Int, (Constraint, Constraint), Con)
+newtype SuspendedConstraint
+  = SuspendedConstraint (MetaVarSet, ConstraintKind, (Constraint, Constraint))
 
-instance Eq SusCon where
-  (SusCon (_, _, c1)) == (SusCon (_, _, c2)) =
-    conToInt c1 == conToInt c2
+instance Eq SuspendedConstraint where
+  (SuspendedConstraint (_, kind1, _)) == (SuspendedConstraint (_, kind2, _)) =
+    fromEnum kind1 == fromEnum kind2
 
-instance Ord SusCon where
-  (SusCon (_, _, c1)) `compare` (SusCon (_, _, c2)) =
-    conToInt c1 `compare` conToInt c2
+instance Ord SuspendedConstraint where
+  (SuspendedConstraint (_, kind1, _)) `compare` (SuspendedConstraint (_, kind2, _)) =
+    fromEnum kind1 `compare` fromEnum kind2
 
-type SusConQueue = Q.MinQueue SusCon
-
-conToInt :: Con -> Int
-conToInt con =
-  case con of
-    ConDelta {} ->
-      0
-    ConOther {} ->
-      1
+type SuspendedConstraintQueue = Q.MinQueue SuspendedConstraint
 
 toVar :: Hint -> Ident -> WeakTermPlus
 toVar m x =

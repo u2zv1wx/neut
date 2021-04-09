@@ -30,18 +30,18 @@ synthesize = do
   case Q.minView cs of
     Nothing ->
       return ()
-    Just ((SusCon (_, (_, orig), ConDelta c)), cs') -> do
+    Just ((SuspendedConstraint (_, ConstraintKindDelta, (c, orig))), cs') -> do
       modify (\env -> env {suspendedConstraintEnv = cs'})
       simplify [(c, orig)]
       synthesize
-    Just ((SusCon (_, _, ConOther)), _) ->
+    Just ((SuspendedConstraint (_, ConstraintKindOther, _)), _) ->
       throwTypeErrors
 
 throwTypeErrors :: WithEnv ()
 throwTypeErrors = do
   q <- gets suspendedConstraintEnv
   sub <- gets substEnv
-  errorList <- forM (Q.toList q) $ \(SusCon (_, (_, (expected, actual)), _)) -> do
+  errorList <- forM (Q.toList q) $ \(SuspendedConstraint (_, _, (_, (expected, actual)))) -> do
     expected' <- substWeakTermPlus sub expected >>= reduceWeakTermPlus
     actual' <- substWeakTermPlus sub actual >>= reduceWeakTermPlus
     return $ logError (getPosInfo (fst actual)) $ constructErrorMsg actual' expected'
