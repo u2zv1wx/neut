@@ -46,10 +46,8 @@ discern' nenv term =
     (m, WeakTermVar _ (I (s, _))) ->
       tryCand (resolveSymbol m (asWeakVar m nenv) s) $ do
         renv <- gets revEnumEnv
-        -- tryCand (resolveSymbol m (asWeakEnumValue m) s) $
         tryCand (resolveSymbol m (findThenModify renv (\x -> (m, WeakTermEnumIntro x))) s) $ do
           eenv <- gets enumEnv
-          -- tryCand (resolveSymbol m (asWeakEnumType m) s) $
           tryCand (resolveSymbol m (findThenModify eenv (\x -> (m, WeakTermEnum x))) s) $
             tryCand (resolveSymbol m (asWeakConstant m) s) $
               raiseError m $ "undefined variable: " <> s
