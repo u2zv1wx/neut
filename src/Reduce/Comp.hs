@@ -16,9 +16,9 @@ type NameEnv = IntMap.IntMap Ident
 reduceCompPlus :: CompPlus -> WithEnv CompPlus
 reduceCompPlus term =
   case term of
-    (m, CompPrimitive c) ->
-      return (m, CompPrimitive c)
-    (m, CompPiElimDownElim v ds) -> do
+    (_, CompPrimitive _) ->
+      return term
+    (_, CompPiElimDownElim v ds) -> do
       denv <- gets defEnv
       case v of
         (_, ValueVarGlobal x)
@@ -28,7 +28,7 @@ reduceCompPlus term =
             let sub = IntMap.fromList (zip (map asInt xs) ds)
             substCompPlus sub IntMap.empty body >>= reduceCompPlus
         _ ->
-          return (m, CompPiElimDownElim v ds)
+          return term
     (m, CompSigmaElim isNoetic xs v e) ->
       case v of
         (_, ValueSigmaIntro ds)
@@ -48,8 +48,8 @@ reduceCompPlus term =
                   return e'
                 _ ->
                   return (m, CompSigmaElim isNoetic xs v e')
-    (m, CompUpIntro v) ->
-      return (m, CompUpIntro v)
+    (_, CompUpIntro _) ->
+      return term
     (m, CompUpElim x e1 e2) -> do
       e1' <- reduceCompPlus e1
       case e1' of
@@ -89,7 +89,7 @@ substValuePlus sub nenv term =
       | Just e <- IntMap.lookup (asInt x) sub ->
         e
       | otherwise ->
-        (m, ValueVarLocal x)
+        term
     (m, ValueSigmaIntro vs) -> do
       let vs' = map (substValuePlus sub nenv) vs
       (m, ValueSigmaIntro vs')
