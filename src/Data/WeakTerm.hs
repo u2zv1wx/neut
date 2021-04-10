@@ -241,6 +241,8 @@ toText term =
           if isOpaque opacity
             then showCons ["fix-irreducible", showVariable x, argStr, toText e]
             else showCons ["fix", showVariable x, argStr, toText e]
+        LamKindCons _ _ ->
+          "<cons>"
         _ -> do
           let argStr = inParen $ showItems $ map showArg xts
           if isTransparent opacity
@@ -293,8 +295,13 @@ toTree term =
       (m, TreeLeaf (showVariable x))
     (m, WeakTermPi xts cod) ->
       (m, TreeNode [(m, TreeLeaf "Π"), (m, TreeNode (map toTreeArg xts)), toTree cod])
-    (m, WeakTermPiIntro {}) -> do
-      (m, TreeLeaf "<lam>")
+    (m, WeakTermPiIntro isReducible kind xts e) -> do
+      case kind of
+        LamKindNormal ->
+          (m, TreeNode [(m, TreeLeaf "λ"), (m, TreeNode (map toTreeArg xts)), toTree e])
+    -- (m, TreeLeaf "<lam>")
+    -- (m, WeakTermPiIntro {}) -> do
+    --   (m, TreeLeaf "<lam>")
     -- (m, WeakTermPiIntro _ xts e) -> do
     --   (m, TreeNode [(m, TreeLeaf "λ"), (m, TreeNode (map toTreeArg xts)), toTree e])
     (m, WeakTermPiElim e es) ->

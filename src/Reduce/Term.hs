@@ -1,6 +1,5 @@
 module Reduce.Term
   ( reduceTermPlus,
-    substTermPlus,
   )
 where
 
@@ -9,11 +8,10 @@ import Data.Basic
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
 import qualified Data.IntMap as IntMap
-import Data.LowType
-import Data.Namespace
 import Data.Term
 import qualified Data.Text as T
 
+-- reduce given term assuming its purity
 reduceTermPlus :: TermPlus -> Compiler TermPlus
 reduceTermPlus term =
   case term of
@@ -36,12 +34,10 @@ reduceTermPlus term =
       e' <- reduceTermPlus e
       es' <- mapM reduceTermPlus es
       let app = TermPiElim e' es'
-      let valueCond = and $ map isValue es
       case e' of
         (_, TermPiIntro opacity LamKindNormal xts body)
           | not (isOpaque opacity),
-            length xts == length es',
-            valueCond -> do
+            length xts == length es' -> do
             let xs = map (\(_, x, _) -> asInt x) xts
             let sub = IntMap.fromList $ zip xs es'
             substTermPlus sub (m, snd body) >>= reduceTermPlus
@@ -178,42 +174,3 @@ substTermPlus' sub binder e =
       let sub' = IntMap.insert (asInt x) (m, TermVar VarKindLocal x') sub
       (xts', e') <- substTermPlus' sub' xts e
       return ((m, x', t') : xts', e')
-
-isValue :: TermPlus -> Bool
-isValue term =
-  case term of
-    (_, TermTau) ->
-      True
-    (_, TermVar _ _) ->
-      True
-    (_, TermPi {}) ->
-      True
-    (_, TermPiIntro {}) ->
-      True
-    (_, TermConst x) ->
-      isValueConst x
-    (_, TermInt _ _) ->
-      True
-    (_, TermFloat _ _) ->
-      True
-    (_, TermEnum _) ->
-      True
-    (_, TermEnumIntro _) ->
-      True
-    _ ->
-      False
-
-isValueConst :: T.Text -> Bool
-isValueConst x
-  | Just _ <- asLowTypeMaybe x =
-    True
-  | Just _ <- asPrimOp x =
-    True
-  | x == "os" <> nsSep <> "stdin" =
-    True
-  | x == "os" <> nsSep <> "stdout" =
-    True
-  | x == "os" <> nsSep <> "stderr" =
-    True
-  | otherwise =
-    False

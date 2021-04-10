@@ -14,6 +14,7 @@ import Data.LowType
 import qualified Data.Set as S
 import Data.Term
 import qualified Data.Text as T
+import Data.Tree
 import Data.WeakTerm
 import Elaborate.Infer
 import Elaborate.Unify
@@ -40,7 +41,7 @@ elaborateStmt' stmt =
       --   p $ T.unpack $ toText e2
       --   p "---------------------"
       unify
-      e'' <- elaborate' e' >>= reduceTermPlus
+      e'' <- elaborate' e'
       t'' <- elaborate' t' >>= reduceTermPlus
       case mx of
         Just (isReducible, x) -> do
@@ -163,7 +164,7 @@ elaborate' term =
                 else raiseError m $ "the constructor here is supposed to be `" <> b <> "`, but is: `" <> b' <> "`" -- fixme: add hint for patterns
             return (m, TermCase resultType' mSubject' (e', t') patList')
         _ -> do
-          raiseError (fst t) $ "the type of this term must be a data-type, but its type is:\n" <> toText (weaken t')
+          raiseError (fst t) $ "the type of this term must be a data-type, but its type is:\n" <> showTree (toTree $ weaken t')
 
 elaborateWeakIdentPlus :: WeakIdentPlus -> Compiler IdentPlus
 elaborateWeakIdentPlus (m, x, t) = do
