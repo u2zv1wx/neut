@@ -34,20 +34,6 @@
           k
           v)))))
 
-; (define mu.out
-;   ((f (hom tau tau))
-;    (F (functor f))
-;    (x (mu f)))
-;   (witness (f (mu f))
-;     (mu.case (f (mu f)) f x
-;       (λ (b v k)
-;         ((functor.map f F)
-;           b
-;           (mu f)
-;           k
-;           v)))))
-
-
 (define-data my-list-f ((a tau) (r tau))
   (nil)
   (cons (_ a) (_ r)))
