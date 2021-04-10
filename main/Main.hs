@@ -6,6 +6,7 @@ import Data.ByteString.Builder
 import qualified Data.ByteString.Lazy as L
 import Data.Env
 import Data.Log
+import Data.Maybe (fromMaybe)
 import Elaborate
 import Emit
 import GHC.IO.Handle
@@ -34,6 +35,9 @@ type ShouldCancelAlloc =
 type ShouldColorize =
   Bool
 
+type ClangOption =
+  String
+
 data OutputKind
   = OutputKindObject
   | OutputKindLLVM
@@ -51,7 +55,7 @@ instance Read OutputKind where
     []
 
 data Command
-  = Build InputPath (Maybe OutputPath) OutputKind ShouldCancelAlloc
+  = Build InputPath (Maybe OutputPath) OutputKind ShouldCancelAlloc (Maybe ClangOption)
   | Check InputPath ShouldColorize CheckOptEndOfEntry
   | Archive InputPath (Maybe OutputPath)
 
@@ -112,6 +116,15 @@ parseBuildOpt =
             help "Set this to disable optimization for redundant alloc"
           ]
       )
+    <*> optional
+      ( strOption
+          ( mconcat
+              [ long "clang-option",
+                metavar "OPT",
+                help "option string to be passed to clang"
+              ]
+          )
+      )
 
 kindReader :: ReadM OutputKind
 kindReader = do
@@ -169,7 +182,7 @@ parseArchiveOpt =
 run :: Command -> IO ()
 run cmd =
   case cmd of
-    Build inputPathStr mOutputPathStr outputKind cancelAllocFlag -> do
+    Build inputPathStr mOutputPathStr outputKind cancelAllocFlag mClangOptStr -> do
       inputPath <- resolveFile' inputPathStr
       resultOrErr <- runCompiler (runBuild inputPath) $ initialEnv {shouldCancelAlloc = cancelAllocFlag}
       (basename, _) <- splitExtension $ filename inputPath
@@ -184,7 +197,8 @@ run cmd =
             OutputKindLLVM ->
               L.writeFile (toFilePath outputPath) llvmIR
             _ -> do
-              let clangCmd = proc "clang" $ clangOptWith outputKind outputPath
+              let additionalClangOptions = words $ fromMaybe "" mClangOptStr
+              let clangCmd = proc "clang" $ clangOptWith outputKind outputPath ++ additionalClangOptions
               withCreateProcess clangCmd {std_in = CreatePipe} $ \(Just stdin) _ _ clangProcessHandler -> do
                 L.hPut stdin llvmIR
                 hClose stdin
