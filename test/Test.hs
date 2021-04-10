@@ -36,11 +36,11 @@ test (srcPath : rest) = do
 test' :: Path Abs File -> IO Bool
 test' srcPath = do
   (binaryPath, _) <- splitExtension srcPath
-  (code, out, _) <- readProcessWithExitCode "neut" ["build", toFilePath srcPath, "-o", toFilePath binaryPath] []
+  (code, out, _) <- readProcessWithExitCode "neut" ["build", toFilePath srcPath, "-o", toFilePath binaryPath, "--clang-option", "-fsanitize=address,undefined -g"] []
   result <-
     case code of
       ExitSuccess -> do
-        result <- readProcess (toFilePath binaryPath) [] [] -- valgrind -qをつかうべき？
+        result <- readProcess (toFilePath binaryPath) [] []
         removeFile binaryPath
         return result
       ExitFailure _ ->
