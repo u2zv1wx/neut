@@ -1,7 +1,8 @@
 (include "../header.neut")
 
 ; nullary sigma-intro
-(define a0 (sigma-introduction))
+(define a0
+  (sigma-introduction))
 
 ; nullary sigma-elim
 (reduce

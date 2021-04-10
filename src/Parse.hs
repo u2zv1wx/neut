@@ -47,7 +47,8 @@ parse stmtTreeList =
               | [e] <- rest -> do
                 e' <- interpret e >>= discern
                 defList <- parse restStmtList
-                return $ WeakStmtReduce m e' : defList
+                t <- newAster m
+                return $ WeakStmtDef m Nothing t e' : defList
               | otherwise ->
                 raiseSyntaxError m "(reduce TREE)"
             "declare-enum"
@@ -116,17 +117,16 @@ parse stmtTreeList =
 interpretAux :: TreePlus -> [TreePlus] -> Compiler [WeakStmt]
 interpretAux headStmt restStmtList = do
   e <- interpret headStmt >>= discern
-  h <- newIdentFromText "_"
   let m = metaOf e
   t <- newAster m
   defList <- parse restStmtList
-  return $ WeakStmtDef True m (m, h, t) e : defList
+  return $ WeakStmtDef m Nothing t e : defList
 
 parseDef :: Bool -> Hint -> TreePlus -> TreePlus -> Compiler WeakStmt
 parseDef isReducible m xt e = do
   e' <- interpret e >>= discern
-  xt' <- prefixTextPlus xt >>= interpretIdentPlus >>= discernIdentPlus
-  return $ WeakStmtDef isReducible m xt' e'
+  (_, x, t) <- prefixTextPlus xt >>= interpretIdentPlus >>= discernIdentPlus
+  return $ WeakStmtDef m (Just (isReducible, x)) t e'
 
 insEnumEnv :: Hint -> T.Text -> [(T.Text, Int)] -> Compiler ()
 insEnumEnv m name xis = do

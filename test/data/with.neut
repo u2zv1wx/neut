@@ -12,4 +12,6 @@
       (let len (string.print &str))
       len)))
 
-(reduce (p (string.new "あ")))
+(reduce
+  (let len (p (string.new "あ")))
+  top.unit)

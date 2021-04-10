@@ -40,7 +40,7 @@ test' srcPath = do
   result <-
     case code of
       ExitSuccess -> do
-        result <- readProcess (toFilePath binaryPath) [] []
+        result <- readProcess (toFilePath binaryPath) [] [] -- valgrind -qをつかうべき？
         removeFile binaryPath
         return result
       ExitFailure _ ->

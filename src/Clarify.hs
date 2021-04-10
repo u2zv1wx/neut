@@ -34,15 +34,20 @@ clarifyStmt tenv ss =
     [] -> do
       m <- newHint 1 1 <$> getCurrentFilePath
       return (m, CompUpIntro (m, ValueInt 64 0))
-    StmtDef _ _ (mx, x, t) e : cont -> do
-      e' <- clarifyTerm tenv e >>= reduceCompPlus
-      insDefEnv (toGlobalVarName x) True [] e' -- implicit S4 box introduction
-      clarifyStmt (insTypeEnv [(mx, x, t)] tenv) cont
-    StmtReduce m e : cont -> do
-      e' <- clarifyTerm tenv e
-      h <- newIdentFromText "hole"
-      cont' <- clarifyStmt tenv cont
-      return (m, CompUpElim h e' cont')
+    StmtDef m mx t e : cont -> do
+      case mx of
+        Just x -> do
+          e' <- clarifyTerm tenv e >>= reduceCompPlus
+          insDefEnv (toGlobalVarName x) True [] e' -- implicit S4 box introduction
+          clarifyStmt (insTypeEnv [(m, x, t)] tenv) cont
+        Nothing -> do
+          e' <- clarifyTerm tenv e
+          result <- newIdentFromText "result"
+          cont' <- clarifyStmt tenv cont
+          t' <- clarifyTerm tenv t
+          discardResult <- toAffineApp m result t'
+          hole <- newIdentFromText "unit"
+          return (m, CompUpElim result e' (m, CompUpElim hole discardResult cont'))
 
 clarifyTerm :: TypeEnv -> TermPlus -> Compiler CompPlus
 clarifyTerm tenv term =
