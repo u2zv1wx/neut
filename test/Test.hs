@@ -1,4 +1,4 @@
-module Main where
+module Main (main) where
 
 import Control.Exception.Safe
 import Control.Monad
@@ -6,18 +6,23 @@ import Data.List
 import Data.Log
 import Path
 import Path.IO
+import System.Environment
 import System.Exit
 import System.Process
 
 main :: IO ()
 main = do
-  dataDir <- getDataDir
-  (_, contents) <- listDir dataDir
-  progList <- filterM isSourceFile contents
-  result <- test $ sort progList
-  if result
-    then return ()
-    else exitWith (ExitFailure 1)
+  args <- getArgs
+  relDirPathList <- mapM parseRelDir args
+  currentDir <- getCurrentDir
+  let testDirPathList = map (\p -> currentDir </> p) relDirPathList
+  forM_ testDirPathList $ \testDirPath -> do
+    (_, contents) <- listDir testDirPath
+    progList <- filterM isSourceFile contents
+    result <- test $ sort progList
+    if result
+      then return ()
+      else exitWith (ExitFailure 1)
 
 test :: [Path Abs File] -> IO Bool
 test [] = return True
@@ -77,12 +82,6 @@ stylize' :: String -> String
 stylize' str = do
   let ls = lines str
   intercalate "\n" $ head ls : map (pad ++) (tail ls)
-
-getDataDir :: IO (Path Abs Dir)
-getDataDir = do
-  currentDir <- getCurrentDir
-  rel <- parseRelDir "test/data"
-  return $ currentDir </> rel
 
 isSourceFile :: Path Abs File -> IO Bool
 isSourceFile path =
