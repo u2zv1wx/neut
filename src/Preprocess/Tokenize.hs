@@ -181,7 +181,7 @@ headStringLengthOf :: EscapeFlag -> T.Text -> Int -> Tokenizer Int
 headStringLengthOf flag s i =
   case T.uncons s of
     Nothing ->
-      raiseTokenizeError "unexpected end of input while lexing string"
+      raiseTokenizeError "unexpected end of input while parsing string"
     Just (c, rest)
       | c == '"' -> do
         incrementColumn

@@ -1,0 +1,6 @@
+(include "../../../foundation.neut")
+
+(define foo (x)
+  (add-i64 x 1))
+
+"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum posuere ligula eget justo ullamcorper, sed tincidunt odio pretium. Quisque id libero quam. Aliquam tincidunt ut ante sit amet pretium. Duis sed semper nisl. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Mauris in interdum leo. Nullam scelerisque in dolor ac tristique. Integer ut nisi arcu. Nam fringilla eget erat eget vestibulum.
