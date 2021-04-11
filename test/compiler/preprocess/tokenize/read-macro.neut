@@ -1,0 +1,7 @@
+(include "../../../foundation.neut")
+
+; quote-unquote-splice
+(define-macro-variadic buz (x xs)
+  `(define foo (,x @,xs)))
+
+(dry-expand (buz some-function 1 2 3 4 5 6 7))

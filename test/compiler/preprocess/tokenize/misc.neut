@@ -1,0 +1,29 @@
+(include "../../../foundation.neut")
+
+   (  define-macro foo(
+
+x
+
+    y
+)  `   (  add-i64,   x
+
+" aoeu aa stri
+
+           n \
+  \" hello  \"
+g"
+
+,
+y)
+; comment())
+) ;comm
+
+(
+
+dry-expand ; comment
+; comment
+
+
+(  foo  aoeu
+; comment
+hoge))
