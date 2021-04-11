@@ -72,23 +72,23 @@ toTree :: MetaTermPlus -> TreePlus
 toTree term =
   case term of
     (m, MetaTermVar x) ->
-      (m, TreeLeaf $ asText' x) -- ホントはmeta専用の名前にするべき
+      (m, TreeLeaf $ asText x) -- ホントはmeta専用の名前にするべき
     (m, MetaTermImpIntro Nothing xs Nothing e) -> do
       let e' = toTree e
-      let xs' = map (\i -> (m, TreeLeaf $ asText' i)) xs
+      let xs' = map (\i -> (m, TreeLeaf $ asText i)) xs
       (m, TreeNode [(m, TreeLeaf "lambda-meta"), (m, TreeNode xs'), e'])
     (m, MetaTermImpIntro Nothing xs (Just rest) e) -> do
       let e' = toTree e
-      let args = map (\i -> (m, TreeLeaf $ asText' i)) $ xs ++ [rest]
+      let args = map (\i -> (m, TreeLeaf $ asText i)) $ xs ++ [rest]
       (m, TreeNode [(m, TreeLeaf "lambda-meta-variadic"), (m, TreeNode args), e'])
     (m, MetaTermImpIntro (Just f) xs Nothing e) -> do
       let e' = toTree e
-      let xs' = map (\i -> (m, TreeLeaf $ asText' i)) xs
-      (m, TreeNode [(m, TreeLeaf "fix-meta"), (m, TreeLeaf (asText' f)), (m, TreeNode xs'), e'])
+      let xs' = map (\i -> (m, TreeLeaf $ asText i)) xs
+      (m, TreeNode [(m, TreeLeaf "fix-meta"), (m, TreeLeaf (asText f)), (m, TreeNode xs'), e'])
     (m, MetaTermImpIntro (Just f) xs (Just rest) e) -> do
       let e' = toTree e
-      let args = map (\i -> (m, TreeLeaf $ asText' i)) $ xs ++ [rest]
-      (m, TreeNode [(m, TreeLeaf "fix-meta-variadic"), (m, TreeLeaf (asText' f)), (m, TreeNode args), e'])
+      let args = map (\i -> (m, TreeLeaf $ asText i)) $ xs ++ [rest]
+      (m, TreeNode [(m, TreeLeaf "fix-meta-variadic"), (m, TreeLeaf (asText f)), (m, TreeNode args), e'])
     (m, MetaTermImpElim e es) -> do
       let e' = toTree e
       let es' = map toTree es

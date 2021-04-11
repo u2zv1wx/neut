@@ -22,11 +22,11 @@ import Text.Read (readMaybe)
 reduceMetaTerm :: MetaTermPlus -> Compiler MetaTermPlus
 reduceMetaTerm term =
   case term of
-    (_, MetaTermVar x) -> do
+    (m, MetaTermVar x) -> do
       ctx <- gets metaTermCtx
       case IntMap.lookup (asInt x) ctx of
-        Just e ->
-          reduceMetaTerm e
+        Just (_, e) ->
+          reduceMetaTerm (m, e)
         Nothing ->
           return term
     (m, MetaTermImpElim e es) -> do
