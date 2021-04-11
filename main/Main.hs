@@ -5,7 +5,6 @@ import Control.Monad.State.Lazy
 import Data.ByteString.Builder
 import qualified Data.ByteString.Lazy as L
 import Data.Env
-import Data.Log
 import Data.Maybe (fromMaybe)
 import Elaborate
 import Emit
@@ -35,6 +34,12 @@ type ShouldCancelAlloc =
 type ShouldColorize =
   Bool
 
+type ShouldDisplayLogLocation =
+  Bool
+
+type ShouldDisplayLogLevel =
+  Bool
+
 type ClangOption =
   String
 
@@ -55,7 +60,7 @@ instance Read OutputKind where
     []
 
 data Command
-  = Build InputPath (Maybe OutputPath) OutputKind ShouldCancelAlloc (Maybe ClangOption)
+  = Build InputPath (Maybe OutputPath) OutputKind ShouldColorize ShouldCancelAlloc ShouldDisplayLogLocation ShouldDisplayLogLevel (Maybe ClangOption)
   | Check InputPath ShouldColorize CheckOptEndOfEntry
   | Archive InputPath (Maybe OutputPath)
 
@@ -90,41 +95,58 @@ parseBuildOpt =
             help "The path of input file"
           ]
       )
-    <*> optional
-      ( strOption $
-          mconcat
-            [ long "output",
-              short 'o',
-              metavar "OUTPUT",
-              help "The path of output file"
-            ]
-      )
-    <*> option
-      kindReader
-      ( mconcat
-          [ long "emit",
-            metavar "KIND",
-            value OutputKindObject,
-            help "The type of output file"
-          ]
-      )
-    <*> flag
-      True
-      False
-      ( mconcat
-          [ long "no-alloc-cancellation",
-            help "Set this to disable optimization for redundant alloc"
-          ]
-      )
-    <*> optional
-      ( strOption
-          ( mconcat
-              [ long "clang-option",
-                metavar "OPT",
-                help "option string to be passed to clang"
+      <*> optional
+        ( strOption $
+            mconcat
+              [ long "output",
+                short 'o',
+                metavar "OUTPUT",
+                help "The path of output file"
               ]
-          )
-      )
+        )
+      <*> option
+        kindReader
+        ( mconcat
+            [ long "emit",
+              metavar "KIND",
+              value OutputKindObject,
+              help "The type of output file"
+            ]
+        )
+      <*> colorizeOpt
+      <*> flag
+        True
+        False
+        ( mconcat
+            [ long "no-alloc-cancellation",
+              help "Set this to disable optimization for redundant alloc"
+            ]
+        )
+      <*> flag
+        True
+        False
+        ( mconcat
+            [ long "no-log-location",
+              help "Set this to suppress location information when displaying log"
+            ]
+        )
+      <*> flag
+        True
+        False
+        ( mconcat
+            [ long "no-log-level",
+              help "Set this to suppress level information when displaying log"
+            ]
+        )
+      <*> optional
+        ( strOption
+            ( mconcat
+                [ long "clang-option",
+                  metavar "OPT",
+                  help "option string to be passed to clang"
+                ]
+            )
+        )
 
 kindReader :: ReadM OutputKind
 kindReader = do
@@ -145,14 +167,7 @@ parseCheckOpt =
             help "The path of input file"
           ]
       )
-      <*> flag
-        True
-        False
-        ( mconcat
-            [ long "no-color",
-              help "Set this to disable colorization of the output"
-            ]
-        )
+      <*> colorizeOpt
       <*> strOption
         ( mconcat
             [ long "end-of-entry",
@@ -161,6 +176,17 @@ parseCheckOpt =
               metavar "STRING"
             ]
         )
+
+colorizeOpt :: Parser Bool
+colorizeOpt =
+  flag
+    True
+    False
+    ( mconcat
+        [ long "no-color",
+          help "Set this to disable colorization of the output"
+        ]
+    )
 
 parseArchiveOpt :: Parser Command
 parseArchiveOpt =
@@ -182,38 +208,29 @@ parseArchiveOpt =
 run :: Command -> IO ()
 run cmd =
   case cmd of
-    Build inputPathStr mOutputPathStr outputKind cancelAllocFlag mClangOptStr -> do
+    Build inputPathStr mOutputPathStr outputKind colorizeFlag cancelAllocFlag logLocationFlag logLevelFlag mClangOptStr -> do
       inputPath <- resolveFile' inputPathStr
-      resultOrErr <- runCompiler (runBuild inputPath) $ initialEnv {shouldCancelAlloc = cancelAllocFlag}
+      llvmIRBuilder <-
+        runCompiler (runBuild inputPath) $
+          initialEnv {shouldColorize = colorizeFlag, shouldCancelAlloc = cancelAllocFlag, shouldDisplayLogLocation = logLocationFlag, shouldDisplayLogLevel = logLevelFlag}
       (basename, _) <- splitExtension $ filename inputPath
       mOutputPath <- mapM resolveFile' mOutputPathStr
       outputPath <- constructOutputPath basename mOutputPath outputKind
-      case resultOrErr of
-        Left (Error err) ->
-          seqIO (map (outputLog True "") err) >> exitWith (ExitFailure 1)
-        Right llvmIRBuilder -> do
-          let llvmIR = toLazyByteString llvmIRBuilder
-          case outputKind of
-            OutputKindLLVM ->
-              L.writeFile (toFilePath outputPath) llvmIR
-            _ -> do
-              let additionalClangOptions = words $ fromMaybe "" mClangOptStr
-              let clangCmd = proc "clang" $ clangOptWith outputKind outputPath ++ additionalClangOptions
-              withCreateProcess clangCmd {std_in = CreatePipe} $ \(Just stdin) _ _ clangProcessHandler -> do
-                L.hPut stdin llvmIR
-                hClose stdin
-                exitCode <- waitForProcess clangProcessHandler
-                exitWith exitCode
+      let llvmIR = toLazyByteString llvmIRBuilder
+      case outputKind of
+        OutputKindLLVM ->
+          L.writeFile (toFilePath outputPath) llvmIR
+        _ -> do
+          let additionalClangOptions = words $ fromMaybe "" mClangOptStr
+          let clangCmd = proc "clang" $ clangOptWith outputKind outputPath ++ additionalClangOptions
+          withCreateProcess clangCmd {std_in = CreatePipe} $ \(Just stdin) _ _ clangProcessHandler -> do
+            L.hPut stdin llvmIR
+            hClose stdin
+            exitCode <- waitForProcess clangProcessHandler
+            exitWith exitCode
     Check inputPathStr colorizeFlag eoe -> do
       inputPath <- resolveFile' inputPathStr
-      resultOrErr <-
-        runCompiler (runCheck inputPath) $
-          initialEnv {shouldColorize = colorizeFlag, endOfEntry = eoe}
-      case resultOrErr of
-        Right _ ->
-          return ()
-        Left (Error err) ->
-          seqIO (map (outputLog colorizeFlag eoe) err) >> exitWith (ExitFailure 1)
+      void $ runCompiler (runCheck inputPath) $ initialEnv {shouldColorize = colorizeFlag, endOfEntry = eoe}
     Archive inputPathStr mOutputPathStr -> do
       libDirPath <- resolveDir' inputPathStr
       let parentDirPath = parent libDirPath
@@ -257,10 +274,6 @@ runBuild =
 runCheck :: Path Abs File -> Compiler ()
 runCheck =
   preprocess >=> parse >=> elaborate >=> \_ -> return ()
-
-seqIO :: [IO ()] -> IO ()
-seqIO =
-  foldr (>>) (return ())
 
 clangOptWith :: OutputKind -> Path Abs File -> [String]
 clangOptWith kind outputPath =

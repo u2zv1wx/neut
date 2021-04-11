@@ -2,8 +2,8 @@ module Main (main) where
 
 import Control.Exception.Safe
 import Control.Monad
+import Data.Env
 import Data.List
-import Data.Log
 import Path
 import Path.IO
 import System.Environment
@@ -15,7 +15,7 @@ main = do
   args <- getArgs
   relDirPathList <- mapM parseRelDir args
   currentDir <- getCurrentDir
-  let testDirPathList = map (\p -> currentDir </> p) relDirPathList
+  let testDirPathList = map (\path -> currentDir </> path) relDirPathList
   forM_ testDirPathList $ \testDirPath -> do
     (_, contents) <- listDir testDirPath
     progList <- filterM isSourceFile contents
@@ -36,13 +36,26 @@ test (srcPath : rest) = do
 test' :: Path Abs File -> IO Bool
 test' srcPath = do
   (binaryPath, _) <- splitExtension srcPath
-  (code, out, _) <- readProcessWithExitCode "neut" ["build", toFilePath srcPath, "-o", toFilePath binaryPath, "--clang-option", "-fsanitize=address,undefined -g"] []
+  (code, out, _) <-
+    readProcessWithExitCode
+      "neut"
+      [ "build",
+        toFilePath srcPath,
+        "-o",
+        toFilePath binaryPath,
+        "--no-color",
+        "--no-log-location",
+        "--no-log-level",
+        "--clang-option",
+        "-fsanitize=address,undefined -g"
+      ]
+      []
   result <-
     case code of
       ExitSuccess -> do
         result <- readProcess (toFilePath binaryPath) [] []
         removeFile binaryPath
-        return result
+        return $ out <> result
       ExitFailure _ ->
         return out
   answerPath <- addExtension ".answer" binaryPath

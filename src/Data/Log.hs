@@ -3,7 +3,6 @@ module Data.Log where
 import Control.Exception.Safe
 import Data.Basic
 import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
 import System.Console.ANSI
 
 data LogLevel
@@ -59,64 +58,11 @@ logLevelToSGR level =
     LogLevelCritical ->
       [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Red]
 
-outputLog :: ColorFlag -> String -> Log -> IO ()
-outputLog b eoe (mpos, l, t) = do
-  case mpos of
-    Nothing ->
-      return ()
-    Just pos ->
-      outputPosInfo b pos
-  outputLogLevel b l
-  outputLogText t
-  outputFooter eoe
-
-outputLog' :: ColorFlag -> Log -> IO ()
-outputLog' b (mpos, l, t) = do
-  case mpos of
-    Nothing ->
-      return ()
-    Just pos ->
-      outputPosInfo b pos
-  outputLogLevel b l
-  TIO.putStr t
-
-outputPass :: String -> IO ()
-outputPass str = do
-  outputLog' True (Nothing, LogLevelPass, T.pack str)
-  putStr "\n"
-
-outputFail :: String -> IO ()
-outputFail str = do
-  outputLog' True (Nothing, LogLevelFail, T.pack str)
-  putStr "\n"
-
-outputFooter :: String -> IO ()
-outputFooter eoe =
-  if eoe == ""
-    then return ()
-    else putStrLn eoe
-
-outputPosInfo :: Bool -> PosInfo -> IO ()
-outputPosInfo b (path, loc) =
-  withSGR b [SetConsoleIntensity BoldIntensity] $ do
-    TIO.putStr $ T.pack (showPosInfo path loc)
-    TIO.putStrLn ":"
-
-outputLogLevel :: Bool -> LogLevel -> IO ()
-outputLogLevel b l =
-  withSGR b (logLevelToSGR l) $ do
-    TIO.putStr $ logLevelToText l
-    TIO.putStr ": "
-
-outputLogText :: T.Text -> IO ()
-outputLogText =
-  TIO.putStrLn
-
-withSGR :: Bool -> [SGR] -> IO () -> IO ()
-withSGR b arg f =
-  if b
-    then setSGR arg >> f >> setSGR [Reset]
-    else f
+forgetPosInfoIfNecessary :: Bool -> Log -> Log
+forgetPosInfoIfNecessary flag (_, l, t) =
+  if flag
+    then (Nothing, l, t)
+    else (Nothing, l, t)
 
 logNote :: PosInfo -> T.Text -> Log
 logNote pos text =

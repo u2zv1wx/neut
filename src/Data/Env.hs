@@ -14,12 +14,15 @@ import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
 import Data.Term
 import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 import Data.Version (showVersion)
 import Data.WeakTerm
 import Path
 import Path.IO
 import Paths_neut (version)
+import System.Console.ANSI
 import System.Directory (createDirectoryIfMissing)
+import System.Exit
 import qualified Text.Show.Pretty as Pr
 
 type Compiler a =
@@ -32,6 +35,10 @@ data VisitInfo
 data Env = Env
   { count :: Int,
     shouldColorize :: Bool,
+    shouldDisplayLogLocation :: Bool,
+    shouldDisplayLogLevel :: Bool,
+    shouldDisplayLogText :: Bool,
+    shouldDisplayLogFooter :: Bool,
     shouldCancelAlloc :: Bool,
     endOfEntry :: String,
     --
@@ -81,6 +88,10 @@ initialEnv =
   Env
     { count = 0,
       shouldColorize = True,
+      shouldDisplayLogLocation = True,
+      shouldDisplayLogLevel = True,
+      shouldDisplayLogText = True,
+      shouldDisplayLogFooter = True,
       shouldCancelAlloc = True,
       endOfEntry = "",
       topMetaNameEnv = Map.empty,
@@ -112,14 +123,14 @@ initialEnv =
       nopFreeSet = S.empty
     }
 
-runCompiler :: Compiler a -> Env -> IO (Either Error a)
+runCompiler :: Compiler a -> Env -> IO a
 runCompiler c env = do
   resultOrErr <- try $ runStateT c env
   case resultOrErr of
-    Left err ->
-      return $ Left err
+    Left (Error err) ->
+      foldr (>>) (exitWith (ExitFailure 1)) (map (outputLog env) err)
     Right (result, _) ->
-      return $ Right result
+      return result
 
 --
 -- generating new symbols using count
@@ -190,31 +201,93 @@ getDirPath base = do
   return path
 
 --
--- output
+-- log
 --
+
+outputLog :: Env -> Log -> IO ()
+outputLog env (mpos, l, t) = do
+  when (shouldDisplayLogLocation env) $
+    outputLogLocation (shouldColorize env) mpos
+  when (shouldDisplayLogLevel env) $
+    outputLogLevel (shouldColorize env) l
+  when (shouldDisplayLogText env) $
+    outputLogText t (logLevelToPad env l)
+  when (shouldDisplayLogFooter env) $
+    outputFooter (endOfEntry env)
+
+outputLogLocation :: Bool -> Maybe PosInfo -> IO ()
+outputLogLocation colorFlag mpos =
+  case mpos of
+    Nothing ->
+      return ()
+    Just (path, loc) ->
+      withSGR colorFlag [SetConsoleIntensity BoldIntensity] $ do
+        TIO.putStr $ T.pack (showPosInfo path loc)
+        TIO.putStrLn ":"
+
+outputFooter :: String -> IO ()
+outputFooter eoe =
+  if eoe == ""
+    then return ()
+    else putStrLn eoe
+
+outputPosInfo :: Bool -> PosInfo -> IO ()
+outputPosInfo b (path, loc) =
+  withSGR b [SetConsoleIntensity BoldIntensity] $ do
+    TIO.putStr $ T.pack (showPosInfo path loc)
+    TIO.putStrLn ":"
+
+outputLogLevel :: Bool -> LogLevel -> IO ()
+outputLogLevel b l =
+  withSGR b (logLevelToSGR l) $ do
+    TIO.putStr $ logLevelToText l
+    TIO.putStr ": "
+
+outputLogText :: T.Text -> T.Text -> IO ()
+outputLogText str pad =
+  TIO.putStrLn $ stylizeLogText str pad
+
+logLevelToPad :: Env -> LogLevel -> T.Text
+logLevelToPad env level =
+  if shouldDisplayLogLevel env
+    then T.replicate (T.length (logLevelToText level) + 2) " "
+    else ""
+
+stylizeLogText :: T.Text -> T.Text -> T.Text
+stylizeLogText str pad = do
+  let ls = T.lines str
+  if null ls
+    then str
+    else T.intercalate "\n" $ head ls : map (pad <>) (tail ls)
+
+withSGR :: Bool -> [SGR] -> IO () -> IO ()
+withSGR b arg f =
+  if b
+    then setSGR arg >> f >> setSGR [Reset]
+    else f
 
 note :: Hint -> T.Text -> Compiler ()
 note m str = do
-  b <- gets shouldColorize
-  eoe <- gets endOfEntry
-  liftIO $ outputLog b eoe $ logNote (getPosInfo m) str
+  env <- get
+  liftIO $ outputLog env $ logNote (getPosInfo m) str
 
 note' :: T.Text -> Compiler ()
 note' str = do
-  b <- gets shouldColorize
-  eoe <- gets endOfEntry
-  liftIO $ outputLog b eoe $ logNote' str
-
-note'' :: T.Text -> Compiler ()
-note'' str = do
-  b <- gets shouldColorize
-  liftIO $ outputLog' b $ logNote' str
+  env <- get
+  liftIO $ outputLog env $ logNote' str
 
 warn :: PosInfo -> T.Text -> Compiler ()
 warn pos str = do
-  b <- gets shouldColorize
-  eoe <- gets endOfEntry
-  liftIO $ outputLog b eoe $ logWarning pos str
+  env <- get
+  liftIO $ outputLog env $ logWarning pos str
+
+outputPass :: String -> IO ()
+outputPass str = do
+  outputLog initialEnv (Nothing, LogLevelPass, T.pack str)
+
+outputFail :: String -> IO ()
+outputFail str = do
+  outputLog initialEnv (Nothing, LogLevelFail, T.pack str)
 
 -- for debug
 p :: String -> Compiler ()
