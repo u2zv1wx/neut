@@ -88,7 +88,7 @@ stylize :: String -> String
 stylize str =
   case str of
     "" ->
-      "(empty)"
+      ""
     _ ->
       stylize' str
 
