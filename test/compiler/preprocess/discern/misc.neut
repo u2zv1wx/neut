@@ -13,7 +13,15 @@
   ((lambda-meta (x) (f (lambda-meta (v) ((x x) v))))
    (lambda-meta (x) (f (lambda-meta (v) ((x x) v))))))
 
-(define-macro length
+(define-macro length (xs)
+  (if-meta (meta.is-nil xs)
+    0
+    (meta.int.add 1 (length (meta.node.tail xs)))))
+
+(dry-expand
+  (length `(a b c d e f)))
+
+(define-macro length-combinator
   (z-combinator
     (lambda-meta (self)
       (lambda-meta (xs)
@@ -22,4 +30,4 @@
           (meta.int.add 1 (self (meta.node.tail xs))))))))
 
 (dry-expand
-  (length `(a b c d e f)))
+  (length-combinator `(a b c d e f)))
