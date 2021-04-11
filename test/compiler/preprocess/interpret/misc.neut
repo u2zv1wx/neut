@@ -1,0 +1,43 @@
+(include "../../../foundation.neut")
+
+(dry-expand 10)
+
+(dry-expand
+  (lambda-meta (x) x))
+
+(dry-expand
+  (apply-meta
+    (lambda-meta-variadic (y z rest) `(pohe @,rest))
+    (fix-meta self (arg1 arg2) (self arg1))
+    (fix-meta-variadic self (arg1 arg2 rest) (self arg1))
+    (leaf a)
+    `b
+    (node (quote c) `(d e ,(node (node) (leaf) `(unquote (quote f)) `g)))))
+
+(define-macro nil
+  (node))
+
+(dry-expand
+  (cond-meta
+    (nil `foo)
+    (10
+      (if-meta nil
+        20
+        (cond-meta
+          (nil `bar)
+          `pohe)))
+    `hello))
+
+(dry-expand
+  (with-meta (lambda-meta (x k) (k x))
+    (let p
+      (begin-meta
+        (let foo ((lambda-meta (x) x) _))
+        (foo 1)))
+    nil
+    (let q
+      (begin-meta
+        (let foo (lambda-meta (x) `(,x ,p ,x)))
+        (let q `(foo bar @,`(a b c d)))
+        (foo `(e f g))))
+    q))

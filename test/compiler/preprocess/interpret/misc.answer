@@ -1,0 +1,5 @@
+10
+(lambda-meta (x) x)
+(pohe a b (c (d e (()  f g))))
+pohe
+((e f g) 1 (e f g))
