@@ -29,15 +29,8 @@ type EscapeFlag =
 
 tokenize :: T.Text -> Compiler [TreePlus]
 tokenize input = do
-  modify (\env -> env {count = 1 + count env})
   path <- getCurrentFilePath
-  let env = TEnv {text = input, line = 1, column = 1, filePath = path}
-  resultOrError <- liftIO $ try $ runStateT (program []) env
-  case resultOrError of
-    Left err ->
-      throw (err :: Error)
-    Right (result, _) ->
-      return result
+  liftIO $ evalStateT (program []) $ TEnv {text = input, line = 1, column = 1, filePath = path}
 
 program :: [TreePlus] -> Tokenizer [TreePlus]
 program acc = do
