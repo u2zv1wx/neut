@@ -17,24 +17,24 @@ main = do
   currentDir <- getCurrentDir
   let testDirPathList = map (\path -> currentDir </> path) relDirPathList
   forM_ testDirPathList $ \testDirPath -> do
-    (_, contents) <- listDir testDirPath
+    (_, contents) <- listDirRecur testDirPath
     progList <- filterM isSourceFile contents
-    result <- test $ sort progList
+    result <- test testDirPath $ sort progList
     if result
       then return ()
       else exitWith (ExitFailure 1)
 
-test :: [Path Abs File] -> IO Bool
-test [] = return True
-test [srcPath] = test' srcPath
-test (srcPath : rest) = do
-  b1 <- test' srcPath
+test :: Path Abs Dir -> [Path Abs File] -> IO Bool
+test _ [] = return True
+test testDirPath [srcPath] = test' testDirPath srcPath
+test testDirPath (srcPath : rest) = do
+  b1 <- test' testDirPath srcPath
   putStr "\n"
-  b2 <- test rest
+  b2 <- test testDirPath rest
   return $ b1 && b2
 
-test' :: Path Abs File -> IO Bool
-test' srcPath = do
+test' :: Path Abs Dir -> Path Abs File -> IO Bool
+test' testDirPath srcPath = do
   (binaryPath, _) <- splitExtension srcPath
   (code, out, _) <-
     readProcessWithExitCode
@@ -60,13 +60,14 @@ test' srcPath = do
         return out
   answerPath <- addExtension ".answer" binaryPath
   expectedResult <- readFile $ toFilePath answerPath
-  (basename, _) <- splitExtension $ filename srcPath
+  relSrcPath <- stripProperPrefix testDirPath srcPath
+  (testName, _) <- splitExtension relSrcPath
   if result == expectedResult
     then do
-      outputPass $ toFilePath basename
+      outputPass $ toFilePath testName
       return True
     else do
-      outputFail $ toFilePath basename
+      outputFail $ toFilePath testName
       putStrLn $ prefixExpected <> stylize expectedResult
       putStrLn $ prefixFound <> stylize result
       return False
