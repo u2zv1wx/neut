@@ -253,7 +253,7 @@ raiseIfFailure m procName exitCode h pkgDirPath =
     ExitSuccess ->
       return ()
     ExitFailure i -> do
-      removeDir pkgDirPath -- cleanup
+      removeDir pkgDirPath
       errStr <- liftIO $ hGetContents h
       raiseError m $ T.pack $ "the child process `" ++ procName ++ "` failed with the following message (exitcode = " ++ show i ++ "):\n" ++ errStr
 
