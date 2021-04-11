@@ -1,0 +1,43 @@
+(include "../../foundation.neut")
+
+
+(section foo)
+
+(define-macro pohe
+ `a)
+
+(section bar)
+
+(define-macro pohe `b)
+
+(end bar)
+
+(end foo)
+
+(dry-expand foo.pohe)
+
+(dry-expand foo.bar.pohe)
+
+(use foo)
+
+(dry-expand pohe)
+
+(dry-expand foo.pohe)
+
+(dry-expand bar.pohe)
+
+(dry-expand foo.bar.pohe)
+
+(define-prefix Q foo.bar)
+
+(dry-expand Q.pohe)
+
+(define-prefix Q foo)
+
+(remove-prefix Q foo.bar)
+
+(dry-expand Q.pohe)
+
+(define-prefix lorem.ipsum Q)
+
+(dry-expand lorem.ipsum.pohe)
