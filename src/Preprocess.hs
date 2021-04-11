@@ -190,8 +190,8 @@ preprocess' stmtList = do
                 raiseSyntaxError m "(introspect LEAF TREE*)"
             "dry-expand"
               | [e] <- rest -> do
-                e' <- autoQuote e >>= evaluate >>= specialize
-                note m (showAsSExp e')
+                e' <- evaluate e
+                note m (showAsSExp $ toTree e')
                 preprocess' restStmtList
               | otherwise ->
                 raiseSyntaxError m "(dry-expand TREE)"

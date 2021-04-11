@@ -24,6 +24,6 @@ dry-expand ; comment
 ; comment
 
 
-(  foo  aoeu
+(  foo  `aoeu
 ; comment
-hoge))
+`hoge))
