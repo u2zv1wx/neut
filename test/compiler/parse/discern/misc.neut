@@ -1,0 +1,9 @@
+(include "../../../foundation.neut")
+
+(define foo (x)
+  ((lambda (x)
+     (lambda (x)
+       (add-i64 x 10)))
+    (lambda ((y x)) x)))
+
+(reduce ((foo tau) 100))
