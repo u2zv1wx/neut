@@ -300,8 +300,7 @@ specialize term =
       es' <- mapM specialize es
       return (m, TreeNode es')
     (m, _) -> do
-      p' term
-      raiseError m $ "meta-reduction of this term resulted in a non-quoted term"
+      raiseError m $ "meta-reduction of this term resulted in a non-AST term:\n" <> showTree (toTree term)
 
 preprocessStmtClause :: TreePlus -> Compiler (T.Text, [TreePlus])
 preprocessStmtClause tree =

@@ -28,7 +28,11 @@
 
 (dry-expand foo.bar.pohe)
 
+(section pohe)
+
 (define-prefix Q foo.bar)
+
+(end pohe)
 
 (dry-expand Q.pohe)
 
