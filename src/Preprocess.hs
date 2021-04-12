@@ -195,6 +195,8 @@ preprocess' stmtList = do
                 preprocess' restStmtList
               | otherwise ->
                 raiseSyntaxError m "(dry-expand TREE)"
+            "statement" ->
+              preprocess' $ rest ++ restStmtList
             _ ->
               preprocessAux headStmt restStmtList
         _ ->
