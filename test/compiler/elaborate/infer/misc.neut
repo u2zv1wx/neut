@@ -1,0 +1,36 @@
+(include "../../../foundation.neut")
+
+(reduce
+  (witness *
+    tau))
+
+(reduce
+  (lambda ((x i64))
+    (witness *
+      x)))
+
+(define global ((x tau)) x)
+
+(reduce
+  global)
+
+(define-opaque global-opaque ((x tau)) x)
+
+(reduce
+  global-opaque)
+
+(reduce
+  (forall ((a tau) (f (hom (hom a a) a))) a))
+
+(reduce
+  (Π-introduction ((a tau) (f (hom (hom a a) a))) a))
+
+(reduce
+  (Π-introduction-fix self ((a tau) (f (hom (hom a a) a))) (witness bottom (self a f))))
+
+(reduce
+  (lambda ((x i64)) (add-i64 x 1)))
+
+(reduce top)
+
+(reduce ((lambda ((x *)) x) top.unit))
