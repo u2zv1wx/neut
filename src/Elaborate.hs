@@ -157,10 +157,13 @@ elaborate' term =
           | Just bs <- Map.lookup (asText name) denv,
             S.member name oenv -> do
             let bs' = map (\((mPat, b, _), _) -> (mPat, asText b)) patList
-            forM_ (zip bs bs') $ \(b, (mPat, b')) -> do
-              if b == b'
-                then return ()
-                else raiseError mPat $ "the constructor here is supposed to be `" <> b <> "`, but is: `" <> b' <> "`" -- fixme: add hint for patterns
+            if length bs /= length bs'
+              then raiseError m "found a non-exhaustive pattern"
+              else do
+                forM_ (zip bs bs') $ \(b, (mPat, b')) -> do
+                  if b == b'
+                    then return ()
+                    else raiseError mPat $ "the constructor here is supposed to be `" <> b <> "`, but is: `" <> b' <> "`" -- fixme: add hint for patterns
             return (m, TermCase resultType' mSubject' (e', t') patList')
         _ -> do
           raiseError (fst t) $ "the type of this term must be a data-type, but its type is:\n" <> showTree (toTree $ weaken t')
