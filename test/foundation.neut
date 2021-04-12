@@ -2,3 +2,9 @@
   "https://gitlab.com/veka41/neut-core/-/raw/master/release/0.1.0.5.tar.xz")
 
 (include "core/0.1.0.5/foundation.neut")
+
+(include "core/0.1.0.5/identity.neut")
+
+(include "core/0.1.0.5/noesis.neut")
+
+(include "core/0.1.0.5/noema.neut")
