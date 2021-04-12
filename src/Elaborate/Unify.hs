@@ -37,7 +37,7 @@ synthesize = do
   case Q.minView cs of
     Nothing ->
       return ()
-    Just ((SuspendedConstraint (_, ConstraintKindDelta, (c, orig))), cs') -> do
+    Just ((SuspendedConstraint (_, ConstraintKindDelta c, (_, orig))), cs') -> do
       modify (\env -> env {suspendedConstraintEnv = cs'})
       simplify [(c, orig)]
       synthesize
@@ -174,12 +174,12 @@ simplify constraintList =
                       else simplify $ ((e1, toPiElim lam2 mess2), orig) : cs
                 (Just (StuckPiElimVar x1 mess1), Just (StuckPiElimAster {}))
                   | Just lam <- lookupDefinition x1 sub -> do
-                    let uc = SuspendedConstraint (fmvs, ConstraintKindDelta, ((toPiElim lam mess1, e2), orig))
+                    let uc = SuspendedConstraint (fmvs, ConstraintKindDelta (toPiElim lam mess1, e2), headConstraint)
                     modify (\env -> env {suspendedConstraintEnv = Q.insert uc (suspendedConstraintEnv env)})
                     simplify cs
                 (Just (StuckPiElimAster {}), Just (StuckPiElimVar x2 mess2))
                   | Just lam <- lookupDefinition x2 sub -> do
-                    let uc = SuspendedConstraint (fmvs, ConstraintKindDelta, ((e1, toPiElim lam mess2), orig)) -- このdeltaだとsuspendで解決できても結局定義を展開してしまうのでダメそう。
+                    let uc = SuspendedConstraint (fmvs, ConstraintKindDelta (e1, toPiElim lam mess2), headConstraint)
                     modify (\env -> env {suspendedConstraintEnv = Q.insert uc (suspendedConstraintEnv env)})
                     simplify cs
                 (Just (StuckPiElimVar x1 mess1), _)

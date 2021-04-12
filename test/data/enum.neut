@@ -1,11 +1,11 @@
 (include "../header.neut")
 
 ; nullary enum
-(declare-enum sample-0)
+(define-enum sample-0)
 
-(declare-enum sample-1 (foo 3))
+(define-enum sample-1 (foo 3))
 
-(declare-enum sample-2 (foo 0) (bar 2))
+(define-enum sample-2 (foo 0) (bar 2))
 
 ; bypass by `enum-introduction`
 (define lam-bar
@@ -17,7 +17,7 @@
 (reduce
   (i64.print (unsafe.cast sample-1 i64 sample-1.foo))) ; 3
 
-(declare-enum sample-3
+(define-enum sample-3
   (foo 1)
   (bar 3)
   buz ; 4

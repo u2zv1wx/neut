@@ -63,26 +63,33 @@ type MetaVarSet =
   S.Set Int
 
 data ConstraintKind
-  = ConstraintKindDelta
+  = ConstraintKindDelta Constraint
   | ConstraintKindOther
-  deriving (Enum)
 
 newtype SuspendedConstraint
   = SuspendedConstraint (MetaVarSet, ConstraintKind, (Constraint, Constraint))
 
 instance Eq SuspendedConstraint where
   (SuspendedConstraint (_, kind1, _)) == (SuspendedConstraint (_, kind2, _)) =
-    fromEnum kind1 == fromEnum kind2
+    kindToInt kind1 == kindToInt kind2
 
 instance Ord SuspendedConstraint where
   (SuspendedConstraint (_, kind1, _)) `compare` (SuspendedConstraint (_, kind2, _)) =
-    fromEnum kind1 `compare` fromEnum kind2
+    kindToInt kind1 `compare` kindToInt kind2
 
 type SuspendedConstraintQueue = Q.MinQueue SuspendedConstraint
 
 toVar :: Hint -> Ident -> WeakTermPlus
 toVar m x =
   (m, WeakTermVar VarKindLocal x)
+
+kindToInt :: ConstraintKind -> Int
+kindToInt k =
+  case k of
+    ConstraintKindDelta {} ->
+      0
+    ConstraintKindOther {} ->
+      1
 
 i8 :: Hint -> WeakTermPlus
 i8 m =
