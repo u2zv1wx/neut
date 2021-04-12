@@ -143,7 +143,7 @@ intBinaryOpSet =
 
 floatBinaryOpSet :: S.Set T.Text
 floatBinaryOpSet =
-  S.fromList ["fadd", "fsub", "fmul", "fdiv", "frem", "srem", "shl", "lshr", "ashr", "and", "or", "xor"]
+  S.fromList ["fadd", "fsub", "fmul", "fdiv", "frem"]
 
 isValidConvOp :: T.Text -> LowType -> LowType -> Bool
 isValidConvOp name domType codType =
