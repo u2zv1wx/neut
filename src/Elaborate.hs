@@ -146,27 +146,40 @@ elaborate' term =
       mSubject' <- mapM elaborate' mSubject
       e' <- elaborate' e
       t' <- elaborate' t >>= reduceTermPlus
-      patList' <- forM patList $ \((mPat, c, xts), body) -> do
-        xts' <- mapM elaborateWeakIdentPlus xts
-        body' <- elaborate' body
-        return ((mPat, c, xts'), body')
       denv <- gets dataEnv
       oenv <- gets opaqueEnv
       case t' of
         (_, TermPiElim (_, TermVar _ name) _)
           | Just bs <- Map.lookup (asText name) denv,
             S.member name oenv -> do
-            let bs' = map (\((mPat, b, _), _) -> (mPat, asText b)) patList
-            if length bs /= length bs'
-              then raiseError m "found a non-exhaustive pattern"
-              else do
-                forM_ (zip bs bs') $ \(b, (mPat, b')) -> do
-                  if b == b'
-                    then return ()
-                    else raiseError mPat $ "the constructor here is supposed to be `" <> b <> "`, but is: `" <> b' <> "`"
+            patList' <- elaboratePatternList m bs patList
             return (m, TermCase resultType' mSubject' (e', t') patList')
         _ -> do
           raiseError (fst t) $ "the type of this term must be a data-type, but its type is:\n" <> showTree (toTree $ weaken t')
+
+-- for now
+elaboratePatternList :: Hint -> [T.Text] -> [(WeakPattern, WeakTermPlus)] -> Compiler [(Pattern, TermPlus)]
+elaboratePatternList m bs patList = do
+  patList' <- forM patList $ \((mPat, c, xts), body) -> do
+    xts' <- mapM elaborateWeakIdentPlus xts
+    body' <- elaborate' body
+    return ((mPat, c, xts'), body')
+  checkCaseSanity m bs patList'
+  return patList'
+
+checkCaseSanity :: Hint -> [T.Text] -> [(Pattern, TermPlus)] -> Compiler ()
+checkCaseSanity m bs patList =
+  case (bs, patList) of
+    ([], []) ->
+      return ()
+    (b : bsRest, ((mPat, b', _), _) : patListRest) -> do
+      if b /= asText b'
+        then raiseError mPat $ "the constructor here is supposed to be `" <> b <> "`, but is: `" <> asText b' <> "`"
+        else checkCaseSanity m bsRest patListRest
+    (b : _, []) ->
+      raiseError m $ "found a non-exhaustive pattern; the clause for `" <> b <> "` is missing"
+    ([], ((mPat, b, _), _) : _) ->
+      raiseError mPat $ "found a redundant pattern; this clause for `" <> asText b <> "` is redundant"
 
 elaborateWeakIdentPlus :: WeakIdentPlus -> Compiler IdentPlus
 elaborateWeakIdentPlus (m, x, t) = do
