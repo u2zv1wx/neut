@@ -51,14 +51,14 @@ parse stmtTreeList =
                 return $ WeakStmtDef m Nothing t e' : defList
               | otherwise ->
                 raiseSyntaxError m "(reduce TREE)"
-            "declare-enum"
+            "define-enum"
               | (_, TreeLeaf name) : ts <- rest -> do
                 name' <- withSectionPrefix name
                 xis <- interpretEnumItem m name' ts
                 insEnumEnv m name' xis
                 parse restStmtList
               | otherwise ->
-                raiseSyntaxError m "(declare-enum LEAF TREE ... TREE)"
+                raiseSyntaxError m "(define-enum LEAF TREE ... TREE)"
             --
             -- namespace-related statements
             --
