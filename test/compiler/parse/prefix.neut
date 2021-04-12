@@ -1,0 +1,50 @@
+(include "../../foundation.neut")
+
+(section foo)
+
+(define pohe
+  top.unit)
+
+(section bar)
+
+(define pohe bool.true)
+
+(end bar)
+
+(end foo)
+
+(reduce foo.pohe)
+
+(reduce foo.bar.pohe)
+
+(use foo)
+
+(reduce pohe)
+
+(reduce foo.pohe)
+
+(reduce bar.pohe)
+
+(reduce foo.bar.pohe)
+
+(section pohe)
+
+(define-prefix Q foo.bar)
+
+(end pohe)
+
+(reduce Q.pohe)
+
+(unuse Q)
+
+(reduce Q.pohe)
+
+(define-prefix Q foo)
+
+(remove-prefix Q foo.bar)
+
+(reduce Q.pohe)
+
+(define-prefix lorem.ipsum Q)
+
+(reduce lorem.ipsum.pohe)
