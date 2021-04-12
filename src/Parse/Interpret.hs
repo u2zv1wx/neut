@@ -59,6 +59,18 @@ interpret inputTree =
             return (m, WeakTermPiIntro OpacityTransparent LamKindNormal xts' e')
           | otherwise ->
             raiseSyntaxError m "(Π-introduction (TREE*) TREE)"
+        "Π-introduction-fix"
+          | [xt, xts@(_, TreeNode _), e] <- rest -> do
+            (m', xt', xts', e') <- interpretFix (m, TreeNode [xt, xts, e])
+            return (m', WeakTermPiIntro OpacityTranslucent (LamKindFix xt') xts' e')
+          | otherwise ->
+            raiseSyntaxError m "(fix TREE (TREE*) TREE)"
+        "Π-introduction-fix-irreducible"
+          | [xt, xts@(_, TreeNode _), e] <- rest -> do
+            (m', xt', xts', e') <- interpretFix (m, TreeNode [xt, xts, e])
+            return (m', WeakTermPiIntro OpacityOpaque (LamKindFix xt') xts' e')
+          | otherwise ->
+            raiseSyntaxError m "(fix-irreducible TREE (TREE*) TREE)"
         "Π-introduction-constructor"
           | [(_, TreeLeaf dataName), (_, TreeLeaf consName), (_, TreeNode xts), e] <- rest -> do
             (xts', e') <- interpretBinder xts e
@@ -78,18 +90,6 @@ interpret inputTree =
             interpretPiElim m e es
           | otherwise ->
             raiseSyntaxError m "(Π-elimination TREE TREE*)"
-        "fix"
-          | [xt, xts@(_, TreeNode _), e] <- rest -> do
-            (m', xt', xts', e') <- interpretFix (m, TreeNode [xt, xts, e])
-            return (m', WeakTermPiIntro OpacityTranslucent (LamKindFix xt') xts' e')
-          | otherwise ->
-            raiseSyntaxError m "(fix TREE (TREE*) TREE)"
-        "fix-irreducible"
-          | [xt, xts@(_, TreeNode _), e] <- rest -> do
-            (m', xt', xts', e') <- interpretFix (m, TreeNode [xt, xts, e])
-            return (m', WeakTermPiIntro OpacityOpaque (LamKindFix xt') xts' e')
-          | otherwise ->
-            raiseSyntaxError m "(fix-irreducible TREE (TREE*) TREE)"
         "constant"
           | [(_, TreeLeaf x)] <- rest ->
             return (m, WeakTermConst x)
