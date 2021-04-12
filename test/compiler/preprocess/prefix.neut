@@ -36,6 +36,10 @@
 
 (dry-expand Q.pohe)
 
+(unuse Q)
+
+(dry-expand Q.pohe)
+
 (define-prefix Q foo)
 
 (remove-prefix Q foo.bar)
