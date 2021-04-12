@@ -1,0 +1,15 @@
+(include "../../foundation.neut")
+
+(define-data item ()
+  (foo)
+  (bar))
+
+(use item)
+
+(use bool)
+
+(define g ((x (item)))
+  (case x
+    ((item.bar) false)
+    ((foo) true)
+    ))

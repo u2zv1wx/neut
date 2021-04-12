@@ -1,0 +1,1 @@
+the constructor here is supposed to be `item.foo`, but is: `item.bar`
