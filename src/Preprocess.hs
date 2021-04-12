@@ -262,7 +262,7 @@ ensureEnvSanity m = do
   penv <- gets prefixEnv
   if null penv
     then return ()
-    else raiseError m "`include` can only be used with no `use`"
+    else raiseError m $ "`include` can only be used with no `use`, but the current `use` is: " <> T.intercalate ", " penv
 
 showCyclicPath :: [Path Abs File] -> T.Text
 showCyclicPath pathList =
