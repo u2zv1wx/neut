@@ -99,13 +99,13 @@ clarifyTerm tenv term =
           (xs, es', xsAsVars) <- unzip3 <$> mapM (clarifyPlus tenv) es
           return $ bindLet (zip xs es') (m, CompPrimitive (PrimitiveDerangement expKind xsAsVars))
     (m, TermCase resultType mSubject (e, _) patList) -> do
-      let fvs = chainFromTermList tenv $ map (caseClauseToLambda m) patList
+      let fvs = chainFromTermList tenv $ map caseClauseToLambda patList
       resultArg <- clarifyPlus tenv resultType
       closure <- clarifyTerm tenv e
       ((closureVarName, closureVar), typeVarName, (envVarName, envVar), (tagVarName, tagVar)) <- newClosureNames m
-      branchList <- forM (zip patList [0 ..]) $ \(((constructorName, xts), body), i) -> do
+      branchList <- forM (zip patList [0 ..]) $ \(((mPat, constructorName, xts), body), i) -> do
         body' <- clarifyTerm (insTypeEnv xts tenv) body
-        clauseClosure <- returnClosure tenv True LamKindNormal fvs m xts body'
+        clauseClosure <- returnClosure tenv True LamKindNormal fvs mPat xts body'
         closureArgs <- constructClauseArguments clauseClosure i $ length patList
         let (argVarNameList, argList, argVarList) = unzip3 (resultArg : closureArgs)
         let consName = wrapWithQuote $ if isJust mSubject then asText constructorName <> ";noetic" else asText constructorName
@@ -113,9 +113,9 @@ clarifyTerm tenv term =
           ( EnumCaseInt i,
             bindLet
               (zip argVarNameList argList)
-              ( m,
+              ( mPat,
                 CompPiElimDownElim
-                  (m, ValueVarGlobal consName)
+                  (mPat, ValueVarGlobal consName)
                   (argVarList ++ [envVar])
               )
           )
@@ -141,11 +141,11 @@ newClosureNames m = do
   lamVarInfo <- newValueVarLocalWith m "thunk"
   return (closureVarInfo, typeVarName, envVarInfo, lamVarInfo)
 
-caseClauseToLambda :: Hint -> (Pattern, TermPlus) -> TermPlus
-caseClauseToLambda m pat =
+caseClauseToLambda :: (Pattern, TermPlus) -> TermPlus
+caseClauseToLambda pat =
   case pat of
-    ((_, xts), body) ->
-      (m, TermPiIntro OpacityTransparent LamKindNormal xts body)
+    ((mPat, _, xts), body) ->
+      (mPat, TermPiIntro OpacityTransparent LamKindNormal xts body)
 
 constructClauseArguments :: CompPlus -> Int -> Int -> Compiler [(Ident, CompPlus, ValuePlus)]
 constructClauseArguments cls clsIndex upperBound = do
@@ -339,7 +339,7 @@ chainOf tenv term =
     (_, TermCase _ mSubject (e, _) patList) -> do
       let xs1 = concat $ (map (chainOf tenv) $ maybeToList mSubject)
       let xs2 = chainOf tenv e
-      let xs3 = concat $ (flip map patList $ \((_, xts), body) -> chainOf' tenv xts [body])
+      let xs3 = concat $ (flip map patList $ \((_, _, xts), body) -> chainOf' tenv xts [body])
       xs1 ++ xs2 ++ xs3
 
 chainOf' :: TypeEnv -> [IdentPlus] -> [TermPlus] -> [IdentPlus]

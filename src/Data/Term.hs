@@ -29,7 +29,7 @@ data Term
   deriving (Show)
 
 type Pattern =
-  (Ident, [IdentPlus])
+  (Hint, Ident, [IdentPlus])
 
 type TermPlus =
   (Hint, Term)
@@ -97,7 +97,7 @@ weaken term =
       let mSubject' = fmap weaken mSubject
       let e' = weaken e
       let t' = weaken t
-      let patList' = map (\((p, xts), body) -> ((p, map weakenIdentPlus xts), weaken body)) patList
+      let patList' = map (\((mp, p, xts), body) -> ((mp, p, map weakenIdentPlus xts), weaken body)) patList
       (m, WeakTermCase resultType' mSubject' (e', t') patList')
 
 weakenIdentPlus :: (Hint, Ident, TermPlus) -> (Hint, Ident, WeakTermPlus)

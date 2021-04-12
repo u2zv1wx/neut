@@ -146,21 +146,21 @@ elaborate' term =
       mSubject' <- mapM elaborate' mSubject
       e' <- elaborate' e
       t' <- elaborate' t >>= reduceTermPlus
-      patList' <- forM patList $ \((c, xts), body) -> do
+      patList' <- forM patList $ \((mPat, c, xts), body) -> do
         xts' <- mapM elaborateWeakIdentPlus xts
         body' <- elaborate' body
-        return ((c, xts'), body')
+        return ((mPat, c, xts'), body')
       denv <- gets dataEnv
       oenv <- gets opaqueEnv
       case t' of
         (_, TermPiElim (_, TermVar _ name) _)
           | Just bs <- Map.lookup (asText name) denv,
             S.member name oenv -> do
-            let bs' = map (\((b, _), _) -> asText b) patList
-            forM_ (zip bs bs') $ \(b, b') -> do
+            let bs' = map (\((mPat, b, _), _) -> (mPat, asText b)) patList
+            forM_ (zip bs bs') $ \(b, (mPat, b')) -> do
               if b == b'
                 then return ()
-                else raiseError m $ "the constructor here is supposed to be `" <> b <> "`, but is: `" <> b' <> "`" -- fixme: add hint for patterns
+                else raiseError mPat $ "the constructor here is supposed to be `" <> b <> "`, but is: `" <> b' <> "`" -- fixme: add hint for patterns
             return (m, TermCase resultType' mSubject' (e', t') patList')
         _ -> do
           raiseError (fst t) $ "the type of this term must be a data-type, but its type is:\n" <> showTree (toTree $ weaken t')

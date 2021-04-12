@@ -94,12 +94,12 @@ discern' nenv term =
       mSubject' <- mapM (discern' nenv) mSubject
       e' <- discern' nenv e
       t' <- discern' nenv t
-      clauseList' <- forM clauseList $ \((constructorName, xts), body) -> do
+      clauseList' <- forM clauseList $ \((mCons, constructorName, xts), body) -> do
         constructorName' <- resolveSymbol m (asItself m nenv) (asText constructorName)
         case constructorName' of
           Just (_, newName) -> do
             (xts', body') <- discernBinder nenv xts body
-            return ((newName, xts'), body')
+            return ((mCons, newName, xts'), body')
           Nothing ->
             raiseError m $ "no such constructor is defined: " <> asText constructorName
       return (m, WeakTermCase resultType' mSubject' (e', t') clauseList')

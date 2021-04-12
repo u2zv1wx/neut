@@ -32,7 +32,7 @@ data WeakTerm
   deriving (Show)
 
 type WeakPattern =
-  (Ident, [WeakIdentPlus])
+  (Hint, Ident, [WeakIdentPlus])
 
 type WeakTermPlus =
   (Hint, WeakTerm)
@@ -146,7 +146,7 @@ varWeakTermPlus term =
       let xs2 = S.unions $ map varWeakTermPlus $ maybeToList mSubject
       let xs3 = varWeakTermPlus e
       let xs4 = varWeakTermPlus t
-      let xs5 = S.unions $ map (\((_, xts), body) -> varWeakTermPlus' xts [body]) patList
+      let xs5 = S.unions $ map (\((_, _, xts), body) -> varWeakTermPlus' xts [body]) patList
       S.unions [xs1, xs2, xs3, xs4, xs5]
 
 varWeakTermPlus' :: [WeakIdentPlus] -> [WeakTermPlus] -> S.Set Ident
@@ -200,7 +200,7 @@ asterWeakTermPlus term =
       let xs2 = S.unions $ map asterWeakTermPlus $ maybeToList mSubject
       let xs3 = asterWeakTermPlus e
       let xs4 = asterWeakTermPlus t
-      let xs5 = S.unions $ map (\((_, xts), body) -> asterWeakTermPlus' xts body) patList
+      let xs5 = S.unions $ map (\((_, _, xts), body) -> asterWeakTermPlus' xts body) patList
       S.unions [xs1, xs2, xs3, xs4, xs5]
 
 asterWeakTermPlus' :: [WeakIdentPlus] -> WeakTermPlus -> S.Set Int
@@ -390,12 +390,12 @@ toTreeCaseClause (pat, e) = do
   (m, TreeNode [toTreePattern m pat, toTree e])
 
 toTreePattern :: Hint -> WeakPattern -> TreePlus
-toTreePattern m (f, xts) = do
+toTreePattern m (mf, f, xts) = do
   let xts' = map (\(_, x, _) -> (m, TreeLeaf (asText x))) xts
-  (m, TreeNode ((m, TreeLeaf (asText f)) : xts'))
+  (m, TreeNode ((mf, TreeLeaf (asText f)) : xts'))
 
-showPattern :: (Ident, [WeakIdentPlus]) -> T.Text
-showPattern (f, xts) = do
+showPattern :: (Hint, Ident, [WeakIdentPlus]) -> T.Text
+showPattern (_, f, xts) = do
   case xts of
     [] ->
       inParen $ asText f

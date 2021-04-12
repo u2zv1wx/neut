@@ -82,9 +82,9 @@ reduceTermPlus term =
           resultType' <- reduceTermPlus resultType
           mSubject' <- mapM reduceTermPlus mSubject
           t' <- reduceTermPlus t
-          clauseList' <- forM clauseList $ \((name, xts), body) -> do
+          clauseList' <- forM clauseList $ \((mPat, name, xts), body) -> do
             body' <- reduceTermPlus body
-            return ((name, xts), body')
+            return ((mPat, name, xts), body')
           return (m, TermCase resultType' mSubject' (e', t') clauseList')
     _ ->
       return term
@@ -94,14 +94,14 @@ checkClauseListSanity consNameList clauseList =
   case (consNameList, clauseList) of
     ([], []) ->
       True
-    (consName : restConsNameList, ((name, _), _) : restClauseList)
+    (consName : restConsNameList, ((_, name, _), _) : restClauseList)
       | consName == asText name ->
         checkClauseListSanity restConsNameList restClauseList
     _ ->
       False
 
 toLamList :: Hint -> (Pattern, TermPlus) -> TermPlus
-toLamList m ((_, xts), body) =
+toLamList m ((_, _, xts), body) =
   (m, TermPiIntro OpacityTransparent LamKindNormal xts body)
 
 substTermPlus :: SubstTerm -> TermPlus -> Compiler TermPlus
@@ -153,9 +153,9 @@ substTermPlus sub term =
       mSubject' <- mapM (substTermPlus sub) mSubject
       e' <- substTermPlus sub e
       t' <- substTermPlus sub t
-      clauseList' <- forM clauseList $ \((name, xts), body) -> do
+      clauseList' <- forM clauseList $ \((mPat, name, xts), body) -> do
         (xts', body') <- substTermPlus' sub xts body
-        return ((name, xts'), body')
+        return ((mPat, name, xts'), body')
       return (m, TermCase resultType' mSubject' (e', t') clauseList')
 
 substTermPlus' ::

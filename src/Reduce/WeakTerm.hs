@@ -87,9 +87,9 @@ reduceWeakTermPlus term =
           resultType' <- reduceWeakTermPlus resultType
           mSubject' <- mapM reduceWeakTermPlus mSubject
           t' <- reduceWeakTermPlus t
-          clauseList' <- forM clauseList $ \((name, xts), body) -> do
+          clauseList' <- forM clauseList $ \((mPat, name, xts), body) -> do
             body' <- reduceWeakTermPlus body
-            return ((name, xts), body')
+            return ((mPat, name, xts), body')
           return (m, WeakTermCase resultType' mSubject' (e', t') clauseList')
     _ ->
       return term
@@ -99,14 +99,14 @@ checkClauseListSanity consNameList clauseList =
   case (consNameList, clauseList) of
     ([], []) ->
       True
-    (consName : restConsNameList, ((name, _), _) : restClauseList)
+    (consName : restConsNameList, ((_, name, _), _) : restClauseList)
       | consName == asText name ->
         checkClauseListSanity restConsNameList restClauseList
     _ ->
       False
 
 toLamList :: Hint -> (WeakPattern, WeakTermPlus) -> WeakTermPlus
-toLamList m ((_, xts), body) =
+toLamList m ((_, _, xts), body) =
   (m, WeakTermPiIntro OpacityTransparent LamKindNormal xts body)
 
 substWeakTermPlus :: SubstWeakTerm -> WeakTermPlus -> Compiler WeakTermPlus
@@ -170,9 +170,9 @@ substWeakTermPlus sub term =
       mSubject' <- mapM (substWeakTermPlus sub) mSubject
       e' <- substWeakTermPlus sub e
       t' <- substWeakTermPlus sub t
-      clauseList' <- forM clauseList $ \((name, xts), body) -> do
+      clauseList' <- forM clauseList $ \((mPat, name, xts), body) -> do
         (xts', body') <- substWeakTermPlus' sub xts body
-        return ((name, xts'), body')
+        return ((mPat, name, xts'), body')
       return (m, WeakTermCase resultType' mSubject' (e', t') clauseList')
 
 substWeakTermPlus' ::

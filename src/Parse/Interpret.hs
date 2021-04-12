@@ -337,9 +337,9 @@ interpretNoeticCaseBody subject nameMap body =
 interpretNoeticPattern :: TreePlus -> Compiler (WeakPattern, [(T.Text, T.Text, WeakTermPlus)])
 interpretNoeticPattern tree =
   case tree of
-    (_, TreeNode ((_, TreeLeaf patName) : xts)) -> do
+    (mPat, TreeNode ((_, TreeLeaf patName) : xts)) -> do
       (xts', nameMap) <- unzip <$> mapM interpretNoeticWeakIdentPlus xts
-      return ((asIdent patName, xts'), nameMap)
+      return ((mPat, asIdent patName, xts'), nameMap)
     _ ->
       raiseSyntaxError (fst tree) "(LEAF TREE*)"
 
@@ -381,9 +381,9 @@ interpretCaseClause tree =
 interpretPattern :: TreePlus -> Compiler WeakPattern
 interpretPattern tree =
   case tree of
-    (_, TreeNode ((_, TreeLeaf patName) : xts)) -> do
+    (mPat, TreeNode ((_, TreeLeaf patName) : xts)) -> do
       xts' <- mapM interpretWeakIdentPlus xts
-      return (asIdent patName, xts')
+      return (mPat, asIdent patName, xts')
     _ ->
       raiseSyntaxError (fst tree) "(LEAF TREE*)"
 

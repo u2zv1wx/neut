@@ -123,21 +123,21 @@ infer' ctx term =
       case clauseList of
         [] ->
           return ((m, WeakTermCase resultType mSubject' (e', t') []), resultType) -- ex falso quodlibet
-        ((constructorName, _), _) : _ -> do
+        ((_, constructorName, _), _) : _ -> do
           cenv <- gets constructorEnv
           case Map.lookup (asText constructorName) cenv of
             Nothing ->
               raiseCritical m $ "no such constructor defined (infer): " <> asText constructorName
             Just (holeCount, _) -> do
               holeList <- mapM (const $ newAsterInCtx ctx m) $ replicate holeCount ()
-              clauseList' <- forM clauseList $ \((name, xts), body) -> do
+              clauseList' <- forM clauseList $ \((mPat, name, xts), body) -> do
                 (xts', (body', tBody)) <- inferBinder ctx xts body
                 insConstraintEnv resultType tBody
                 let xs = map (\(mx, x, t) -> ((mx, WeakTermVar VarKindLocal x), t)) xts'
                 tCons <- lookupWeakTypeEnv m name
                 (_, tPat) <- inferPiElim ctx m ((m, WeakTermVar VarKindLocal name), tCons) (holeList ++ xs)
                 insConstraintEnv tPat t'
-                return ((name, xts'), body')
+                return ((mPat, name, xts'), body')
               return ((m, WeakTermCase resultType mSubject' (e', t') clauseList'), resultType)
 
 inferSubject :: Hint -> Context -> WeakTermPlus -> Compiler WeakTermPlus
