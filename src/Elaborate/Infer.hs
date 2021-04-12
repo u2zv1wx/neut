@@ -98,17 +98,13 @@ infer' ctx term =
       return ((m, WeakTermEnumIntro l), t)
     (m, WeakTermEnumElim (e, _) ces) -> do
       (e', t') <- infer' ctx e
-      if null ces
-        then do
-          h <- newTypeAsterInCtx ctx m
-          return ((m, WeakTermEnumElim (e', t') []), h) -- ex falso quodlibet
-        else do
-          let (cs, es) = unzip ces
-          (cs', tcs) <- unzip <$> mapM (inferEnumCase ctx) cs
-          forM_ (zip tcs (repeat t')) $ uncurry insConstraintEnv
-          (es', ts) <- unzip <$> mapM (infer' ctx) es
-          forM_ (zip (repeat (head ts)) (tail ts)) $ uncurry insConstraintEnv
-          return ((m, WeakTermEnumElim (e', t') $ zip cs' es'), head ts)
+      let (cs, es) = unzip ces
+      (cs', tcs) <- unzip <$> mapM (inferEnumCase ctx) cs
+      forM_ (zip tcs (repeat t')) $ uncurry insConstraintEnv
+      (es', ts) <- unzip <$> mapM (infer' ctx) es
+      h <- newTypeAsterInCtx ctx m
+      forM_ (zip (repeat h) ts) $ uncurry insConstraintEnv
+      return ((m, WeakTermEnumElim (e', t') $ zip cs' es'), h)
     (m, WeakTermQuestion e _) -> do
       (e', te) <- infer' ctx e
       return ((m, WeakTermQuestion e' te), te)

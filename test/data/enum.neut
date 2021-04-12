@@ -23,6 +23,10 @@
   buz ; 4
   qux) ; 5
 
+(define fake ((a tau) (x sample-0))
+  (witness a
+    (switch x)))
+
 (reduce
   (i64.print (unsafe.cast sample-3 i64 sample-3.foo))  ; 1
   (i64.print (unsafe.cast sample-2 i64 (lam-bar i8)))  ; 2
