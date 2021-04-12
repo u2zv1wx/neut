@@ -8,9 +8,8 @@
 (statement
   (section bar)
   (define pohe bool.true)
-  (end bar))
-
-(end foo)
+  (end bar)
+  (end foo))
 
 (reduce foo.pohe)
 
