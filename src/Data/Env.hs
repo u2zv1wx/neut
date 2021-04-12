@@ -5,6 +5,7 @@ import Control.Monad.State.Lazy
 import Data.Basic
 import Data.Comp
 import qualified Data.HashMap.Lazy as Map
+import Data.IORef
 import qualified Data.IntMap as IntMap
 import Data.Log
 import Data.LowComp
@@ -23,6 +24,7 @@ import Paths_neut (version)
 import System.Console.ANSI
 import System.Directory (createDirectoryIfMissing)
 import System.Exit
+import System.IO.Unsafe (unsafePerformIO)
 import qualified Text.Show.Pretty as Pr
 
 type Compiler a =
@@ -33,8 +35,7 @@ data VisitInfo
   | VisitInfoFinish
 
 data Env = Env
-  { count :: Int,
-    shouldColorize :: Bool,
+  { shouldColorize :: Bool,
     shouldDisplayLogLocation :: Bool,
     shouldDisplayLogLevel :: Bool,
     shouldDisplayLogText :: Bool,
@@ -86,8 +87,7 @@ data Env = Env
 initialEnv :: Env
 initialEnv =
   Env
-    { count = 0,
-      shouldColorize = True,
+    { shouldColorize = True,
       shouldDisplayLogLocation = True,
       shouldDisplayLogLevel = True,
       shouldDisplayLogText = True,
@@ -136,14 +136,15 @@ runCompiler c env = do
 -- generating new symbols using count
 --
 
+{-# NOINLINE count #-}
+count :: IORef Int
+count =
+  unsafePerformIO (newIORef 0)
+
 {-# INLINE newCount #-}
 newCount :: Compiler Int
 newCount = do
-  i <- gets count
-  modify (\e -> e {count = i + 1})
-  if i + 1 == 0
-    then raiseCritical' "counter exhausted"
-    else return i
+  liftIO $ atomicModifyIORef' count $ \x -> let z = x + 1 in (z, z) -- for now (i64-overflow breaks this)
 
 {-# INLINE newIdentFromText #-}
 newIdentFromText :: T.Text -> Compiler Ident

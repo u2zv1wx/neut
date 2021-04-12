@@ -8,6 +8,7 @@ import Control.Monad.State
 import Data.Basic
 import Data.Comp
 import Data.Env
+import Data.IORef
 
 linearize ::
   [(Ident, CompPlus)] -> -- [(x1, t1), ..., (xn, tn)]  (closed chain)
@@ -92,10 +93,11 @@ distinguishComp z term =
           return (vs, (m, CompEnumElim d' []))
         _ -> do
           let (cs, es) = unzip branchList
-          envBefore <- get
-          (vsses, envAfterList) <- fmap unzip $ forM es $ \e -> liftIO $ runStateT (distinguishComp z e) envBefore
-          let (vss, es') = unzip vsses
-          put (head envAfterList)
+          countBefore <- liftIO $ readIORef count
+          (vss, es') <- fmap unzip $
+            forM es $ \e -> do
+              liftIO $ writeIORef count countBefore
+              distinguishComp z e
           return (concat $ [vs, head vss], (m, CompEnumElim d' (zip cs es')))
 
 distinguishPrimitive :: Ident -> Primitive -> Compiler ([Ident], Primitive)
