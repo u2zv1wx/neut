@@ -1,0 +1,184 @@
+(include "../../../foundation.neut")
+
+(reduce tau)
+
+(define f ((x i64))
+  (witness * (add-i64 x 1)))
+
+(define g ((x f32))
+  (fadd-f32 x 3.288))
+
+(define h ((foo i64))
+  (add-i64 ?foo foo))
+
+(reduce
+  (Π () tau))
+
+(reduce
+  (Π ((x i64)) tau))
+
+(reduce
+  (Π ((x i64) (y i1) (z f32)) tau))
+
+(reduce
+  (Π-introduction () tau))
+
+(reduce
+  (Π-introduction ((x i64)) x))
+
+(reduce
+  (Π-introduction ((x i64) (y i1) (z f32)) z))
+
+(reduce
+  (Π-introduction-fix self () (witness bottom (self))))
+
+(reduce
+  (Π-introduction-fix self ((x i64)) (witness bottom (self x))))
+
+(reduce
+  (Π-introduction-fix self ((x i64) (y i1) (z f32)) (witness bottom (self x y z))))
+
+(reduce
+  (Π-introduction-fix-irreducible self () (witness bottom (self))))
+
+(reduce
+  (Π-introduction-fix-irreducible self ((x i64)) (witness bottom (self x))))
+
+(reduce
+  (Π-introduction-fix-irreducible self ((x i64) (y i1) (z f32)) (witness bottom (self x y z))))
+
+(define-macro-variadic set-as-data (rest)
+  `(set-as-data @,rest))
+
+(set-as-data foo 0 bar buz qux)
+
+(reduce
+  (Π-introduction-constructor foo bar () tau))
+
+(reduce
+  (Π-introduction-constructor foo buz ((x i64)) tau))
+
+(reduce
+  (Π-introduction-constructor foo qux ((x i64) (y i22) (z f16)) tau))
+
+(define fake-1
+  (Π-introduction-resource-handler () tau))
+
+(define fake-2
+  (Π-introduction-resource-handler ((x i64)) x))
+
+(define fake-3
+  (Π-introduction-resource-handler ((x i64) (y i1) (z f32)) z))
+
+(reduce
+  (Π-elimination (lambda () tau)))
+
+(reduce
+  (Π-elimination (lambda (x) x) tau))
+
+(reduce
+  (Π-elimination (lambda ((x tau) (y tau)) x) tau tau))
+
+(reduce
+  ((lambda ((add-i64 tau))
+    ((constant add-i64) (i64 1) 2))
+   tau))
+
+(reduce
+  (fadd-f16 (f16 2) (f16 2.288)))
+
+(reduce
+  (fadd-f32 (f32 2) (f32 2.288)))
+
+(reduce
+  (fadd-f64 (f64 2) (f64 2.288)))
+
+(use bool)
+
+(reduce
+  ((lambda ((x (enum bool)))
+    (enum-elimination x
+      (bool.true (f32 10))
+      (false (f32 20))))
+  (enum-introduction bool.true)))
+
+(define fake-nop ()
+  (witness top
+    (derangement nop (i64 10))))
+
+(define fake-store ((dest unsafe.pointer))
+  (witness top
+    (derangement (store i64) dest (i64 10))))
+
+(define fake-load ((src unsafe.pointer))
+  (witness unsafe.pointer
+    (derangement (load (pointer i8)) src)))
+
+(define fake-create-array ()
+  (witness unsafe.pointer
+    (derangement (create-array i8) (i8 10) (i8 20) (i8 30))))
+
+(define fake-create-struct ((some-struct unsafe.pointer) (x unsafe.pointer))
+  (witness unsafe.pointer
+    (derangement (create-struct i8 (struct i8) i64 (pointer i8) f32) (i8 10) some-struct (i64 30) x (f32 2.8))))
+
+(define fake-syscall ((x unsafe.pointer))
+  (witness unsafe.pointer
+    (derangement (syscall 100) (i8 10) x (i64 30) x (f32 2.8))))
+
+(define fake-external-allocate ((size i64))
+  (witness unsafe.pointer
+    (derangement (external malloc) size)))
+
+(define fake-external-deallocate ((ptr unsafe.pointer))
+  (witness top
+    (derangement (external free) ptr)))
+
+(reduce
+  (fake-external-deallocate (fake-external-allocate 10)))
+
+(define-data empty ())
+
+(define empty-elim ((x (empty)) (a tau))
+  (witness a
+    (case x)))
+
+(define empty-elim-noetic ((s subject) (x (noema s (empty))) (a tau))
+  (witness a
+    (case-noetic x)))
+
+(define-data list ((a tau))
+  (nil)
+  (cons (_ a) (_ (list a))))
+
+(define length ((a tau) (xs (list a)))
+  (witness i64
+    (case xs
+      ((list.nil) 0)
+      ((list.cons y ys)
+        (add-i64 1 (length a ys))))))
+
+(define length-noetic-internal
+  ((s subject)
+   (a tau)
+   (xs (noema s (list a)))
+   (acc i64))
+  (witness i64
+    (case-noetic xs
+      ((list.nil)
+        acc)
+      ((list.cons _ ys)
+        (length-noetic-internal s a ys (add-i64 acc 1))))))
+
+(define length-noetic
+  ((a tau)
+   (xs (list a)))
+  (witness (product (list a) i64)
+    (with-region s
+      (let xs-noema (noema.new s (list a) &xs))
+      ((noesis.return s) * (tuple xs (length-noetic-internal s a xs-noema 0))))))
+
+(reduce
+  (let xs (list.cons i64 1 (list.cons * 2 (list.cons * 3 (list.nil *)))))
+  (let len (length-noetic i64 &xs))
+  len)
