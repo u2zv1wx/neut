@@ -73,8 +73,7 @@ elaborate' term =
     (m, WeakTermPiElim (mh, WeakTermAster x) es) -> do
       sub <- gets substEnv
       case IntMap.lookup x sub of
-        Nothing -> do
-          p' term
+        Nothing ->
           raiseError mh "couldn't instantiate the asterisk here"
         Just (_, WeakTermPiIntro OpacityTransparent LamKindNormal xts e)
           | length xts == length es -> do
