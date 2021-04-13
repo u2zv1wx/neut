@@ -34,13 +34,9 @@ use :: T.Text -> IO ()
 use s =
   modifyIORef' prefixEnv $ \env -> s : env
 
--- modify (\e -> e {prefixEnv = s : prefixEnv e})
-
 unuse :: T.Text -> IO ()
 unuse s =
   modifyIORef' prefixEnv $ \env -> filter (/= s) env
-
--- modify (\e -> e {prefixEnv = filter (/= s) (prefixEnv e)})
 
 withSectionPrefix :: T.Text -> IO T.Text
 withSectionPrefix x = do
@@ -80,7 +76,6 @@ prefixTextPlus tree =
 
 handleSection :: T.Text -> IO a -> IO a
 handleSection s cont = do
-  -- modify (\e -> e {sectionEnv = s : sectionEnv e})
   modifyIORef' sectionEnv $ \env -> s : env
   getCurrentSection >>= use
   cont
@@ -95,7 +90,6 @@ handleEnd m s cont = do
       | s == s' -> do
         getCurrentSection >>= unuse
         modifyIORef' sectionEnv $ \_ -> ns'
-        -- modify (\e -> e {sectionEnv = ns'})
         cont
       | otherwise ->
         raiseError m $

@@ -3,9 +3,9 @@ module Main (main) where
 import Clarify
 import Control.Monad
 import Data.ByteString.Builder
-import Data.IORef
 import qualified Data.ByteString.Lazy as L
 import Data.Env
+import Data.IORef
 import Data.Maybe (fromMaybe)
 import Elaborate
 import Emit
@@ -216,7 +216,6 @@ run cmd =
       writeIORef shouldDisplayLogLevel logLevelFlag
       inputPath <- resolveFile' inputPathStr
       llvmIRBuilder <- runCompiler (runBuild inputPath)
-      -- initialEnv {shouldColorize = colorizeFlag, shouldCancelAlloc = cancelAllocFlag, shouldDisplayLogLocation = logLocationFlag, shouldDisplayLogLevel = logLevelFlag}
       (basename, _) <- splitExtension $ filename inputPath
       mOutputPath <- mapM resolveFile' mOutputPathStr
       outputPath <- constructOutputPath basename mOutputPath outputKind
@@ -237,7 +236,6 @@ run cmd =
       writeIORef endOfEntry eoe
       inputPath <- resolveFile' inputPathStr
       void $ runCompiler (runCheck inputPath)
-        -- $ initialEnv {shouldColorize = colorizeFlag, endOfEntry = eoe}
     Archive inputPathStr mOutputPathStr -> do
       libDirPath <- resolveDir' inputPathStr
       let parentDirPath = parent libDirPath

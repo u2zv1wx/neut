@@ -75,7 +75,6 @@ parse stmtTreeList =
                 raiseSyntaxError m "(end LEAF)"
             "define-prefix"
               | [(_, TreeLeaf from), (_, TreeLeaf to)] <- rest -> do
-                -- modify (\env -> env {nsEnv = (from, to) : (nsEnv env)})
                 modifyIORef' nsEnv $ \env -> (from, to) : env
                 parse restStmtList
               | otherwise ->
@@ -83,7 +82,6 @@ parse stmtTreeList =
             "remove-prefix"
               | [(_, TreeLeaf from), (_, TreeLeaf to)] <- rest -> do
                 modifyIORef' nsEnv $ \env -> filter (/= (from, to)) env
-                -- modify (\env -> env {nsEnv = (filter (/= (from, to))) (nsEnv env)})
                 parse restStmtList
               | otherwise ->
                 raiseSyntaxError m "(remove-prefix LEAF LEAF)"
@@ -105,10 +103,8 @@ parse stmtTreeList =
                 Just i <- readMaybe (T.unpack intStr) -> do
                 xs <- mapM (extractLeaf >=> withSectionPrefix) constructorNameList
                 name' <- withSectionPrefix name
-                -- modify (\env -> env {dataEnv = Map.insert name' xs (dataEnv env)})
                 modifyIORef' dataEnv $ \env -> Map.insert name' xs env
                 forM_ (zip xs [0 ..]) $ \(x, k) -> modifyIORef' constructorEnv $ \env -> Map.insert x (i, k) env
-                -- modify (\env -> env {constructorEnv = Map.insert x (i, k) (constructorEnv env)})
                 parse restStmtList
               | otherwise -> do
                 raiseSyntaxError m "(set-as-data LEAF INT LEAF*)"
@@ -145,14 +141,6 @@ insEnumEnv m name xis = do
       let rev = Map.fromList $ zip xs (zip (repeat name) is)
       modifyIORef' enumEnv $ \env -> Map.insert name xis env
       modifyIORef' revEnumEnv $ \env -> Map.union rev env
-
--- modify
---   ( \e ->
---       e
---         { enumEnv = Map.insert name xis (enumEnv e),
---           revEnumEnv = rev `Map.union` revEnumEnv e
---         }
---   )
 
 extractLeaf :: TreePlus -> IO T.Text
 extractLeaf t =

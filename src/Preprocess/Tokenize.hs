@@ -14,14 +14,6 @@ import qualified Data.Text as T
 import Data.Tree
 import System.IO.Unsafe (unsafePerformIO)
 
--- data TEnv = TEnv
---   { text :: T.Text,
---     line :: Int,
---     column :: Int,
---     filePath :: Path Abs File
---   }
---   deriving (Show)
-
 type EscapeFlag =
   Bool
 
@@ -188,7 +180,6 @@ string = do
   len <- headStringLengthOf False rest 1
   let (x, rest') = T.splitAt len s
   modifyIORef' text $ \_ -> rest'
-  -- modify (\env -> env {text = rest'})
   return x
 
 headStringLengthOf :: EscapeFlag -> T.Text -> Int -> IO Int
@@ -216,7 +207,6 @@ currentHint :: IO Hint
 currentHint = do
   l <- readIORef line
   c <- readIORef column
-  -- path <- readIORef filePath
   path <- getCurrentFilePath
   return $ newHint (fromEnum l) (fromEnum c) path
 
@@ -246,18 +236,11 @@ updateStreamL s = do
   modifyIORef' text $ \_ -> s
   incrementLine
 
--- modifyIORef' line $ \x -> 1 + x
--- modifyIORef' column $ \_ -> 1
-
--- modify (\env -> env {text = s, line = 1 + line env, column = 1})
-
 {-# INLINE updateStreamC #-}
 updateStreamC :: Int -> T.Text -> IO ()
 updateStreamC c s = do
   modifyIORef' text $ \_ -> s
   modifyIORef' column $ \x -> c + x
-
--- modify (\env -> env {text = s, column = c + column env})
 
 {-# INLINE incrementLine #-}
 incrementLine :: IO ()
@@ -265,14 +248,10 @@ incrementLine = do
   modifyIORef' line $ \x -> 1 + x
   modifyIORef' column $ \_ -> 1
 
--- modify (\env -> env {line = 1 + line env, column = 1})
-
 {-# INLINE incrementColumn #-}
 incrementColumn :: IO ()
 incrementColumn =
   modifyIORef' column $ \x -> 1 + x
-
--- modify (\env -> env {column = 1 + column env})
 
 raiseTokenizeError :: T.Text -> IO a
 raiseTokenizeError txt = do

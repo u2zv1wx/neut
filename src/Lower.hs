@@ -139,7 +139,6 @@ loadContent' isNoetic bp bt values cont =
         l <- llvmUncast (Just $ takeBaseName' bp) bp bt
         tmp <- newNameWith'' $ Just $ takeBaseName' bp
         j <- newCount
-        -- let j = newCount ()
         commConv tmp l $ LowCompCont (LowOpFree (LowValueVarLocal tmp) bt j) cont
     (i, (x, et)) : xis -> do
       cont' <- loadContent' isNoetic bp bt xis cont
@@ -483,8 +482,6 @@ getEnumNum m label = do
 insLowDefEnv :: T.Text -> [Ident] -> LowComp -> IO ()
 insLowDefEnv funName args e =
   modifyIORef' lowDefEnv $ \env -> Map.insert funName (args, e) env
-
--- modify (\env -> env {lowDefEnv = Map.insert funName (args, e) (lowDefEnv env)})
 
 commConv :: Ident -> LowComp -> LowComp -> IO LowComp
 commConv x llvm cont2 =

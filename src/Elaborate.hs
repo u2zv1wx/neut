@@ -47,10 +47,8 @@ elaborateStmt' stmt =
       case mx of
         Just (isReducible, x) -> do
           insWeakTypeEnv x $ weaken t''
-          -- modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e'') (substEnv env)})
           modifyIORef' substEnv $ \env -> IntMap.insert (asInt x) (weaken e'') env
           when (not isReducible) $ modifyIORef' opaqueEnv $ \env -> S.insert x env
-          -- modify (\env -> env {opaqueEnv = S.insert x (opaqueEnv env)})
           cont' <- elaborateStmt' cont
           return $ StmtDef m (Just x) t'' e'' : cont'
         Nothing -> do

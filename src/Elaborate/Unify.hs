@@ -29,7 +29,6 @@ unify =
 analyze :: IO ()
 analyze = do
   cs <- readIORef constraintEnv
-  -- modify (\env -> env {constraintEnv = []})
   modifyIORef' constraintEnv $ \_ -> []
   simplify $ zip cs cs
 
@@ -40,7 +39,6 @@ synthesize = do
     Nothing ->
       return ()
     Just ((SuspendedConstraint (_, ConstraintKindDelta c, (_, orig))), cs') -> do
-      -- modify (\env -> env {suspendedConstraintEnv = cs'})
       modifyIORef' suspendedConstraintEnv $ \_ -> cs'
       simplify [(c, orig)]
       synthesize
@@ -178,13 +176,11 @@ simplify constraintList =
                 (Just (StuckPiElimVar x1 mess1), Just (StuckPiElimAster {}))
                   | Just lam <- lookupDefinition x1 sub -> do
                     let uc = SuspendedConstraint (fmvs, ConstraintKindDelta (toPiElim lam mess1, e2), headConstraint)
-                    -- modify (\env -> env {suspendedConstraintEnv = Q.insert uc (suspendedConstraintEnv env)})
                     modifyIORef' suspendedConstraintEnv $ \env -> Q.insert uc env
                     simplify cs
                 (Just (StuckPiElimAster {}), Just (StuckPiElimVar x2 mess2))
                   | Just lam <- lookupDefinition x2 sub -> do
                     let uc = SuspendedConstraint (fmvs, ConstraintKindDelta (e1, toPiElim lam mess2), headConstraint)
-                    -- modify (\env -> env {suspendedConstraintEnv = Q.insert uc (suspendedConstraintEnv env)})
                     modifyIORef' suspendedConstraintEnv $ \env -> Q.insert uc env
                     simplify cs
                 (Just (StuckPiElimVar x1 mess1), _)
@@ -195,18 +191,15 @@ simplify constraintList =
                     simplify $ ((e1, toPiElim lam mess2), orig) : cs
                 _ -> do
                   let uc = SuspendedConstraint (fmvs, ConstraintKindOther, headConstraint)
-                  -- modify (\env -> env {suspendedConstraintEnv = Q.insert uc (suspendedConstraintEnv env)})
                   modifyIORef' suspendedConstraintEnv $ \env -> Q.insert uc env
                   simplify cs
 
 {-# INLINE resolveHole #-}
 resolveHole :: Int -> [[WeakIdentPlus]] -> WeakTermPlus -> [(Constraint, Constraint)] -> IO ()
 resolveHole h1 xss e2' cs = do
-  -- modify (\env -> env {substEnv = IntMap.insert h1 (toPiIntro xss e2') (substEnv env)})
   modifyIORef' substEnv $ \env -> IntMap.insert h1 (toPiIntro xss e2') env
   sus <- readIORef suspendedConstraintEnv
   let (sus1, sus2) = Q.partition (\(SuspendedConstraint (hs, _, _)) -> S.member h1 hs) sus
-  -- modify (\env -> env {suspendedConstraintEnv = sus2})
   modifyIORef' suspendedConstraintEnv $ \_ -> sus2
   let sus1' = map (\(SuspendedConstraint (_, _, c)) -> c) $ Q.toList sus1
   simplify $ sus1' ++ cs

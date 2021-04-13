@@ -89,8 +89,6 @@ insDefEnv :: T.Text -> Bool -> [Ident] -> CompPlus -> IO ()
 insDefEnv name isReducible args e =
   modifyIORef' defEnv $ \env -> Map.insert name (isReducible, args, e) env
 
--- modify (\env -> env {defEnv = Map.insert name (isReducible, args, e) (defEnv env)})
-
 {-# INLINE boolTrue #-}
 boolTrue :: T.Text
 boolTrue =

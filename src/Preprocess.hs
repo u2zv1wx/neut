@@ -36,7 +36,6 @@ preprocess mainFilePath = do
 visit :: Path Abs File -> IO [TreePlus]
 visit path = do
   pushTrace path
-  -- modify (\env -> env {fileEnv = Map.insert path VisitInfoActive (fileEnv env)})
   modifyIORef' fileEnv $ \env -> Map.insert path VisitInfoActive env
   content <- TIO.readFile $ toFilePath path
   tokenize content >>= preprocess'
@@ -44,7 +43,6 @@ visit path = do
 leave :: IO [TreePlus]
 leave = do
   path <- getCurrentFilePath
-  -- modify (\env -> env {fileEnv = Map.insert path VisitInfoFinish (fileEnv env)})
   modifyIORef' fileEnv $ \env -> Map.insert path VisitInfoFinish env
   popTrace
   return []
@@ -53,13 +51,9 @@ pushTrace :: Path Abs File -> IO ()
 pushTrace path =
   modifyIORef' traceEnv $ \env -> path : env
 
--- modify (\env -> env {traceEnv = path : traceEnv env})
-
 popTrace :: IO ()
 popTrace =
   modifyIORef' traceEnv $ \env -> tail env
-
--- modify (\env -> env {traceEnv = tail (traceEnv env)})
 
 preprocess' :: [TreePlus] -> IO [TreePlus]
 preprocess' stmtList = do
@@ -92,9 +86,7 @@ preprocess' stmtList = do
                 body' <- evaluate body
                 name' <- withSectionPrefix name
                 name'' <- newIdentFromIdent $ asIdent name'
-                -- modify (\env -> env {topMetaNameEnv = Map.insert name' name'' (topMetaNameEnv env)})
                 modifyIORef' topMetaNameEnv $ \env -> Map.insert name' name'' env
-                -- modify (\env -> env {metaTermCtx = IntMap.insert (asInt name'') body' (metaTermCtx env)})
                 modifyIORef' metaTermCtx $ \env -> IntMap.insert (asInt name'') body' env
                 preprocess' restStmtList
               | [name@(_, TreeLeaf _), xts, body] <- rest -> do
@@ -159,7 +151,6 @@ preprocess' stmtList = do
                 raiseSyntaxError m "(end LEAF)"
             "define-prefix"
               | [(_, TreeLeaf from), (_, TreeLeaf to)] <- rest -> do
-                -- modify (\env -> env {nsEnv = (from, to) : (nsEnv env)})
                 modifyIORef' nsEnv $ \env -> (from, to) : env
                 treeList <- preprocess' restStmtList
                 return $ headStmt : treeList
@@ -167,7 +158,6 @@ preprocess' stmtList = do
                 raiseSyntaxError m "(define-prefix LEAF LEAF)"
             "remove-prefix"
               | [(_, TreeLeaf from), (_, TreeLeaf to)] <- rest -> do
-                -- modify (\env -> env {nsEnv = (filter (/= (from, to))) (nsEnv env)})
                 modifyIORef' nsEnv $ \env -> (filter (/= (from, to))) env
                 treeList <- preprocess' restStmtList
                 return $ headStmt : treeList
@@ -379,8 +369,7 @@ isSpecialForm nenv tree = do
     _ ->
       return False
 
--- generateLastStmtList :: T.Text -> (Env -> [T.Text]) -> IO [TreePlus]
-generateLastStmtList :: T.Text -> (IORef [T.Text]) -> IO [TreePlus]
+generateLastStmtList :: T.Text -> IORef [T.Text] -> IO [TreePlus]
 generateLastStmtList atom accessor = do
   path <- getCurrentFilePath
   env <- readIORef accessor

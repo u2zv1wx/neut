@@ -29,7 +29,6 @@ discernIdentPlus (m, x, t) = do
   t' <- discern' nenv t
   x' <- newIdentFromIdent x
   modifyIORef' topNameEnv $ \env -> Map.insert (asText x) x' env
-  -- modify (\env -> env {topNameEnv = Map.insert (asText x) x' nenv})
   return (m, x', t')
 
 -- Alpha-convert all the variables so that different variables have different names.

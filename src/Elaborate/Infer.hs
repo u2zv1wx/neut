@@ -72,7 +72,6 @@ infer' ctx term =
           return asterInfo
         Nothing -> do
           (app, higherApp) <- newAsterInCtx ctx m
-          -- modify (\env -> env {holeEnv = IntMap.insert x (app, higherApp) henv})
           modifyIORef' holeEnv $ \env -> IntMap.insert x (app, higherApp) env
           return (app, higherApp)
     (m, WeakTermConst x)
@@ -287,13 +286,9 @@ insConstraintEnv :: WeakTermPlus -> WeakTermPlus -> IO ()
 insConstraintEnv t1 t2 =
   modifyIORef' constraintEnv $ \env -> (t1, t2) : env
 
--- modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
-
 insWeakTypeEnv :: Ident -> WeakTermPlus -> IO ()
 insWeakTypeEnv (I (_, i)) t =
   modifyIORef' weakTypeEnv $ \env -> IntMap.insert i t env
-
--- modify (\e -> e {weakTypeEnv = IntMap.insert i t (weakTypeEnv e)})
 
 lookupWeakTypeEnv :: Hint -> Ident -> IO WeakTermPlus
 lookupWeakTypeEnv m s = do

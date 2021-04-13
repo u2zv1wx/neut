@@ -30,98 +30,6 @@ data VisitInfo
   = VisitInfoActive
   | VisitInfoFinish
 
--- data Env = Env
---   {
---   }
-
--- shouldColorize :: Bool,
--- shouldDisplayLogLocation :: Bool,
--- shouldDisplayLogLevel :: Bool,
--- shouldDisplayLogText :: Bool,
--- shouldDisplayLogFooter :: Bool,
--- shouldCancelAlloc :: Bool,
--- endOfEntry :: String,
---
--- Preprocess
---
--- topMetaNameEnv :: Map.HashMap T.Text Ident,
--- metaTermCtx :: SubstMetaTerm,
---
--- parse
---
--- fileEnv :: Map.HashMap (Path Abs File) VisitInfo,
--- traceEnv :: [Path Abs File],
--- [("choice", [("left", 0), ("right", 1)]), ...]
--- enumEnv :: Map.HashMap T.Text [(T.Text, Int)],
--- [("left", ("choice", 0)), ("right", ("choice", 1)), ...]
--- revEnumEnv :: Map.HashMap T.Text (T.Text, Int),
--- dataEnv :: Map.HashMap T.Text [T.Text],
--- constructorEnv :: Map.HashMap T.Text (Int, Int),
--- prefixEnv :: [T.Text],
--- nsEnv :: [(T.Text, T.Text)],
--- sectionEnv :: [T.Text],
--- topNameEnv :: Map.HashMap T.Text Ident,
---
--- elaborate
---
--- weakTypeEnv :: IntMap.IntMap WeakTermPlus,
--- constTypeEnv :: Map.HashMap T.Text TermPlus,
--- holeEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus),
--- constraintEnv :: [Constraint],
--- suspendedConstraintEnv :: SuspendedConstraintQueue,
--- substEnv :: IntMap.IntMap WeakTermPlus,
--- opaqueEnv :: S.Set Ident,
---
--- clarify
---
--- defEnv :: Map.HashMap T.Text (IsReducible, [Ident], CompPlus),
---
--- LLVM
---
--- lowDefEnv :: Map.HashMap T.Text ([Ident], LowComp),
--- declEnv :: Map.HashMap T.Text ([LowType], LowType),
--- nopFreeSet :: S.Set Int
-
--- initialEnv :: Env
--- initialEnv =
---   Env
---   -- shouldColorize = True,
---   -- shouldDisplayLogLocation = True,
---   -- shouldDisplayLogLevel = True,
---   -- shouldDisplayLogText = True,
---   -- shouldDisplayLogFooter = True,
---   -- shouldCancelAlloc = True,
---   -- endOfEntry = "",
---   -- topMetaNameEnv = Map.empty,
---   -- metaTermCtx = IntMap.empty,
---   -- nsEnv = [],
---   -- enumEnv = Map.empty,
---   -- fileEnv = Map.empty,
---   -- holeEnv = IntMap.empty,
---   -- traceEnv = [],
---   -- revEnumEnv = Map.empty,
---   -- dataEnv = Map.empty,
---   -- constructorEnv = Map.empty,
---   -- topNameEnv = Map.empty,
---   -- prefixEnv = [],
---   -- sectionEnv = [],
---   -- weakTypeEnv = IntMap.empty,
---   -- constTypeEnv = Map.empty,
---   -- defEnv = Map.empty,
---   -- lowDefEnv = Map.empty,
---   -- declEnv =
---   --   Map.fromList
---   --     [ ("malloc", ([voidPtr], voidPtr)),
---   --       ("free", ([voidPtr], voidPtr))
---   --     ],
---   -- constraintEnv = [],
---   -- suspendedConstraintEnv = Q.empty,
---   -- substEnv = IntMap.empty,
---   -- opaqueEnv = S.empty,
---   -- nopFreeSet = S.empty
---     {
---     }
-
 runCompiler :: IO a -> IO a
 runCompiler c = do
   resultOrErr <- try c
@@ -130,15 +38,6 @@ runCompiler c = do
       foldr (>>) (exitWith (ExitFailure 1)) (map outputLog err)
     Right result ->
       return result
-
--- runCompiler :: Compiler a -> Env -> IO a
--- runCompiler c env = do
---   resultOrErr <- try $ runStateT c env
---   case resultOrErr of
---     Left (Error err) ->
---       foldr (>>) (exitWith (ExitFailure 1)) (map outputLog err)
---     Right (result, _) ->
---       return result
 
 --
 -- global variables
