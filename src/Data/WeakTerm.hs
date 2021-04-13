@@ -256,19 +256,15 @@ toText term =
             then showCons ["λ", argStr, toText e]
             else showCons ["λ-irreducible", argStr, toText e]
     (_, WeakTermPiElim e es) ->
-      -- case e of
-      --   (_, WeakTermAster i) ->
-      --     "?M" <> T.pack (show i)
-      -- (_, WeakTermAster _) ->
-      --   "*"
-      -- _ ->
-      showCons $ map toText $ e : es
+      case e of
+        (_, WeakTermAster _) ->
+          "*"
+        _ ->
+          showCons $ map toText $ e : es
     (_, WeakTermConst x) ->
       x
-    -- (_, WeakTermAster _) ->
-    --   "*"
-    (_, WeakTermAster i) ->
-      "?M" <> T.pack (show i)
+    (_, WeakTermAster _) ->
+      "*"
     (_, WeakTermInt _ a) ->
       T.pack $ show a
     (_, WeakTermFloat _ a) ->
@@ -375,10 +371,6 @@ showTypeArgs args =
 showVariable :: Ident -> T.Text
 showVariable x =
   asText x
-
--- if T.any (\c -> c `S.member` S.fromList "()") $ asText x
---   then "_"
---   else asText x
 
 showCaseClause :: (WeakPattern, WeakTermPlus) -> T.Text
 showCaseClause (pat, e) =

@@ -137,7 +137,7 @@ loadContent' isNoetic bp bt values cont =
         return cont
       | otherwise -> do
         l <- llvmUncast (Just $ takeBaseName' bp) bp bt
-        tmp <- newNameWith'' $ Just $ takeBaseName' bp
+        tmp <- newNameWith $ Just $ takeBaseName' bp
         j <- newCount
         commConv tmp l $ LowCompCont (LowOpFree (LowValueVarLocal tmp) bt j) cont
     (i, (x, et)) : xis -> do
@@ -228,8 +228,8 @@ llvmCast mName v lowType =
     LowTypeFloat i ->
       llvmCastFloat mName v i
     _ -> do
-      tmp <- newNameWith'' mName
-      x <- newNameWith'' mName
+      tmp <- newNameWith mName
+      x <- newNameWith mName
       return
         ( LowValueVarLocal x,
           lowerValueLet tmp v
@@ -242,8 +242,8 @@ llvmCastInt ::
   LowType ->
   IO (LowValue, LowComp -> IO LowComp)
 llvmCastInt mName v lowType = do
-  x <- newNameWith'' mName
-  y <- newNameWith'' mName
+  x <- newNameWith mName
+  y <- newNameWith mName
   return
     ( LowValueVarLocal y,
       lowerValueLet x v
@@ -262,7 +262,7 @@ llvmCastFloat mName v size = do
   let intType = LowTypeInt $ sizeAsInt size
   (xName, x) <- newValueLocal' mName
   (yName, y) <- newValueLocal' mName
-  z <- newNameWith'' mName
+  z <- newNameWith mName
   return
     ( LowValueVarLocal z,
       lowerValueLet xName v
@@ -279,14 +279,14 @@ llvmUncast mName result lowType =
     LowTypeFloat i ->
       llvmUncastFloat mName result i
     _ -> do
-      x <- newNameWith'' mName
+      x <- newNameWith mName
       return $
         LowCompLet x (LowOpBitcast result lowType voidPtr) $
           LowCompReturn (LowValueVarLocal x)
 
 llvmUncastInt :: Maybe T.Text -> LowValue -> LowType -> IO LowComp
 llvmUncastInt mName result lowType = do
-  x <- newNameWith'' mName
+  x <- newNameWith mName
   return $
     LowCompLet x (LowOpIntToPointer result lowType voidPtr) $
       LowCompReturn (LowValueVarLocal x)
@@ -295,8 +295,8 @@ llvmUncastFloat :: Maybe T.Text -> LowValue -> FloatSize -> IO LowComp
 llvmUncastFloat mName floatResult i = do
   let floatType = LowTypeFloat i
   let intType = LowTypeInt $ sizeAsInt i
-  tmp <- newNameWith'' mName
-  x <- newNameWith'' mName
+  tmp <- newNameWith mName
+  x <- newNameWith mName
   return $
     LowCompLet tmp (LowOpBitcast floatResult floatType intType) $
       LowCompLet x (LowOpIntToPointer (LowValueVarLocal tmp) intType voidPtr) $
@@ -454,11 +454,11 @@ newValueLocal name = do
 
 newValueLocal' :: Maybe T.Text -> IO (Ident, LowValue)
 newValueLocal' mName = do
-  x <- newNameWith'' mName
+  x <- newNameWith mName
   return (x, LowValueVarLocal x)
 
-newNameWith'' :: Maybe T.Text -> IO Ident
-newNameWith'' mName =
+newNameWith :: Maybe T.Text -> IO Ident
+newNameWith mName =
   case mName of
     Nothing ->
       newIdentFromText "var"
