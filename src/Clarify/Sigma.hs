@@ -1,7 +1,7 @@
 module Clarify.Sigma
   ( immediateS4,
     returnImmediateS4,
-    sigmaS4,
+    closureEnvS4,
     returnClosureS4,
   )
 where
@@ -106,6 +106,17 @@ supplyName mName =
     Left t -> do
       x <- newIdentFromText "unused-sigarg"
       return (x, t)
+
+closureEnvS4 ::
+  Hint ->
+  [Either CompPlus (Ident, CompPlus)] ->
+  IO ValuePlus
+closureEnvS4 m mxts =
+  case mxts of
+    [] ->
+      immediateS4 m -- performance optimization; not necessary for correctness
+    _ ->
+      sigmaS4 Nothing m mxts
 
 returnClosureS4 :: Hint -> IO CompPlus
 returnClosureS4 m = do

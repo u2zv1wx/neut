@@ -231,7 +231,7 @@ returnClosure tenv isReducible kind fvs m xts e = do
   xts' <- clarifyBinder tenv xts
   let xts'' = dropFst xts'
   let fvs'' = dropFst fvs'
-  fvEnvSigma <- sigmaS4 Nothing m $ map Right fvs''
+  fvEnvSigma <- closureEnvS4 m $ map Right fvs''
   let fvEnv = (m, ValueSigmaIntro (map (\(mx, x, _) -> (mx, ValueVarLocal x)) fvs'))
   case kind of
     LamKindNormal -> do
