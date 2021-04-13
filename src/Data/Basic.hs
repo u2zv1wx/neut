@@ -45,7 +45,7 @@ data Opacity
   = OpacityOpaque
   | OpacityTranslucent
   | OpacityTransparent
-  deriving (Show)
+  deriving (Show, Eq)
 
 data VarKind
   = VarKindLocal

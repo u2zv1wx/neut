@@ -306,21 +306,21 @@ toTree term =
       case kind of
         LamKindNormal ->
           (m, TreeNode [(m, TreeLeaf "λ"), (m, TreeNode (map toTreeArg xts)), toTree e])
-    -- (m, TreeLeaf "<lam>")
-    -- (m, WeakTermPiIntro {}) -> do
-    --   (m, TreeLeaf "<lam>")
-    -- (m, WeakTermPiIntro _ xts e) -> do
-    --   (m, TreeNode [(m, TreeLeaf "λ"), (m, TreeNode (map toTreeArg xts)), toTree e])
+        LamKindFix (_, self, _)
+          | isReducible == OpacityOpaque ->
+            (m, TreeNode [(m, TreeLeaf "Π-introduction-fix-irreducible"), (m, TreeLeaf $ showVariable self), (m, TreeNode (map toTreeArg xts)), toTree e])
+          | otherwise ->
+            (m, TreeNode [(m, TreeLeaf "Π-introduction-fix"), (m, TreeLeaf $ showVariable self), (m, TreeNode (map toTreeArg xts)), toTree e])
+        LamKindCons _ consName ->
+          (m, TreeLeaf $ "<" <> consName <> ">")
+        LamKindResourceHandler ->
+          (m, TreeLeaf $ "<resource-handler>")
     (m, WeakTermPiElim e es) ->
       case e of
         (_, WeakTermAster _) ->
           (m, TreeLeaf "*")
         _ ->
           (m, TreeNode (map toTree $ e : es))
-    -- (m, WeakTermFix b (_, x, _) xts e) -> do
-    --   if b
-    --     then (m, TreeNode [(m, TreeLeaf "fix"), (m, TreeLeaf (showVariable x)), (m, TreeNode (map toTreeArg xts)), toTree e])
-    --     else (m, TreeNode [(m, TreeLeaf "fix-irreducible"), (m, TreeLeaf (showVariable x)), (m, TreeNode (map toTreeArg xts)), toTree e])
     (m, WeakTermConst x) ->
       (m, TreeLeaf x)
     (m, WeakTermAster _) ->
@@ -374,7 +374,7 @@ showTypeArgs args =
 
 showVariable :: Ident -> T.Text
 showVariable x =
-  asText' x
+  asText x
 
 -- if T.any (\c -> c `S.member` S.fromList "()") $ asText x
 --   then "_"

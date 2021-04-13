@@ -102,6 +102,9 @@
       (false (f32 20))))
   (enum-introduction bool.true)))
 
+(reduce
+  (question (lambda ((x i64)) x)))
+
 (define fake-nop ()
   (witness top
     (derangement nop (i64 10))))

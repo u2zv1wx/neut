@@ -154,7 +154,7 @@ reduceConstApp m c es =
       | [(mNode, MetaTermNode ts)] <- es ->
         case ts of
           h : _ ->
-            return (m, snd h)
+            return h -- this (intentionally) breaks `e1 ~> e2 => location(e) = location(e')`
           _ ->
             raiseError mNode "the constant `head` cannot be applied to nil"
     "meta.node.return"
