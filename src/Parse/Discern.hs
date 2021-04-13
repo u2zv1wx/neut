@@ -4,10 +4,11 @@ module Parse.Discern
   )
 where
 
-import Control.Monad.State.Lazy
+import Control.Monad
 import Data.Basic
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import Data.IORef
 import Data.Log
 import Data.Namespace
 import qualified Data.Text as T
@@ -15,32 +16,33 @@ import Data.WeakTerm
 
 type NameEnv = Map.HashMap T.Text Ident
 
-discern :: WeakTermPlus -> Compiler WeakTermPlus
+discern :: WeakTermPlus -> IO WeakTermPlus
 discern e = do
-  nenv <- gets topNameEnv
+  nenv <- readIORef topNameEnv
   discern' nenv e
 
-discernIdentPlus :: WeakIdentPlus -> Compiler WeakIdentPlus
+discernIdentPlus :: WeakIdentPlus -> IO WeakIdentPlus
 discernIdentPlus (m, x, t) = do
-  nenv <- gets topNameEnv
+  nenv <- readIORef topNameEnv
   when (Map.member (asText x) nenv) $
     raiseError m $ "the variable `" <> asText x <> "` is already defined at the top level"
   t' <- discern' nenv t
   x' <- newIdentFromIdent x
-  modify (\env -> env {topNameEnv = Map.insert (asText x) x' nenv})
+  modifyIORef' topNameEnv $ \env -> Map.insert (asText x) x' env
+  -- modify (\env -> env {topNameEnv = Map.insert (asText x) x' nenv})
   return (m, x', t')
 
 -- Alpha-convert all the variables so that different variables have different names.
-discern' :: NameEnv -> WeakTermPlus -> Compiler WeakTermPlus
+discern' :: NameEnv -> WeakTermPlus -> IO WeakTermPlus
 discern' nenv term =
   case term of
     (m, WeakTermTau) ->
       return (m, WeakTermTau)
     (m, WeakTermVar _ (I (s, _))) ->
       tryCand (resolveSymbol m (asWeakVar m nenv) s) $ do
-        renv <- gets revEnumEnv
+        renv <- readIORef revEnumEnv
         tryCand (resolveSymbol m (findThenModify renv (\x -> (m, WeakTermEnumIntro x))) s) $ do
-          eenv <- gets enumEnv
+          eenv <- readIORef enumEnv
           tryCand (resolveSymbol m (findThenModify eenv (\x -> (m, WeakTermEnum x))) s) $
             tryCand (resolveSymbol m (asWeakConstant m) s) $
               raiseError m $ "undefined variable: " <> s
@@ -108,7 +110,7 @@ discernBinder ::
   NameEnv ->
   [WeakIdentPlus] ->
   WeakTermPlus ->
-  Compiler ([WeakIdentPlus], WeakTermPlus)
+  IO ([WeakIdentPlus], WeakTermPlus)
 discernBinder nenv binder e =
   case binder of
     [] -> do
@@ -120,17 +122,17 @@ discernBinder nenv binder e =
       (xts', e') <- discernBinder (Map.insert (asText x) x' nenv) xts e
       return ((mx, x', t') : xts', e')
 
-discernEnumCase :: Hint -> EnumCase -> Compiler EnumCase
+discernEnumCase :: Hint -> EnumCase -> IO EnumCase
 discernEnumCase m weakCase =
   case weakCase of
     EnumCaseLabel l -> do
-      renv <- gets revEnumEnv
+      renv <- readIORef revEnumEnv
       ml <- resolveSymbol m (findThenModify renv EnumCaseLabel) l
       case ml of
         Just l' ->
           return l'
         Nothing -> do
-          e <- gets enumEnv
+          e <- readIORef enumEnv
           p' e
           raiseError m $ "no such enum-value is defined: " <> l
     _ ->

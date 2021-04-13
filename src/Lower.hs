@@ -3,17 +3,18 @@ module Lower
   )
 where
 
-import Control.Monad.State.Lazy
+import Control.Monad
 import Data.Basic
 import Data.Comp
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import Data.IORef
 import Data.Log
 import Data.LowComp
 import Data.LowType
 import qualified Data.Text as T
 
-lower :: CompPlus -> Compiler LowComp
+lower :: CompPlus -> IO LowComp
 lower mainTerm@(m, _) = do
   mainTerm'' <- lowerComp mainTerm
   -- the result of "main" must be i64, not i8*
@@ -23,7 +24,7 @@ lower mainTerm@(m, _) = do
   -- let result: i8* := (main-term) in {cast result to i64}
   commConv result mainTerm'' castResult
 
-lowerComp :: CompPlus -> Compiler LowComp
+lowerComp :: CompPlus -> IO LowComp
 lowerComp term =
   case term of
     (m, CompPrimitive theta) ->
@@ -56,7 +57,7 @@ lowerComp term =
           (cast, castThen) <- llvmCast (Just "enum-base") v t
           castThen $ LowCompSwitch (cast, t) defaultCase caseList
 
-uncastList :: [(Ident, (Ident, LowType))] -> CompPlus -> Compiler LowComp
+uncastList :: [(Ident, (Ident, LowType))] -> CompPlus -> IO LowComp
 uncastList args e =
   case args of
     [] ->
@@ -109,7 +110,7 @@ loadContent ::
   LowType -> -- the type of base pointer
   [((LowValue, LowType), (Ident, (Ident, LowType)))] -> -- [(the index of an element, the variable to load the element)]
   CompPlus -> -- continuation
-  Compiler LowComp
+  IO LowComp
 loadContent isNoetic v bt iyxs cont =
   case iyxs of
     [] ->
@@ -128,7 +129,7 @@ loadContent' ::
   LowType -> -- the type of base pointer
   [((LowValue, LowType), (Ident, LowType))] -> -- [(the index of an element, the variable to keep the loaded content)]
   LowComp -> -- continuation
-  Compiler LowComp
+  IO LowComp
 loadContent' isNoetic bp bt values cont =
   case values of
     []
@@ -149,7 +150,7 @@ loadContent' isNoetic bp bt values cont =
           (LowOpGetElementPtr (bp, bt) [(LowValueInt 0, LowTypeInt 32), i])
           $ LowCompLet x (LowOpLoad pos et) cont'
 
-lowerCompPrimitive :: Hint -> Primitive -> Compiler LowComp
+lowerCompPrimitive :: Hint -> Primitive -> IO LowComp
 lowerCompPrimitive m codeOp =
   case codeOp of
     PrimitivePrimOp op vs ->
@@ -167,11 +168,12 @@ lowerCompPrimitive m codeOp =
               LowCompReturn (LowValueVarLocal res)
         DerangementExternal name -> do
           (xs, vs) <- unzip <$> mapM (const $ newValueLocal "ext-call-arg") args
-          denv <- gets declEnv
+          denv <- readIORef declEnv
           when (not $ name `Map.member` denv) $ do
             let dom = map (const voidPtr) vs
             let cod = voidPtr
-            modify (\env -> env {declEnv = Map.insert name (dom, cod) denv})
+            modifyIORef' declEnv $ \env -> Map.insert name (dom, cod) env
+          -- modify (\env -> env {declEnv = Map.insert name (dom, cod) denv})
           lowerValueLet' (zip xs args) $ LowCompCall (LowValueVarGlobal name) vs
         DerangementLoad valueLowType -> do
           let ptr = args !! 0
@@ -199,14 +201,14 @@ lowerCompPrimitive m codeOp =
           resName <- newIdentFromText "result"
           storeContent m resName structType argTypeList (LowCompReturn (LowValueVarLocal resName))
 
-lowerCompPrimOp :: PrimOp -> [ValuePlus] -> Compiler LowComp
+lowerCompPrimOp :: PrimOp -> [ValuePlus] -> IO LowComp
 lowerCompPrimOp op@(PrimOp _ domList cod) vs = do
   (argVarList, castArgsThen) <- llvmCastPrimArgs $ zip vs domList
   result <- newIdentFromText "prim-op-result"
   uncast <- llvmUncast (Just $ asText result) (LowValueVarLocal result) cod
   castArgsThen $ LowCompLet result (LowOpPrimOp op argVarList) uncast
 
-llvmCastPrimArgs :: [(ValuePlus, LowType)] -> Compiler ([LowValue], LowComp -> Compiler LowComp)
+llvmCastPrimArgs :: [(ValuePlus, LowType)] -> IO ([LowValue], LowComp -> IO LowComp)
 llvmCastPrimArgs dts =
   case dts of
     [] ->
@@ -220,7 +222,7 @@ llvmCast ::
   Maybe T.Text ->
   ValuePlus ->
   LowType ->
-  Compiler (LowValue, LowComp -> Compiler LowComp)
+  IO (LowValue, LowComp -> IO LowComp)
 llvmCast mName v lowType =
   case lowType of
     LowTypeInt _ ->
@@ -240,7 +242,7 @@ llvmCastInt ::
   Maybe T.Text -> -- base name for newly created variables
   ValuePlus ->
   LowType ->
-  Compiler (LowValue, LowComp -> Compiler LowComp)
+  IO (LowValue, LowComp -> IO LowComp)
 llvmCastInt mName v lowType = do
   x <- newNameWith'' mName
   y <- newNameWith'' mName
@@ -256,7 +258,7 @@ llvmCastFloat ::
   Maybe T.Text -> -- base name for newly created variables
   ValuePlus ->
   FloatSize ->
-  Compiler (LowValue, LowComp -> Compiler LowComp)
+  IO (LowValue, LowComp -> IO LowComp)
 llvmCastFloat mName v size = do
   let floatType = LowTypeFloat size
   let intType = LowTypeInt $ sizeAsInt size
@@ -271,7 +273,7 @@ llvmCastFloat mName v size = do
     )
 
 -- uncast: {some-concrete-type} -> voidPtr
-llvmUncast :: Maybe T.Text -> LowValue -> LowType -> Compiler LowComp
+llvmUncast :: Maybe T.Text -> LowValue -> LowType -> IO LowComp
 llvmUncast mName result lowType =
   case lowType of
     LowTypeInt _ ->
@@ -284,14 +286,14 @@ llvmUncast mName result lowType =
         LowCompLet x (LowOpBitcast result lowType voidPtr) $
           LowCompReturn (LowValueVarLocal x)
 
-llvmUncastInt :: Maybe T.Text -> LowValue -> LowType -> Compiler LowComp
+llvmUncastInt :: Maybe T.Text -> LowValue -> LowType -> IO LowComp
 llvmUncastInt mName result lowType = do
   x <- newNameWith'' mName
   return $
     LowCompLet x (LowOpIntToPointer result lowType voidPtr) $
       LowCompReturn (LowValueVarLocal x)
 
-llvmUncastFloat :: Maybe T.Text -> LowValue -> FloatSize -> Compiler LowComp
+llvmUncastFloat :: Maybe T.Text -> LowValue -> FloatSize -> IO LowComp
 llvmUncastFloat mName floatResult i = do
   let floatType = LowTypeFloat i
   let intType = LowTypeInt $ sizeAsInt i
@@ -302,19 +304,19 @@ llvmUncastFloat mName floatResult i = do
       LowCompLet x (LowOpIntToPointer (LowValueVarLocal tmp) intType voidPtr) $
         LowCompReturn (LowValueVarLocal x)
 
-llvmUncastLet :: Ident -> LowValue -> LowType -> LowComp -> Compiler LowComp
+llvmUncastLet :: Ident -> LowValue -> LowType -> LowComp -> IO LowComp
 llvmUncastLet x@(I (s, _)) d lowType cont = do
   l <- llvmUncast (Just s) d lowType
   commConv x l cont
 
 -- `lowerValueLet x d cont` binds the data `d` to the variable `x`, and computes the
 -- continuation `cont`.
-lowerValueLet :: Ident -> ValuePlus -> LowComp -> Compiler LowComp
+lowerValueLet :: Ident -> ValuePlus -> LowComp -> IO LowComp
 lowerValueLet x lowerValue cont =
   case lowerValue of
     (m, ValueVarGlobal y) -> do
-      denv <- gets defEnv
-      lenv <- gets lowDefEnv
+      denv <- readIORef defEnv
+      lenv <- readIORef lowDefEnv
       case Map.lookup y denv of
         Nothing ->
           raiseCritical m $ "no such global label defined: " <> y
@@ -340,7 +342,7 @@ lowerValueLet x lowerValue cont =
       i <- toInteger <$> getEnumNum m l
       llvmUncastLet x (LowValueInt i) (LowTypeInt 64) cont
 
-lowerValueLet' :: [(Ident, ValuePlus)] -> LowComp -> Compiler LowComp
+lowerValueLet' :: [(Ident, ValuePlus)] -> LowComp -> IO LowComp
 lowerValueLet' binder cont =
   case binder of
     [] ->
@@ -350,7 +352,7 @@ lowerValueLet' binder cont =
       lowerValueLet x d cont'
 
 -- returns Nothing iff the branch list is empty
-constructSwitch :: [(EnumCase, CompPlus)] -> Compiler (Maybe (LowComp, [(Int, LowComp)]))
+constructSwitch :: [(EnumCase, CompPlus)] -> IO (Maybe (LowComp, [(Int, LowComp)]))
 constructSwitch switch =
   case switch of
     [] ->
@@ -388,7 +390,7 @@ storeContent ::
   AggPtrType ->
   [(ValuePlus, LowType)] ->
   LowComp ->
-  Compiler LowComp
+  IO LowComp
 storeContent m reg aggPtrType dts cont = do
   let lowType = toLowType aggPtrType
   (cast, castThen) <- llvmCast (Just $ asText reg) (m, ValueVarLocal reg) lowType
@@ -405,7 +407,7 @@ storeContent' ::
   LowType -> -- the type of base pointer (like [n x u8]*, {i8*, i8*}*, etc.)
   [(Integer, (ValuePlus, LowType))] -> -- [(the index of an element, the element to be stored)]
   LowComp -> -- continuation
-  Compiler LowComp
+  IO LowComp
 storeContent' bp bt values cont =
   case values of
     [] ->
@@ -421,7 +423,7 @@ storeContent' bp bt values cont =
           (LowOpGetElementPtr (bp, bt) [(LowValueInt 0, LowTypeInt 32), (LowValueInt i, it)])
           $ LowCompCont (LowOpStore et cast loc) cont'
 
-storeContent'' :: Ident -> LowType -> SizeInfo -> Int -> LowComp -> Compiler LowComp
+storeContent'' :: Ident -> LowType -> SizeInfo -> Int -> LowComp -> IO LowComp
 storeContent'' reg elemType sizeInfo len cont = do
   (tmp, tmpVar) <- newValueLocal $ "sizeof-" <> asText reg
   (c, cVar) <- newValueLocal $ "sizeof-" <> asText reg
@@ -447,17 +449,17 @@ toFunPtrType :: [a] -> LowType
 toFunPtrType xs =
   LowTypePointer (LowTypeFunction (map (const voidPtr) xs) voidPtr)
 
-newValueLocal :: T.Text -> Compiler (Ident, LowValue)
+newValueLocal :: T.Text -> IO (Ident, LowValue)
 newValueLocal name = do
   x <- newIdentFromText name
   return (x, LowValueVarLocal x)
 
-newValueLocal' :: Maybe T.Text -> Compiler (Ident, LowValue)
+newValueLocal' :: Maybe T.Text -> IO (Ident, LowValue)
 newValueLocal' mName = do
   x <- newNameWith'' mName
   return (x, LowValueVarLocal x)
 
-newNameWith'' :: Maybe T.Text -> Compiler Ident
+newNameWith'' :: Maybe T.Text -> IO Ident
 newNameWith'' mName =
   case mName of
     Nothing ->
@@ -465,24 +467,26 @@ newNameWith'' mName =
     Just name ->
       newIdentFromText name
 
-enumValueToInteger :: Hint -> T.Text -> Compiler Int
+enumValueToInteger :: Hint -> T.Text -> IO Int
 enumValueToInteger m l =
   getEnumNum m l
 
-getEnumNum :: Hint -> T.Text -> Compiler Int
+getEnumNum :: Hint -> T.Text -> IO Int
 getEnumNum m label = do
-  renv <- gets revEnumEnv
+  renv <- readIORef revEnumEnv
   case Map.lookup label renv of
     Nothing ->
       raiseCritical m $ "no such enum is defined: " <> label
     Just (_, i) ->
       return i
 
-insLowDefEnv :: T.Text -> [Ident] -> LowComp -> Compiler ()
+insLowDefEnv :: T.Text -> [Ident] -> LowComp -> IO ()
 insLowDefEnv funName args e =
-  modify (\env -> env {lowDefEnv = Map.insert funName (args, e) (lowDefEnv env)})
+  modifyIORef' lowDefEnv $ \env -> Map.insert funName (args, e) env
 
-commConv :: Ident -> LowComp -> LowComp -> Compiler LowComp
+-- modify (\env -> env {lowDefEnv = Map.insert funName (args, e) (lowDefEnv env)})
+
+commConv :: Ident -> LowComp -> LowComp -> IO LowComp
 commConv x llvm cont2 =
   case llvm of
     LowCompReturn d ->

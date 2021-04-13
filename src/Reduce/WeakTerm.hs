@@ -4,15 +4,16 @@ module Reduce.WeakTerm
   )
 where
 
-import Control.Monad.State.Lazy
+import Control.Monad
 import Data.Basic
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import Data.IORef
 import qualified Data.IntMap as IntMap
 import qualified Data.Text as T
 import Data.WeakTerm
 
-reduceWeakTermPlus :: WeakTermPlus -> Compiler WeakTermPlus
+reduceWeakTermPlus :: WeakTermPlus -> IO WeakTermPlus
 reduceWeakTermPlus term =
   case term of
     (m, WeakTermPi xts cod) -> do
@@ -74,7 +75,7 @@ reduceWeakTermPlus term =
     (m, WeakTermCase resultType mSubject (e, t) clauseList) -> do
       e' <- reduceWeakTermPlus e
       let lamList = map (toLamList m) clauseList
-      denv <- gets dataEnv
+      denv <- readIORef dataEnv
       case e' of
         (_, WeakTermPiIntro opacity (LamKindCons dataName consName) _ _)
           | not (isOpaque opacity),
@@ -109,7 +110,7 @@ toLamList :: Hint -> (WeakPattern, WeakTermPlus) -> WeakTermPlus
 toLamList m ((_, _, xts), body) =
   (m, WeakTermPiIntro OpacityTransparent LamKindNormal xts body)
 
-substWeakTermPlus :: SubstWeakTerm -> WeakTermPlus -> Compiler WeakTermPlus
+substWeakTermPlus :: SubstWeakTerm -> WeakTermPlus -> IO WeakTermPlus
 substWeakTermPlus sub term =
   case term of
     (_, WeakTermTau) ->
@@ -179,7 +180,7 @@ substWeakTermPlus' ::
   SubstWeakTerm ->
   [WeakIdentPlus] ->
   WeakTermPlus ->
-  Compiler ([WeakIdentPlus], WeakTermPlus)
+  IO ([WeakIdentPlus], WeakTermPlus)
 substWeakTermPlus' sub binder e =
   case binder of
     [] -> do

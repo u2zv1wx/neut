@@ -4,47 +4,60 @@ module Preprocess.Tokenize
 where
 
 import Control.Exception.Safe
-import Control.Monad.State.Lazy
 import Data.Basic
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import Data.IORef
 import Data.Log
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Tree
-import Path
+import System.IO.Unsafe (unsafePerformIO)
 
-data TEnv = TEnv
-  { text :: T.Text,
-    line :: Int,
-    column :: Int,
-    filePath :: Path Abs File
-  }
-  deriving (Show)
-
-type Tokenizer a = StateT TEnv IO a
+-- data TEnv = TEnv
+--   { text :: T.Text,
+--     line :: Int,
+--     column :: Int,
+--     filePath :: Path Abs File
+--   }
+--   deriving (Show)
 
 type EscapeFlag =
   Bool
 
-tokenize :: T.Text -> Compiler [TreePlus]
-tokenize input = do
-  path <- getCurrentFilePath
-  liftIO $ evalStateT (program []) $ TEnv {text = input, line = 1, column = 1, filePath = path}
+{-# NOINLINE text #-}
+text :: IORef T.Text
+text =
+  unsafePerformIO (newIORef "")
 
-program :: [TreePlus] -> Tokenizer [TreePlus]
+{-# NOINLINE line #-}
+line :: IORef Int
+line =
+  unsafePerformIO (newIORef 1)
+
+{-# NOINLINE column #-}
+column :: IORef Int
+column =
+  unsafePerformIO (newIORef 1)
+
+tokenize :: T.Text -> IO [TreePlus]
+tokenize input = do
+  modifyIORef' text $ \_ -> input
+  program []
+
+program :: [TreePlus] -> IO [TreePlus]
 program acc = do
   skip
-  s <- gets text
+  s <- readIORef text
   if T.null s
     then return $ reverse acc
     else do
       t <- term
       program $ t : acc
 
-term :: Tokenizer TreePlus
+term :: IO TreePlus
 term = do
-  s <- gets text
+  s <- readIORef text
   case T.uncons s of
     Just (c, _)
       | Just l <- Map.lookup c readMacroMap ->
@@ -54,10 +67,10 @@ term = do
     _ ->
       leaf
 
-leaf :: Tokenizer TreePlus
+leaf :: IO TreePlus
 leaf = do
   m <- currentHint
-  s <- gets text
+  s <- readIORef text
   case T.uncons s of
     Just ('"', _) -> do
       k <- string
@@ -76,7 +89,7 @@ leaf = do
     Nothing ->
       raiseTokenizeError "unexpected end of input\nexpecting: LEAF"
 
-node :: Tokenizer TreePlus
+node :: IO TreePlus
 node = do
   m <- currentHint
   char '(' >> skip
@@ -84,7 +97,7 @@ node = do
   skip >> char ')' >> skip
   return (m, TreeNode itemList)
 
-resolveReadMacro :: Char -> T.Text -> Tokenizer TreePlus
+resolveReadMacro :: Char -> T.Text -> IO TreePlus
 resolveReadMacro from to = do
   m <- currentHint
   char from >> skip
@@ -92,9 +105,9 @@ resolveReadMacro from to = do
   skip
   return (m, TreeNode [(m, TreeLeaf to), item])
 
-char :: Char -> Tokenizer ()
+char :: Char -> IO ()
 char c = do
-  s <- gets text
+  s <- readIORef text
   case T.uncons s of
     Nothing ->
       raiseTokenizeError $
@@ -112,9 +125,9 @@ char c = do
             <> T.singleton c
             <> "'"
 
-skip :: Tokenizer ()
+skip :: IO ()
 skip = do
-  s <- gets text
+  s <- readIORef text
   case T.uncons s of
     Just (c, rest)
       | c == ';' ->
@@ -126,9 +139,9 @@ skip = do
     _ ->
       return ()
 
-comment :: Tokenizer ()
+comment :: IO ()
 comment = do
-  s <- gets text
+  s <- readIORef text
   case T.uncons s of
     Just (c, rest)
       | c `S.member` newlineSet ->
@@ -138,15 +151,15 @@ comment = do
     Nothing ->
       return ()
 
-many :: Tokenizer a -> Tokenizer [a]
+many :: IO a -> IO [a]
 many f =
   sepEndBy f (return ())
 
-sepEndBy :: Tokenizer a -> Tokenizer () -> Tokenizer [a]
+sepEndBy :: IO a -> IO () -> IO [a]
 sepEndBy f g =
   sepEndBy' (f >>= return . Right) g []
 
-sepEndBy' :: Tokenizer (Either [a] a) -> Tokenizer () -> [a] -> Tokenizer [a]
+sepEndBy' :: IO (Either [a] a) -> IO () -> [a] -> IO [a]
 sepEndBy' f g acc = do
   itemOrResult <- catch f (finalize acc)
   g
@@ -156,28 +169,29 @@ sepEndBy' f g acc = do
     Left result ->
       return result
 
-finalize :: [a] -> Error -> Tokenizer (Either [a] a)
+finalize :: [a] -> Error -> IO (Either [a] a)
 finalize acc _ =
   return $ Left $ reverse acc
 
-symbol :: Tokenizer T.Text
+symbol :: IO T.Text
 symbol = do
-  s <- gets text
+  s <- readIORef text
   let x = T.takeWhile isSymbolChar s
   let rest = T.dropWhile isSymbolChar s
   updateStreamC (T.length x) rest
   return x
 
-string :: Tokenizer T.Text
+string :: IO T.Text
 string = do
-  s <- gets text
+  s <- readIORef text
   let rest = T.tail s -- T.head s is known to be '"'
   len <- headStringLengthOf False rest 1
   let (x, rest') = T.splitAt len s
-  modify (\env -> env {text = rest'})
+  modifyIORef' text $ \_ -> rest'
+  -- modify (\env -> env {text = rest'})
   return x
 
-headStringLengthOf :: EscapeFlag -> T.Text -> Int -> Tokenizer Int
+headStringLengthOf :: EscapeFlag -> T.Text -> Int -> IO Int
 headStringLengthOf flag s i =
   case T.uncons s of
     Nothing ->
@@ -198,11 +212,12 @@ headStringLengthOf flag s i =
         incrementColumn
         headStringLengthOf False rest (i + 1)
 
-currentHint :: Tokenizer Hint
+currentHint :: IO Hint
 currentHint = do
-  l <- gets line
-  c <- gets column
-  path <- gets filePath
+  l <- readIORef line
+  c <- readIORef column
+  -- path <- readIORef filePath
+  path <- getCurrentFilePath
   return $ newHint (fromEnum l) (fromEnum c) path
 
 {-# INLINE isSymbolChar #-}
@@ -226,26 +241,40 @@ nonSymbolSet =
   S.fromList $ "() \"\n;" ++ map fst (Map.toList readMacroMap)
 
 {-# INLINE updateStreamL #-}
-updateStreamL :: T.Text -> Tokenizer ()
-updateStreamL s =
-  modify (\env -> env {text = s, line = 1 + line env, column = 1})
+updateStreamL :: T.Text -> IO ()
+updateStreamL s = do
+  modifyIORef' text $ \_ -> s
+  incrementLine
+
+-- modifyIORef' line $ \x -> 1 + x
+-- modifyIORef' column $ \_ -> 1
+
+-- modify (\env -> env {text = s, line = 1 + line env, column = 1})
 
 {-# INLINE updateStreamC #-}
-updateStreamC :: Int -> T.Text -> Tokenizer ()
-updateStreamC c s =
-  modify (\env -> env {text = s, column = c + column env})
+updateStreamC :: Int -> T.Text -> IO ()
+updateStreamC c s = do
+  modifyIORef' text $ \_ -> s
+  modifyIORef' column $ \x -> c + x
+
+-- modify (\env -> env {text = s, column = c + column env})
 
 {-# INLINE incrementLine #-}
-incrementLine :: Tokenizer ()
-incrementLine =
-  modify (\env -> env {line = 1 + line env, column = 1})
+incrementLine :: IO ()
+incrementLine = do
+  modifyIORef' line $ \x -> 1 + x
+  modifyIORef' column $ \_ -> 1
+
+-- modify (\env -> env {line = 1 + line env, column = 1})
 
 {-# INLINE incrementColumn #-}
-incrementColumn :: Tokenizer ()
+incrementColumn :: IO ()
 incrementColumn =
-  modify (\env -> env {column = 1 + column env})
+  modifyIORef' column $ \x -> 1 + x
 
-raiseTokenizeError :: T.Text -> Tokenizer a
+-- modify (\env -> env {column = 1 + column env})
+
+raiseTokenizeError :: T.Text -> IO a
 raiseTokenizeError txt = do
   m <- currentHint
   throw $ Error [logError (getPosInfo m) txt]

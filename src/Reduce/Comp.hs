@@ -4,22 +4,22 @@ module Reduce.Comp
   )
 where
 
-import Control.Monad.State.Lazy
 import Data.Basic hiding (asIdent)
 import Data.Comp
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import Data.IORef
 import qualified Data.IntMap as IntMap
 
 type NameEnv = IntMap.IntMap Ident
 
-reduceCompPlus :: CompPlus -> Compiler CompPlus
+reduceCompPlus :: CompPlus -> IO CompPlus
 reduceCompPlus term =
   case term of
     (_, CompPrimitive _) ->
       return term
     (_, CompPiElimDownElim v ds) -> do
-      denv <- gets defEnv
+      denv <- readIORef defEnv
       case v of
         (_, ValueVarGlobal x)
           | Just (isReducible, xs, body) <- Map.lookup x denv,
@@ -96,7 +96,7 @@ substValuePlus sub nenv term =
     _ ->
       term
 
-substCompPlus :: SubstValuePlus -> NameEnv -> CompPlus -> Compiler CompPlus
+substCompPlus :: SubstValuePlus -> NameEnv -> CompPlus -> IO CompPlus
 substCompPlus sub nenv term =
   case term of
     (m, CompPrimitive theta) -> do

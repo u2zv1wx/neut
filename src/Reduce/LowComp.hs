@@ -3,9 +3,9 @@ module Reduce.LowComp
   )
 where
 
-import Control.Monad.State.Lazy
 import Data.Basic
 import Data.Env
+import Data.IORef
 import qualified Data.IntMap as IntMap
 import Data.LowComp
 import Data.LowType
@@ -15,9 +15,9 @@ import qualified Data.Set as S
 type SizeMap =
   Map.Map SizeInfo [(Int, LowValue)]
 
-reduceLowComp :: SubstLowComp -> SizeMap -> LowComp -> Compiler LowComp
+reduceLowComp :: SubstLowComp -> SizeMap -> LowComp -> IO LowComp
 reduceLowComp sub sizeMap llvm = do
-  cancelAllocFlag <- gets shouldCancelAlloc
+  cancelAllocFlag <- readIORef shouldCancelAlloc
   case llvm of
     LowCompReturn d ->
       return $ LowCompReturn $ substLowValue sub d
@@ -36,7 +36,8 @@ reduceLowComp sub sizeMap llvm = do
         LowOpAlloc _ size
           | cancelAllocFlag,
             Just ((j, d) : rest) <- Map.lookup size sizeMap -> do
-            modify (\env -> env {nopFreeSet = S.insert j (nopFreeSet env)})
+            modifyIORef' nopFreeSet $ \env -> S.insert j env
+            -- modify (\env -> env {nopFreeSet = S.insert j (nopFreeSet env)})
             let sizeMap' = Map.insert size rest sizeMap
             let sub' = IntMap.insert (asInt x) (substLowValue sub d) sub
             reduceLowComp sub' sizeMap' cont

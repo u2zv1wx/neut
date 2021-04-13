@@ -4,7 +4,7 @@ module Clarify.Linearize
 where
 
 import Clarify.Utility
-import Control.Monad.State
+import Control.Monad
 import Data.Basic
 import Data.Comp
 import Data.Env
@@ -13,7 +13,7 @@ import Data.IORef
 linearize ::
   [(Ident, CompPlus)] -> -- [(x1, t1), ..., (xn, tn)]  (closed chain)
   CompPlus -> -- a term that can contain non-linear occurrences of xi
-  Compiler CompPlus -- a term in which all the variables in the closed chain occur linearly
+  IO CompPlus -- a term in which all the variables in the closed chain occur linearly
 linearize binder e =
   case binder of
     [] ->
@@ -27,7 +27,7 @@ linearize binder e =
         z : zs ->
           insertHeader x z zs t e''
 
-insertFooter :: Ident -> CompPlus -> CompPlus -> Compiler CompPlus
+insertFooter :: Ident -> CompPlus -> CompPlus -> IO CompPlus
 insertFooter x t e@(m, _) = do
   ans <- newIdentFromText "answer"
   hole <- newIdentFromText "unit"
@@ -40,7 +40,7 @@ insertHeader ::
   [Ident] ->
   CompPlus ->
   CompPlus ->
-  Compiler CompPlus
+  IO CompPlus
 insertHeader x z1 zs t e@(m, _) = do
   case zs of
     [] ->
@@ -50,7 +50,7 @@ insertHeader x z1 zs t e@(m, _) = do
       copyRelevantVar <- toRelevantApp m x t
       return (m, CompUpElim z1 copyRelevantVar e')
 
-distinguishValue :: Ident -> ValuePlus -> Compiler ([Ident], ValuePlus)
+distinguishValue :: Ident -> ValuePlus -> IO ([Ident], ValuePlus)
 distinguishValue z term =
   case term of
     (m, ValueVarLocal x) ->
@@ -65,7 +65,7 @@ distinguishValue z term =
     _ ->
       return ([], term)
 
-distinguishComp :: Ident -> CompPlus -> Compiler ([Ident], CompPlus)
+distinguishComp :: Ident -> CompPlus -> IO ([Ident], CompPlus)
 distinguishComp z term =
   case term of
     (m, CompPrimitive theta) -> do
@@ -93,14 +93,14 @@ distinguishComp z term =
           return (vs, (m, CompEnumElim d' []))
         _ -> do
           let (cs, es) = unzip branchList
-          countBefore <- liftIO $ readIORef count
+          countBefore <- readIORef count
           (vss, es') <- fmap unzip $
             forM es $ \e -> do
-              liftIO $ writeIORef count countBefore
+              writeIORef count countBefore
               distinguishComp z e
           return (concat $ [vs, head vss], (m, CompEnumElim d' (zip cs es')))
 
-distinguishPrimitive :: Ident -> Primitive -> Compiler ([Ident], Primitive)
+distinguishPrimitive :: Ident -> Primitive -> IO ([Ident], Primitive)
 distinguishPrimitive z term =
   case term of
     PrimitivePrimOp op ds -> do

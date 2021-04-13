@@ -4,9 +4,10 @@ module Elaborate.Unify
 where
 
 import Control.Exception.Safe
-import Control.Monad.State.Lazy
+import Control.Monad
 import Data.Basic
 import Data.Env
+import Data.IORef
 import qualified Data.IntMap as IntMap
 import Data.Log
 import qualified Data.PQueue.Min as Q
@@ -21,33 +22,35 @@ data Stuck
   | StuckPiElimAster Int [[WeakTermPlus]]
   deriving (Show)
 
-unify :: Compiler ()
+unify :: IO ()
 unify =
   analyze >> synthesize
 
-analyze :: Compiler ()
+analyze :: IO ()
 analyze = do
-  cs <- gets constraintEnv
-  modify (\env -> env {constraintEnv = []})
+  cs <- readIORef constraintEnv
+  -- modify (\env -> env {constraintEnv = []})
+  modifyIORef' constraintEnv $ \_ -> []
   simplify $ zip cs cs
 
-synthesize :: Compiler ()
+synthesize :: IO ()
 synthesize = do
-  cs <- gets suspendedConstraintEnv
+  cs <- readIORef suspendedConstraintEnv
   case Q.minView cs of
     Nothing ->
       return ()
     Just ((SuspendedConstraint (_, ConstraintKindDelta c, (_, orig))), cs') -> do
-      modify (\env -> env {suspendedConstraintEnv = cs'})
+      -- modify (\env -> env {suspendedConstraintEnv = cs'})
+      modifyIORef' suspendedConstraintEnv $ \_ -> cs'
       simplify [(c, orig)]
       synthesize
     Just ((SuspendedConstraint (_, ConstraintKindOther, _)), _) ->
       throwTypeErrors
 
-throwTypeErrors :: Compiler a
+throwTypeErrors :: IO a
 throwTypeErrors = do
-  q <- gets suspendedConstraintEnv
-  sub <- gets substEnv
+  q <- readIORef suspendedConstraintEnv
+  sub <- readIORef substEnv
   errorList <- forM (Q.toList q) $ \(SuspendedConstraint (_, _, (_, (expected, actual)))) -> do
     expected' <- substWeakTermPlus sub expected >>= reduceWeakTermPlus
     actual' <- substWeakTermPlus sub actual >>= reduceWeakTermPlus
@@ -61,7 +64,7 @@ constructErrorMsg e1 e2 =
     <> "\n- "
     <> toText e2
 
-simplify :: [(Constraint, Constraint)] -> Compiler ()
+simplify :: [(Constraint, Constraint)] -> IO ()
 simplify constraintList =
   case constraintList of
     [] ->
@@ -122,7 +125,7 @@ simplify constraintList =
             i1 == i2 -> do
             simplify $ map (\pair -> (pair, orig)) (zip es1 es2) ++ cs
         (e1, e2) -> do
-          sub <- gets substEnv
+          sub <- readIORef substEnv
           let fvs1 = varWeakTermPlus e1
           let fvs2 = varWeakTermPlus e2
           let fmvs1 = asterWeakTermPlus e1
@@ -175,12 +178,14 @@ simplify constraintList =
                 (Just (StuckPiElimVar x1 mess1), Just (StuckPiElimAster {}))
                   | Just lam <- lookupDefinition x1 sub -> do
                     let uc = SuspendedConstraint (fmvs, ConstraintKindDelta (toPiElim lam mess1, e2), headConstraint)
-                    modify (\env -> env {suspendedConstraintEnv = Q.insert uc (suspendedConstraintEnv env)})
+                    -- modify (\env -> env {suspendedConstraintEnv = Q.insert uc (suspendedConstraintEnv env)})
+                    modifyIORef' suspendedConstraintEnv $ \env -> Q.insert uc env
                     simplify cs
                 (Just (StuckPiElimAster {}), Just (StuckPiElimVar x2 mess2))
                   | Just lam <- lookupDefinition x2 sub -> do
                     let uc = SuspendedConstraint (fmvs, ConstraintKindDelta (e1, toPiElim lam mess2), headConstraint)
-                    modify (\env -> env {suspendedConstraintEnv = Q.insert uc (suspendedConstraintEnv env)})
+                    -- modify (\env -> env {suspendedConstraintEnv = Q.insert uc (suspendedConstraintEnv env)})
+                    modifyIORef' suspendedConstraintEnv $ \env -> Q.insert uc env
                     simplify cs
                 (Just (StuckPiElimVar x1 mess1), _)
                   | Just lam <- lookupDefinition x1 sub -> do
@@ -190,24 +195,27 @@ simplify constraintList =
                     simplify $ ((e1, toPiElim lam mess2), orig) : cs
                 _ -> do
                   let uc = SuspendedConstraint (fmvs, ConstraintKindOther, headConstraint)
-                  modify (\env -> env {suspendedConstraintEnv = Q.insert uc (suspendedConstraintEnv env)})
+                  -- modify (\env -> env {suspendedConstraintEnv = Q.insert uc (suspendedConstraintEnv env)})
+                  modifyIORef' suspendedConstraintEnv $ \env -> Q.insert uc env
                   simplify cs
 
 {-# INLINE resolveHole #-}
-resolveHole :: Int -> [[WeakIdentPlus]] -> WeakTermPlus -> [(Constraint, Constraint)] -> Compiler ()
+resolveHole :: Int -> [[WeakIdentPlus]] -> WeakTermPlus -> [(Constraint, Constraint)] -> IO ()
 resolveHole h1 xss e2' cs = do
-  modify (\env -> env {substEnv = IntMap.insert h1 (toPiIntro xss e2') (substEnv env)})
-  sus <- gets suspendedConstraintEnv
+  -- modify (\env -> env {substEnv = IntMap.insert h1 (toPiIntro xss e2') (substEnv env)})
+  modifyIORef' substEnv $ \env -> IntMap.insert h1 (toPiIntro xss e2') env
+  sus <- readIORef suspendedConstraintEnv
   let (sus1, sus2) = Q.partition (\(SuspendedConstraint (hs, _, _)) -> S.member h1 hs) sus
-  modify (\env -> env {suspendedConstraintEnv = sus2})
+  -- modify (\env -> env {suspendedConstraintEnv = sus2})
+  modifyIORef' suspendedConstraintEnv $ \_ -> sus2
   let sus1' = map (\(SuspendedConstraint (_, _, c)) -> c) $ Q.toList sus1
   simplify $ sus1' ++ cs
 
-simplifyBinder :: Constraint -> [WeakIdentPlus] -> [WeakIdentPlus] -> Compiler [(Constraint, Constraint)]
+simplifyBinder :: Constraint -> [WeakIdentPlus] -> [WeakIdentPlus] -> IO [(Constraint, Constraint)]
 simplifyBinder orig =
   simplifyBinder' orig IntMap.empty
 
-simplifyBinder' :: Constraint -> SubstWeakTerm -> [WeakIdentPlus] -> [WeakIdentPlus] -> Compiler [(Constraint, Constraint)]
+simplifyBinder' :: Constraint -> SubstWeakTerm -> [WeakIdentPlus] -> [WeakIdentPlus] -> IO [(Constraint, Constraint)]
 simplifyBinder' orig sub args1 args2 =
   case (args1, args2) of
     ((m1, x1, t1) : xts1, (_, x2, t2) : xts2) -> do
@@ -218,7 +226,7 @@ simplifyBinder' orig sub args1 args2 =
     _ ->
       return []
 
-asWeakIdentPlus :: Hint -> WeakTermPlus -> Compiler WeakIdentPlus
+asWeakIdentPlus :: Hint -> WeakTermPlus -> IO WeakIdentPlus
 asWeakIdentPlus m t = do
   h <- newIdentFromText "aster"
   return (m, h, t)

@@ -3,10 +3,10 @@ module Preprocess.Discern
   )
 where
 
-import Control.Monad.State.Lazy
 import Data.Basic
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import Data.IORef
 import Data.Log
 import Data.MetaTerm
 import Data.Namespace
@@ -14,12 +14,12 @@ import qualified Data.Text as T
 
 type NameEnv = Map.HashMap T.Text Ident
 
-discernMetaTerm :: MetaTermPlus -> Compiler MetaTermPlus
+discernMetaTerm :: MetaTermPlus -> IO MetaTermPlus
 discernMetaTerm e = do
-  nenv <- gets topMetaNameEnv
+  nenv <- readIORef topMetaNameEnv
   discernMetaTerm' nenv e
 
-discernMetaTerm' :: NameEnv -> MetaTermPlus -> Compiler MetaTermPlus
+discernMetaTerm' :: NameEnv -> MetaTermPlus -> IO MetaTermPlus
 discernMetaTerm' nenv term =
   case term of
     (m, MetaTermVar (I (s, _))) ->
@@ -58,7 +58,7 @@ discernBinder ::
   [Ident] ->
   Maybe Ident ->
   MetaTermPlus ->
-  Compiler ([Ident], Maybe Ident, MetaTermPlus)
+  IO ([Ident], Maybe Ident, MetaTermPlus)
 discernBinder nenv binder mf e =
   case binder of
     [] -> do

@@ -9,11 +9,12 @@ where
 import Clarify.Linearize
 import Clarify.Sigma
 import Clarify.Utility
-import Control.Monad.State.Lazy
+import Control.Monad
 import Data.Basic
 import Data.Comp
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import Data.IORef
 import qualified Data.IntMap as IntMap
 import Data.List (nubBy)
 import Data.Log
@@ -24,11 +25,11 @@ import Data.Term
 import qualified Data.Text as T
 import Reduce.Comp
 
-clarify :: [Stmt] -> Compiler CompPlus
+clarify :: [Stmt] -> IO CompPlus
 clarify =
   clarifyStmt IntMap.empty >=> reduceCompPlus
 
-clarifyStmt :: TypeEnv -> [Stmt] -> Compiler CompPlus
+clarifyStmt :: TypeEnv -> [Stmt] -> IO CompPlus
 clarifyStmt tenv ss =
   case ss of
     [] -> do
@@ -49,7 +50,7 @@ clarifyStmt tenv ss =
           hole <- newIdentFromText "unit"
           return (m, CompUpElim result e' (m, CompUpElim hole discardResult cont'))
 
-clarifyTerm :: TypeEnv -> TermPlus -> Compiler CompPlus
+clarifyTerm :: TypeEnv -> TermPlus -> IO CompPlus
 clarifyTerm tenv term =
   case term of
     (m, TermTau) ->
@@ -133,7 +134,7 @@ clarifyTerm tenv term =
             )
         )
 
-newClosureNames :: Hint -> Compiler ((Ident, ValuePlus), Ident, (Ident, ValuePlus), (Ident, ValuePlus))
+newClosureNames :: Hint -> IO ((Ident, ValuePlus), Ident, (Ident, ValuePlus), (Ident, ValuePlus))
 newClosureNames m = do
   closureVarInfo <- newValueVarLocalWith m "closure"
   typeVarName <- newIdentFromText "exp"
@@ -147,12 +148,12 @@ caseClauseToLambda pat =
     ((mPat, _, xts), body) ->
       (mPat, TermPiIntro OpacityTransparent LamKindNormal xts body)
 
-constructClauseArguments :: CompPlus -> Int -> Int -> Compiler [(Ident, CompPlus, ValuePlus)]
+constructClauseArguments :: CompPlus -> Int -> Int -> IO [(Ident, CompPlus, ValuePlus)]
 constructClauseArguments cls clsIndex upperBound = do
   (innerClsVarName, innerClsVar) <- newValueVarLocalWith (fst cls) "var"
   constructClauseArguments' (innerClsVarName, cls, innerClsVar) clsIndex 0 upperBound
 
-constructClauseArguments' :: (Ident, CompPlus, ValuePlus) -> Int -> Int -> Int -> Compiler [(Ident, CompPlus, ValuePlus)]
+constructClauseArguments' :: (Ident, CompPlus, ValuePlus) -> Int -> Int -> Int -> IO [(Ident, CompPlus, ValuePlus)]
 constructClauseArguments' clsInfo clsIndex cursor upperBound = do
   if cursor == upperBound
     then return []
@@ -166,18 +167,18 @@ constructClauseArguments' clsInfo clsIndex cursor upperBound = do
           fakeClosure <- makeFakeClosure m
           return $ (argVarName, (m, CompUpIntro fakeClosure), argVar) : rest
 
-makeFakeClosure :: Hint -> Compiler ValuePlus
+makeFakeClosure :: Hint -> IO ValuePlus
 makeFakeClosure m = do
   imm <- immediateS4 m
   return (m, ValueSigmaIntro [imm, (m, ValueInt 64 0), (m, ValueInt 64 0)])
 
-clarifyPlus :: TypeEnv -> TermPlus -> Compiler (Ident, CompPlus, ValuePlus)
+clarifyPlus :: TypeEnv -> TermPlus -> IO (Ident, CompPlus, ValuePlus)
 clarifyPlus tenv e@(m, _) = do
   e' <- clarifyTerm tenv e
   (varName, var) <- newValueVarLocalWith m "var"
   return (varName, e', var)
 
-clarifyBinder :: TypeEnv -> [IdentPlus] -> Compiler [(Hint, Ident, CompPlus)]
+clarifyBinder :: TypeEnv -> [IdentPlus] -> IO [(Hint, Ident, CompPlus)]
 clarifyBinder tenv binder =
   case binder of
     [] ->
@@ -191,7 +192,7 @@ chainFromTermList :: TypeEnv -> [TermPlus] -> [IdentPlus]
 chainFromTermList tenv es =
   nubFreeVariables $ concat $ map (chainOf tenv) es
 
-alignFreeVariables :: TypeEnv -> Hint -> [IdentPlus] -> [CompPlus] -> Compiler [CompPlus]
+alignFreeVariables :: TypeEnv -> Hint -> [IdentPlus] -> [CompPlus] -> IO [CompPlus]
 alignFreeVariables tenv m fvs es = do
   es' <- mapM (returnClosure tenv True LamKindNormal fvs m []) es
   mapM (\cls -> callClosure m cls []) es'
@@ -200,7 +201,7 @@ nubFreeVariables :: [IdentPlus] -> [IdentPlus]
 nubFreeVariables =
   nubBy (\(_, x, _) (_, y, _) -> x == y)
 
-clarifyConst :: TypeEnv -> Hint -> T.Text -> Compiler CompPlus
+clarifyConst :: TypeEnv -> Hint -> T.Text -> IO CompPlus
 clarifyConst tenv m constName
   | Just op <- asPrimOp constName =
     clarifyPrimOp tenv op m
@@ -209,7 +210,7 @@ clarifyConst tenv m constName
   | otherwise = do
     raiseCritical m $ "undefined constant: " <> constName
 
-clarifyPrimOp :: TypeEnv -> PrimOp -> Hint -> Compiler CompPlus
+clarifyPrimOp :: TypeEnv -> PrimOp -> Hint -> IO CompPlus
 clarifyPrimOp tenv op@(PrimOp _ domList _) m = do
   argTypeList <- mapM (lowTypeToType m) domList
   (xs, varList) <- unzip <$> mapM (const (newValueVarLocalWith m "prim")) domList
@@ -224,7 +225,7 @@ returnClosure ::
   Hint -> -- meta of lambda
   [IdentPlus] -> -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
   CompPlus -> -- the `e` in `lam (x1, ..., xn). e`
-  Compiler CompPlus
+  IO CompPlus
 returnClosure tenv isReducible kind fvs m xts e = do
   fvs' <- clarifyBinder tenv fvs
   xts' <- clarifyBinder tenv xts
@@ -239,7 +240,7 @@ returnClosure tenv isReducible kind fvs m xts e = do
       registerIfNecessary m name isReducible False xts'' fvs'' e
       return (m, CompUpIntro (m, ValueSigmaIntro [fvEnvSigma, fvEnv, (m, ValueVarGlobal (wrapWithQuote name))]))
     LamKindCons _ consName -> do
-      cenv <- gets constructorEnv
+      cenv <- readIORef constructorEnv
       case Map.lookup consName cenv of
         Just (_, constructorNumber) -> do
           registerIfNecessary m consName isReducible True xts'' fvs'' e
@@ -269,9 +270,9 @@ registerIfNecessary ::
   [(Ident, CompPlus)] ->
   [(Ident, CompPlus)] ->
   CompPlus ->
-  Compiler ()
+  IO ()
 registerIfNecessary m name isReducible isNoetic xts1 xts2 e = do
-  denv <- gets defEnv
+  denv <- readIORef defEnv
   when (not $ name `Map.member` denv) $ do
     e' <- linearize (xts2 ++ xts1) e
     (envVarName, envVar) <- newValueVarLocalWith m "env"
@@ -282,7 +283,7 @@ registerIfNecessary m name isReducible isNoetic xts1 xts2 e = do
       bodyNoetic <- reduceCompPlus (m, CompSigmaElim True (map fst xts2) envVar e')
       insDefEnv (wrapWithQuote $ name <> ";noetic") isReducible args bodyNoetic
 
-callClosure :: Hint -> CompPlus -> [(Ident, CompPlus, ValuePlus)] -> Compiler CompPlus
+callClosure :: Hint -> CompPlus -> [(Ident, CompPlus, ValuePlus)] -> IO CompPlus
 callClosure m e zexes = do
   let (zs, es', xs) = unzip3 zexes
   ((closureVarName, closureVar), typeVarName, (envVarName, envVar), (lamVarName, lamVar)) <- newClosureNames m

@@ -1,9 +1,9 @@
 module Data.Namespace where
 
-import Control.Monad.State.Lazy
 import Data.Basic
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import Data.IORef
 import Data.Log
 import Data.LowType
 import Data.MetaTerm
@@ -30,22 +30,26 @@ nsOS :: T.Text
 nsOS =
   "os" <> nsSep
 
-use :: T.Text -> Compiler ()
+use :: T.Text -> IO ()
 use s =
-  modify (\e -> e {prefixEnv = s : prefixEnv e})
+  modifyIORef' prefixEnv $ \env -> s : env
 
-unuse :: T.Text -> Compiler ()
+-- modify (\e -> e {prefixEnv = s : prefixEnv e})
+
+unuse :: T.Text -> IO ()
 unuse s =
-  modify (\e -> e {prefixEnv = filter (/= s) (prefixEnv e)})
+  modifyIORef' prefixEnv $ \env -> filter (/= s) env
 
-withSectionPrefix :: T.Text -> Compiler T.Text
+-- modify (\e -> e {prefixEnv = filter (/= s) (prefixEnv e)})
+
+withSectionPrefix :: T.Text -> IO T.Text
 withSectionPrefix x = do
-  ns <- gets sectionEnv
+  ns <- readIORef sectionEnv
   return $ foldl (\acc n -> n <> nsSep <> acc) x ns
 
-getCurrentSection :: Compiler T.Text
+getCurrentSection :: IO T.Text
 getCurrentSection = do
-  ns <- gets sectionEnv
+  ns <- readIORef sectionEnv
   return $ getCurrentSection' ns
 
 getCurrentSection' :: [T.Text] -> T.Text
@@ -58,7 +62,7 @@ getCurrentSection' nameStack =
     (n : ns) ->
       getCurrentSection' ns <> nsSep <> n
 
-prefixTextPlus :: TreePlus -> Compiler TreePlus
+prefixTextPlus :: TreePlus -> IO TreePlus
 prefixTextPlus tree =
   case tree of
     (_, TreeLeaf "_") ->
@@ -74,29 +78,31 @@ prefixTextPlus tree =
     t ->
       raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
 
-handleSection :: T.Text -> Compiler a -> Compiler a
+handleSection :: T.Text -> IO a -> IO a
 handleSection s cont = do
-  modify (\e -> e {sectionEnv = s : sectionEnv e})
+  -- modify (\e -> e {sectionEnv = s : sectionEnv e})
+  modifyIORef' sectionEnv $ \env -> s : env
   getCurrentSection >>= use
   cont
 
-handleEnd :: Hint -> T.Text -> Compiler a -> Compiler a
+handleEnd :: Hint -> T.Text -> IO a -> IO a
 handleEnd m s cont = do
-  ns <- gets sectionEnv
+  ns <- readIORef sectionEnv
   case ns of
     [] ->
       raiseError m "there is no section to end"
     s' : ns'
       | s == s' -> do
         getCurrentSection >>= unuse
-        modify (\e -> e {sectionEnv = ns'})
+        modifyIORef' sectionEnv $ \_ -> ns'
+        -- modify (\e -> e {sectionEnv = ns'})
         cont
       | otherwise ->
         raiseError m $
           "the innermost section is not `" <> s <> "`, but is `" <> s' <> "`"
 
 {-# INLINE resolveSymbol #-}
-resolveSymbol :: Hint -> (T.Text -> Maybe b) -> T.Text -> Compiler (Maybe b)
+resolveSymbol :: Hint -> (T.Text -> Maybe b) -> T.Text -> IO (Maybe b)
 resolveSymbol m predicate name = do
   candList <- constructCandList name
   case takeAll predicate candList [] of
@@ -108,10 +114,10 @@ resolveSymbol m predicate name = do
       let candInfo = T.concat $ map (\cand -> "\n- " <> cand) candList'
       raiseError m $ "this `" <> name <> "` is ambiguous since it could refer to:" <> candInfo
 
-constructCandList :: T.Text -> Compiler [T.Text]
+constructCandList :: T.Text -> IO [T.Text]
 constructCandList name = do
-  penv <- gets prefixEnv
-  nenv <- gets nsEnv
+  penv <- readIORef prefixEnv
+  nenv <- readIORef nsEnv
   return $ constructCandList' nenv $ name : map (<> nsSep <> name) penv
 
 constructCandList' :: [(T.Text, T.Text)] -> [T.Text] -> [T.Text]

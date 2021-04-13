@@ -3,11 +3,12 @@ module Emit
   )
 where
 
-import Control.Monad.State.Lazy
+import Control.Monad
 import Data.Basic
 import Data.ByteString.Builder
 import Data.Env
 import qualified Data.HashMap.Lazy as HashMap
+import Data.IORef
 import qualified Data.IntMap as IntMap
 import Data.Log
 import Data.LowComp
@@ -20,12 +21,12 @@ import Numeric.Half
 import Reduce.LowComp
 import qualified System.Info as System
 
-emit :: LowComp -> Compiler Builder
+emit :: LowComp -> IO Builder
 emit mainTerm = do
   g <- emitDeclarations
   mainTerm' <- reduceLowComp IntMap.empty Map.empty mainTerm
   zs <- emitDefinition "i64" "main" [] mainTerm'
-  lenv <- gets lowDefEnv
+  lenv <- readIORef lowDefEnv
   xs <-
     forM (HashMap.toList lenv) $ \(name, (args, body)) -> do
       let args' = map (showLowValue . LowValueVarLocal) args
@@ -33,9 +34,9 @@ emit mainTerm = do
       emitDefinition "i8*" (TE.encodeUtf8Builder name) args' body'
   return $ unlinesL $ g : zs <> concat xs
 
-emitDeclarations :: Compiler Builder
+emitDeclarations :: IO Builder
 emitDeclarations = do
-  denv <- HashMap.toList <$> gets declEnv
+  denv <- HashMap.toList <$> readIORef declEnv
   return $ unlinesL $ map declToBuilder denv
 
 declToBuilder :: (T.Text, ([LowType], LowType)) -> Builder
@@ -49,7 +50,7 @@ declToBuilder (name, (dom, cod)) = do
     <> showItems showLowType dom
     <> ")"
 
-emitDefinition :: Builder -> Builder -> [Builder] -> LowComp -> Compiler [Builder]
+emitDefinition :: Builder -> Builder -> [Builder] -> LowComp -> IO [Builder]
 emitDefinition retType name args asm = do
   let header = sig retType name args <> " {"
   content <- emitLowComp retType asm
@@ -60,12 +61,12 @@ sig :: Builder -> Builder -> [Builder] -> Builder
 sig retType name args =
   "define fastcc " <> retType <> " @" <> name <> showLocals args
 
-emitBlock :: Builder -> Ident -> LowComp -> Compiler [Builder]
+emitBlock :: Builder -> Ident -> LowComp -> IO [Builder]
 emitBlock funName (I (_, i)) asm = do
   a <- emitLowComp funName asm
   return $ emitLabel ("_" <> intDec i) : a
 
-emitLowComp :: Builder -> LowComp -> Compiler [Builder]
+emitLowComp :: Builder -> LowComp -> IO [Builder]
 emitLowComp retType llvm =
   case llvm of
     LowCompReturn d ->
@@ -113,7 +114,7 @@ emitLowComp retType llvm =
     LowCompUnreachable ->
       emitOp $ unwordsL ["unreachable"]
 
-emitLowOp :: LowOp -> Compiler Builder
+emitLowOp :: LowOp -> IO Builder
 emitLowOp llvmOp =
   case llvmOp of
     LowOpCall d ds ->
@@ -153,7 +154,7 @@ emitLowOp llvmOp =
     LowOpAlloc d _ ->
       return $ unwordsL ["call fastcc", "i8*", "@malloc(i8* " <> showLowValue d <> ")"]
     LowOpFree d _ j -> do
-      nenv <- gets nopFreeSet
+      nenv <- readIORef nopFreeSet
       if S.member j nenv
         then return "bitcast i8* null to i8*" -- nop
         else return $ unwordsL ["call fastcc", "i8*", "@free(i8* " <> showLowValue d <> ")"]
@@ -173,21 +174,21 @@ emitLowOp llvmOp =
         _ ->
           raiseCritical' $ "unknown primitive: " <> op
 
-emitUnaryOp :: LowType -> Builder -> LowValue -> Compiler Builder
+emitUnaryOp :: LowType -> Builder -> LowValue -> IO Builder
 emitUnaryOp t inst d =
   return $ unwordsL [inst, showLowType t, showLowValue d]
 
-emitBinaryOp :: LowType -> Builder -> LowValue -> LowValue -> Compiler Builder
+emitBinaryOp :: LowType -> Builder -> LowValue -> LowValue -> IO Builder
 emitBinaryOp t inst d1 d2 =
   return $
     unwordsL [inst, showLowType t, showLowValue d1 <> ",", showLowValue d2]
 
-emitConvOp :: Builder -> LowValue -> LowType -> LowType -> Compiler Builder
+emitConvOp :: Builder -> LowValue -> LowType -> LowType -> IO Builder
 emitConvOp cast d dom cod =
   return $
     unwordsL [cast, showLowType dom, showLowValue d, "to", showLowType cod]
 
-emitSyscallOp :: Integer -> [LowValue] -> Compiler Builder
+emitSyscallOp :: Integer -> [LowValue] -> IO Builder
 emitSyscallOp num ds = do
   regList <- getRegList
   case System.arch of
@@ -206,11 +207,11 @@ emitSyscallOp num ds = do
     targetArch ->
       raiseCritical' $ "unsupported target arch: " <> T.pack (show targetArch)
 
-emitOp :: Builder -> Compiler [Builder]
+emitOp :: Builder -> IO [Builder]
 emitOp s =
   return ["  " <> s]
 
-emitRet :: Builder -> LowValue -> Compiler [Builder]
+emitRet :: Builder -> LowValue -> IO [Builder]
 emitRet retType d =
   emitOp $ unwordsL ["ret", retType, showLowValue d]
 
@@ -218,7 +219,7 @@ emitLabel :: Builder -> Builder
 emitLabel s =
   s <> ":"
 
-constructLabelList :: [a] -> Compiler [Ident]
+constructLabelList :: [a] -> IO [Ident]
 constructLabelList input =
   case input of
     [] ->
@@ -299,7 +300,7 @@ showLowTypeAsIfNonPtr lowType =
     LowTypePointer t ->
       showLowType t
 
-getRegList :: Compiler [Builder]
+getRegList :: IO [Builder]
 getRegList = do
   case (System.os, System.arch) of
     ("linux", "x86_64") ->

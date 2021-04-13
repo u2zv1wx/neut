@@ -1,14 +1,15 @@
 module Clarify.Utility where
 
-import Control.Monad.State.Lazy
+import Control.Monad
 import Data.Basic
 import Data.Comp
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import Data.IORef
 import Data.Namespace
 import qualified Data.Text as T
 
-toApp :: T.Text -> Hint -> Ident -> CompPlus -> Compiler CompPlus
+toApp :: T.Text -> Hint -> Ident -> CompPlus -> IO CompPlus
 toApp switcher m x t = do
   (expVarName, expVar) <- newValueVarLocalWith m "exp"
   return
@@ -26,14 +27,14 @@ toApp switcher m x t = do
 -- toAffineApp meta x t ~>
 --   bind exp := t in
 --   exp @ (0, x)
-toAffineApp :: Hint -> Ident -> CompPlus -> Compiler CompPlus
+toAffineApp :: Hint -> Ident -> CompPlus -> IO CompPlus
 toAffineApp =
   toApp boolFalse
 
 -- toRelevantApp meta x t ~>
 --   bind exp := t in
 --   exp @ (1, x)
-toRelevantApp :: Hint -> Ident -> CompPlus -> Compiler CompPlus
+toRelevantApp :: Hint -> Ident -> CompPlus -> IO CompPlus
 toRelevantApp =
   toApp boolTrue
 
@@ -49,17 +50,17 @@ switch :: CompPlus -> CompPlus -> [(EnumCase, CompPlus)]
 switch e1 e2 =
   [(EnumCaseLabel boolFalse, e1), (EnumCaseDefault, e2)]
 
-tryCache :: Hint -> T.Text -> Compiler () -> Compiler ValuePlus
+tryCache :: Hint -> T.Text -> IO () -> IO ValuePlus
 tryCache m key doInsertion = do
-  denv <- gets defEnv
+  denv <- readIORef defEnv
   when (not $ Map.member key denv) doInsertion
   return (m, ValueVarGlobal key)
 
 makeSwitcher ::
   Hint ->
-  (ValuePlus -> Compiler CompPlus) ->
-  (ValuePlus -> Compiler CompPlus) ->
-  Compiler ([Ident], CompPlus)
+  (ValuePlus -> IO CompPlus) ->
+  (ValuePlus -> IO CompPlus) ->
+  IO ([Ident], CompPlus)
 makeSwitcher m compAff compRel = do
   (switchVarName, switchVar) <- newValueVarLocalWith m "switch"
   (argVarName, argVar) <- newValueVarLocalWith m "arg"
@@ -77,16 +78,18 @@ makeSwitcher m compAff compRel = do
 registerSwitcher ::
   Hint ->
   T.Text ->
-  (ValuePlus -> Compiler CompPlus) ->
-  (ValuePlus -> Compiler CompPlus) ->
-  Compiler ()
+  (ValuePlus -> IO CompPlus) ->
+  (ValuePlus -> IO CompPlus) ->
+  IO ()
 registerSwitcher m name aff rel = do
   (args, e) <- makeSwitcher m aff rel
   insDefEnv name True args e
 
-insDefEnv :: T.Text -> Bool -> [Ident] -> CompPlus -> Compiler ()
+insDefEnv :: T.Text -> Bool -> [Ident] -> CompPlus -> IO ()
 insDefEnv name isReducible args e =
-  modify (\env -> env {defEnv = Map.insert name (isReducible, args, e) (defEnv env)})
+  modifyIORef' defEnv $ \env -> Map.insert name (isReducible, args, e) env
+
+-- modify (\env -> env {defEnv = Map.insert name (isReducible, args, e) (defEnv env)})
 
 {-# INLINE boolTrue #-}
 boolTrue :: T.Text

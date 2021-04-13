@@ -5,10 +5,11 @@ where
 
 import Codec.Binary.UTF8.String
 import Control.Exception.Safe
-import Control.Monad.State.Lazy hiding (get)
+import Control.Monad
 import Data.Basic
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import Data.IORef
 import qualified Data.IntMap as IntMap
 import Data.List (intersperse)
 import Data.Log
@@ -19,11 +20,11 @@ import qualified Data.Text as T
 import Data.Tree
 import Text.Read (readMaybe)
 
-reduceMetaTerm :: MetaTermPlus -> Compiler MetaTermPlus
+reduceMetaTerm :: MetaTermPlus -> IO MetaTermPlus
 reduceMetaTerm term =
   case term of
     (m, MetaTermVar x) -> do
-      ctx <- gets metaTermCtx
+      ctx <- readIORef metaTermCtx
       case IntMap.lookup (asInt x) ctx of
         Just (_, e) ->
           reduceMetaTerm (m, e)
@@ -75,7 +76,7 @@ reduceMetaTerm term =
     _ ->
       return term
 
-raiseArityMismatch :: Hint -> Int -> Int -> Compiler a
+raiseArityMismatch :: Hint -> Int -> Int -> IO a
 raiseArityMismatch m expected found = do
   case expected of
     0 ->
@@ -85,12 +86,12 @@ raiseArityMismatch m expected found = do
     _ ->
       raiseError m $ "the function here must be called with " <> T.pack (show expected) <> " arguments, but found " <> T.pack (show found)
 
-reduceConstApp :: Hint -> T.Text -> [MetaTermPlus] -> Compiler MetaTermPlus
+reduceConstApp :: Hint -> T.Text -> [MetaTermPlus] -> IO MetaTermPlus
 reduceConstApp m c es =
   case c of
     "meta.dump"
       | [arg] <- es -> do
-        liftIO $ putStrLn $ T.unpack $ showAsSExp $ toTree arg
+        putStrLn $ T.unpack $ showAsSExp $ toTree arg
         return (m, MetaTermLeaf "true")
     "meta.size-of"
       | [t] <- es -> do
@@ -235,7 +236,7 @@ reduceConstApp m c es =
       | otherwise -> do
         raiseConstAppError m c es
 
-takeNode :: MetaTermPlus -> Compiler [MetaTermPlus]
+takeNode :: MetaTermPlus -> IO [MetaTermPlus]
 takeNode t =
   case t of
     (_, MetaTermNode ts) ->
@@ -244,7 +245,7 @@ takeNode t =
       let err = toConstError ArgNode t
       throw $ Error [err]
 
-runTakeWhile :: MetaTermPlus -> [MetaTermPlus] -> Compiler [MetaTermPlus]
+runTakeWhile :: MetaTermPlus -> [MetaTermPlus] -> IO [MetaTermPlus]
 runTakeWhile predicate ts =
   case ts of
     [] ->
@@ -257,7 +258,7 @@ runTakeWhile predicate ts =
           return $ t : rest'
         else return []
 
-runDropWhile :: MetaTermPlus -> [MetaTermPlus] -> Compiler [MetaTermPlus]
+runDropWhile :: MetaTermPlus -> [MetaTermPlus] -> IO [MetaTermPlus]
 runDropWhile predicate ts =
   case ts of
     [] ->
@@ -268,7 +269,7 @@ runDropWhile predicate ts =
         then runDropWhile predicate rest
         else return rest
 
-raiseConstAppError :: Hint -> T.Text -> [MetaTermPlus] -> Compiler a
+raiseConstAppError :: Hint -> T.Text -> [MetaTermPlus] -> IO a
 raiseConstAppError m c es = do
   case Map.lookup c metaConstants of
     Nothing ->

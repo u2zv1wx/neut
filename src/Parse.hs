@@ -3,10 +3,11 @@ module Parse
   )
 where
 
-import Control.Monad.State.Lazy hiding (get)
+import Control.Monad
 import Data.Basic
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import Data.IORef
 import Data.List (find)
 import Data.Log
 import Data.Namespace
@@ -17,7 +18,7 @@ import Parse.Discern
 import Parse.Interpret
 import Text.Read (readMaybe)
 
-parse :: [TreePlus] -> Compiler [WeakStmt]
+parse :: [TreePlus] -> IO [WeakStmt]
 parse stmtTreeList =
   case stmtTreeList of
     [] ->
@@ -74,13 +75,15 @@ parse stmtTreeList =
                 raiseSyntaxError m "(end LEAF)"
             "define-prefix"
               | [(_, TreeLeaf from), (_, TreeLeaf to)] <- rest -> do
-                modify (\env -> env {nsEnv = (from, to) : (nsEnv env)})
+                -- modify (\env -> env {nsEnv = (from, to) : (nsEnv env)})
+                modifyIORef' nsEnv $ \env -> (from, to) : env
                 parse restStmtList
               | otherwise ->
                 raiseSyntaxError m "(define-prefix LEAF LEAF)"
             "remove-prefix"
               | [(_, TreeLeaf from), (_, TreeLeaf to)] <- rest -> do
-                modify (\env -> env {nsEnv = (filter (/= (from, to))) (nsEnv env)})
+                modifyIORef' nsEnv $ \env -> filter (/= (from, to)) env
+                -- modify (\env -> env {nsEnv = (filter (/= (from, to))) (nsEnv env)})
                 parse restStmtList
               | otherwise ->
                 raiseSyntaxError m "(remove-prefix LEAF LEAF)"
@@ -102,8 +105,10 @@ parse stmtTreeList =
                 Just i <- readMaybe (T.unpack intStr) -> do
                 xs <- mapM (extractLeaf >=> withSectionPrefix) constructorNameList
                 name' <- withSectionPrefix name
-                modify (\env -> env {dataEnv = Map.insert name' xs (dataEnv env)})
-                forM_ (zip xs [0 ..]) $ \(x, k) -> modify (\env -> env {constructorEnv = Map.insert x (i, k) (constructorEnv env)})
+                -- modify (\env -> env {dataEnv = Map.insert name' xs (dataEnv env)})
+                modifyIORef' dataEnv $ \env -> Map.insert name' xs env
+                forM_ (zip xs [0 ..]) $ \(x, k) -> modifyIORef' constructorEnv $ \env -> Map.insert x (i, k) env
+                -- modify (\env -> env {constructorEnv = Map.insert x (i, k) (constructorEnv env)})
                 parse restStmtList
               | otherwise -> do
                 raiseSyntaxError m "(set-as-data LEAF INT LEAF*)"
@@ -114,7 +119,7 @@ parse stmtTreeList =
         _ ->
           interpretAux headStmt restStmtList
 
-interpretAux :: TreePlus -> [TreePlus] -> Compiler [WeakStmt]
+interpretAux :: TreePlus -> [TreePlus] -> IO [WeakStmt]
 interpretAux headStmt restStmtList = do
   e <- interpret headStmt >>= discern
   let m = metaOf e
@@ -122,15 +127,15 @@ interpretAux headStmt restStmtList = do
   defList <- parse restStmtList
   return $ WeakStmtDef m Nothing t e : defList
 
-parseDef :: Bool -> Hint -> TreePlus -> TreePlus -> Compiler WeakStmt
+parseDef :: Bool -> Hint -> TreePlus -> TreePlus -> IO WeakStmt
 parseDef isReducible m xt e = do
   e' <- interpret e >>= discern
   (_, x, t) <- prefixTextPlus xt >>= interpretIdentPlus >>= discernIdentPlus
   return $ WeakStmtDef m (Just (isReducible, x)) t e'
 
-insEnumEnv :: Hint -> T.Text -> [(T.Text, Int)] -> Compiler ()
+insEnumEnv :: Hint -> T.Text -> [(T.Text, Int)] -> IO ()
 insEnumEnv m name xis = do
-  eenv <- gets enumEnv
+  eenv <- readIORef enumEnv
   let definedEnums = Map.keys eenv ++ map fst (concat (Map.elems eenv))
   case find (`elem` definedEnums) $ name : map fst xis of
     Just x ->
@@ -138,15 +143,18 @@ insEnumEnv m name xis = do
     _ -> do
       let (xs, is) = unzip xis
       let rev = Map.fromList $ zip xs (zip (repeat name) is)
-      modify
-        ( \e ->
-            e
-              { enumEnv = Map.insert name xis (enumEnv e),
-                revEnumEnv = rev `Map.union` revEnumEnv e
-              }
-        )
+      modifyIORef' enumEnv $ \env -> Map.insert name xis env
+      modifyIORef' revEnumEnv $ \env -> Map.union rev env
 
-extractLeaf :: TreePlus -> Compiler T.Text
+-- modify
+--   ( \e ->
+--       e
+--         { enumEnv = Map.insert name xis (enumEnv e),
+--           revEnumEnv = rev `Map.union` revEnumEnv e
+--         }
+--   )
+
+extractLeaf :: TreePlus -> IO T.Text
 extractLeaf t =
   case t of
     (_, TreeLeaf x) ->

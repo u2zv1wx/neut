@@ -18,12 +18,12 @@ immediateName :: T.Text
 immediateName =
   "cartesian-immediate"
 
-returnImmediateS4 :: Hint -> Compiler CompPlus
+returnImmediateS4 :: Hint -> IO CompPlus
 returnImmediateS4 m = do
   v <- immediateS4 m
   return (m, CompUpIntro v)
 
-immediateS4 :: Hint -> Compiler ValuePlus
+immediateS4 :: Hint -> IO ValuePlus
 immediateS4 m = do
   let immediateT _ = return (m, CompUpIntro (m, ValueSigmaIntro []))
   let immediate4 arg = return (m, CompUpIntro arg)
@@ -33,7 +33,7 @@ sigmaS4 ::
   Maybe T.Text ->
   Hint ->
   [Either CompPlus (Ident, CompPlus)] ->
-  Compiler ValuePlus
+  IO ValuePlus
 sigmaS4 mName m mxts =
   case mName of
     Nothing -> do
@@ -62,7 +62,7 @@ sigmaT ::
   Hint ->
   [Either CompPlus (Ident, CompPlus)] ->
   ValuePlus ->
-  Compiler CompPlus
+  IO CompPlus
 sigmaT m mxts argVar = do
   xts <- mapM supplyName mxts
   -- as == [APP-1, ..., APP-n]   (`a` here stands for `app`)
@@ -89,7 +89,7 @@ sigma4 ::
   Hint ->
   [Either CompPlus (Ident, CompPlus)] ->
   ValuePlus ->
-  Compiler CompPlus
+  IO CompPlus
 sigma4 m mxts argVar = do
   xts <- mapM supplyName mxts
   -- as == [APP-1, ..., APP-n]
@@ -98,7 +98,7 @@ sigma4 m mxts argVar = do
   body' <- linearize xts $ bindLet (zip varNameList as) (m, CompUpIntro (m, ValueSigmaIntro varList))
   return (m, CompSigmaElim True (map fst xts) argVar body')
 
-supplyName :: Either b (Ident, b) -> Compiler (Ident, b)
+supplyName :: Either b (Ident, b) -> IO (Ident, b)
 supplyName mName =
   case mName of
     Right (x, t) ->
@@ -107,7 +107,7 @@ supplyName mName =
       x <- newIdentFromText "unused-sigarg"
       return (x, t)
 
-returnClosureS4 :: Hint -> Compiler CompPlus
+returnClosureS4 :: Hint -> IO CompPlus
 returnClosureS4 m = do
   (env, envVar) <- newValueVarLocalWith m "env"
   retImmS4 <- returnImmediateS4 m

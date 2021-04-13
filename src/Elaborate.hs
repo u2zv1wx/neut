@@ -3,10 +3,11 @@ module Elaborate
   )
 where
 
-import Control.Monad.State.Lazy
+import Control.Monad
 import Data.Basic
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import Data.IORef
 import qualified Data.IntMap as IntMap
 import Data.List (nub)
 import Data.Log
@@ -21,11 +22,11 @@ import Elaborate.Unify
 import Reduce.Term
 import Reduce.WeakTerm
 
-elaborate :: [WeakStmt] -> Compiler [Stmt]
+elaborate :: [WeakStmt] -> IO [Stmt]
 elaborate ss =
   elaborateStmt' ss
 
-elaborateStmt' :: [WeakStmt] -> Compiler [Stmt]
+elaborateStmt' :: [WeakStmt] -> IO [Stmt]
 elaborateStmt' stmt =
   case stmt of
     [] -> do
@@ -34,7 +35,7 @@ elaborateStmt' stmt =
       (e', te) <- infer e
       t' <- inferType t
       insConstraintEnv te t'
-      -- cs <- gets constraintEnv
+      -- cs <- readIORef constraintEnv
       -- p "==========================================================="
       -- forM_ cs $ \(e1, e2) -> do
       --   p $ T.unpack $ toText e1
@@ -46,15 +47,17 @@ elaborateStmt' stmt =
       case mx of
         Just (isReducible, x) -> do
           insWeakTypeEnv x $ weaken t''
-          modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e'') (substEnv env)})
-          when (not isReducible) $ modify (\env -> env {opaqueEnv = S.insert x (opaqueEnv env)})
+          -- modify (\env -> env {substEnv = IntMap.insert (asInt x) (weaken e'') (substEnv env)})
+          modifyIORef' substEnv $ \env -> IntMap.insert (asInt x) (weaken e'') env
+          when (not isReducible) $ modifyIORef' opaqueEnv $ \env -> S.insert x env
+          -- modify (\env -> env {opaqueEnv = S.insert x (opaqueEnv env)})
           cont' <- elaborateStmt' cont
           return $ StmtDef m (Just x) t'' e'' : cont'
         Nothing -> do
           cont' <- elaborateStmt' cont
           return $ StmtDef m Nothing t'' e'' : cont'
 
-elaborate' :: WeakTermPlus -> Compiler TermPlus
+elaborate' :: WeakTermPlus -> IO TermPlus
 elaborate' term =
   case term of
     (m, WeakTermTau) ->
@@ -71,7 +74,7 @@ elaborate' term =
       e' <- elaborate' e
       return (m, TermPiIntro isReducible kind' xts' e')
     (m, WeakTermPiElim (mh, WeakTermAster x) es) -> do
-      sub <- gets substEnv
+      sub <- readIORef substEnv
       case IntMap.lookup x sub of
         Nothing ->
           raiseError mh "couldn't instantiate the asterisk here"
@@ -146,8 +149,8 @@ elaborate' term =
       mSubject' <- mapM elaborate' mSubject
       e' <- elaborate' e
       t' <- elaborate' t >>= reduceTermPlus
-      denv <- gets dataEnv
-      oenv <- gets opaqueEnv
+      denv <- readIORef dataEnv
+      oenv <- readIORef opaqueEnv
       case t' of
         (_, TermPiElim (_, TermVar _ name) _)
           | Just bs <- Map.lookup (asText name) denv,
@@ -158,7 +161,7 @@ elaborate' term =
           raiseError (fst t) $ "the type of this term must be a data-type, but its type is:\n" <> showTree (toTree $ weaken t')
 
 -- for now
-elaboratePatternList :: Hint -> [T.Text] -> [(WeakPattern, WeakTermPlus)] -> Compiler [(Pattern, TermPlus)]
+elaboratePatternList :: Hint -> [T.Text] -> [(WeakPattern, WeakTermPlus)] -> IO [(Pattern, TermPlus)]
 elaboratePatternList m bs patList = do
   patList' <- forM patList $ \((mPat, c, xts), body) -> do
     xts' <- mapM elaborateWeakIdentPlus xts
@@ -167,7 +170,7 @@ elaboratePatternList m bs patList = do
   checkCaseSanity m bs patList'
   return patList'
 
-checkCaseSanity :: Hint -> [T.Text] -> [(Pattern, TermPlus)] -> Compiler ()
+checkCaseSanity :: Hint -> [T.Text] -> [(Pattern, TermPlus)] -> IO ()
 checkCaseSanity m bs patList =
   case (bs, patList) of
     ([], []) ->
@@ -181,12 +184,12 @@ checkCaseSanity m bs patList =
     ([], ((mPat, b, _), _) : _) ->
       raiseError mPat $ "found a redundant pattern; this clause for `" <> asText b <> "` is redundant"
 
-elaborateWeakIdentPlus :: WeakIdentPlus -> Compiler IdentPlus
+elaborateWeakIdentPlus :: WeakIdentPlus -> IO IdentPlus
 elaborateWeakIdentPlus (m, x, t) = do
   t' <- elaborate' t
   return (m, x, t')
 
-elaborateKind :: LamKind WeakIdentPlus -> Compiler (LamKind IdentPlus)
+elaborateKind :: LamKind WeakIdentPlus -> IO (LamKind IdentPlus)
 elaborateKind kind =
   case kind of
     LamKindNormal ->
@@ -199,7 +202,7 @@ elaborateKind kind =
     LamKindResourceHandler ->
       return LamKindResourceHandler
 
-checkSwitchExaustiveness :: Hint -> T.Text -> [EnumCase] -> Compiler ()
+checkSwitchExaustiveness :: Hint -> T.Text -> [EnumCase] -> IO ()
 checkSwitchExaustiveness m x caseList = do
   let b = EnumCaseDefault `elem` caseList
   enumSet <- lookupEnumSet m x
@@ -207,9 +210,9 @@ checkSwitchExaustiveness m x caseList = do
   when (not ((toInteger (length enumSet)) <= len || b)) $
     raiseError m "this switch is ill-constructed in that it is not exhaustive"
 
-lookupEnumSet :: Hint -> T.Text -> Compiler [T.Text]
+lookupEnumSet :: Hint -> T.Text -> IO [T.Text]
 lookupEnumSet m name = do
-  eenv <- gets enumEnv
+  eenv <- readIORef enumEnv
   case Map.lookup name eenv of
     Nothing ->
       raiseError m $ "no such enum defined: " <> name

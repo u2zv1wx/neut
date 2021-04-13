@@ -1,8 +1,9 @@
 module Main (main) where
 
 import Clarify
-import Control.Monad.State.Lazy
+import Control.Monad
 import Data.ByteString.Builder
+import Data.IORef
 import qualified Data.ByteString.Lazy as L
 import Data.Env
 import Data.Maybe (fromMaybe)
@@ -209,10 +210,13 @@ run :: Command -> IO ()
 run cmd =
   case cmd of
     Build inputPathStr mOutputPathStr outputKind colorizeFlag cancelAllocFlag logLocationFlag logLevelFlag mClangOptStr -> do
+      writeIORef shouldColorize colorizeFlag
+      writeIORef shouldCancelAlloc cancelAllocFlag
+      writeIORef shouldDisplayLogLocation logLocationFlag
+      writeIORef shouldDisplayLogLevel logLevelFlag
       inputPath <- resolveFile' inputPathStr
-      llvmIRBuilder <-
-        runCompiler (runBuild inputPath) $
-          initialEnv {shouldColorize = colorizeFlag, shouldCancelAlloc = cancelAllocFlag, shouldDisplayLogLocation = logLocationFlag, shouldDisplayLogLevel = logLevelFlag}
+      llvmIRBuilder <- runCompiler (runBuild inputPath)
+      -- initialEnv {shouldColorize = colorizeFlag, shouldCancelAlloc = cancelAllocFlag, shouldDisplayLogLocation = logLocationFlag, shouldDisplayLogLevel = logLevelFlag}
       (basename, _) <- splitExtension $ filename inputPath
       mOutputPath <- mapM resolveFile' mOutputPathStr
       outputPath <- constructOutputPath basename mOutputPath outputKind
@@ -229,8 +233,11 @@ run cmd =
             exitCode <- waitForProcess clangProcessHandler
             exitWith exitCode
     Check inputPathStr colorizeFlag eoe -> do
+      writeIORef shouldColorize colorizeFlag
+      writeIORef endOfEntry eoe
       inputPath <- resolveFile' inputPathStr
-      void $ runCompiler (runCheck inputPath) $ initialEnv {shouldColorize = colorizeFlag, endOfEntry = eoe}
+      void $ runCompiler (runCheck inputPath)
+        -- $ initialEnv {shouldColorize = colorizeFlag, endOfEntry = eoe}
     Archive inputPathStr mOutputPathStr -> do
       libDirPath <- resolveDir' inputPathStr
       let parentDirPath = parent libDirPath
@@ -267,11 +274,11 @@ constructOutputArchivePath inputPath mPath =
     Nothing ->
       resolveFile' (fromRelDir $ dirname inputPath) >>= addExtension ".tar" >>= addExtension ".gz"
 
-runBuild :: Path Abs File -> Compiler Builder
+runBuild :: Path Abs File -> IO Builder
 runBuild =
   preprocess >=> parse >=> elaborate >=> clarify >=> lower >=> emit
 
-runCheck :: Path Abs File -> Compiler ()
+runCheck :: Path Abs File -> IO ()
 runCheck =
   preprocess >=> parse >=> elaborate >=> \_ -> return ()
 

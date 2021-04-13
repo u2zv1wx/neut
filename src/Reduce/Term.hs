@@ -3,16 +3,17 @@ module Reduce.Term
   )
 where
 
-import Control.Monad.State.Lazy
+import Control.Monad
 import Data.Basic
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import Data.IORef
 import qualified Data.IntMap as IntMap
 import Data.Term
 import qualified Data.Text as T
 
 -- reduce given term assuming its purity
-reduceTermPlus :: TermPlus -> Compiler TermPlus
+reduceTermPlus :: TermPlus -> IO TermPlus
 reduceTermPlus term =
   case term of
     (m, TermPi xts cod) -> do
@@ -69,7 +70,7 @@ reduceTermPlus term =
     (m, TermCase resultType mSubject (e, t) clauseList) -> do
       e' <- reduceTermPlus e
       let lamList = map (toLamList m) clauseList
-      denv <- gets dataEnv
+      denv <- readIORef dataEnv
       case e' of
         (_, TermPiIntro opacity (LamKindCons dataName consName) _ _)
           | not (isOpaque opacity),
@@ -104,7 +105,7 @@ toLamList :: Hint -> (Pattern, TermPlus) -> TermPlus
 toLamList m ((_, _, xts), body) =
   (m, TermPiIntro OpacityTransparent LamKindNormal xts body)
 
-substTermPlus :: SubstTerm -> TermPlus -> Compiler TermPlus
+substTermPlus :: SubstTerm -> TermPlus -> IO TermPlus
 substTermPlus sub term =
   case term of
     (_, TermTau) ->
@@ -162,7 +163,7 @@ substTermPlus' ::
   SubstTerm ->
   [IdentPlus] ->
   TermPlus ->
-  Compiler ([IdentPlus], TermPlus)
+  IO ([IdentPlus], TermPlus)
 substTermPlus' sub binder e =
   case binder of
     [] -> do

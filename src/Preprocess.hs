@@ -1,9 +1,10 @@
 module Preprocess (preprocess) where
 
-import Control.Monad.State.Lazy hiding (get)
+import Control.Monad
 import Data.Basic
 import Data.Env
 import qualified Data.HashMap.Lazy as Map
+import Data.IORef
 import qualified Data.IntMap as IntMap
 import Data.Log
 import Data.MetaTerm
@@ -23,7 +24,7 @@ import qualified System.Info as System
 import System.Process hiding (env)
 import Text.Read (readMaybe)
 
-preprocess :: Path Abs File -> Compiler [TreePlus]
+preprocess :: Path Abs File -> IO [TreePlus]
 preprocess mainFilePath = do
   pushTrace mainFilePath
   -- out <- visit mainFilePath
@@ -32,29 +33,35 @@ preprocess mainFilePath = do
   -- _ <- liftIO $ exitWith ExitSuccess
   visit mainFilePath
 
-visit :: Path Abs File -> Compiler [TreePlus]
+visit :: Path Abs File -> IO [TreePlus]
 visit path = do
   pushTrace path
-  modify (\env -> env {fileEnv = Map.insert path VisitInfoActive (fileEnv env)})
-  content <- liftIO $ TIO.readFile $ toFilePath path
+  -- modify (\env -> env {fileEnv = Map.insert path VisitInfoActive (fileEnv env)})
+  modifyIORef' fileEnv $ \env -> Map.insert path VisitInfoActive env
+  content <- TIO.readFile $ toFilePath path
   tokenize content >>= preprocess'
 
-leave :: Compiler [TreePlus]
+leave :: IO [TreePlus]
 leave = do
   path <- getCurrentFilePath
-  modify (\env -> env {fileEnv = Map.insert path VisitInfoFinish (fileEnv env)})
+  -- modify (\env -> env {fileEnv = Map.insert path VisitInfoFinish (fileEnv env)})
+  modifyIORef' fileEnv $ \env -> Map.insert path VisitInfoFinish env
   popTrace
   return []
 
-pushTrace :: Path Abs File -> Compiler ()
+pushTrace :: Path Abs File -> IO ()
 pushTrace path =
-  modify (\env -> env {traceEnv = path : traceEnv env})
+  modifyIORef' traceEnv $ \env -> path : env
 
-popTrace :: Compiler ()
+-- modify (\env -> env {traceEnv = path : traceEnv env})
+
+popTrace :: IO ()
 popTrace =
-  modify (\env -> env {traceEnv = tail (traceEnv env)})
+  modifyIORef' traceEnv $ \env -> tail env
 
-preprocess' :: [TreePlus] -> Compiler [TreePlus]
+-- modify (\env -> env {traceEnv = tail (traceEnv env)})
+
+preprocess' :: [TreePlus] -> IO [TreePlus]
 preprocess' stmtList = do
   case stmtList of
     [] -> do
@@ -79,14 +86,16 @@ preprocess' stmtList = do
             --
             "define-macro"
               | [(_, TreeLeaf name), body] <- rest -> do
-                nenv <- gets topMetaNameEnv
+                nenv <- readIORef topMetaNameEnv
                 when (Map.member name nenv) $
                   raiseError m $ "the meta-variable `" <> name <> "` is already defined at the top level"
                 body' <- evaluate body
                 name' <- withSectionPrefix name
                 name'' <- newIdentFromIdent $ asIdent name'
-                modify (\env -> env {topMetaNameEnv = Map.insert name' name'' (topMetaNameEnv env)})
-                modify (\env -> env {metaTermCtx = IntMap.insert (asInt name'') body' (metaTermCtx env)})
+                -- modify (\env -> env {topMetaNameEnv = Map.insert name' name'' (topMetaNameEnv env)})
+                modifyIORef' topMetaNameEnv $ \env -> Map.insert name' name'' env
+                -- modify (\env -> env {metaTermCtx = IntMap.insert (asInt name'') body' (metaTermCtx env)})
+                modifyIORef' metaTermCtx $ \env -> IntMap.insert (asInt name'') body' env
                 preprocess' restStmtList
               | [name@(_, TreeLeaf _), xts, body] <- rest -> do
                 let defFix = (m, TreeNode [leaf, name, (m, TreeNode [(m, TreeLeaf "fix-meta"), name, xts, body])])
@@ -120,14 +129,14 @@ preprocess' stmtList = do
                   let curlCmd = proc "curl" ["-s", "-S", "-L", urlStr']
                   let tarCmd = proc "tar" ["xJf", "-", "-C", toFilePath pkg', "--strip-components=1"]
                   (_, Just stdoutHandler, Just curlErrorHandler, curlHandler) <-
-                    liftIO $ createProcess curlCmd {cwd = Just (toFilePath libDirPath), std_out = CreatePipe, std_err = CreatePipe}
+                    createProcess curlCmd {cwd = Just (toFilePath libDirPath), std_out = CreatePipe, std_err = CreatePipe}
                   (_, _, Just tarErrorHandler, tarHandler) <-
-                    liftIO $ createProcess tarCmd {cwd = Just (toFilePath libDirPath), std_in = UseHandle stdoutHandler, std_err = CreatePipe}
+                    createProcess tarCmd {cwd = Just (toFilePath libDirPath), std_in = UseHandle stdoutHandler, std_err = CreatePipe}
                   note' $ "downloading " <> pkg <> " from " <> T.pack urlStr'
-                  curlExitCode <- liftIO $ waitForProcess curlHandler
+                  curlExitCode <- waitForProcess curlHandler
                   raiseIfFailure mUrl "curl" curlExitCode curlErrorHandler pkgDirPath
                   note' $ "extracting " <> pkg <> " into " <> T.pack (toFilePath pkgDirPath)
-                  tarExitCode <- liftIO $ waitForProcess tarHandler
+                  tarExitCode <- waitForProcess tarHandler
                   raiseIfFailure mUrl "tar" tarExitCode tarErrorHandler pkgDirPath
                   return ()
                 preprocess' restStmtList
@@ -150,14 +159,16 @@ preprocess' stmtList = do
                 raiseSyntaxError m "(end LEAF)"
             "define-prefix"
               | [(_, TreeLeaf from), (_, TreeLeaf to)] <- rest -> do
-                modify (\env -> env {nsEnv = (from, to) : (nsEnv env)})
+                -- modify (\env -> env {nsEnv = (from, to) : (nsEnv env)})
+                modifyIORef' nsEnv $ \env -> (from, to) : env
                 treeList <- preprocess' restStmtList
                 return $ headStmt : treeList
               | otherwise ->
                 raiseSyntaxError m "(define-prefix LEAF LEAF)"
             "remove-prefix"
               | [(_, TreeLeaf from), (_, TreeLeaf to)] <- rest -> do
-                modify (\env -> env {nsEnv = (filter (/= (from, to))) (nsEnv env)})
+                -- modify (\env -> env {nsEnv = (filter (/= (from, to))) (nsEnv env)})
+                modifyIORef' nsEnv $ \env -> (filter (/= (from, to))) env
                 treeList <- preprocess' restStmtList
                 return $ headStmt : treeList
               | otherwise ->
@@ -202,13 +213,13 @@ preprocess' stmtList = do
         _ ->
           preprocessAux headStmt restStmtList
 
-preprocessAux :: TreePlus -> [TreePlus] -> Compiler [TreePlus]
+preprocessAux :: TreePlus -> [TreePlus] -> IO [TreePlus]
 preprocessAux headStmt restStmtList = do
   headStmt' <- autoQuote headStmt >>= evaluate >>= specialize
   treeList <- preprocess' restStmtList
   return $ headStmt' : treeList
 
-evaluate :: TreePlus -> Compiler MetaTermPlus
+evaluate :: TreePlus -> IO MetaTermPlus
 evaluate e =
   interpretCode e >>= discernMetaTerm >>= reduceMetaTerm
 
@@ -217,7 +228,7 @@ includeFile ::
   Hint ->
   T.Text ->
   [TreePlus] ->
-  Compiler [TreePlus]
+  IO [TreePlus]
 includeFile m mPath pathString as = do
   ensureEnvSanity m
   path <- readStrOrThrow mPath pathString
@@ -228,10 +239,10 @@ includeFile m mPath pathString as = do
       else getLibraryDirPath
   newPath <- resolveFile dirPath path
   ensureFileExistence m newPath
-  denv <- gets fileEnv
+  denv <- readIORef fileEnv
   case Map.lookup newPath denv of
     Just VisitInfoActive -> do
-      tenv <- gets traceEnv
+      tenv <- readIORef traceEnv
       let cyclicPath = dropWhile (/= newPath) (reverse tenv) ++ [newPath]
       raiseError m $ "found a cyclic inclusion:\n" <> showCyclicPath cyclicPath
     Just VisitInfoFinish ->
@@ -241,7 +252,7 @@ includeFile m mPath pathString as = do
       treeList2 <- preprocess' as
       return $ treeList1 ++ treeList2
 
-readStrOrThrow :: (Read a) => Hint -> T.Text -> Compiler a
+readStrOrThrow :: (Read a) => Hint -> T.Text -> IO a
 readStrOrThrow m quotedStr =
   case readMaybe (T.unpack quotedStr) of
     Nothing ->
@@ -249,19 +260,19 @@ readStrOrThrow m quotedStr =
     Just str ->
       return str
 
-raiseIfFailure :: Hint -> String -> ExitCode -> Handle -> Path Abs Dir -> Compiler ()
+raiseIfFailure :: Hint -> String -> ExitCode -> Handle -> Path Abs Dir -> IO ()
 raiseIfFailure m procName exitCode h pkgDirPath =
   case exitCode of
     ExitSuccess ->
       return ()
     ExitFailure i -> do
       removeDir pkgDirPath
-      errStr <- liftIO $ hGetContents h
+      errStr <- hGetContents h
       raiseError m $ T.pack $ "the child process `" ++ procName ++ "` failed with the following message (exitcode = " ++ show i ++ "):\n" ++ errStr
 
-ensureEnvSanity :: Hint -> Compiler ()
+ensureEnvSanity :: Hint -> IO ()
 ensureEnvSanity m = do
-  penv <- gets prefixEnv
+  penv <- readIORef prefixEnv
   if null penv
     then return ()
     else raiseError m $ "`include` can only be used with no `use`, but the current `use` is: " <> T.intercalate ", " penv
@@ -286,14 +297,14 @@ showCyclicPath' pathList =
     (path : ps) ->
       "\n  ~> " <> T.pack (toFilePath path) <> showCyclicPath' ps
 
-ensureFileExistence :: Hint -> Path Abs File -> Compiler ()
+ensureFileExistence :: Hint -> Path Abs File -> IO ()
 ensureFileExistence m path = do
   b <- doesFileExist path
   if b
     then return ()
     else raiseError m $ "no such file: " <> T.pack (toFilePath path)
 
-specialize :: MetaTermPlus -> Compiler TreePlus
+specialize :: MetaTermPlus -> IO TreePlus
 specialize term =
   case term of
     (m, MetaTermLeaf x) ->
@@ -304,7 +315,7 @@ specialize term =
     (m, _) -> do
       raiseError m $ "meta-reduction of this term resulted in a non-AST term:\n" <> showTree (toTree term)
 
-preprocessStmtClause :: TreePlus -> Compiler (T.Text, [TreePlus])
+preprocessStmtClause :: TreePlus -> IO (T.Text, [TreePlus])
 preprocessStmtClause tree =
   case tree of
     (_, TreeNode ((_, TreeLeaf x) : stmtList)) ->
@@ -312,7 +323,7 @@ preprocessStmtClause tree =
     (m, _) ->
       raiseSyntaxError m "(LEAF TREE*)"
 
-retrieveCompileTimeVarValue :: Hint -> T.Text -> Compiler T.Text
+retrieveCompileTimeVarValue :: Hint -> T.Text -> IO T.Text
 retrieveCompileTimeVarValue m var =
   case var of
     "OS" ->
@@ -322,12 +333,12 @@ retrieveCompileTimeVarValue m var =
     _ ->
       raiseError m $ "no such compile-time variable defined: " <> var
 
-autoQuote :: TreePlus -> Compiler TreePlus
+autoQuote :: TreePlus -> IO TreePlus
 autoQuote tree = do
-  nenv <- gets topMetaNameEnv
+  nenv <- readIORef topMetaNameEnv
   autoQuote' nenv tree
 
-autoQuote' :: Map.HashMap T.Text Ident -> TreePlus -> Compiler TreePlus
+autoQuote' :: Map.HashMap T.Text Ident -> TreePlus -> IO TreePlus
 autoQuote' nenv tree =
   case tree of
     (_, TreeLeaf _) ->
@@ -339,21 +350,21 @@ autoQuote' nenv tree =
       ts'' <- mapM (modifier nenv) ts'
       return (m, TreeNode ts'')
 
-quoteData :: Map.HashMap T.Text Ident -> TreePlus -> Compiler TreePlus
+quoteData :: Map.HashMap T.Text Ident -> TreePlus -> IO TreePlus
 quoteData nenv tree@(m, _) = do
   b <- isSpecialForm nenv tree
   if b
     then return tree
     else return (m, TreeNode [(m, TreeLeaf "quote"), tree])
 
-unquoteCode :: Map.HashMap T.Text Ident -> TreePlus -> Compiler TreePlus
+unquoteCode :: Map.HashMap T.Text Ident -> TreePlus -> IO TreePlus
 unquoteCode nenv tree@(m, _) = do
   b <- isSpecialForm nenv tree
   if b
     then return (m, TreeNode [(m, TreeLeaf "unquote"), tree])
     else return tree
 
-isSpecialForm :: Map.HashMap T.Text Ident -> TreePlus -> Compiler Bool
+isSpecialForm :: Map.HashMap T.Text Ident -> TreePlus -> IO Bool
 isSpecialForm nenv tree = do
   case tree of
     (m, TreeLeaf x) -> do
@@ -368,24 +379,25 @@ isSpecialForm nenv tree = do
     _ ->
       return False
 
-generateLastStmtList :: T.Text -> (Env -> [T.Text]) -> Compiler [TreePlus]
+-- generateLastStmtList :: T.Text -> (Env -> [T.Text]) -> IO [TreePlus]
+generateLastStmtList :: T.Text -> (IORef [T.Text]) -> IO [TreePlus]
 generateLastStmtList atom accessor = do
   path <- getCurrentFilePath
-  env <- gets accessor
+  env <- readIORef accessor
   let m = newHint 0 0 path
   return $ map (\x -> (m, TreeNode [(m, TreeLeaf atom), (m, TreeLeaf x)])) env
 
-generateUnuseStmtList :: Compiler [TreePlus]
+generateUnuseStmtList :: IO [TreePlus]
 generateUnuseStmtList =
   generateLastStmtList "unuse" prefixEnv
 
-generateEndStmtList :: Compiler [TreePlus]
+generateEndStmtList :: IO [TreePlus]
 generateEndStmtList =
   generateLastStmtList "end" sectionEnv
 
-generateRemovePrefixStmtList :: Compiler [TreePlus]
+generateRemovePrefixStmtList :: IO [TreePlus]
 generateRemovePrefixStmtList = do
   path <- getCurrentFilePath
   let m = newHint 0 0 path
-  nenv <- gets nsEnv
+  nenv <- readIORef nsEnv
   return $ map (\(from, to) -> (m, TreeNode [(m, TreeLeaf "remove-prefix"), (m, TreeLeaf from), (m, TreeLeaf to)])) nenv
