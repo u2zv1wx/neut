@@ -16,21 +16,16 @@ dependencies:
 - base
 - bytestring
 - containers
-- directory
 - half
-- hashable
-- mtl
 - optparse-applicative
 - path
 - path-io
 - pqueue
-- pretty-show
 - process
 - safe-exceptions
 - text
 - unordered-containers
 - utf8-string
-- zlib
 
 library:
   source-dirs: src

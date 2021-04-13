@@ -8,7 +8,7 @@ where
 
 import Clarify.Linearize
 import Clarify.Utility
-import Control.Monad.State.Lazy
+import Control.Monad
 import Data.Basic
 import Data.Comp
 import Data.Global

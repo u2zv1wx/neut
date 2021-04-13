@@ -20,9 +20,7 @@ import Path
 import Path.IO
 import Paths_neut (version)
 import System.Console.ANSI
-import System.Directory (createDirectoryIfMissing)
 import System.IO.Unsafe (unsafePerformIO)
-import qualified Text.Show.Pretty as Pr
 
 data VisitInfo
   = VisitInfoActive
@@ -255,7 +253,7 @@ getDirPath :: Path Rel Dir -> IO (Path Abs Dir)
 getDirPath base = do
   homeDirPath <- getHomeDir
   let path = homeDirPath </> base
-  createDirectoryIfMissing True $ toFilePath path
+  createDirIfMissing True path
   return path
 
 --
@@ -363,4 +361,4 @@ p s =
 
 p' :: (Show a) => a -> IO ()
 p' s =
-  putStrLn $ Pr.ppShow s
+  putStrLn $ show s
