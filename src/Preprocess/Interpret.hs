@@ -4,7 +4,7 @@ module Preprocess.Interpret
 where
 
 import Data.Basic
-import Data.Env
+import Data.Global
 import Data.Log
 import Data.MetaTerm
 import qualified Data.Text as T

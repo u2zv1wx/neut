@@ -6,7 +6,7 @@ where
 import Control.Monad
 import Data.Basic
 import Data.ByteString.Builder
-import Data.Env
+import Data.Global
 import qualified Data.HashMap.Lazy as HashMap
 import Data.IORef
 import qualified Data.IntMap as IntMap

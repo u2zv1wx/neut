@@ -1,11 +1,13 @@
 module Main (main) where
 
 import Clarify
+import Control.Exception.Safe
 import Control.Monad
 import Data.ByteString.Builder
 import qualified Data.ByteString.Lazy as L
-import Data.Env
+import Data.Global
 import Data.IORef
+import Data.Log
 import Data.Maybe (fromMaybe)
 import Elaborate
 import Emit
@@ -297,3 +299,12 @@ clangBaseOpt outputPath =
     "-o",
     toFilePath outputPath
   ]
+
+runCompiler :: IO a -> IO a
+runCompiler c = do
+  resultOrErr <- try c
+  case resultOrErr of
+    Left (Error err) ->
+      foldr (>>) (exitWith (ExitFailure 1)) (map outputLog err)
+    Right result ->
+      return result

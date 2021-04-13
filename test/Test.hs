@@ -2,7 +2,7 @@ module Main (main) where
 
 import Control.Exception.Safe
 import Control.Monad
-import Data.Env
+import Data.Global
 import Data.List
 import Path
 import Path.IO

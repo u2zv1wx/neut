@@ -1,6 +1,5 @@
-module Data.Env where
+module Data.Global where
 
-import Control.Exception.Safe
 import Data.Basic
 import Data.Comp
 import qualified Data.HashMap.Lazy as Map
@@ -22,22 +21,12 @@ import Path.IO
 import Paths_neut (version)
 import System.Console.ANSI
 import System.Directory (createDirectoryIfMissing)
-import System.Exit
 import System.IO.Unsafe (unsafePerformIO)
 import qualified Text.Show.Pretty as Pr
 
 data VisitInfo
   = VisitInfoActive
   | VisitInfoFinish
-
-runCompiler :: IO a -> IO a
-runCompiler c = do
-  resultOrErr <- try c
-  case resultOrErr of
-    Left (Error err) ->
-      foldr (>>) (exitWith (ExitFailure 1)) (map outputLog err)
-    Right result ->
-      return result
 
 --
 -- global variables

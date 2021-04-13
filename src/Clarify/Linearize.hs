@@ -7,7 +7,7 @@ import Clarify.Utility
 import Control.Monad
 import Data.Basic
 import Data.Comp
-import Data.Env
+import Data.Global
 import Data.IORef
 
 linearize ::

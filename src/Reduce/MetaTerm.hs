@@ -7,7 +7,7 @@ import Codec.Binary.UTF8.String
 import Control.Exception.Safe
 import Control.Monad
 import Data.Basic
-import Data.Env
+import Data.Global
 import qualified Data.HashMap.Lazy as Map
 import Data.IORef
 import qualified Data.IntMap as IntMap

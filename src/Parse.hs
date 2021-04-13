@@ -5,7 +5,7 @@ where
 
 import Control.Monad
 import Data.Basic
-import Data.Env
+import Data.Global
 import qualified Data.HashMap.Lazy as Map
 import Data.IORef
 import Data.List (find)

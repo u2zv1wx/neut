@@ -4,7 +4,7 @@ module Reduce.LowComp
 where
 
 import Data.Basic
-import Data.Env
+import Data.Global
 import Data.IORef
 import qualified Data.IntMap as IntMap
 import Data.LowComp

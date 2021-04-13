@@ -6,7 +6,7 @@ module Parse.Interpret
 where
 
 import Data.Basic
-import Data.Env
+import Data.Global
 import Data.Log
 import Data.LowType
 import Data.Maybe (fromMaybe)

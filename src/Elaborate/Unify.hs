@@ -6,7 +6,7 @@ where
 import Control.Exception.Safe
 import Control.Monad
 import Data.Basic
-import Data.Env
+import Data.Global
 import Data.IORef
 import qualified Data.IntMap as IntMap
 import Data.Log

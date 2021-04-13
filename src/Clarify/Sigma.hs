@@ -11,7 +11,7 @@ import Clarify.Utility
 import Control.Monad.State.Lazy
 import Data.Basic
 import Data.Comp
-import Data.Env
+import Data.Global
 import qualified Data.Text as T
 
 immediateName :: T.Text
