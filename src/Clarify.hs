@@ -39,7 +39,7 @@ clarifyStmt tenv ss =
       case mx of
         Just x -> do
           e' <- clarifyTerm tenv e >>= reduceCompPlus
-          insDefEnv (toGlobalVarName x) True [] e' -- implicit S4 box introduction
+          insDefEnv (toGlobalVarName x) True [] e'
           clarifyStmt (insTypeEnv [(m, x, t)] tenv) cont
         Nothing -> do
           e' <- clarifyTerm tenv e
@@ -60,7 +60,7 @@ clarifyTerm tenv term =
         VarKindLocal ->
           return (m, CompUpIntro (m, ValueVarLocal x))
         _ ->
-          return (m, CompPiElimDownElim (m, ValueVarGlobal (toGlobalVarName x)) []) -- implicit S4 box elimination
+          return (m, CompPiElimDownElim (m, ValueVarGlobal (toGlobalVarName x)) [])
     (m, TermPi {}) ->
       returnClosureS4 m
     (m, TermPiIntro opacity kind mxts e) -> do
