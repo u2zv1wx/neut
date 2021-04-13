@@ -172,7 +172,6 @@ lowerCompPrimitive m codeOp =
             let dom = map (const voidPtr) vs
             let cod = voidPtr
             modifyIORef' declEnv $ \env -> Map.insert name (dom, cod) env
-          -- modify (\env -> env {declEnv = Map.insert name (dom, cod) denv})
           lowerValueLet' (zip xs args) $ LowCompCall (LowValueVarGlobal name) vs
         DerangementLoad valueLowType -> do
           let ptr = args !! 0
