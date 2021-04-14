@@ -5,7 +5,7 @@ neut is a dependently-typed programming language based on [[https://ncatlab.org/
 - garbage collection,
 - region-based memory management.
 
-Theoretically, this is made possible by translating the source language into a dependent variant of [[https://www.cs.bham.ac.uk/~pbl/papers/thesisqmwphd.pdf][Call-By-Push-Value]]. The crucial point of this translation is to see that knowing the type of a term in the target calculus is knowing how to eta-expand the term, which in turn means knowing how to copy/discard the term. In the translation, a type is not erased, but *translated into a computationally-meaningful term that copies/discards the terms of the type*.
+Theoretically, this is made possible by translating the source language into a dependent variant of [[https://www.cs.bham.ac.uk/~pbl/papers/thesisqmwphd.pdf][Call-By-Push-Value]]. The crucial point of this translation is to see that knowing the type of a term in the target calculus is knowing how to eta-expand the term, which in turn means knowing how to copy/discard the term. In the translation, a type is not erased, but translated into a computationally-meaningful term that copies/discards the terms of the type.
 
 Practically, this means that you can write your program in the ordinary lambda-calculus without any extra restrictions or annotations, and at the same time are allowed to control how resources are used in the program. If you want an ordinary-lambda-calculus based programming language with a human-predictable semantics (including its memory management), this might be for you.
 
@@ -23,21 +23,18 @@ Here I briefly summarize the basic properties of neut before diving into the det
 - [[#examples][Examples]]
   - [[#proof-theoretic-memory-management][Proof-Theoretic Memory Management]]
   - [[#manual-optimization-via-borrowing][Manual Optimization via Borrowing]]
+  - [[#noetic-computation-something-like-the-immutable-references-in-rust]["Noetic" Computation (Something Like the Immutable References in Rust)]]
   - [[#automatic-optimization-via-mallocfree-cancellation][Automatic Optimization via malloc/free Cancellation]]
   - [[#summary][Summary]]
 - [[#installation][Installation]]
 - [[#highly-accelerated-tutorial][Highly-Accelerated Tutorial]]
+- [[#syntax-and-semantics-of-meta-statements][Syntax and Semantics of Meta-Statements]]
 - [[#syntax-and-semantics-of-statements][Syntax and Semantics of Statements]]
-  - [[#constant][constant]]
   - [[#ensure][ensure]]
   - [[#enum][enum]]
-  - [[#erase][erase]]
   - [[#include][include]]
-  - [[#inductive][inductive]]
   - [[#introspect][introspect]]
-  - [[#notation][notation]]
   - [[#let][let]]
-  - [[#record][record]]
   - [[#useunuse][use/unuse]]
   - [[#sectionend][section/end]]
 - [[#syntax-and-semantics-of-terms][Syntax and Semantics of Terms]]
@@ -45,14 +42,11 @@ Here I briefly summarize the basic properties of neut before diving into the det
   - [[#variable][variable]]
   - [[#π][Π]]
   - [[#fix][fix]]
-  - [[#constant-1][constant]]
+  - [[#constant][constant]]
   - [[#int][int]]
   - [[#float][float]]
   - [[#enum-1][enum]]
-  - [[#array][array]]
-  - [[#struct][struct]]
   - [[#question][question]]
-  - [[#erase-1][erase]]
 - [[#auxiliary-syntax][Auxiliary Syntax]]
   - [[#asterisk][asterisk]]
   - [[#sigma][sigma]]
@@ -449,6 +443,8 @@ In short: the resulting code is faster in that it is free from the redundant cop
 
 This is how neut controls resources efficiently, without modifying the type system of the source language.
 
+** "Noetic" Computation (Something Like the Immutable References in Rust)
+
 ** Automatic Optimization via malloc/free Cancellation
 neut's static memory management enables not only the "manual" optimization we have just seen, but also another "automatic" optimization. Remember the first example:
 #+BEGIN_SRC neut
@@ -571,6 +567,8 @@ Now I think you are basically ready to, for example, start reading [[https://git
 
 That pretty much should do it. I hope you enjoy this language.
 
+* Syntax and Semantics of Meta-Statements
+
 * Syntax and Semantics of Statements
 (fixme: the content below is out-of-date)
 
@@ -587,29 +585,29 @@ I also define the symbol =STRING= to be a double-quoted string.
 
 Note that the examples codes below usually assumes that the core library is already included.
 
-** constant
-=constant= declares an external constant.
+# ** constant
+# =constant= declares an external constant.
 
-*** Example
-#+BEGIN_SRC neut
-(constant unsafe.cast
-  (Π ((A tau)
-      (B tau)
-      (x A))
-     B))
+# *** Example
+# #+BEGIN_SRC neut
+# (constant unsafe.cast
+#   (Π ((A tau)
+#       (B tau)
+#       (x A))
+#      B))
 
-(let foo (unsafe.cast i64 string 1)) ; foo : string
-#+END_SRC
-*** Syntax
-#+BEGIN_SRC neut
-(constant LEAF TREE)
-#+END_SRC
-*** Semantics
-=(constant x t)= modifies the state of the compiler so that the [[#constant][constant]] =x= of type =t= is available in the succeeding code. Declared constants can then be available for use in the same way as ordinary [[#upsilon][variables]].
+# (let foo (unsafe.cast i64 string 1)) ; foo : string
+# #+END_SRC
+# *** Syntax
+# #+BEGIN_SRC neut
+# (constant LEAF TREE)
+# #+END_SRC
+# *** Semantics
+# =(constant x t)= modifies the state of the compiler so that the [[#constant][constant]] =x= of type =t= is available in the succeeding code. Declared constants can then be available for use in the same way as ordinary [[#upsilon][variables]].
 
-All the constants must have distinct names.
+# All the constants must have distinct names.
 
-This statement is currently intended only for internal use (e.g. implementation of a syscall). FFI might also be supported in future release via this statement.
+# This statement is currently intended only for internal use (e.g. implementation of a syscall). FFI might also be supported in future release via this statement.
 
 ** ensure
 =ensure= fetches the content of the specified URL for later use.
@@ -683,33 +681,6 @@ Discriminant value starts from =0= by default, and increments one by one. The "c
 
 All the discriminant values of an enum-type must be distinct.
 
-** erase
-=erase= makes given variable invisible in its continuation.
-*** Example
-#+BEGIN_SRC neut
-(define helper (x)
-  (add-i64 x 1))
-
-(define f (x)
-  (mul-i64 (helper x) 2))
-
-(f 10)        ; ~> 22
-
-(helper 10)   ; ~> 11
-
-(erase helper)
-
-(f 10)        ; ~> 22
-
-; (helper 10) ; ~> undefined variable: helper
-#+END_SRC
-*** Syntax
-#+BEGIN_SRC neut
-(erase LEAF)
-#+END_SRC
-*** Semantics
-=erase= makes given variable invisible in its continuation.
-
 ** include
 =include= "pastes" the content of the specified file.
 # temporary transfers the parsing process to the file specified by given path, if necessary.
@@ -749,94 +720,94 @@ With the following notes:
 
 (4) Cyclic inclusion is invalid.
 
-** inductive
-=inductive= defines an inductive type, its introduction rules (constructors), and its pattern match function.
-*** Example
-#+BEGIN_SRC neut
-(inductive list ((a tau))
-  (nil ()
-    (list a))
-  (cons ((_ a) (_ (list a)))
-    (list a)))
+# ** inductive
+# =inductive= defines an inductive type, its introduction rules (constructors), and its pattern match function.
+# *** Example
+# #+BEGIN_SRC neut
+# (inductive list ((a tau))
+#   (nil ()
+#     (list a))
+#   (cons ((_ a) (_ (list a)))
+#     (list a)))
 
-(define length
-  ((a tau)
-   (xs (list a)))
-  (list.case i64 a xs
-    (λ ()
-      0)
-    (λ (_ ys)
-      (add-i64 1 (length a ys)))))
+# (define length
+#   ((a tau)
+#    (xs (list a)))
+#   (list.case i64 a xs
+#     (λ ()
+#       0)
+#     (λ (_ ys)
+#       (add-i64 1 (length a ys)))))
 
-(let xs (list.cons * 10 (list.cons * 20 (list.nil i64))))
+# (let xs (list.cons * 10 (list.cons * 20 (list.nil i64))))
 
-(i64.print (length xs)) ; ~> 2
+# (i64.print (length xs)) ; ~> 2
 
-; mutually inductive types
-(inductive
-  (even ((_ (nat)))
-    (zero-is-even
-      ()
-      (even (nat.zero)))
-    (succ-of-odd-is-even
-      ((n (nat))
-       (_ (odd n)))
-      (even (nat.succ n))))
-  (odd ((_ (nat)))
-    (succ-of-even-is-odd
-      ((n (nat))
-       (_ (even n)))
-      (odd (nat.succ n)))))
-#+END_SRC
-*** Syntax
-#+BEGIN_SRC neut
-(inductive LEAF ((LEAF TREE) ... (LEAF TREE))
-  (LEAF ((LEAF TREE) ... (LEAF TREE))
-    TREE)
-  ...
-  (LEAF ((LEAF TREE) ... (LEAF TREE))
-    TREE))
+# ; mutually inductive types
+# (inductive
+#   (even ((_ (nat)))
+#     (zero-is-even
+#       ()
+#       (even (nat.zero)))
+#     (succ-of-odd-is-even
+#       ((n (nat))
+#        (_ (odd n)))
+#       (even (nat.succ n))))
+#   (odd ((_ (nat)))
+#     (succ-of-even-is-odd
+#       ((n (nat))
+#        (_ (even n)))
+#       (odd (nat.succ n)))))
+# #+END_SRC
+# *** Syntax
+# #+BEGIN_SRC neut
+# (inductive LEAF ((LEAF TREE) ... (LEAF TREE))
+#   (LEAF ((LEAF TREE) ... (LEAF TREE))
+#     TREE)
+#   ...
+#   (LEAF ((LEAF TREE) ... (LEAF TREE))
+#     TREE))
 
-; n-mutual inductive type
-(inductive
-  (LEAF ((LEAF TREE) ... (LEAF TREE))
-    (LEAF ((LEAF TREE) ... (LEAF TREE))
-      TREE)
-    ...
-    (LEAF ((LEAF TREE) ... (LEAF TREE))
-      TREE))
-  ...
-  (LEAF ((LEAF TREE) ... (LEAF TREE))
-    (LEAF ((LEAF TREE) ... (LEAF TREE))
-      TREE)
-    ...
-    (LEAF ((LEAF TREE) ... (LEAF TREE))
-      TREE)))
-#+END_SRC
-*** Semantics
-When parsed, the =inductive= statement is translated into the =let= statements that defines (1) the inductive type, (2) the introduction rules (or the constructors of the inductive type), and (3) the pattern match function. For example, consider the following =inductive= statement:
-#+BEGIN_SRC neut
-(inductive list ((a tau))
-  (nil ()
-    (list a))
-  (cons ((_ a) (_ (list a)))
-    (list a)))
-#+END_SRC
-Given this statement, the compiler generates the =let= statements that define the followings:
-1. The inductive type =list : Pi (a : tau). tau=
-2. The introduction rules (constructors) of the type:
-   - =list.nil : Pi (a : tau). list a=
-   - =list.cons : Pi (a : tau, _ : a, _ : list a). list a=
-3. The pattern matching function of the type:
-   - =list.case : Π (z : tau, a : tau, _ : list a, on-nil : Π (). z, on-cons : Π (_ : a, _ : list a). z). z=
-The structure of a pattern matching function is: =Π (RESULT_TYPE : tau, {ARGUMENTS_OF_THE_INDUCTIVE_TYPE}, {THE_TERM_BEING_MATCHED}, {LIST_OF_CLAUSES}). RESULT_TYPE=.
+# ; n-mutual inductive type
+# (inductive
+#   (LEAF ((LEAF TREE) ... (LEAF TREE))
+#     (LEAF ((LEAF TREE) ... (LEAF TREE))
+#       TREE)
+#     ...
+#     (LEAF ((LEAF TREE) ... (LEAF TREE))
+#       TREE))
+#   ...
+#   (LEAF ((LEAF TREE) ... (LEAF TREE))
+#     (LEAF ((LEAF TREE) ... (LEAF TREE))
+#       TREE)
+#     ...
+#     (LEAF ((LEAF TREE) ... (LEAF TREE))
+#       TREE)))
+# #+END_SRC
+# *** Semantics
+# When parsed, the =inductive= statement is translated into the =let= statements that defines (1) the inductive type, (2) the introduction rules (or the constructors of the inductive type), and (3) the pattern match function. For example, consider the following =inductive= statement:
+# #+BEGIN_SRC neut
+# (inductive list ((a tau))
+#   (nil ()
+#     (list a))
+#   (cons ((_ a) (_ (list a)))
+#     (list a)))
+# #+END_SRC
+# Given this statement, the compiler generates the =let= statements that define the followings:
+# 1. The inductive type =list : Pi (a : tau). tau=
+# 2. The introduction rules (constructors) of the type:
+#    - =list.nil : Pi (a : tau). list a=
+#    - =list.cons : Pi (a : tau, _ : a, _ : list a). list a=
+# 3. The pattern matching function of the type:
+#    - =list.case : Π (z : tau, a : tau, _ : list a, on-nil : Π (). z, on-cons : Π (_ : a, _ : list a). z). z=
+# The structure of a pattern matching function is: =Π (RESULT_TYPE : tau, {ARGUMENTS_OF_THE_INDUCTIVE_TYPE}, {THE_TERM_BEING_MATCHED}, {LIST_OF_CLAUSES}). RESULT_TYPE=.
 
-The codomain of each constructor must be of the form =(a e1 ... en)=, where the =a= is the inductive type being defined. For example,
-#+BEGIN_SRC neut
-(inductive foo ((x bool))
-  (bar () i64))
-#+END_SRC
-is an invalid =inductive= statement, since the codomain of =bar= is not of the form =(foo _)=, but =i64=.
+# The codomain of each constructor must be of the form =(a e1 ... en)=, where the =a= is the inductive type being defined. For example,
+# #+BEGIN_SRC neut
+# (inductive foo ((x bool))
+#   (bar () i64))
+# #+END_SRC
+# is an invalid =inductive= statement, since the codomain of =bar= is not of the form =(foo _)=, but =i64=.
 
 ** introspect
 =introspect= introspects the state of the compiler and selects statements by those information.
@@ -875,79 +846,6 @@ The =var= in =(introspect var (...))= must be a valid compile-time variable. The
 |-----------------------+-----------------|
 | OS                    | linux, darwin   |
 | architecture          | x64             |
-
-** notation
-The =notation= statement registers a notation (macro).
-*** Example
-#+BEGIN_SRC neut
-(notation λ Π-introduction)
-
-((λ (x) (add-i64 x 1)) 10) ; ~> 11
-
-(notation switch enum-elimination)
-
-(notation (if b e1 e2)
-  (switch b
-    (bool.true e1)
-    (bool.false e2)))
-#+END_SRC
-*** Syntax
-#+BEGIN_SRC neut
-(notation TREE TREE)
-#+END_SRC
-*** Semantics
-=(notation FROM TO)= modifies the state of the compiler so that the mapping =FROM ~> TO= is recognized as a notation (macro). This affects the result of macro expansion in the succeeding code.
-
-*** Notes on Macro Expansion
-Macro-expansion in neut is a process of applying *step-expansion* recursively.
-
-I believe this step-expansion process is best explained by example. Consider we have defined a notation as follows:
-#+BEGIN_SRC text
-(notation (if b e1 e2)
-  (switch b
-    (bool.true e1)
-    (bool.false e2)))
-#+END_SRC
-Also suppose that we have the following AST:
-#+BEGIN_SRC text
-(if some-condition
-  (i64.print 10)
-  (string.print "hello"))
-#+END_SRC
-In this situation, the compiler creates the following substitution:
-#+BEGIN_SRC text
-b  ~> some-condition
-e1 ~> (i64.print 10)
-e2 ~> (string.print "hello")
-#+END_SRC
-and then replaces =b=, =e1=, and =e2= in the codomain of the notation according to this substitution. The resulting tree is:
-#+BEGIN_SRC text
-(switch some-condition
-  (bool.true (i64.print 10))
-  (bool.false (string.print "hello")))
-#+END_SRC
-Given this step-expansion, macro-expansion is schematically defined as follows.
-#+BEGIN_SRC haskell
-macroExpand :: Tree -> Tree
-macroExpand inputTree =
-  case inputTree of
-    Leaf x ->
-      recurseOrReturn (Leaf x)
-    Node t1 ... tn ->
-      recurseOrReturn (Node (macroExpand t1) ... (macroExpand tn))
-
-recurseOrReturn :: Tree -> Tree
-recurseOrReturn t =
-  case stepExpand t of
-    -- if there exists a notation that step-expands `t`, with resulting subtitution `sub`
-    Just sub ->
-      macroExpand (applySubstitution sub t)
-    Nothing ->
-      t
-#+END_SRC
-(The pseudo-code above is intended to be call-by-value)
-
-You may want to use this statement with [[#erase-1][erase]] to accomplish (a certain sort of) safety.
 
 ** let
 =let= evaluates given term and binds the result to the specified variable.
@@ -1008,72 +906,72 @@ LEAF_PLUS ::= LEAF | (LEAF TREE)
 
 If a user input =e= is not parsed as a statement when it is supposed to be, the compiler interprets it as =(let _ e)=.
 
-** record
-The =record= statement creates a record type, its elimination rules (destructors), and its introduction rule.
-*** Example
-#+BEGIN_SRC neut
-(record my-record ((a tau))
-  (item-1
-    a)
-  (item-2
-    i64)
-  (item-3
-    top))
+# ** record
+# The =record= statement creates a record type, its elimination rules (destructors), and its introduction rule.
+# *** Example
+# #+BEGIN_SRC neut
+# (record my-record ((a tau))
+#   (item-1
+#     a)
+#   (item-2
+#     i64)
+#   (item-3
+#     top))
 
-(let item
-  (my-record.new
-    i64
-    10
-    20
-    top.unit))
+# (let item
+#   (my-record.new
+#     i64
+#     10
+#     20
+#     top.unit))
 
-(i64.print (my-record.item-1 i64 item)) ; ~> 10
+# (i64.print (my-record.item-1 i64 item)) ; ~> 10
 
-(i64.print (my-record.item-2 i64 item)) ; ~> 20
-#+END_SRC
-*** Syntax
-#+BEGIN_SRC neut
-(record LEAF ((LEAF TREE) ... (LEAF TREE))
-  (LEAF TREE)
-  ...
-  (LEAF TREE))
-#+END_SRC
-*** Semantics
-When parsed, the =record= statement is translated into =let= statements that defines (1) the record type, (2) the elimination rules (or the destructors of the record type), and (3) the introduction rule. For example, consider the following =record= statement:
-#+BEGIN_SRC neut
-(record my-record ((a tau))
-  (item-1
-    a)
-  (item-2
-    i64)
-  (item-3
-    top))
-#+END_SRC
-Given this statement, the compiler generates [[#definelet][let]] statements that define the followings:
-1. The record type =my-record : Pi (a : tau). tau=
-2. The elimination rules (destructors) of the type:
-   - =my-record.item-1 : Pi (a : tau, _ : my-record a). a=
-   - =my-record.item-2 : Pi (a : tau, _ : my-record a). i64=
-   - =my-record.item-3 : Pi (a : tau, _ : my-record a). top=
-3. The introduction rule of the type:
-   - =my-record.new : Π (a : tau, item-1 : a, item-2 : i64, item-3 : top). my-record a=
+# (i64.print (my-record.item-2 i64 item)) ; ~> 20
+# #+END_SRC
+# *** Syntax
+# #+BEGIN_SRC neut
+# (record LEAF ((LEAF TREE) ... (LEAF TREE))
+#   (LEAF TREE)
+#   ...
+#   (LEAF TREE))
+# #+END_SRC
+# *** Semantics
+# When parsed, the =record= statement is translated into =let= statements that defines (1) the record type, (2) the elimination rules (or the destructors of the record type), and (3) the introduction rule. For example, consider the following =record= statement:
+# #+BEGIN_SRC neut
+# (record my-record ((a tau))
+#   (item-1
+#     a)
+#   (item-2
+#     i64)
+#   (item-3
+#     top))
+# #+END_SRC
+# Given this statement, the compiler generates [[#definelet][let]] statements that define the followings:
+# 1. The record type =my-record : Pi (a : tau). tau=
+# 2. The elimination rules (destructors) of the type:
+#    - =my-record.item-1 : Pi (a : tau, _ : my-record a). a=
+#    - =my-record.item-2 : Pi (a : tau, _ : my-record a). i64=
+#    - =my-record.item-3 : Pi (a : tau, _ : my-record a). top=
+# 3. The introduction rule of the type:
+#    - =my-record.new : Π (a : tau, item-1 : a, item-2 : i64, item-3 : top). my-record a=
 
-Internally, every record statement is translated into the corresponding [[#inductive][inductive]] statement. For example, given the =record= statement above, the compiler translates it into the following =inductive= statement:
-#+BEGIN_SRC neut
-(inductive my-record ((a tau))
-  (new
-    ((item-1 a)
-     (item-2 i64)
-     (item-3 top))
-    (my-record a)))
-#+END_SRC
-The compiler then processes this statement in the same way ordinary =inductive= statement, generating the record type =my-record= and the introduction rule =my-record.new=, and the pattern matching function =my-record.case=. After that, the compiler automatically generates destructors from this definition via =my-record.case=. For example, the generated definition of =my-record.item-1= is as follows:
-#+BEGIN_SRC neut
-(define my-record.item-1 ((a tau) (record-value (my-record a)))
-  (my-record.case a record-value
-    (λ (item-1 item-2 item-3) item-1)))
-#+END_SRC
-The other destructors are defined similarly.
+# Internally, every record statement is translated into the corresponding [[#inductive][inductive]] statement. For example, given the =record= statement above, the compiler translates it into the following =inductive= statement:
+# #+BEGIN_SRC neut
+# (inductive my-record ((a tau))
+#   (new
+#     ((item-1 a)
+#      (item-2 i64)
+#      (item-3 top))
+#     (my-record a)))
+# #+END_SRC
+# The compiler then processes this statement in the same way ordinary =inductive= statement, generating the record type =my-record= and the introduction rule =my-record.new=, and the pattern matching function =my-record.case=. After that, the compiler automatically generates destructors from this definition via =my-record.case=. For example, the generated definition of =my-record.item-1= is as follows:
+# #+BEGIN_SRC neut
+# (define my-record.item-1 ((a tau) (record-value (my-record a)))
+#   (my-record.case a record-value
+#     (λ (item-1 item-2 item-3) item-1)))
+# #+END_SRC
+# The other destructors are defined similarly.
 
 ** use/unuse
 =use= inserts a prefix to the prefix environment. =unuse= removes a prefix from the prefix environment.
@@ -1525,138 +1423,138 @@ well-formed(Γ)   {`l` is a value of enum-type `(enum E)`}
 *** Notes
 The cases of an enum-elimination must be exhaustive.
 
-** array
-=array= is the array type in LLVM.
-*** Example
-#+BEGIN_SRC neut
-; float array
-(let _
-  (array-introduction f16 3.28 2.14 2.0 9.82))
+# ** array
+# =array= is the array type in LLVM.
+# *** Example
+# #+BEGIN_SRC neut
+# ; float array
+# (let _
+#   (array-introduction f16 3.28 2.14 2.0 9.82))
 
-(let xs
-  (array-introduction i64 1 2 -30 20))
+# (let xs
+#   (array-introduction i64 1 2 -30 20))
 
-(let k
-  (with identity.bind
-    (let a (i64.array-access 0 4 &xs))
-    (let b (i64.array-access 1 4 &xs))
-    (let c (i64.array-access 2 4 &xs))
-    (let d (i64.array-access 3 4 &xs))
-    (erase xs)
-    (i64.add a (i64.add b (i64.add c d)))))
+# (let k
+#   (with identity.bind
+#     (let a (i64.array-access 0 4 &xs))
+#     (let b (i64.array-access 1 4 &xs))
+#     (let c (i64.array-access 2 4 &xs))
+#     (let d (i64.array-access 3 4 &xs))
+#     (erase xs)
+#     (i64.add a (i64.add b (i64.add c d)))))
 
-(i64.print k) ; -7
+# (i64.print k) ; -7
 
-(i64.print
-  (array-elimination i64 (a b c d) xs
-    (i64.add a (i64.add b (i64.add c d))))) ; -7
-#+END_SRC
-*** Syntax
-#+BEGIN_SRC text
-; the array type
-(array TREE LOWTYPE)
+# (i64.print
+#   (array-elimination i64 (a b c d) xs
+#     (i64.add a (i64.add b (i64.add c d))))) ; -7
+# #+END_SRC
+# *** Syntax
+# #+BEGIN_SRC text
+# ; the array type
+# (array TREE LOWTYPE)
 
-(array-introduction LOWTYPE TREE ... TREE)
+# (array-introduction LOWTYPE TREE ... TREE)
 
-(array-elimination LOWTYPE (LEAF_PLUS ... LEAF_PLUS) TREE TREE)
+# (array-elimination LOWTYPE (LEAF_PLUS ... LEAF_PLUS) TREE TREE)
 
-LOWTYPE ::= i{n} | f{n}
+# LOWTYPE ::= i{n} | f{n}
 
-LEAF_PLUS ::= LEAF | (LEAF TREE)
-#+END_SRC
-*** Inference Rule
-#+BEGIN_SRC text
-Γ |- len : i64    {`k` is an integer type or a float type}
------------------------------------------------------------ (array)
-              Γ |- (array len k) : tau
-
-
-Γ |- l1 : k   ...  Γ |- ln : k      {`k` is an integer type or a float type}
------------------------------------------------------------------------------ (array-introduction)
-       Γ |- (array-introduction k l1 ... ln) : (array (i64 n) k)
+# LEAF_PLUS ::= LEAF | (LEAF TREE)
+# #+END_SRC
+# *** Inference Rule
+# #+BEGIN_SRC text
+# Γ |- len : i64    {`k` is an integer type or a float type}
+# ----------------------------------------------------------- (array)
+#               Γ |- (array len k) : tau
 
 
-Γ |- e1 : (array (i64 n) k)     Γ, x1 : k, ..., xn : k |- e2 : B
-------------------------------------------------------------------- (array-elimination)
- Γ |- (array-elimination k (x1 ... xn) e1 e2) : B
-#+END_SRC
-*** Semantics
-#+BEGIN_SRC neut
-(array-elimination _ (x1 ... xn) (array-introduction _ e1 ... en) e)
-~> e {x1 := e1,
-      ...,
-      xn := en}
-#+END_SRC
-*** Notes
-The type of elements of an array must be the integer type, or the float type.
-
-The memory layout of an array is the same as the one of LLVM; For example, an array of type =i8= is aligned as in the array =[0 x i8]= in LLVM.
-
-The array type can be used, for example, to implement string.
-
-You won't use =array-elimination= in actual code; You would use the constant =array-access= instead.
-
-** struct
-=struct= is the struct type in LLVM.
-*** Example
-#+BEGIN_SRC neut
-(let st
-  (struct-introduction
-    (f16 3.8)
-    (i8 8)
-    (i16 -300)
-    (f32 33.0)
-    (i64 30)
-    (i64 10)
-    (f64 -329444.4444444)
-    (i8 9)))
-
-(i64.print
-  (struct-elimination
-    ((_ f16) (_ i8) (_ i16) (_ f32) (z i64) (w i64) (_ f64) (_ i8))
-    st
-    (i64.add z w))) ; ~> 40
-#+END_SRC
-*** Syntax
-#+BEGIN_SRC neut
-; the struct type
-(struct LOWTYPE ... LOWTYPE)
-
-(struct-introduction (LOWTYPE TREE) ... (LOWTYPE TREE))
-
-(struct-elimination ((LEAF LOWTYPE) ... (LEAF LOWTYPE)) TREE TREE)
-
-LOWTYPE ::= i{n} | f{n}
-#+END_SRC
-*** Inference Rule
-#+BEGIN_SRC text
-well-formed(Γ)    {Every `ki` in {`k1`, ..., `kn`} is either an integer type or a float type}
----------------------------------------------------------------------------------------------- (struct)
-                         Γ |- (struct k1 ... kn) : tau
+# Γ |- l1 : k   ...  Γ |- ln : k      {`k` is an integer type or a float type}
+# ----------------------------------------------------------------------------- (array-introduction)
+#        Γ |- (array-introduction k l1 ... ln) : (array (i64 n) k)
 
 
-Γ |- e1 : k1   (...)   Γ |- en : kn      Γ |- (struct k1 ... kn) : tau
--------------------------------------------------------------------------- (struct-introduction)
-   Γ |- (struct-introduction (e1 k1) ... (en kn)) : (struct k1 ... kn)
+# Γ |- e1 : (array (i64 n) k)     Γ, x1 : k, ..., xn : k |- e2 : B
+# ------------------------------------------------------------------- (array-elimination)
+#  Γ |- (array-elimination k (x1 ... xn) e1 e2) : B
+# #+END_SRC
+# *** Semantics
+# #+BEGIN_SRC neut
+# (array-elimination _ (x1 ... xn) (array-introduction _ e1 ... en) e)
+# ~> e {x1 := e1,
+#       ...,
+#       xn := en}
+# #+END_SRC
+# *** Notes
+# The type of elements of an array must be the integer type, or the float type.
+
+# The memory layout of an array is the same as the one of LLVM; For example, an array of type =i8= is aligned as in the array =[0 x i8]= in LLVM.
+
+# The array type can be used, for example, to implement string.
+
+# You won't use =array-elimination= in actual code; You would use the constant =array-access= instead.
+
+# ** struct
+# =struct= is the struct type in LLVM.
+# *** Example
+# #+BEGIN_SRC neut
+# (let st
+#   (struct-introduction
+#     (f16 3.8)
+#     (i8 8)
+#     (i16 -300)
+#     (f32 33.0)
+#     (i64 30)
+#     (i64 10)
+#     (f64 -329444.4444444)
+#     (i8 9)))
+
+# (i64.print
+#   (struct-elimination
+#     ((_ f16) (_ i8) (_ i16) (_ f32) (z i64) (w i64) (_ f64) (_ i8))
+#     st
+#     (i64.add z w))) ; ~> 40
+# #+END_SRC
+# *** Syntax
+# #+BEGIN_SRC neut
+# ; the struct type
+# (struct LOWTYPE ... LOWTYPE)
+
+# (struct-introduction (LOWTYPE TREE) ... (LOWTYPE TREE))
+
+# (struct-elimination ((LEAF LOWTYPE) ... (LEAF LOWTYPE)) TREE TREE)
+
+# LOWTYPE ::= i{n} | f{n}
+# #+END_SRC
+# *** Inference Rule
+# #+BEGIN_SRC text
+# well-formed(Γ)    {Every `ki` in {`k1`, ..., `kn`} is either an integer type or a float type}
+# ---------------------------------------------------------------------------------------------- (struct)
+#                          Γ |- (struct k1 ... kn) : tau
 
 
-Γ |- e1 : (struct k1 ... kn)       Γ, x1 : k1, ..., xn : kn |- e2 : B
---------------------------------------------------------------------------- (struct-elimination)
-    Γ |- (struct-elimination ((x1 k1) ... (xn kn)) e1 e2) : B
-#+END_SRC
-*** Semantics
-#+BEGIN_SRC text
-(struct-elimination (x1 _) ... (xn _) (struct-introduction (_ e1) ... (_ en)) e)
-~> e {x1 := e1,
-      ...,
-      xn := en}
-#+END_SRC
-*** Notes
-Note that an element of a struct type in neut is restricted into an integer or a float. This means, among others, that you can't write a struct that contains another struct, or a memory region. This might get in the way when you implement an interface of a syscall; You might want to use the constant =unsafe.cast= in that case, or "flatten" the struct.
+# Γ |- e1 : k1   (...)   Γ |- en : kn      Γ |- (struct k1 ... kn) : tau
+# -------------------------------------------------------------------------- (struct-introduction)
+#    Γ |- (struct-introduction (e1 k1) ... (en kn)) : (struct k1 ... kn)
 
-The memory layout of a struct is the same as the one of LLVM; For example, a struct of type =(struct i8 f16 i32)= is aligned as in a struct of type ={i8, f16, f32}= in LLVM.
 
-The struct type is intended to be used for implementation of interfaces of syscalls.
+# Γ |- e1 : (struct k1 ... kn)       Γ, x1 : k1, ..., xn : kn |- e2 : B
+# --------------------------------------------------------------------------- (struct-elimination)
+#     Γ |- (struct-elimination ((x1 k1) ... (xn kn)) e1 e2) : B
+# #+END_SRC
+# *** Semantics
+# #+BEGIN_SRC text
+# (struct-elimination (x1 _) ... (xn _) (struct-introduction (_ e1) ... (_ en)) e)
+# ~> e {x1 := e1,
+#       ...,
+#       xn := en}
+# #+END_SRC
+# *** Notes
+# Note that an element of a struct type in neut is restricted into an integer or a float. This means, among others, that you can't write a struct that contains another struct, or a memory region. This might get in the way when you implement an interface of a syscall; You might want to use the constant =unsafe.cast= in that case, or "flatten" the struct.
+
+# The memory layout of a struct is the same as the one of LLVM; For example, a struct of type =(struct i8 f16 i32)= is aligned as in a struct of type ={i8, f16, f32}= in LLVM.
+
+# The struct type is intended to be used for implementation of interfaces of syscalls.
 
 ** question
 =question= requests the compiler to show the type of a term.
@@ -1685,105 +1583,6 @@ The struct type is intended to be used for implementation of interfaces of sysca
 #+END_SRC
 *** Notes
 The type of a term wrapped by =question= is reported by the compiler. This might be useful when used in harmony with a linter like flycheck.
-
-** erase
-=erase= makes given variables invisible in its scope.
-*** Example
-#+BEGIN_SRC neut
-((λ (x y) x) bool.true bool.false)                        ; ~> bool.true
-
-((λ (x y) (erase (x) x)) bool.true bool.false)            ; ~> undefined variable: x
-
-((λ (x y) (erase (y) x)) bool.true bool.false)            ; ~> bool.true
-
-((λ (x y) (erase (x y) x)) bool.true bool.false)          ; ~> undefined variable: x
-
-; `with` has a dedicated notation for `erase`
-(with identity.bind
-  (let x bool.true)
-  (let y x)
-  (erase x)
-  y) ; ~> undefined variable: y
-#+END_SRC
-*** Syntax
-#+BEGIN_SRC neut
-(erase (LEAF ... LEAF) TREE)
-#+END_SRC
-*** Inference Rule
-#+BEGIN_SRC text
-Γ |- e : A    (x1 : A1, ..., xn : An) ∈ Γ    (x1 : A1, ..., xn : An) ∉ freevar(e)
--------------------------------------------------------------------------------------- (erase)
-                   Γ |- (erase (x1 ... xn) e) : A
-#+END_SRC
-*** Semantics
-#+BEGIN_SRC neut
-(erase (x1 ... xn) e)
-~> e
-#+END_SRC
-
-*** Notes
-=erase= can be used, for example, to ensure that a variable is not used after a certain point of a program:
-#+BEGIN_SRC neut
-; `with` has a dedicated notation for `erase`
-(with identity.bind
-  (let VAR (some-computation))
-  {COMPUTATION_WITH_VAR}
-  (erase VAR)
-  {COMPUTATION_WITHOUT_VAR}
-  ...)
-#+END_SRC
-
-=erase= can also be used to ensure that a variable introduced in a [[#notation][notation]] doesn't cause name collision with a free variable. For example, consider the following notation:
-#+BEGIN_SRC neut
-(notation (foo e1 e2)
-  (λ
-    ((z tau)
-     (k (Π ((_ i64) (_ bool)) z)))
-    (k e1 e2)))
-
-(let p (foo 10 bool.true))
-#+END_SRC
-Though the notation =foo= works in many cases, it can cause an unintuitive behavior if the =e1= or =e2= in =(foo e1 e2)= contains =k= as a free variable:
-#+BEGIN_SRC neut
-(let k 100)
-
-(let p (foo k bool.true))
-; ~> (let p
-;      (λ
-;        ((z tau)
-;         (k (Π ((_ i64) (_ bool)))))
-;        (k k bool.true)))
-; ~> type error
-#+END_SRC
-Though we luckily got a type error in the example above, generally this sort of variable capturing can result in a more hard-to-debug runtime error. =erase= can be used here to prevent this kind of situation as follows:
-#+BEGIN_SRC neut
-(notation (foo e1 e2)
-  (λ
-    ((z tau)
-     (k (Π ((_ i64) (_ bool)) z)))
-    (k (erase (z k) e1) e2)))
-
-(let k 100)
-
-(let p (foo k bool.true))
-; ~> (let p
-;      (λ
-;        ((z tau)
-;         (k (Π ((_ i64) (_ bool)))))
-;        (k (erase (z k) k) bool.true)))
-; ~> undefined variable: k
-#+END_SRC
-That is, using =erase=, we can ensure that a variable introduced by =notation= does not collide with a free variable contained in an argument of the notation.
-
-Note that =erase= is only a partial solution to the problem of [[https://en.wikipedia.org/wiki/Hygienic_macro][hygienic macros]]. Consider the following code:
-#+BEGIN_SRC neut
-(notation (unless condition on-false on-true)
-  (if (bool.not condition) on-true on-false)
-#+END_SRC
-The notation above presupposes that the free variable =bool.not= is bound in a sane way; =bool.not= can't be something like =(λ (x) x)=, or =(string.print "hello, world!")=. Or, even the very symbol =erase= can theoretically be bound to a variable. Thus =erase= has no use in this situation.
-
-# though we might be able to introduce something like =(coerase (LEAF ... LEAF) TREE)= which ensures that every given variable is defined at top level. We will have to prohibit using the names =erase= and =coerase= as a name of a bound variable in that case.
-
 
 * Auxiliary Syntax
 ** asterisk
