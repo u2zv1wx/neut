@@ -15,15 +15,15 @@ Here I briefly summarize the basic properties of neut before diving into the det
 - Memory allocation/deallocation is statically determined at compile time
 
 * Table of Contents                                                    :TOC_3:
-- [[#examples][Examples]]
-  - [[#proof-theoretic-memory-management][Proof-Theoretic Memory Management]]
+- [[#ideas-by-examples][Ideas by Examples]]
+  - [[#memory-management-based-on-linearity][Memory Management Based on Linearity]]
     - [[#basics][Basics]]
     - [[#types-as-exponentializers][Types as Exponentializers]]
     - [[#notes-on-closures][Notes on Closures]]
     - [[#notes-on-polymorphic-functions][Notes on Polymorphic Functions]]
     - [[#summary-so-far][Summary So Far]]
   - [[#manual-optimization-via-borrowing][Manual Optimization via Borrowing]]
-  - [[#noetic-computation][Noetic Computation]]
+  - [[#manual-optimization-via-noetic-computation][Manual Optimization via Noetic Computation]]
   - [[#automatic-optimization-via-mallocfree-cancellation][Automatic Optimization via malloc/free Cancellation]]
   - [[#summary][Summary]]
 - [[#installation][Installation]]
@@ -89,7 +89,8 @@ Here I briefly summarize the basic properties of neut before diving into the det
     - [[#example-2][Example]]
     - [[#notes-2][Notes]]
 - [[#contribution][Contribution]]
-  - [[#the-structure-of-the-compiler][The Structure of the Compiler]]
+  - [[#development][Development]]
+    - [[#the-structure-of-the-compiler][The Structure of the Compiler]]
   - [[#donation][Donation]]
 - [[#contact][Contact]]
 - [[#things-left-undone][Things Left Undone]]
@@ -97,10 +98,9 @@ Here I briefly summarize the basic properties of neut before diving into the det
   - [[#llvm-ir-for-the-first-example][LLVM IR for the First Example]]
   - [[#llvm-ir-for-the-second-example][LLVM IR for the Second Example]]
 
-* Examples
-# What follows in this section is a very quick explanation of the language. For more in-depth information like its background, see: [[https://veka41.gitlab.io/post/2020-10-17.html][(English)]] / [[https://veka41.gitlab.io/post/2020-10-03.html][(Japanese)]]
+* Ideas by Examples
 
-** Proof-Theoretic Memory Management
+** Memory Management Based on Linearity
 *** Basics
 Let's see how neut manages resources. The following code prints the string "a" for the 3 times:
 #+BEGIN_SRC neut
@@ -475,7 +475,7 @@ In short: the resulting code is faster in that it is free from the redundant cop
 
 This is how neut controls resources efficiently, without modifying the type system of the source language.
 
-** Noetic Computation
+** Manual Optimization via Noetic Computation
 TBD (write about the efficient implementation of =list.length= via case-noetic)
 
 ** Automatic Optimization via malloc/free Cancellation
@@ -1971,13 +1971,21 @@ This subcommand is intended to be used with an editor-side syntax checker like [
 
 * Contribution
 
-** The Structure of the Compiler
+** Development
+*** The Structure of the Compiler
 
 ** Donation
 
 * Contact
+veka41@protonmail.ch
 
 * Things Left Undone
+- sophistication on library-related things
+- incremental compilation
+- track the location of a code piece when expanding macros more acculately
+- better pattern matching syntax (like nested pattern)
+- syntax highlighter for editors other than Emacs
+- etc.
 
 * Appendix
 
