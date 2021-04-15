@@ -15,7 +15,7 @@ Here I briefly summarize the basic properties of neut before diving into the det
 - Memory allocation/deallocation is statically determined at compile time
 
 * Table of Contents                                                    :TOC_3:
-- [[#ideas-by-examples][Ideas by Examples]]
+- [[#ideas][Ideas]]
   - [[#memory-management-based-on-linearity][Memory Management Based on Linearity]]
     - [[#basics][Basics]]
     - [[#types-as-exponentializers][Types as Exponentializers]]
@@ -97,7 +97,7 @@ Here I briefly summarize the basic properties of neut before diving into the det
   - [[#llvm-ir-for-the-first-example][LLVM IR for the First Example]]
   - [[#llvm-ir-for-the-second-example][LLVM IR for the Second Example]]
 
-* Ideas by Examples
+* Ideas
 
 ** Memory Management Based on Linearity
 *** Basics
@@ -476,6 +476,10 @@ This is how neut controls resources efficiently, without modifying the type syst
 
 ** Manual Optimization via Noetic Computation
 TBD (write about the efficient implementation of =list.length= via case-noetic)
+
+#+begin_quote
+The tree simpliciter can burn up, be resolved into its chemical elements, etc. But the sense — the sense of this perception, something belonging necessarily to its essence — cannot burn up; it has no chemical elements, no forces, no real properties.
+#+end_quote
 
 ** Automatic Optimization via malloc/free Cancellation
 neut's static memory management enables not only the "manual" optimization we have just seen, but also another "automatic" optimization. Remember the first example:
