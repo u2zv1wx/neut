@@ -61,7 +61,6 @@ Here I briefly summarize the basic properties of neut before diving into the det
     - [[#tau][tau]]
     - [[#variable-1][variable]]
     - [[#π][Π]]
-    - [[#fix][fix]]
     - [[#constant-1][constant]]
     - [[#int][int]]
     - [[#float][float]]
@@ -1149,8 +1148,8 @@ is preferred to:
     (mul-i64 x (fact (sub-i64 x 1)))))
 #+END_SRC
 
-*** fix
-=fix= is for recursion.
+*** COMMENT Π-introduction-fix
+=Π-introduction-fix= is for recursion.
 **** Example
 #+BEGIN_SRC neut
 (let fact
