@@ -1,13 +1,13 @@
 #+TITLE: neut
-neut is a dependently-typed programming language based on [[https://ncatlab.org/nlab/show/calculus+of+constructions][the Calculus of Constructions (CoC)]]. The interesting point is that this language determines how to allocate/deallocate memory at compile-time, without extra annotations to the type system. In other words, neut in its source language is the ordinary lambda-calculus after all (imagine something like Haskell, OCaml, Idris, Coq, Agda, or Lean), and at the same time it handles memory without using, for example:
+neut is a dependently-typed programming language based on [[https://ncatlab.org/nlab/show/calculus+of+constructions][the Calculus of Constructions (CoC)]]. The interesting point is that this language determines how to allocate/deallocate memory at compile-time, without extra annotations to the type system. In other words, neut in its source language is the ordinary lambda-calculus after all (imagine something like Haskell, OCaml, Idris, Coq, Agda, or Lean), and at the same time it handles memory without using, for example, explicit malloc/free, or garbage collection.
 
-- explicit malloc/free,
-- garbage collection,
-- region-based memory management.
+# - explicit malloc/free,
+# - garbage collection,
+# - region-based memory management.
 
 # Theoretically, this is made possible by translating the source language into a dependent variant of [[https://www.cs.bham.ac.uk/~pbl/papers/thesisqmwphd.pdf][Call-By-Push-Value]]. The crucial point of this translation is to see that knowing the type of a term in the target calculus is knowing how to eta-expand the term, which in turn means knowing how to copy/discard the term. In the translation, a type is not erased, but translated into a computationally-meaningful term that copies/discards the terms of the type.
 
-This is made possible by translating every type of the language into a function that can be used to copy/discard the terms of the type. Thereforee, in this language, a type is not erased, but translated into a computationally-meaningful term.
+Theoretically, this is made possible by translating every type of the language into a function that can be used to copy/discard the terms of the type; in this language, a type is not erased, but translated into a computationally-meaningful term.
 
 Practically, this means that you can write your program in the ordinary lambda-calculus without any extra restrictions or annotations, and at the same time are allowed to control how resources are used in the program. If you want an ordinary-lambda-calculus based programming language with a human-predictable semantics (including its memory management), this might be for you.
 
@@ -35,7 +35,7 @@ Here I briefly summarize the basic properties of neut before diving into the det
   - [[#summary][Summary]]
 - [[#installation][Installation]]
 - [[#language-overview][Language Overview]]
-  - [[#structure][Structure]]
+  - [[#basic-structure][Basic Structure]]
   - [[#example-code][Example Code]]
 - [[#syntax-and-semantics-of-the-meta-language][Syntax and Semantics of the Meta Language]]
   - [[#statements][Statements]]
@@ -96,7 +96,7 @@ Here I briefly summarize the basic properties of neut before diving into the det
     - [[#example-2][Example]]
     - [[#notes-2][Notes]]
 - [[#contribution][Contribution]]
-  - [[#compiler-structure][Compiler Structure]]
+  - [[#the-structure-of-the-compiler][The Structure of the Compiler]]
   - [[#donation][Donation]]
 - [[#contact][Contact]]
 - [[#things-left-undone][Things Left Undone]]
@@ -594,7 +594,7 @@ As for editor support, you can currently try [[https://github.com/u2zv1wx/neut-m
 
 * Language Overview
 
-** Structure
+** Basic Structure
 You can find a detailed description of the syntax, the logic, and the semantics of neut in the succeeding sections. Those should suffice to read/write a program of neut. Having said that though, some might prefer learning from actual source code after taking a brief look at this and that basic stuff. So here I introduce you some necessities that would be required to understand - or guess the meaning of - a program of neut.
 
 Let's start. Notes on programs. (0) A program of neut is a list of statements, processed one by one. (1) [[#ensure][ensure]] and [[#include][include]] are the ones that use codes written in other files. I recommend you to read the linked notes; both of them are not so long. (2) [[#useunuse][use/unuse]] and [[#sectionend][section/end]] are the ones that handle namespace. Again I recommend you to read them.
@@ -1978,7 +1978,7 @@ This subcommand is intended to be used with an editor-side syntax checker like [
 
 * Contribution
 
-** Compiler Structure
+** The Structure of the Compiler
 
 ** Donation
 
