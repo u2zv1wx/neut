@@ -5,7 +5,9 @@ neut is a dependently-typed programming language based on [[https://ncatlab.org/
 - garbage collection,
 - region-based memory management.
 
-Theoretically, this is made possible by translating the source language into a dependent variant of [[https://www.cs.bham.ac.uk/~pbl/papers/thesisqmwphd.pdf][Call-By-Push-Value]]. The crucial point of this translation is to see that knowing the type of a term in the target calculus is knowing how to eta-expand the term, which in turn means knowing how to copy/discard the term. In the translation, a type is not erased, but translated into a computationally-meaningful term that copies/discards the terms of the type.
+# Theoretically, this is made possible by translating the source language into a dependent variant of [[https://www.cs.bham.ac.uk/~pbl/papers/thesisqmwphd.pdf][Call-By-Push-Value]]. The crucial point of this translation is to see that knowing the type of a term in the target calculus is knowing how to eta-expand the term, which in turn means knowing how to copy/discard the term. In the translation, a type is not erased, but translated into a computationally-meaningful term that copies/discards the terms of the type.
+
+This is made possible by translating every type of the language into a function that can be used to copy/discard the terms of the type. Thereforee, in this language, a type is not erased, but translated into a computationally-meaningful term.
 
 Practically, this means that you can write your program in the ordinary lambda-calculus without any extra restrictions or annotations, and at the same time are allowed to control how resources are used in the program. If you want an ordinary-lambda-calculus based programming language with a human-predictable semantics (including its memory management), this might be for you.
 
@@ -13,7 +15,7 @@ Here I briefly summarize the basic properties of neut before diving into the det
 
 - A compiled language
 - The output is [[https://llvm.org/docs/LangRef.html][LLVM IR]] / assembly / executable binary (the last two are via clang)
-- The type system is CoC + fix + int + float + enum + array + struct - universe hierarchy
+- The type system is CoC + fix + int + float + enum - universe hierarchy (+ unsafe cast)
 - The type inference algorithm is based on [[https://arxiv.org/abs/1505.04324][the one of Lean]]
 - The evaluation strategy is call-by-value
 - Every tail call is optimized into a loop
@@ -33,6 +35,8 @@ Here I briefly summarize the basic properties of neut before diving into the det
   - [[#summary][Summary]]
 - [[#installation][Installation]]
 - [[#language-overview][Language Overview]]
+  - [[#structure][Structure]]
+  - [[#example-code][Example Code]]
 - [[#syntax-and-semantics-of-the-meta-language][Syntax and Semantics of the Meta Language]]
   - [[#statements][Statements]]
     - [[#define-macro-define-macro-variadic][define-macro, define-macro-variadic]]
@@ -51,6 +55,7 @@ Here I briefly summarize the basic properties of neut before diving into the det
     - [[#constant][constant]]
     - [[#integer][integer]]
     - [[#leafnode][leaf/node]]
+  - [[#notes-on-quote-unquote-and-splice][Notes on Quote, Unquote and Splice]]
 - [[#syntax-and-semantics-of-the-object-language][Syntax and Semantics of the Object Language]]
   - [[#statements-1][Statements]]
     - [[#enum][enum]]
@@ -92,15 +97,15 @@ Here I briefly summarize the basic properties of neut before diving into the det
     - [[#notes-2][Notes]]
 - [[#contribution][Contribution]]
   - [[#compiler-structure][Compiler Structure]]
-  - [[#things-left-undone][Things Left Undone]]
   - [[#donation][Donation]]
 - [[#contact][Contact]]
+- [[#things-left-undone][Things Left Undone]]
 - [[#appendix][Appendix]]
   - [[#llvm-ir-for-the-first-example][LLVM IR for the First Example]]
   - [[#llvm-ir-for-the-second-example][LLVM IR for the Second Example]]
 
 * Examples
-What follows in this section is a very quick explanation of the language. For more in-depth information like its background, see: [[https://veka41.gitlab.io/post/2020-10-17.html][(English)]] / [[https://veka41.gitlab.io/post/2020-10-03.html][(Japanese)]]
+# What follows in this section is a very quick explanation of the language. For more in-depth information like its background, see: [[https://veka41.gitlab.io/post/2020-10-17.html][(English)]] / [[https://veka41.gitlab.io/post/2020-10-03.html][(Japanese)]]
 
 ** Proof-Theoretic Memory Management
 *** Basics
@@ -588,6 +593,8 @@ To uninstall, you just have to remove the binary =~/.local/bin/neut= and the dir
 As for editor support, you can currently try [[https://github.com/u2zv1wx/neut-mode][neut-mode]] and [[https://github.com/u2zv1wx/flycheck-neut][flycheck-neut]] if you're using Emacs. The former package is for syntax highlighting, and the latter one for linting.
 
 * Language Overview
+
+** Structure
 You can find a detailed description of the syntax, the logic, and the semantics of neut in the succeeding sections. Those should suffice to read/write a program of neut. Having said that though, some might prefer learning from actual source code after taking a brief look at this and that basic stuff. So here I introduce you some necessities that would be required to understand - or guess the meaning of - a program of neut.
 
 Let's start. Notes on programs. (0) A program of neut is a list of statements, processed one by one. (1) [[#ensure][ensure]] and [[#include][include]] are the ones that use codes written in other files. I recommend you to read the linked notes; both of them are not so long. (2) [[#useunuse][use/unuse]] and [[#sectionend][section/end]] are the ones that handle namespace. Again I recommend you to read them.
@@ -601,6 +608,8 @@ Next. Notes on the compiler subcommands. (0) You can build a program with =$ neu
 Now I think you are basically ready to, for example, start reading [[https://github.com/u2zv1wx/neut/tree/master/test/data][the files in the test directory]], or [[https://github.com/u2zv1wx/neut-core][the files in the core library]], referring the sections below as necessary. After that you should know how to write lambdas, recursive functions, inductive types, tuples. You need a state? You can use the state monad. Multiple effects? The free monad. You have the full power of lambda calculus.
 
 That pretty much should do it. I hope you enjoy this language.
+
+** Example Code
 
 * Syntax and Semantics of the Meta Language
 ** Statements
@@ -740,6 +749,8 @@ TBD
 *** integer
 
 *** leaf/node
+
+** Notes on Quote, Unquote and Splice
 
 * Syntax and Semantics of the Object Language
 
@@ -1969,11 +1980,11 @@ This subcommand is intended to be used with an editor-side syntax checker like [
 
 ** Compiler Structure
 
-** Things Left Undone
-
 ** Donation
 
 * Contact
+
+* Things Left Undone
 
 * Appendix
 
