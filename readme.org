@@ -117,7 +117,7 @@ Let's see how neut manages resources. The following code prints the string "a" f
 #+END_SRC
 The =(with identity.bind (...))= is the same as the do-notation in Haskell or other languages, specialized to the identity monad.
 
-By running =$ neut build --no-alloc-cancellation --emit llvm filename.neut=, we obtain schematically the following LLVM IR (the =--no-alloc-cancellation= is to disable certain optimization that we will see later):
+By running =neut build --no-alloc-cancellation --emit llvm filename.neut=, we obtain schematically the following LLVM IR (the =--no-alloc-cancellation= is to disable certain optimization that we will see later):
 #+BEGIN_SRC llvm
 declare void @free(i8*)
 declare i8* @write(i8*, i8*, i8*)
@@ -418,7 +418,7 @@ Or,
 #+END_SRC
 This notation is "borrowing" in neut. Note that borrowing in neut is nothing but a syntactic translation. Borrowing has nothing to do with, for example, the type system, or the operational semantics, of neut. Indeed, this syntactic translation is processed at the stage of parsing in the compiler.
 
-Let's see how the resulting LLVM IR changes. Is it faster now? We can compile the code above by running =$ neut build --no-alloc-cancellation --emit llvm filename.neut=. The output is schematically as follows:
+Let's see how the resulting LLVM IR changes. Is it faster now? We can compile the code above by running =neut build --no-alloc-cancellation --emit llvm filename.neut=. The output is schematically as follows:
 #+BEGIN_SRC llvm
 declare void @free(i8*)
 declare i8* @write(i8*, i8*, i8*)
@@ -478,7 +478,7 @@ This is how neut controls resources efficiently, without modifying the type syst
 TBD (write about the efficient implementation of =list.length= via case-noetic)
 
 #+begin_quote
-The tree simpliciter can burn up, be resolved into its chemical elements, etc. But the sense — the sense of this perception, something belonging necessarily to its essence — cannot burn up; it has no chemical elements, no forces, no real properties.
+The tree simpliciter can burn up, be resolved into its chemical elements, etc. But the sense — the sense of this perception, something belonging necessarily to its essence — cannot burn up; it has no chemical elements, no forces, no real properties. -- Edmund Husserl
 #+end_quote
 
 ** Automatic Optimization via malloc/free Cancellation
@@ -569,8 +569,8 @@ The currently supported platforms are: Linux (x64), macOS (x64).
 
 Make sure that you have already installed [[https://zlib.net/][zlib]] (>= 1.2.11), [[https://wiki.openssl.org/index.php/Libssl_API][libssl]] (>= 1.1.1), [[https://docs.haskellstack.org/en/stable/README/][stack]] (>= 2.3.0) and [[https://clang.llvm.org/][clang]] (>= 10.0.0). On Debian, for example, the first three can be installed as follows:
 #+BEGIN_SRC shell
-$ sudo apt install zlib1g-dev libssl-dev haskell-stack
-$ stack upgrade --binary-only # not required if your stack is already up-to-date
+sudo apt install zlib1g-dev libssl-dev haskell-stack
+stack upgrade --binary-only # not required if your stack is already up-to-date
 #+END_SRC
 =clang= can be installed in the way described [[https://apt.llvm.org/][here]].
 
@@ -578,11 +578,14 @@ Also make sure that you have =~/.local/bin= in your =$PATH=.
 
 Then, clone the repository and build it:
 #+BEGIN_SRC shell
-$ git clone https://github.com/u2zv1wx/neut
-$ cd neut
-$ git checkout 0.1.0.0
-$ stack test    # this builds the project and tests its behavior
-$ stack install # this installs the executable `neut` into `~/.local/bin`
+git clone https://github.com/u2zv1wx/neut
+cd neut
+git checkout 0.1.0.0
+# the following builds the project and tests its behavior
+# it also checks memory sanity via the clang option "-fsanitize=memory"
+stack test --test-arguments test/data --test-arguments test/compiler
+# this installs the executable `neut` into `~/.local/bin`
+stack install
 #+END_SRC
 To uninstall, you just have to remove the binary =~/.local/bin/neut= and the directory =~/.local/share/neut=.
 
@@ -599,7 +602,7 @@ Next. Notes on terms. (0) Note that what follows presupposes the =notation.neut=
 
 Next. Notes on primitives: (0) The following primitive types are available: =i1=, =i2=, =i3=, ..., =i64=. These are the same as the corresponding integer types in LLVM. (1) You can also use =f16=, =f32=, and =f64=. These are LLVM's =half=, =float=, and =double=, respectively. (2) You will soon come to want primitive instructions - like =add=, =mul=, or =xor= - that can operate on terms of these types. You can find information on them [[#primitives][in this section]]. (3) In the section you can also find notes on unsafe casting, array accessing, and syscall. I think these should also count as necessities. (4) When you use an effectful primitive like =os.write= in a type, the behavior of the resulting executable is undefined.
 
-Next. Notes on the compiler subcommands. (0) You can build a program with =$ neut build path/to/file.neut=. (1) You can create an =tar.gz= archive of a project via =$ neut archive path/to/dir=. Then you can upload the archive to somewhere, allowing others to =ensure= and =include= it.
+Next. Notes on the compiler subcommands. (0) You can build a program with =neut build path/to/file.neut=. (1) You can create an =tar.gz= archive of a project via =neut archive path/to/dir=. Then you can upload the archive to somewhere, allowing others to =ensure= and =include= it.
 
 Now I think you are basically ready to, for example, start reading [[https://github.com/u2zv1wx/neut/tree/master/test/data][the files in the test directory]], or [[https://github.com/u2zv1wx/neut-core][the files in the core library]], referring the sections below as necessary. After that you should know how to write lambdas, recursive functions, inductive types, tuples. You need a state? You can use the state monad. Multiple effects? The free monad. You have the full power of lambda calculus.
 
@@ -1938,7 +1941,7 @@ The =neut= binary provides the subcommands in this section.
 ** archive
 *** Example
 #+BEGIN_SRC shell
-$ neut archive path/to/source/directory -o path/to/release/directory/0.1.0.0.tar.gz
+neut archive path/to/source/directory -o path/to/release/directory/0.1.0.0.tar.gz
 #+END_SRC
 *** Notes
 The =archive= subcommand creates a tar.gz archive from the specified directory. The [[#ensure][ensure]] statement expects an archive created by this subcommand.
@@ -1946,10 +1949,10 @@ The =archive= subcommand creates a tar.gz archive from the specified directory. 
 ** build
 *** Example
 #+BEGIN_SRC shell
-$ neut build path/to/file.neut             # create an executable ./file
-$ neut build -o output path/to/file.neut --clang-option "-fsanitize=memory -g"   # create an executable ./output, using clang's option "-fsanitize=memory -g"
-$ neut build --emit llvm path/to/file.neut # create a LLVM IR file ./file.ll
-$ neut build --emit asm path/to/file.neut  # create an assembly code ./file.s
+neut build path/to/file.neut             # create an executable ./file
+neut build -o output path/to/file.neut --clang-option "-fsanitize=memory -g"   # create an executable ./output, using clang's option "-fsanitize=memory -g"
+neut build --emit llvm path/to/file.neut # create a LLVM IR file ./file.ll
+neut build --emit asm path/to/file.neut  # create an assembly code ./file.s
 #+END_SRC
 *** Notes
 The =build= subcommand builds given source code and emits resulting code.
@@ -1959,9 +1962,9 @@ Internally, these command firstly creates an LLVM IR, then passes it to =clang= 
 ** check
 *** Example
 #+BEGIN_SRC shell
-$ neut check path/to/file.neut
-$ neut check --no-color path/to/file.neut
-$ neut check --end-of-entry EOE path/to/file.neut
+neut check path/to/file.neut
+neut check --no-color path/to/file.neut
+neut check --end-of-entry EOE path/to/file.neut
 #+END_SRC
 *** Notes
 The =check= subcommand type-checks given file.
