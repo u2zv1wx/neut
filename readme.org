@@ -19,48 +19,82 @@ Here I briefly summarize the basic properties of neut before diving into the det
 - Every tail call is optimized into a loop
 - Memory allocation/deallocation is statically determined at compile time
 
-* Table of Contents                                                    :TOC:
+* Table of Contents                                                    :TOC_3:
 - [[#examples][Examples]]
   - [[#proof-theoretic-memory-management][Proof-Theoretic Memory Management]]
+    - [[#basics][Basics]]
+    - [[#types-as-exponentializers][Types as Exponentializers]]
+    - [[#notes-on-closures][Notes on Closures]]
+    - [[#notes-on-polymorphic-functions][Notes on Polymorphic Functions]]
+    - [[#summary-so-far][Summary So Far]]
   - [[#manual-optimization-via-borrowing][Manual Optimization via Borrowing]]
-  - [[#noetic-computation-something-like-the-immutable-references-in-rust]["Noetic" Computation (Something Like the Immutable References in Rust)]]
+  - [[#noetic-computation][Noetic Computation]]
   - [[#automatic-optimization-via-mallocfree-cancellation][Automatic Optimization via malloc/free Cancellation]]
   - [[#summary][Summary]]
 - [[#installation][Installation]]
-- [[#highly-accelerated-tutorial][Highly-Accelerated Tutorial]]
-- [[#syntax-and-semantics-of-meta-statements][Syntax and Semantics of Meta-Statements]]
-- [[#syntax-and-semantics-of-statements][Syntax and Semantics of Statements]]
-  - [[#ensure][ensure]]
-  - [[#enum][enum]]
-  - [[#include][include]]
-  - [[#introspect][introspect]]
-  - [[#let][let]]
-  - [[#useunuse][use/unuse]]
-  - [[#sectionend][section/end]]
-- [[#syntax-and-semantics-of-terms][Syntax and Semantics of Terms]]
-  - [[#tau][tau]]
-  - [[#variable][variable]]
-  - [[#π][Π]]
-  - [[#fix][fix]]
-  - [[#constant][constant]]
-  - [[#int][int]]
-  - [[#float][float]]
-  - [[#enum-1][enum]]
-  - [[#question][question]]
-- [[#auxiliary-syntax][Auxiliary Syntax]]
-  - [[#asterisk][asterisk]]
-  - [[#sigma][sigma]]
-  - [[#with][with]]
-  - [[#partial-application][Partial Application]]
-- [[#primitives][Primitives]]
-  - [[#llvm-based-primitives][LLVM-Based Primitives]]
-  - [[#syscalls][Syscalls]]
-  - [[#array-indexing][Array Indexing]]
-  - [[#unsafe-cast][Unsafe Cast]]
+- [[#language-overview][Language Overview]]
+- [[#syntax-and-semantics-of-the-meta-language][Syntax and Semantics of the Meta Language]]
+  - [[#statements][Statements]]
+    - [[#define-macro-define-macro-variadic][define-macro, define-macro-variadic]]
+    - [[#define-prefix-remove-prefix][define-prefix, remove-prefix]]
+    - [[#dry-expand][dry-expand]]
+    - [[#ensure][ensure]]
+    - [[#include][include]]
+    - [[#introspect][introspect]]
+    - [[#sectionend][section/end]]
+    - [[#statement][statement]]
+    - [[#useunuse][use/unuse]]
+  - [[#terms][Terms]]
+    - [[#variable][variable]]
+    - [[#implication][implication]]
+    - [[#if][if]]
+    - [[#constant][constant]]
+    - [[#integer][integer]]
+    - [[#leafnode][leaf/node]]
+- [[#syntax-and-semantics-of-the-object-language][Syntax and Semantics of the Object Language]]
+  - [[#statements-1][Statements]]
+    - [[#enum][enum]]
+    - [[#define][define]]
+    - [[#define-prefix-remove-prefix-1][define-prefix, remove-prefix]]
+    - [[#reduce][reduce]]
+    - [[#useunuse-1][use/unuse]]
+    - [[#sectionend-1][section/end]]
+  - [[#terms-1][Terms]]
+    - [[#tau][tau]]
+    - [[#variable-1][variable]]
+    - [[#π][Π]]
+    - [[#fix][fix]]
+    - [[#constant-1][constant]]
+    - [[#int][int]]
+    - [[#float][float]]
+    - [[#enum-1][enum]]
+    - [[#question][question]]
+    - [[#derangement][derangement]]
+  - [[#auxiliary-statements][Auxiliary Statements]]
+    - [[#define-data][define-data]]
+    - [[#define-codata][define-codata]]
+    - [[#define-resource-type][define-resource-type]]
+  - [[#auxiliary-terms][Auxiliary Terms]]
+    - [[#asterisk][asterisk]]
+    - [[#sigma][sigma]]
+    - [[#with][with]]
+    - [[#case-case-noetic][case, case-noetic]]
+    - [[#partial-application][Partial Application]]
 - [[#compiler-subcommands][Compiler Subcommands]]
   - [[#archive][archive]]
+    - [[#example][Example]]
+    - [[#notes][Notes]]
   - [[#build][build]]
+    - [[#example-1][Example]]
+    - [[#notes-1][Notes]]
   - [[#check][check]]
+    - [[#example-2][Example]]
+    - [[#notes-2][Notes]]
+- [[#contribution][Contribution]]
+  - [[#compiler-structure][Compiler Structure]]
+  - [[#things-left-undone][Things Left Undone]]
+  - [[#donation][Donation]]
+- [[#contact][Contact]]
 - [[#appendix][Appendix]]
   - [[#llvm-ir-for-the-first-example][LLVM IR for the First Example]]
   - [[#llvm-ir-for-the-second-example][LLVM IR for the Second Example]]
@@ -443,7 +477,8 @@ In short: the resulting code is faster in that it is free from the redundant cop
 
 This is how neut controls resources efficiently, without modifying the type system of the source language.
 
-** "Noetic" Computation (Something Like the Immutable References in Rust)
+** Noetic Computation
+TBD (write about the efficient implementation of =list.length= via case-noetic)
 
 ** Automatic Optimization via malloc/free Cancellation
 neut's static memory management enables not only the "manual" optimization we have just seen, but also another "automatic" optimization. Remember the first example:
@@ -552,7 +587,7 @@ To uninstall, you just have to remove the binary =~/.local/bin/neut= and the dir
 
 As for editor support, you can currently try [[https://github.com/u2zv1wx/neut-mode][neut-mode]] and [[https://github.com/u2zv1wx/flycheck-neut][flycheck-neut]] if you're using Emacs. The former package is for syntax highlighting, and the latter one for linting.
 
-* Highly-Accelerated Tutorial
+* Language Overview
 You can find a detailed description of the syntax, the logic, and the semantics of neut in the succeeding sections. Those should suffice to read/write a program of neut. Having said that though, some might prefer learning from actual source code after taking a brief look at this and that basic stuff. So here I introduce you some necessities that would be required to understand - or guess the meaning of - a program of neut.
 
 Let's start. Notes on programs. (0) A program of neut is a list of statements, processed one by one. (1) [[#ensure][ensure]] and [[#include][include]] are the ones that use codes written in other files. I recommend you to read the linked notes; both of them are not so long. (2) [[#useunuse][use/unuse]] and [[#sectionend][section/end]] are the ones that handle namespace. Again I recommend you to read them.
@@ -567,9 +602,148 @@ Now I think you are basically ready to, for example, start reading [[https://git
 
 That pretty much should do it. I hope you enjoy this language.
 
-* Syntax and Semantics of Meta-Statements
+* Syntax and Semantics of the Meta Language
+** Statements
 
-* Syntax and Semantics of Statements
+*** define-macro, define-macro-variadic
+TBD
+
+*** define-prefix, remove-prefix
+TBD
+
+*** dry-expand
+TBD
+
+*** ensure
+=ensure= fetches the content of the specified URL for later use.
+
+**** Example
+#+BEGIN_SRC neut
+(ensure core/0.1.0.0
+  "https://github.com/u2zv1wx/neut-core/raw/master/release/0.1.0.0.tar.gz")
+
+(include "core/0.1.0.0/core.neut")
+#+END_SRC
+**** Syntax
+#+BEGIN_SRC neut
+(ensure LEAF STRING)
+#+END_SRC
+**** Semantics
+=(ensure path URL)= fetches the content of the specified URL, extracts the content into =~/.local/share/neut/NEUT_VERSION/path=, assuming that the format of the archive is =tar.gz=. The =path= must be a valid path string. Every path separator in =path= is treated "literally". For example, if the =path= is =some-library/0.2.0.0=, the content of the archive is extracted into =~/.local/share/neut/NEUT_VERSION/some-library/0.2.0.0=.
+
+If the target directory of archive extraction already exists, =ensure= does nothing.
+
+This statement is intended to be used in harmony with [[#include][include]].
+
+Archives specified in =ensure= is expected to be the ones created via [[#archive][archive]].
+
+
+*** include
+=include= "pastes" the content of the specified file.
+# temporary transfers the parsing process to the file specified by given path, if necessary.
+**** Example
+#+BEGIN_SRC neut
+(include "core/0.1.0.0/free.neut")
+
+(include "./relative/path/from/the/dir/path/of/this/file.neut")
+#+END_SRC
+**** Syntax
+#+BEGIN_SRC neut
+(include STRING)
+#+END_SRC
+**** Semantics
+#+BEGIN_SRC neut
+{CODE_1}
+
+(include STRING)
+
+{CODE_2}
+
+~>
+
+{CODE_1}
+
+{THE_CONTENT_OF_THE_FILE_SPECIFIED_BY_THE_STRING}
+
+{CODE_2}
+#+END_SRC
+With the following notes:
+
+(1) If the first character of the path is dot ("."), the path is interpreted as a relative one. That is, the path is calculated using the current file's directory as the base path. Otherwise, the base path is set to be the library path (i.e. =~/.local/share/neut/NEUT_VERSION/library=).
+
+(2) If the file is already included, =include= does nothing.
+
+(3) When including a file, [[#useunuse][the prefix environment]] must be empty.
+
+(4) Cyclic inclusion is invalid.
+
+
+
+
+*** introspect
+=introspect= introspects the state of the compiler and selects statements by those information.
+**** Example
+#+BEGIN_SRC neut
+(introspect OS
+  (linux
+    (include library "constant/linux.neut"))
+  (darwin
+    (include library "constant/darwin.neut")))
+#+END_SRC
+**** Syntax
+#+BEGIN_SRC neut
+(introspect LEAF (LEAF TREE ... TREE) ... (LEAF TREE ... TREE))
+#+END_SRC
+**** Semantics
+#+BEGIN_SRC text
+(introspect VAR
+  (VAR-1 stmt-1-1 ... stmt-1-n{1})
+  ...
+  (VAR-m stmt-m-1 ... stmt-m-n{m}))
+
+~>
+
+(stmt-i-1)
+...
+(stmt-i-n)
+
+[where VAR == VAR-i]
+#+END_SRC
+If the corresponding value is not found in the clause list, this statement does nothing.
+
+The =var= in =(introspect var (...))= must be a valid compile-time variable. The valid compile-time variables and its possible values are currently as in the table below:
+
+| compile-time variable | possible values         |
+|-----------------------+-------------------------|
+| OS                    | linux, darwin           |
+| architecture          | x86_64, aarch64, (etc.) |
+
+*** section/end
+TBD
+
+*** statement
+TBD
+
+*** use/unuse
+TBD
+
+
+** Terms
+*** variable
+
+*** implication
+
+*** if
+
+*** constant
+
+*** integer
+
+*** leaf/node
+
+* Syntax and Semantics of the Object Language
+
+** Statements
 (fixme: the content below is out-of-date)
 
 A program of neut is a list of statements. Each statement is one of the following statements described in this section.
@@ -585,56 +759,10 @@ I also define the symbol =STRING= to be a double-quoted string.
 
 Note that the examples codes below usually assumes that the core library is already included.
 
-# ** constant
-# =constant= declares an external constant.
 
-# *** Example
-# #+BEGIN_SRC neut
-# (constant unsafe.cast
-#   (Π ((A tau)
-#       (B tau)
-#       (x A))
-#      B))
-
-# (let foo (unsafe.cast i64 string 1)) ; foo : string
-# #+END_SRC
-# *** Syntax
-# #+BEGIN_SRC neut
-# (constant LEAF TREE)
-# #+END_SRC
-# *** Semantics
-# =(constant x t)= modifies the state of the compiler so that the [[#constant][constant]] =x= of type =t= is available in the succeeding code. Declared constants can then be available for use in the same way as ordinary [[#upsilon][variables]].
-
-# All the constants must have distinct names.
-
-# This statement is currently intended only for internal use (e.g. implementation of a syscall). FFI might also be supported in future release via this statement.
-
-** ensure
-=ensure= fetches the content of the specified URL for later use.
-
-*** Example
-#+BEGIN_SRC neut
-(ensure core/0.1.0.0
-  "https://github.com/u2zv1wx/neut-core/raw/master/release/0.1.0.0.tar.gz")
-
-(include "core/0.1.0.0/core.neut")
-#+END_SRC
-*** Syntax
-#+BEGIN_SRC neut
-(ensure LEAF STRING)
-#+END_SRC
-*** Semantics
-=(ensure path URL)= fetches the content of the specified URL, extracts the content into =~/.local/share/neut/NEUT_VERSION/path=, assuming that the format of the archive is =tar.gz=. The =path= must be a valid path string. Every path separator in =path= is treated "literally". For example, if the =path= is =some-library/0.2.0.0=, the content of the archive is extracted into =~/.local/share/neut/NEUT_VERSION/some-library/0.2.0.0=.
-
-If the target directory of archive extraction already exists, =ensure= does nothing.
-
-This statement is intended to be used in harmony with [[#include][include]].
-
-Archives specified in =ensure= is expected to be the ones created via [[#archive][archive]].
-
-** enum
+*** enum
 =enum= declares a new enum-type and its values.
-*** Example
+**** Example
 #+BEGIN_SRC neut
 (enum choice left right) ; defines choice : tau, choice.left : choice, and choice.right : choice
 
@@ -666,13 +794,13 @@ Archives specified in =ensure= is expected to be the ones created via [[#archive
 (i64.print (unsafe.cast foo i64 foo.e)) ; ~> 22
 (i64.print (unsafe.cast foo i64 foo.f)) ; ~> 103
 #+END_SRC
-*** Syntax
+**** Syntax
 #+BEGIN_SRC neut
 (enum LEAF LEAF_INT ... LEAF_INT)
 
 LEAF_INT := LEAF | (LEAF INT)
 #+END_SRC
-*** Semantics
+**** Semantics
 =(enum x a1 ... an)= updates the state of the compiler so that the specified enum-type =x : tau= and the enum-values =x.a1, ..., x.an : x= can be used in its continuation.
 
 Every enum-value has its internal i64 value (discriminant). Those discriminant values can be extracted by using the constant =unsafe.cast=, though usually not recommended.
@@ -681,301 +809,76 @@ Discriminant value starts from =0= by default, and increments one by one. The "c
 
 All the discriminant values of an enum-type must be distinct.
 
-** include
-=include= "pastes" the content of the specified file.
-# temporary transfers the parsing process to the file specified by given path, if necessary.
-*** Example
-#+BEGIN_SRC neut
-(include "core/0.1.0.0/free.neut")
 
-(include "./relative/path/from/the/dir/path/of/this/file.neut")
-#+END_SRC
-*** Syntax
-#+BEGIN_SRC neut
-(include STRING)
-#+END_SRC
-*** Semantics
-#+BEGIN_SRC neut
-{CODE_1}
+*** define
+# =define= evaluates given term and binds the result to the specified variable.
+TBD
 
-(include STRING)
-
-{CODE_2}
-
-~>
-
-{CODE_1}
-
-{THE_CONTENT_OF_THE_FILE_SPECIFIED_BY_THE_STRING}
-
-{CODE_2}
-#+END_SRC
-With the following notes:
-
-(1) If the first character of the path is dot ("."), the path is interpreted as a relative one. That is, the path is calculated using the current file's directory as the base path. Otherwise, the base path is set to be the library path (i.e. =~/.local/share/neut/NEUT_VERSION/library=).
-
-(2) If the file is already included, =include= does nothing.
-
-(3) When including a file, [[#useunuse][the prefix environment]] must be empty.
-
-(4) Cyclic inclusion is invalid.
-
-# ** inductive
-# =inductive= defines an inductive type, its introduction rules (constructors), and its pattern match function.
 # *** Example
 # #+BEGIN_SRC neut
-# (inductive list ((a tau))
-#   (nil ()
-#     (list a))
-#   (cons ((_ a) (_ (list a)))
-#     (list a)))
+# (let foo (i64 10)) ; define a variable `foo` to be `10`
 
-# (define length
-#   ((a tau)
-#    (xs (list a)))
-#   (list.case i64 a xs
-#     (λ ()
-#       0)
-#     (λ (_ ys)
-#       (add-i64 1 (length a ys)))))
+# (i64.print foo) ; ~> 10 (this is equivalent to `(let _ (i64.print foo))`)
 
-# (let xs (list.cons * 10 (list.cons * 20 (list.nil i64))))
+# (let (bar i64) 20) ; `let` with type annotation
 
-# (i64.print (length xs)) ; ~> 2
+# (i64.print bar) ; ~> 20
 
-# ; mutually inductive types
-# (inductive
-#   (even ((_ (nat)))
-#     (zero-is-even
-#       ()
-#       (even (nat.zero)))
-#     (succ-of-odd-is-even
-#       ((n (nat))
-#        (_ (odd n)))
-#       (even (nat.succ n))))
-#   (odd ((_ (nat)))
-#     (succ-of-even-is-odd
-#       ((n (nat))
-#        (_ (even n)))
-#       (odd (nat.succ n)))))
+# ; `define` is defined in `core/<VERSION>/notation.neut` as follows:
+# ; (notation (define f xts e)
+# ;   (let f (fix f xts e)))
+# ;
+# ; (notation (define f e)
+# ;   (let f e))
+# ;
+
+# ; ordinary definition (i.e. 1-mutual definition)
+# (define fact ((x i64))
+#   (if (icmp-sle-i64 x 0) ; compare (by less-than-or-equal) two `i64`s as signed integers
+#     1
+#     (mul-i64 x (fact (sub-i64 x 1)))))
+
+# (i64.print (fact foo)) ; ~> 3628800 (= 10!)
+
+# ; mutual recursion can be realized as in the ordinary way:
+# (define even-f ((f (hom i64 bool)) (n i64))
+#   (if (icmp-eq-i64 n 0)
+#     true
+#     (f (sub-i64 n 1))))
+
+# (define odd ((n i64))
+#   (if (icmp-eq-i64 n 0)
+#     false
+#     (even-f odd (sub-i64 n 1))))
+
+# (define even ((n i64))
+#   (even-f odd n))
+
+# (i64.print
+#   (if (even 10)
+#     100
+#     1000)) ; ~> 100
 # #+END_SRC
 # *** Syntax
 # #+BEGIN_SRC neut
-# (inductive LEAF ((LEAF TREE) ... (LEAF TREE))
-#   (LEAF ((LEAF TREE) ... (LEAF TREE))
-#     TREE)
-#   ...
-#   (LEAF ((LEAF TREE) ... (LEAF TREE))
-#     TREE))
+# (let LEAF_PLUS TREE)
 
-# ; n-mutual inductive type
-# (inductive
-#   (LEAF ((LEAF TREE) ... (LEAF TREE))
-#     (LEAF ((LEAF TREE) ... (LEAF TREE))
-#       TREE)
-#     ...
-#     (LEAF ((LEAF TREE) ... (LEAF TREE))
-#       TREE))
-#   ...
-#   (LEAF ((LEAF TREE) ... (LEAF TREE))
-#     (LEAF ((LEAF TREE) ... (LEAF TREE))
-#       TREE)
-#     ...
-#     (LEAF ((LEAF TREE) ... (LEAF TREE))
-#       TREE)))
+# LEAF_PLUS ::= LEAF | (LEAF TREE)
 # #+END_SRC
 # *** Semantics
-# When parsed, the =inductive= statement is translated into the =let= statements that defines (1) the inductive type, (2) the introduction rules (or the constructors of the inductive type), and (3) the pattern match function. For example, consider the following =inductive= statement:
-# #+BEGIN_SRC neut
-# (inductive list ((a tau))
-#   (nil ()
-#     (list a))
-#   (cons ((_ a) (_ (list a)))
-#     (list a)))
-# #+END_SRC
-# Given this statement, the compiler generates the =let= statements that define the followings:
-# 1. The inductive type =list : Pi (a : tau). tau=
-# 2. The introduction rules (constructors) of the type:
-#    - =list.nil : Pi (a : tau). list a=
-#    - =list.cons : Pi (a : tau, _ : a, _ : list a). list a=
-# 3. The pattern matching function of the type:
-#    - =list.case : Π (z : tau, a : tau, _ : list a, on-nil : Π (). z, on-cons : Π (_ : a, _ : list a). z). z=
-# The structure of a pattern matching function is: =Π (RESULT_TYPE : tau, {ARGUMENTS_OF_THE_INDUCTIVE_TYPE}, {THE_TERM_BEING_MATCHED}, {LIST_OF_CLAUSES}). RESULT_TYPE=.
+# =(let x e)= checks the type of the term =e=, evaluates the term =e=, then defines a variable =x= with =e= as its content. =x= is available in the continuation. The type of =x= can be annotated to be =t= by writing =(let (x t) e)=.
 
-# The codomain of each constructor must be of the form =(a e1 ... en)=, where the =a= is the inductive type being defined. For example,
-# #+BEGIN_SRC neut
-# (inductive foo ((x bool))
-#   (bar () i64))
-# #+END_SRC
-# is an invalid =inductive= statement, since the codomain of =bar= is not of the form =(foo _)=, but =i64=.
+# If a user input =e= is not parsed as a statement when it is supposed to be, the compiler interprets it as =(let _ e)=.
 
-** introspect
-=introspect= introspects the state of the compiler and selects statements by those information.
-*** Example
-#+BEGIN_SRC neut
-(introspect OS
-  (linux
-    (include library "constant/linux.neut"))
-  (darwin
-    (include library "constant/darwin.neut")))
-#+END_SRC
-*** Syntax
-#+BEGIN_SRC neut
-(introspect LEAF (LEAF TREE ... TREE) ... (LEAF TREE ... TREE))
-#+END_SRC
-*** Semantics
-#+BEGIN_SRC text
-(introspect VAR
-  (VAR-1 stmt-1-1 ... stmt-1-n{1})
-  ...
-  (VAR-m stmt-m-1 ... stmt-m-n{m}))
+*** define-prefix, remove-prefix
+TBD
 
-~>
+*** reduce
+TBD
 
-(stmt-i-1)
-...
-(stmt-i-n)
-
-[where VAR == VAR-i]
-#+END_SRC
-If the corresponding value is not found in the clause list, this statement does nothing.
-
-The =var= in =(introspect var (...))= must be a valid compile-time variable. The valid compile-time variables and its possible values are currently as in the table below:
-
-| compile-time variable | possible values |
-|-----------------------+-----------------|
-| OS                    | linux, darwin   |
-| architecture          | x64             |
-
-** let
-=let= evaluates given term and binds the result to the specified variable.
-
-*** Example
-#+BEGIN_SRC neut
-(let foo (i64 10)) ; define a variable `foo` to be `10`
-
-(i64.print foo) ; ~> 10 (this is equivalent to `(let _ (i64.print foo))`)
-
-(let (bar i64) 20) ; `let` with type annotation
-
-(i64.print bar) ; ~> 20
-
-; `define` is defined in `core/<VERSION>/notation.neut` as follows:
-; (notation (define f xts e)
-;   (let f (fix f xts e)))
-;
-; (notation (define f e)
-;   (let f e))
-;
-
-; ordinary definition (i.e. 1-mutual definition)
-(define fact ((x i64))
-  (if (icmp-sle-i64 x 0) ; compare (by less-than-or-equal) two `i64`s as signed integers
-    1
-    (mul-i64 x (fact (sub-i64 x 1)))))
-
-(i64.print (fact foo)) ; ~> 3628800 (= 10!)
-
-; mutual recursion can be realized as in the ordinary way:
-(define even-f ((f (hom i64 bool)) (n i64))
-  (if (icmp-eq-i64 n 0)
-    true
-    (f (sub-i64 n 1))))
-
-(define odd ((n i64))
-  (if (icmp-eq-i64 n 0)
-    false
-    (even-f odd (sub-i64 n 1))))
-
-(define even ((n i64))
-  (even-f odd n))
-
-(i64.print
-  (if (even 10)
-    100
-    1000)) ; ~> 100
-#+END_SRC
-*** Syntax
-#+BEGIN_SRC neut
-(let LEAF_PLUS TREE)
-
-LEAF_PLUS ::= LEAF | (LEAF TREE)
-#+END_SRC
-*** Semantics
-=(let x e)= checks the type of the term =e=, evaluates the term =e=, then defines a variable =x= with =e= as its content. =x= is available in the continuation. The type of =x= can be annotated to be =t= by writing =(let (x t) e)=.
-
-If a user input =e= is not parsed as a statement when it is supposed to be, the compiler interprets it as =(let _ e)=.
-
-# ** record
-# The =record= statement creates a record type, its elimination rules (destructors), and its introduction rule.
-# *** Example
-# #+BEGIN_SRC neut
-# (record my-record ((a tau))
-#   (item-1
-#     a)
-#   (item-2
-#     i64)
-#   (item-3
-#     top))
-
-# (let item
-#   (my-record.new
-#     i64
-#     10
-#     20
-#     top.unit))
-
-# (i64.print (my-record.item-1 i64 item)) ; ~> 10
-
-# (i64.print (my-record.item-2 i64 item)) ; ~> 20
-# #+END_SRC
-# *** Syntax
-# #+BEGIN_SRC neut
-# (record LEAF ((LEAF TREE) ... (LEAF TREE))
-#   (LEAF TREE)
-#   ...
-#   (LEAF TREE))
-# #+END_SRC
-# *** Semantics
-# When parsed, the =record= statement is translated into =let= statements that defines (1) the record type, (2) the elimination rules (or the destructors of the record type), and (3) the introduction rule. For example, consider the following =record= statement:
-# #+BEGIN_SRC neut
-# (record my-record ((a tau))
-#   (item-1
-#     a)
-#   (item-2
-#     i64)
-#   (item-3
-#     top))
-# #+END_SRC
-# Given this statement, the compiler generates [[#definelet][let]] statements that define the followings:
-# 1. The record type =my-record : Pi (a : tau). tau=
-# 2. The elimination rules (destructors) of the type:
-#    - =my-record.item-1 : Pi (a : tau, _ : my-record a). a=
-#    - =my-record.item-2 : Pi (a : tau, _ : my-record a). i64=
-#    - =my-record.item-3 : Pi (a : tau, _ : my-record a). top=
-# 3. The introduction rule of the type:
-#    - =my-record.new : Π (a : tau, item-1 : a, item-2 : i64, item-3 : top). my-record a=
-
-# Internally, every record statement is translated into the corresponding [[#inductive][inductive]] statement. For example, given the =record= statement above, the compiler translates it into the following =inductive= statement:
-# #+BEGIN_SRC neut
-# (inductive my-record ((a tau))
-#   (new
-#     ((item-1 a)
-#      (item-2 i64)
-#      (item-3 top))
-#     (my-record a)))
-# #+END_SRC
-# The compiler then processes this statement in the same way ordinary =inductive= statement, generating the record type =my-record= and the introduction rule =my-record.new=, and the pattern matching function =my-record.case=. After that, the compiler automatically generates destructors from this definition via =my-record.case=. For example, the generated definition of =my-record.item-1= is as follows:
-# #+BEGIN_SRC neut
-# (define my-record.item-1 ((a tau) (record-value (my-record a)))
-#   (my-record.case a record-value
-#     (λ (item-1 item-2 item-3) item-1)))
-# #+END_SRC
-# The other destructors are defined similarly.
-
-** use/unuse
+*** use/unuse
 =use= inserts a prefix to the prefix environment. =unuse= removes a prefix from the prefix environment.
-*** Example
+**** Example
 #+BEGIN_SRC neut
 (let foo.bar.buz (i64 10))
 
@@ -1001,23 +904,23 @@ If a user input =e= is not parsed as a statement when it is supposed to be, the 
 (i64.print bar.buz)     ; ~> undefined variable: `bar.buz`
 (i64.print foo.bar.buz) ; ~> 10
 #+END_SRC
-*** Syntax
+**** Syntax
 #+BEGIN_SRC neut
 (use LEAF)
 
 (unuse LEAF)
 #+END_SRC
-*** Semantics
+**** Semantics
 When parsed, the statement =(use PREFIX)= inserts =PREFIX= at the head of the prefix environment, which is a list of prefixes.
 
 When parsed, the statement =(unuse PREFIX)= removes =PREFIX= from the prefix environment. If the =PREFIX= is not contained in the environment, the =unuse= statement does nothing.
 
 The prefix environment modifies [[#upsilon][how the compiler interprets a variable]].
 
-** section/end
+*** section/end
 =section= - =end= automatically adds the specified prefix to the variables defined by =let=.
 
-*** Example
+**** Example
 #+BEGIN_SRC neut
 (section pohe)
 
@@ -1052,13 +955,13 @@ The prefix environment modifies [[#upsilon][how the compiler interprets a variab
 (i64.print qux.bar)      ; ~> undefined variable
 (i64.print pohe.qux.bar) ; ~> 20
 #+END_SRC
-*** Syntax
+**** Syntax
 #+BEGIN_SRC neut
 (section LEAF)
 
 (end LEAF)
 #+END_SRC
-*** Semantics
+**** Semantics
 The list of statement
 #+BEGIN_SRC neut
 (section FOO)
@@ -1082,20 +985,20 @@ In other words, the =section= - =end= statement
 
 Each =section= must be paired with an =end= with the corresponding name.
 
-* Syntax and Semantics of Terms
-** tau
+** Terms
+*** tau
 =tau= is the type of types.
-*** Example
+**** Example
 #+BEGIN_SRC neut
 (define id ((a tau) (x a)) x)
 
 (id i64 10)
 #+END_SRC
-*** Syntax
+**** Syntax
 #+BEGIN_SRC neut
 tau
 #+END_SRC
-*** Inference Rule
+**** Inference Rule
 #+BEGIN_SRC text
 
 -------------------(empty)
@@ -1106,11 +1009,11 @@ well-formed(Γ)
 --------------- (tau)
 Γ |- tau : tau
 #+END_SRC
-*** Semantics
+**** Semantics
 =tau= doesn't have any operational semantics.
 
-** variable
-*** Example
+*** variable
+**** Example
 #+BEGIN_SRC neut
 (let x (i64 10))
 
@@ -1118,11 +1021,11 @@ well-formed(Γ)
 
 (let _ (i64 20)) ; anonymous variable
 #+END_SRC
-*** Syntax
+**** Syntax
 #+BEGIN_SRC neut
 LEAF
 #+END_SRC
-*** Inference Rule
+**** Inference Rule
 #+BEGIN_SRC text
     Γ |- A : tau
 ------------------------- (ext)
@@ -1133,10 +1036,10 @@ well-formed(Γ)  (x : A) ∈ Γ
 ---------------------------- (var)
        Γ |- x : A
 #+END_SRC
-*** Semantics
+**** Semantics
 A variable doesn't have any operational semantics by itself.
 
-*** Notes
+**** Notes
 If a leaf is not parsed into any other syntactic construct, the leaf =x= is regarded as a variable.
 
 The name of a variable is interpreted in relation with the keyword environment. For example, if the keyword environment is =["foo", "bar", "buz"]=, the name =qux= is interpreted in the following way:
@@ -1146,9 +1049,9 @@ The name of a variable is interpreted in relation with the keyword environment. 
 4. If not found, look up a bound variable named =buz.qux= in current scope.
 5. If not found, report the error: "undefined variable".
 
-** Π
+*** Π
 =Π= is the universal quantification.
-*** Example
+**** Example
 #+BEGIN_SRC neut
 ; unary Π-introduction
 (let f2
@@ -1172,7 +1075,7 @@ The name of a variable is interpreted in relation with the keyword environment. 
 
 (i64.print (f3 1 2))
 #+END_SRC
-*** Syntax
+**** Syntax
 #+BEGIN_SRC neut
 (Π (LEAF_PLUS*) B)
 (Π-introduction (LEAF_PLUS*) e)
@@ -1181,7 +1084,7 @@ The name of a variable is interpreted in relation with the keyword environment. 
 
 LEAF_PLUS ::= LEAF | (LEAF TREE)
 #+END_SRC
-*** Inference Rule
+**** Inference Rule
 #+BEGIN_SRC text
 Γ |- A1 : tau    Γ, x1 : A1 |- A2 : tau    (...)    Γ, x1 : A1, ..., xn : An |- B : tau
 ---------------------------------------------------------------------------------------- (Π)
@@ -1197,7 +1100,7 @@ LEAF_PLUS ::= LEAF | (LEAF TREE)
 -------------------------------------------------------------------------------------- (Π-elimination)
               Γ |- (Π-elimination e e1 ... en) : B {xi := ei}
 #+END_SRC
-*** Semantics
+**** Semantics
 #+BEGIN_SRC neut
 (Π-elimination e e1 ... en)
 ~> (Π-elimination v v1 ... vn)  [i.e. reduce e and ei into the values v and vi, from left to right]
@@ -1205,7 +1108,7 @@ LEAF_PLUS ::= LEAF | (LEAF TREE)
 (Π-elimination (Π-introduction ((x1 A1) ... (xn An)) e) v1 ... vn)
 ~> e {x1 := v1, ..., xn := vn}
 #+END_SRC
-*** Notes
+**** Notes
 If a tree =(e e1 ... en)= is not parsed into any other terms, the tree is regarded as =(Π-elimination e e1 ... en)=.
 
 If the name of an argument of a Π-introduction is "_", the compiler automatically generates a fresh name so that the variable cannot be used in its scope.
@@ -1242,9 +1145,9 @@ is preferred to:
     (mul-i64 x (fact (sub-i64 x 1)))))
 #+END_SRC
 
-** fix
+*** fix
 =fix= is for recursion.
-*** Example
+**** Example
 #+BEGIN_SRC neut
 (let fact
   (fix self ((x i64))
@@ -1252,19 +1155,19 @@ is preferred to:
       1
       (mul-i64 x (self (sub-i64 x 1))))))
 #+END_SRC
-*** Syntax
+**** Syntax
 #+BEGIN_SRC neut
 (fix LEAF_PLUS (LEAF_PLUS ... LEAF_PLUS) TREE)
 
 LEAF_PLUS ::= LEAF | (LEAF TREE)
 #+END_SRC
-*** Inference Rule
+**** Inference Rule
 #+BEGIN_SRC text
 Γ, f : (Π ((x1 A1) ... (xn An)) B), x1 : A1, ..., xn : An |- e : B
 -------------------------------------------------------------------- (fix)
 Γ |- (fix f ((x1 A1) ... (xn An)) e) : (Π ((x1 A1) ... (xn An)) B)
 #+END_SRC
-*** Semantics
+**** Semantics
 #+BEGIN_SRC neut
 (Π-elimination (fix self ((x1 A1) ... (xn An)) e) v1 ... vn)
 ~> e {x1 := v1,
@@ -1272,46 +1175,46 @@ LEAF_PLUS ::= LEAF | (LEAF TREE)
       xn := vn,
       self := (fix self ((x1 A1) ... (xn An)) e)}
 #+END_SRC
-*** Notes
+**** Notes
 Every tail call is optimized into a loop.
 
 The logic of neut doesn't adopt the universe hierarchy, and thus inconsistent. This means that the Z combinator can be written in the source language as an ordinary term. In other words, from the viewpoint of expressive power, =fix= is simply redundant. The existence of =fix= is just for optimization purpose.
 
 # (By the way, can it be said that the weakly-normalizing fragment of CoC-without-universe-hierarchy (CoC-) is consistent? If it is true, it seems to me that we can prove a theorem by taking a proof term of CoC- and check if it halts by trying to reduce the term into its normal form; Or just a delusion?)
 
-** constant
+*** constant
 =constant= is for external constants.
-*** Example
+**** Example
 #+BEGIN_SRC neut
 ((constant add-i64) 1 3) ; ~> 4
 (add-i64 1 3)            ; ~> 4
 #+END_SRC
-*** Syntax
+**** Syntax
 #+BEGIN_SRC neut
 (constant LEAF)
 LEAF
 #+END_SRC
-*** Inference Rule
+**** Inference Rule
 #+BEGIN_SRC text
 Γ |- A : tau          {`c` is declared to be a constant of type `A`}
 --------------------------------------------------------------------- (constant)
          Γ |- (constant c) : A
 #+END_SRC
-*** Semantics
+**** Semantics
 The =constant= rule doesn't have any operational semantics by itself; Each constant has its own dedicated semantics.
-*** Notes
+**** Notes
 If a leaf is declared to be a constant using the [[#constant][constant]] statement beforehand, the leaf is interpreted as =(constant LEAF)=.
 
-** int
+*** int
 =i{n}= is the integer type in LLVM.
-*** Example
+**** Example
 #+BEGIN_SRC neut
 (add-i64 (i64 1) 2)
 (i32 10)
 23456789
 (mul-i2 (i2 100) 3)
 #+END_SRC
-*** Syntax
+**** Syntax
 #+BEGIN_SRC neut
 ; the integer type i{n}
 i{n} [where n is one of 1, 2, ..., 64]
@@ -1322,31 +1225,31 @@ i{n} [where n is one of 1, 2, ..., 64]
 ; an integer without explicit type info
 LEAF [where this LEAF can be parsed as integer]
 #+END_SRC
-*** Inference Rule
+**** Inference Rule
 #+BEGIN_SRC text
 well-formed(Γ)     {`l` is an integer}     {i{n} is a valid integer type}
 --------------------------------------------------------------------------- (integer)
                   Γ |- (i{n} l) : i{n}
 #+END_SRC
-*** Semantics
+**** Semantics
 The terms of an integer type don't have any operational semantics by themselves.
-*** Notes
+**** Notes
 The =int= type in neut is the same as the one of LLVM, restricted into =i1=, =i2=, ..., =i64=.
 
 Every integer of type =i{n}= is interpreted modulo =2^n=, just as in the same way of LLVM. For example, =(i2 10)= is the same as =(i2 6)=, =(i2 2)=, =(i2 -2)=, or =(i2 -6)=, since all of these are equivalent modulo =2^2=.
 
 An integer without explicit type information is overloaded; it's type is firstly set to be unknown, and then inferred.
 
-** float
+*** float
 =f{n}= is the float type in LLVM.
-*** Example
+**** Example
 #+BEGIN_SRC neut
 (f16 3.8)
 (f32 9.22888)
 (f64 1.23456789)
 (fadd-f64 1.23456 (f64 7.89))
 #+END_SRC
-*** Syntax
+**** Syntax
 #+BEGIN_SRC neut
 ; the float type f{n}
 f{n}   [where n is one of 16, 32, 64]
@@ -1356,24 +1259,24 @@ f{n}   [where n is one of 16, 32, 64]
 
 LEAF [where this LEAF can be parsed as float]
 #+END_SRC
-*** Inference Rule
+**** Inference Rule
 #+BEGIN_SRC text
 well-formed(Γ)     {`l` is a float}      {f{n} is a valid float type}
 ------------------------------------------------------------------------ (float)
                   Γ |- l : f{n}
 #+END_SRC
-*** Semantics
+**** Semantics
 The terms of a float type don't have any operational semantics by themselves.
-*** Notes
+**** Notes
 The =float= type in neut is the same as the one of LLVM. Specifically, LLVM's =half= corresponds to neut's =f16=, =float= to =f32=, and =double= to =f64=.
 
 An float without explicit type information is overloaded; it's type is firstly set to be unknown, and then inferred.
 
-** enum
+*** enum
 =enum= is the enumeration type.
-*** Example
+**** Example
 See the example in [[#enum][the section about the enum statement]].
-*** Syntax
+**** Syntax
 #+BEGIN_SRC neut
 (enum LEAF)
 
@@ -1387,7 +1290,7 @@ LEAF
 
 ENUM_CASE ::= LEAF | default
 #+END_SRC
-*** Inference Rule
+**** Inference Rule
 #+BEGIN_SRC text
 well-formed(Γ)  {`E` is declared to be an enum type}
 ----------------------------------------------------- (enum)
@@ -1403,7 +1306,7 @@ well-formed(Γ)   {`l` is a value of enum-type `(enum E)`}
 ---------------------------------------------------------------------- (enum-elimination)
        Γ |- (enum-elimination e (l1 e1) ... (ln en)) : A
 #+END_SRC
-*** Semantics
+**** Semantics
 #+BEGIN_SRC neut
 (enum-elimination (enum-introduction c)
   (c1 e1)
@@ -1420,7 +1323,7 @@ well-formed(Γ)   {`l` is a value of enum-type `(enum E)`}
 ~> e [where e != e1, ..., en]
 #+END_SRC
 
-*** Notes
+**** Notes
 The cases of an enum-elimination must be exhaustive.
 
 # ** array
@@ -1556,38 +1459,300 @@ The cases of an enum-elimination must be exhaustive.
 
 # The struct type is intended to be used for implementation of interfaces of syscalls.
 
-** question
+*** question
 =question= requests the compiler to show the type of a term.
-*** Example
+**** Example
 #+BEGIN_SRC neut
 (let x top.unit)
 
 (question x)
 #+END_SRC
-*** Syntax
+**** Syntax
 #+BEGIN_SRC neut
 (question TREE)
 
 ?TREE
 #+END_SRC
-*** Inference Rule
+**** Inference Rule
 #+BEGIN_SRC text
      Γ |- e : A
 ----------------------- (question)
 Γ |- (question e) : A
 #+END_SRC
-*** Semantics
+**** Semantics
 #+BEGIN_SRC neut
 (question e)
 ~> e
 #+END_SRC
-*** Notes
+**** Notes
 The type of a term wrapped by =question= is reported by the compiler. This might be useful when used in harmony with a linter like flycheck.
 
-* Auxiliary Syntax
-** asterisk
+*** derangement
+TBD
+# ** LLVM-Based Primitives
+# neut currently supports the following LLVM instructions: =fneg, add, fadd, sub, fsub, mul, fmul, udiv, sdiv, fdiv, urem, srem, frem, shl, lshr, ashr, and, or, xor, trunc, zext, sext, fptrunc, fpext, fptoui, fptosi, uitofp, sitofp, icmp, fcmp=.
+
+# Each instruction is "separated" according to its type. Let us take the instruction =fneg= for example. This instruction can be applied to =half=, =float=, and =double= in LLVM. Thus, neut has the following three constants as primitives: =fneg-f16, fneg-f32, fneg-f64=. For the instruction =add=, the constants =add-i1, add-i2, ..., add-i64= is available.
+
+# The instructions with two type arguments like =fptosi= is named as =fptosi-f64-i32, fptosi-f32-i1, fptosi-f16-i5=, etc.
+
+# As for the comparison operators =icmp= and =fcmp=, the names are of the form ={icmp, fcmp}-{CONDITION}-{TYPE}=. For example, =icmp-eq-i16, icmp-ult-i32, icmp-sge-i64, fcmp-ogt-f32, fcmp-ord-f16, fcmp-ueq-f64= are all valid.
+
+# The semantics of these instructions is as specified in the [[https://llvm.org/docs/LangRef.html][LLVM Language Reference Manual]].
+
+# ** Syscalls
+# neut supports syscalls, although its current support is far from complete. As you can see in =core/VERSION/constant/{linux, darwin}.neut=, only basic syscalls like =read, write, exit, open, close= are supported. This is not something that is caused by theoretical difficulties; Rather, this is simply because of my limited resource of time.
+
+# It would be worth noting that a syscall can't produce/consume a resource. For example, the syscall =write= is declared to have the following type in neut:
+# #+BEGIN_SRC neut
+# (constant os.write
+#   (Π
+#     ((len i64)
+#      (out file-descriptor)
+#      (buf (array len i8))
+#      (nbyte i64))
+#     (product (array len i8) i64)))
+# #+END_SRC
+# Compare the type above with the C signature of =write=:
+# #+BEGIN_SRC c
+# ssize_t write(int fildes, const void *buf, size_t nbyte);
+# #+END_SRC
+# Ignoring the =(len i64)= part that is necessary to receive an array of arbitrary length, the crucial difference here is the types of the codomains. While the latter one returns ordinary =ssize_t= (integer), the former one also returns the original array. This is because the syscall =write= doesn't consume (i.e. deallocate) given string. If =write= in neut didn't return the original string, the string would be never freed in the succeeding program, causing space leak.
+
+# Regarding macOS: You may note that the "syscalls" are lowered to some external interface functions on macOS. This is because macOS doesn't support a direct use of a syscall; Indeed, for example, if we were to use the syscall =fork= directly (0x2000002), a succeeding =malloc= causes a fatal error, saying something like =mach_vm_map(size=1048576) failed (error code=268435459)=.
+
+# Implementation note: A syscall can be added via the following procedure:
+# 1. Declare corresponding constant (like =os.write=) using the [[#constant][constant]] statement
+# 2. Register its argument information and the syscall number in =src/Data/Syscall.hs=
+# 3. Rebuild the compiler and run some test codes to check if it really works
+# Here, the "argument information" is a list consists of one of the following tags: "immediate", "struct", "array", and "unused". This information is necessary to generate a corresponding syscall without writing each function definition explicitly. For example, consider you add a syscall =foo= with its argument information ["unused", "immediate", "struct", "array"]. This creates a function with 4 arguments. Let us call these arguments =x1=, =x2=, =x3=, and =x4=. The compiler then generates a function that calls the syscall, assuming that the "struct"- and "array"-tagged arguments are borrowed one. That is, the compiler generates a function that is defined schematically as follows:
+# #+BEGIN_SRC haskell
+# syscall-foo x1 x2 x3 x4 :=
+#   let result := CALL_SYSCALL(foo, x2, x3, x4) in
+#   return (x2, x3, result)
+# #+END_SRC
+# Using this mechanism, for example, the actual implementation of the syscall =os.write= above can be generated from ["unused", "immediate", "array", "immediate"]:
+# #+BEGIN_SRC haskell
+# syscall-os.write A out buf nbyte :=
+#   let result := CALL_SYSCALL(write, out, buf, nbyte) in
+#   return (buf, result)
+# #+END_SRC
+
+# ** Array Indexing
+# neut offers a family of constants that allows us to access an element of an array. The names of these constants are of the form ={LOWTYPE}.array-access=, where the ={LOWTYPE}= is either =i{n}= or =f{n}=. For example, =i8.array-access= can be used for indexing of an array of type =(array N i8)=.
+
+# The types of these accesser are of the following form:
+# #+BEGIN_SRC neut
+# (Π
+#   ((i i64)
+#    (n i64)
+#    (_ (array n LOWTYPE)))
+#   (product (array n LOWTYPE) LOWTYPE))
+# #+END_SRC
+# where the first argument =i= specifies the index of the array, and the second argument =n= specifies the length of the array. Using this constant, one can use an element of an array without consuming the array as follows:
+# #+BEGIN_SRC neut
+# (let xs
+#   (array-introduction i64 1 2 -30 20))
+
+# (with identity.bind
+#   (let a (i64.array-access 0 * &xs)) ; the `*` is inferred to be `4`, since the length of `xs` is 4
+#   (let b (i64.array-access 1 * &xs))
+#   (let c (i64.array-access 2 * &xs))
+#   (let d (i64.array-access 3 * &xs))
+#   (i64.add a (i64.add b (i64.add c d)))) ; 1 + 2 + (-30) + 20
+# #+END_SRC
+
+# ** Unsafe Cast
+# The constant =unsafe.cast : Pi (A : tau, B : tau, x : A). B= is available (assuming that the constant is declared using the statement [[#constant][constant]]). The semantics of this constant is the no-op cast:
+# #+BEGIN_SRC neut
+# (unsafe.cast t1 t2 e)
+# ~> e
+# #+END_SRC
+
+# You can easily break the resource management system of neut using this constant. Consider the following example:
+# #+BEGIN_SRC neut
+# (ensure core/0.1.0.0
+#   "https://github.com/u2zv1wx/neut-core/raw/master/release/0.1.0.0.tar.gz")
+
+# ; (note that this declares the constant unsafe.cast)
+# (include "core/0.1.0.0/core.neut")
+
+# (let z (unsafe.cast i64 (Π ((_ i64)) i64) 1))
+
+# (let foo z) ; (*1)
+
+# (let bar z) ; (*2)
+# #+END_SRC
+# The code above uses the variable =z= for the two times. Since =z= is casted to a Π-type, The resulting code tries to copy the integer =1= as if it were a closure. Since the internal representation of a closure at least uses 3 words, this causes an access to an invalid memory region, that is, a segmentation fault.
+
+** Auxiliary Statements
+
+*** define-data
+TBD
+# =inductive= defines an inductive type, its introduction rules (constructors), and its pattern match function.
+# *** Example
+# #+BEGIN_SRC neut
+# (inductive list ((a tau))
+#   (nil ()
+#     (list a))
+#   (cons ((_ a) (_ (list a)))
+#     (list a)))
+
+# (define length
+#   ((a tau)
+#    (xs (list a)))
+#   (list.case i64 a xs
+#     (λ ()
+#       0)
+#     (λ (_ ys)
+#       (add-i64 1 (length a ys)))))
+
+# (let xs (list.cons * 10 (list.cons * 20 (list.nil i64))))
+
+# (i64.print (length xs)) ; ~> 2
+
+# ; mutually inductive types
+# (inductive
+#   (even ((_ (nat)))
+#     (zero-is-even
+#       ()
+#       (even (nat.zero)))
+#     (succ-of-odd-is-even
+#       ((n (nat))
+#        (_ (odd n)))
+#       (even (nat.succ n))))
+#   (odd ((_ (nat)))
+#     (succ-of-even-is-odd
+#       ((n (nat))
+#        (_ (even n)))
+#       (odd (nat.succ n)))))
+# #+END_SRC
+# *** Syntax
+# #+BEGIN_SRC neut
+# (inductive LEAF ((LEAF TREE) ... (LEAF TREE))
+#   (LEAF ((LEAF TREE) ... (LEAF TREE))
+#     TREE)
+#   ...
+#   (LEAF ((LEAF TREE) ... (LEAF TREE))
+#     TREE))
+
+# ; n-mutual inductive type
+# (inductive
+#   (LEAF ((LEAF TREE) ... (LEAF TREE))
+#     (LEAF ((LEAF TREE) ... (LEAF TREE))
+#       TREE)
+#     ...
+#     (LEAF ((LEAF TREE) ... (LEAF TREE))
+#       TREE))
+#   ...
+#   (LEAF ((LEAF TREE) ... (LEAF TREE))
+#     (LEAF ((LEAF TREE) ... (LEAF TREE))
+#       TREE)
+#     ...
+#     (LEAF ((LEAF TREE) ... (LEAF TREE))
+#       TREE)))
+# #+END_SRC
+# *** Semantics
+# When parsed, the =inductive= statement is translated into the =let= statements that defines (1) the inductive type, (2) the introduction rules (or the constructors of the inductive type), and (3) the pattern match function. For example, consider the following =inductive= statement:
+# #+BEGIN_SRC neut
+# (inductive list ((a tau))
+#   (nil ()
+#     (list a))
+#   (cons ((_ a) (_ (list a)))
+#     (list a)))
+# #+END_SRC
+# Given this statement, the compiler generates the =let= statements that define the followings:
+# 1. The inductive type =list : Pi (a : tau). tau=
+# 2. The introduction rules (constructors) of the type:
+#    - =list.nil : Pi (a : tau). list a=
+#    - =list.cons : Pi (a : tau, _ : a, _ : list a). list a=
+# 3. The pattern matching function of the type:
+#    - =list.case : Π (z : tau, a : tau, _ : list a, on-nil : Π (). z, on-cons : Π (_ : a, _ : list a). z). z=
+# The structure of a pattern matching function is: =Π (RESULT_TYPE : tau, {ARGUMENTS_OF_THE_INDUCTIVE_TYPE}, {THE_TERM_BEING_MATCHED}, {LIST_OF_CLAUSES}). RESULT_TYPE=.
+
+# The codomain of each constructor must be of the form =(a e1 ... en)=, where the =a= is the inductive type being defined. For example,
+# #+BEGIN_SRC neut
+# (inductive foo ((x bool))
+#   (bar () i64))
+# #+END_SRC
+# is an invalid =inductive= statement, since the codomain of =bar= is not of the form =(foo _)=, but =i64=.
+
+*** define-codata
+TBD
+# The =record= statement creates a record type, its elimination rules (destructors), and its introduction rule.
+# *** Example
+# #+BEGIN_SRC neut
+# (record my-record ((a tau))
+#   (item-1
+#     a)
+#   (item-2
+#     i64)
+#   (item-3
+#     top))
+
+# (let item
+#   (my-record.new
+#     i64
+#     10
+#     20
+#     top.unit))
+
+# (i64.print (my-record.item-1 i64 item)) ; ~> 10
+
+# (i64.print (my-record.item-2 i64 item)) ; ~> 20
+# #+END_SRC
+# *** Syntax
+# #+BEGIN_SRC neut
+# (record LEAF ((LEAF TREE) ... (LEAF TREE))
+#   (LEAF TREE)
+#   ...
+#   (LEAF TREE))
+# #+END_SRC
+# *** Semantics
+# When parsed, the =record= statement is translated into =let= statements that defines (1) the record type, (2) the elimination rules (or the destructors of the record type), and (3) the introduction rule. For example, consider the following =record= statement:
+# #+BEGIN_SRC neut
+# (record my-record ((a tau))
+#   (item-1
+#     a)
+#   (item-2
+#     i64)
+#   (item-3
+#     top))
+# #+END_SRC
+# Given this statement, the compiler generates [[#definelet][let]] statements that define the followings:
+# 1. The record type =my-record : Pi (a : tau). tau=
+# 2. The elimination rules (destructors) of the type:
+#    - =my-record.item-1 : Pi (a : tau, _ : my-record a). a=
+#    - =my-record.item-2 : Pi (a : tau, _ : my-record a). i64=
+#    - =my-record.item-3 : Pi (a : tau, _ : my-record a). top=
+# 3. The introduction rule of the type:
+#    - =my-record.new : Π (a : tau, item-1 : a, item-2 : i64, item-3 : top). my-record a=
+
+# Internally, every record statement is translated into the corresponding [[#inductive][inductive]] statement. For example, given the =record= statement above, the compiler translates it into the following =inductive= statement:
+# #+BEGIN_SRC neut
+# (inductive my-record ((a tau))
+#   (new
+#     ((item-1 a)
+#      (item-2 i64)
+#      (item-3 top))
+#     (my-record a)))
+# #+END_SRC
+# The compiler then processes this statement in the same way ordinary =inductive= statement, generating the record type =my-record= and the introduction rule =my-record.new=, and the pattern matching function =my-record.case=. After that, the compiler automatically generates destructors from this definition via =my-record.case=. For example, the generated definition of =my-record.item-1= is as follows:
+# #+BEGIN_SRC neut
+# (define my-record.item-1 ((a tau) (record-value (my-record a)))
+#   (my-record.case a record-value
+#     (λ (item-1 item-2 item-3) item-1)))
+# #+END_SRC
+# The other destructors are defined similarly.
+
+*** define-resource-type
+TBD
+
+
+** Auxiliary Terms
+*** asterisk
 =*= is a placeholder that must be inferred.
-*** Example
+**** Example
 #+BEGIN_SRC neut
 (define id ((a tau) (x a)) x)
 
@@ -1597,13 +1762,13 @@ The type of a term wrapped by =question= is reported by the compiler. This might
 
 (id * foo.value) ; ~> foo.value (`*` is inferred to be `foo`)
 #+END_SRC
-*** Syntax
+**** Syntax
 #+BEGIN_SRC neut
-*
+**
 #+END_SRC
-*** Semantics
+**** Semantics
 =*= doesn't have any operational semantics.
-*** Notes
+**** Notes
 =*= can be used as a placeholder that must be resolved by the compiler using the constraints generated in its type inference procedure.
 
 If the type is not determined, the compiler raises an error; For example, the type of =x= in the following code is not determined:
@@ -1612,9 +1777,9 @@ If the type is not determined, the compiler raises an error; For example, the ty
 #+END_SRC
 since the =10= cannot be determined to be =i32=, =i16=, or =i64=, etc.
 
-** sigma
+*** sigma
 =sigma= is the existential quantification.
-*** Example
+**** Example
 #+BEGIN_SRC neut
 ; binary sigma-intro without dependence
 (let pair
@@ -1637,7 +1802,7 @@ since the =10= cannot be determined to be =i32=, =i16=, or =i64=, etc.
 (let 0-pair
   (sigma-introduction)
 #+END_SRC
-*** Syntax
+**** Syntax
 #+BEGIN_SRC neut
 (sigma ((x1 A1) ... (xn An)) B)
 
@@ -1647,7 +1812,7 @@ since the =10= cannot be determined to be =i32=, =i16=, or =i64=, etc.
 
 LEAF_PLUS ::= LEAF | (LEAF TREE)
 #+END_SRC
-*** Semantics
+**** Semantics
 #+BEGIN_SRC text
 (sigma ((x1 A1) ... (xn An)) B)
 ~> (Π ((Z tau)
@@ -1663,7 +1828,7 @@ LEAF_PLUS ::= LEAF | (LEAF TREE)
 (sigma-elimination ((x1 A1) ... (xn An)) e1 e2)
 ~> (e1 hole (lambda ((x1 A1) ... (xn An)) e2))
 #+END_SRC
-*** Notes
+**** Notes
 Actual definition of =sigma= is found in =core/VERSION/notation.neut=; =sigma= is just a convenient notation of a certain use of =Π=. This encoding is the ordinary one in CoC.
 
 Sigma-type with dependence can be used, for example, to realize the type of string as follows:
@@ -1675,9 +1840,9 @@ In this case, a term of this =string= type is something like =(3, [10, 20, 30])=
 
 A sigma-type without dependence is the familiar product type; =(sigma ((_ A1) ... (_ An)) B)= is =(product A1 ... An B)=.
 
-** with
+*** with
 =with= is a do-notation with the bind operation made explicit.
-*** Example
+**** Example
 #+BEGIN_SRC neut
 (with identity.bind
   (let str "foo")
@@ -1697,11 +1862,11 @@ A sigma-type without dependence is the familiar product type; =(sigma ((_ A1) ..
   (let len (string.print &str))
   len)
 #+END_SRC
-*** Syntax
+**** Syntax
 #+BEGIN_SRC neut
 (with TREE TREE ... TREE)
 #+END_SRC
-*** Semantics
+**** Semantics
 #+BEGIN_SRC text
 (with bind (let x (e e1 ... en)) rest+)
 ~> (bind * * (with (e e1' ... en'))
@@ -1725,7 +1890,7 @@ where:
 (with e)
 ~> e
 #+END_SRC
-*** Notes
+**** Notes
 =with= can be understood as a generalization of =begin= in Scheme, or an explicit version of the =do= notation in Haskell.
 
 The "borrowing" is covered by the first rule of the semantics; As you can see from the definition, this realization of borrowing works for any =bind= operation.
@@ -1734,8 +1899,11 @@ Note that the =bind= operator is not restricted to monadic bind; You can set any
 
 The =e= in =(let x e)= is automatically surrounded by =with=.
 
-** Partial Application
-*** Example
+*** case, case-noetic
+TBD
+
+*** Partial Application
+**** Example
 #+BEGIN_SRC neut
 (define id ((a tau) (x a)) x)
 
@@ -1751,108 +1919,11 @@ The =e= in =(let x e)= is automatically surrounded by =with=.
 (id-bool bool.true)
 #+END_SRC
 
-*** Sematics
+**** Sematics
 #+BEGIN_SRC text
 (e e1 ... en)  [where e_{i1} = _, ..., e_{im} = _]
 ~> (λ (x1 ... xm) (e e1 ... en)) [replacing e_{ik} with xk]
 #+END_SRC
-
-* Primitives
-** LLVM-Based Primitives
-neut currently supports the following LLVM instructions: =fneg, add, fadd, sub, fsub, mul, fmul, udiv, sdiv, fdiv, urem, srem, frem, shl, lshr, ashr, and, or, xor, trunc, zext, sext, fptrunc, fpext, fptoui, fptosi, uitofp, sitofp, icmp, fcmp=.
-
-Each instruction is "separated" according to its type. Let us take the instruction =fneg= for example. This instruction can be applied to =half=, =float=, and =double= in LLVM. Thus, neut has the following three constants as primitives: =fneg-f16, fneg-f32, fneg-f64=. For the instruction =add=, the constants =add-i1, add-i2, ..., add-i64= is available.
-
-The instructions with two type arguments like =fptosi= is named as =fptosi-f64-i32, fptosi-f32-i1, fptosi-f16-i5=, etc.
-
-As for the comparison operators =icmp= and =fcmp=, the names are of the form ={icmp, fcmp}-{CONDITION}-{TYPE}=. For example, =icmp-eq-i16, icmp-ult-i32, icmp-sge-i64, fcmp-ogt-f32, fcmp-ord-f16, fcmp-ueq-f64= are all valid.
-
-The semantics of these instructions is as specified in the [[https://llvm.org/docs/LangRef.html][LLVM Language Reference Manual]].
-
-** Syscalls
-neut supports syscalls, although its current support is far from complete. As you can see in =core/VERSION/constant/{linux, darwin}.neut=, only basic syscalls like =read, write, exit, open, close= are supported. This is not something that is caused by theoretical difficulties; Rather, this is simply because of my limited resource of time.
-
-It would be worth noting that a syscall can't produce/consume a resource. For example, the syscall =write= is declared to have the following type in neut:
-#+BEGIN_SRC neut
-(constant os.write
-  (Π
-    ((len i64)
-     (out file-descriptor)
-     (buf (array len i8))
-     (nbyte i64))
-    (product (array len i8) i64)))
-#+END_SRC
-Compare the type above with the C signature of =write=:
-#+BEGIN_SRC c
-ssize_t write(int fildes, const void *buf, size_t nbyte);
-#+END_SRC
-Ignoring the =(len i64)= part that is necessary to receive an array of arbitrary length, the crucial difference here is the types of the codomains. While the latter one returns ordinary =ssize_t= (integer), the former one also returns the original array. This is because the syscall =write= doesn't consume (i.e. deallocate) given string. If =write= in neut didn't return the original string, the string would be never freed in the succeeding program, causing space leak.
-
-Regarding macOS: You may note that the "syscalls" are lowered to some external interface functions on macOS. This is because macOS doesn't support a direct use of a syscall; Indeed, for example, if we were to use the syscall =fork= directly (0x2000002), a succeeding =malloc= causes a fatal error, saying something like =mach_vm_map(size=1048576) failed (error code=268435459)=.
-
-Implementation note: A syscall can be added via the following procedure:
-1. Declare corresponding constant (like =os.write=) using the [[#constant][constant]] statement
-2. Register its argument information and the syscall number in =src/Data/Syscall.hs=
-3. Rebuild the compiler and run some test codes to check if it really works
-Here, the "argument information" is a list consists of one of the following tags: "immediate", "struct", "array", and "unused". This information is necessary to generate a corresponding syscall without writing each function definition explicitly. For example, consider you add a syscall =foo= with its argument information ["unused", "immediate", "struct", "array"]. This creates a function with 4 arguments. Let us call these arguments =x1=, =x2=, =x3=, and =x4=. The compiler then generates a function that calls the syscall, assuming that the "struct"- and "array"-tagged arguments are borrowed one. That is, the compiler generates a function that is defined schematically as follows:
-#+BEGIN_SRC haskell
-syscall-foo x1 x2 x3 x4 :=
-  let result := CALL_SYSCALL(foo, x2, x3, x4) in
-  return (x2, x3, result)
-#+END_SRC
-Using this mechanism, for example, the actual implementation of the syscall =os.write= above can be generated from ["unused", "immediate", "array", "immediate"]:
-#+BEGIN_SRC haskell
-syscall-os.write A out buf nbyte :=
-  let result := CALL_SYSCALL(write, out, buf, nbyte) in
-  return (buf, result)
-#+END_SRC
-
-** Array Indexing
-neut offers a family of constants that allows us to access an element of an array. The names of these constants are of the form ={LOWTYPE}.array-access=, where the ={LOWTYPE}= is either =i{n}= or =f{n}=. For example, =i8.array-access= can be used for indexing of an array of type =(array N i8)=.
-
-The types of these accesser are of the following form:
-#+BEGIN_SRC neut
-(Π
-  ((i i64)
-   (n i64)
-   (_ (array n LOWTYPE)))
-  (product (array n LOWTYPE) LOWTYPE))
-#+END_SRC
-where the first argument =i= specifies the index of the array, and the second argument =n= specifies the length of the array. Using this constant, one can use an element of an array without consuming the array as follows:
-#+BEGIN_SRC neut
-(let xs
-  (array-introduction i64 1 2 -30 20))
-
-(with identity.bind
-  (let a (i64.array-access 0 * &xs)) ; the `*` is inferred to be `4`, since the length of `xs` is 4
-  (let b (i64.array-access 1 * &xs))
-  (let c (i64.array-access 2 * &xs))
-  (let d (i64.array-access 3 * &xs))
-  (i64.add a (i64.add b (i64.add c d)))) ; 1 + 2 + (-30) + 20
-#+END_SRC
-
-** Unsafe Cast
-The constant =unsafe.cast : Pi (A : tau, B : tau, x : A). B= is available (assuming that the constant is declared using the statement [[#constant][constant]]). The semantics of this constant is the no-op cast:
-#+BEGIN_SRC neut
-(unsafe.cast t1 t2 e)
-~> e
-#+END_SRC
-
-You can easily break the resource management system of neut using this constant. Consider the following example:
-#+BEGIN_SRC neut
-(ensure core/0.1.0.0
-  "https://github.com/u2zv1wx/neut-core/raw/master/release/0.1.0.0.tar.gz")
-
-; (note that this declares the constant unsafe.cast)
-(include "core/0.1.0.0/core.neut")
-
-(let z (unsafe.cast i64 (Π ((_ i64)) i64) 1))
-
-(let foo z) ; (*1)
-
-(let bar z) ; (*2)
-#+END_SRC
-The code above uses the variable =z= for the two times. Since =z= is casted to a Π-type, The resulting code tries to copy the integer =1= as if it were a closure. Since the internal representation of a closure at least uses 3 words, this causes an access to an invalid memory region, that is, a segmentation fault.
 
 * Compiler Subcommands
 The =neut= binary provides the subcommands in this section.
@@ -1869,7 +1940,7 @@ The =archive= subcommand creates a tar.gz archive from the specified directory. 
 *** Example
 #+BEGIN_SRC shell
 $ neut build path/to/file.neut             # create an executable ./file
-$ neut build -o output path/to/file.neut   # create an executable ./output
+$ neut build -o output path/to/file.neut --clang-option "-fsanitize=memory -g"   # create an executable ./output, using clang's option "-fsanitize=memory -g"
 $ neut build --emit llvm path/to/file.neut # create a LLVM IR file ./file.ll
 $ neut build --emit asm path/to/file.neut  # create an assembly code ./file.s
 #+END_SRC
@@ -1893,6 +1964,16 @@ If =--no-color= option is specified, the result of type checking is printed with
 If =--end-of-entry SEPARATOR= is specified, each entry of the result of type checking is followed by =SEPARATOR=.
 
 This subcommand is intended to be used with an editor-side syntax checker like [[https://www.flycheck.org/en/latest/][flycheck]].
+
+* Contribution
+
+** Compiler Structure
+
+** Things Left Undone
+
+** Donation
+
+* Contact
 
 * Appendix
 
