@@ -475,11 +475,95 @@ In short: the resulting code is faster in that it is free from the redundant cop
 This is how neut controls resources efficiently, without modifying the type system of the source language.
 
 ** Manual Optimization via Noetic Computation
+Still, this is not enough. Suppose we have a term of type =list a=, and are trying to calculate its length. The naive implementation would be something like this:
+#+begin_src neut
+; length : (a : tau, xs : list a) -> i64
+(define length ((a tau) (xs (list a)))
+  (case xs
+    ((nil)
+      0)
+    ((cons y ys)
+      (add-i64 1 (length a ys)))))
+
+(define some-function ()
+  (with identity.bind
+    (let xs (list.new i64 1 2 3))  ; xs : list i64 := [1, 2, 3]
+    (let len (length i64 xs))
+    (if (< len 3)
+      (foo xs)
+      (bar xs)))))
+#+end_src
+The code above calculates the desired result. However, we can see that the function =some-function= uses =xs= in non-linear manner. This means that the =xs= is cloned just to calculate its length. This behavior is far from satisfactory. On the other hand, if we rewrite =length= so that it also returns the original list (to use the optimization that we have just seen), then we need to write something like this:
+#+begin_src neut
+; length : (a : tau, xs : list a) -> (list a) * i64
+(define length ((a tau) (xs (list a)))
+  (case xs
+    ((nil)
+      (tuple (nil i64) 0))
+    ((cons y ys)
+      (let (tuple tmp-list ys-length) (length a ys))
+      (tuple (cons i64 y tmp-list) (add-i64 1 ys-length)))))
+#+end_src
+In this implementation, the original list =xs= is wholy destructed and reconstructed using =nil= and =cons= from the ground up. Again, this is not a satisfactory behavior.
+
+The solution to this problem is to create an unconsumable, read-only, or "noetic" version of =xs : list a=. Firstly, let us add the following constants to the language:
+#+begin_src text
+subject    : tau
+noesis     : Π (s : subject, a : tau). tau
+noema      : Π (s : subject, a : tau). tau
+noema.new  : Π (s : subject, a : tau, value : a). noesis s (noema s a)
+noesis.run : Π (a : tau). (Π (s : subject). noesis s a). a
+#+end_src
+If you are familiar with Haskell, you can think of =noesis= as the ST monad, =noema= as the STRef, =noema.new= as newSTRef, and =intersubjectivity= as runSTMonad.
+
+A =subject= is just a tag that is used by =noesis=. =noesis= is the identity monad with additional tag =s : subject=. =noema= is the "unconsumable" version of the original value, which can only be constructed within a noesis monad, using =noema.new=. =noesis.run= something that states "If =noesis s a= is true for any subject =s=, then =a= is true".
+
+As for =noema=, let's consider the following pseudo code:
+#+begin_src text
+let xs : list a := (some-initialization) in
+let a := f xs in
+let b := g xs in
+(...)
+#+end_src
+In the code above, =xs= is used twice, and thus it is copied.
+
+#+begin_src text
+let xs' : noema s (list a) := (some-initialization) in
+let a := f xs' in
+let b := g xs' in
+(...)
+#+end_src
+On the other hand, in the code above, the =xs'= is not copied despite the fact that it is used twice.
+
+
+#+begin_src neut
+(define length-internal
+  ((s subject)
+   (a tau)
+   (xs (noema s (list a)))
+   (acc i64))
+  (witness i64
+    (case-noetic xs
+      ((list.nil)
+        acc)
+      ((list.cons _ ys)
+        (length-internal s a ys (add-i64 acc 1))))))
+
+(define length
+  ((a tau)
+   (xs (list a)))
+  (with-region s
+    (let xs-noema (noema.new s (list a) &xs))
+    ((noesis.return s) (product (list a) i64) (tuple xs (length-internal s a xs-noema 0)))))
+#+end_src
+
 TBD (write about the efficient implementation of =list.length= via case-noetic)
 
 #+begin_quote
-The tree simpliciter can burn up, be resolved into its chemical elements, etc. But the sense — the sense of this perception, something belonging necessarily to its essence — cannot burn up; it has no chemical elements, no forces, no real properties. -- Edmund Husserl
+The tree simpliciter can burn up, be resolved into its chemical elements, etc. But the sense — the sense of this perception, something belonging necessarily to its essence — cannot burn up; it has no chemical elements, no forces, no real properties. —— Edmund Husserl
 #+end_quote
+
+The =xs= can be deallocated (burn up). But the noema of =xs= can't be deallocated.
 
 ** Automatic Optimization via malloc/free Cancellation
 neut's static memory management enables not only the "manual" optimization we have just seen, but also another "automatic" optimization. Remember the first example:
@@ -1983,7 +2067,7 @@ This subcommand is intended to be used with an editor-side syntax checker like [
 ** Donation
 
 * Contact
-veka41@protonmail.ch
+veka41@protonmail.ch (english/japanese)
 
 * Things Left Undone
 - sophistication on library-related things
@@ -1991,6 +2075,7 @@ veka41@protonmail.ch
 - track the location of a code piece when expanding macros more acculately
 - better pattern matching syntax (like nested pattern)
 - syntax highlighter for editors other than Emacs
+- wrapper library for parallel computation
 - etc.
 
 * Appendix
