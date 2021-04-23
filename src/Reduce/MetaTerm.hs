@@ -125,6 +125,10 @@ reduceConstApp m c es =
     "meta.leaf.mul"
       | [(_, MetaTermLeaf s1), (_, MetaTermLeaf s2)] <- es ->
         return (m, MetaTermLeaf (s1 <> s2))
+    "meta.leaf.new-int"
+      | [] <- es -> do
+        i <- newCount
+        return (m, MetaTermLeaf (T.pack (show i)))
     "meta.leaf.new-symbol"
       | [(_, MetaTermLeaf s)] <- es -> do
         k <- newText

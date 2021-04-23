@@ -173,7 +173,7 @@ interpret inputTree =
             let doNotCare = (m, WeakTermTau)
             return (m, WeakTermCase doNotCare (Just s) (e'', te) clauseList')
           | otherwise ->
-            raiseSyntaxError m "(case-noetic TREE TREE TREE*)"
+            raiseSyntaxError m "(case-noetic TREE TREE*)"
         "unsafe.hole"
           | [(_, TreeLeaf intStr)] <- rest,
             Just i <- readMaybe $ T.unpack intStr -> do

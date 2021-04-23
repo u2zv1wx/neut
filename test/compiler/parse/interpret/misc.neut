@@ -177,9 +177,8 @@
   ((a tau)
    (xs (list a)))
   (witness (product (list a) i64)
-    (with-region s
-      (let xs-noema (noema.new s (list a) &xs))
-      ((noesis.return s) * (tuple xs (length-noetic-internal s a xs-noema 0))))))
+    (with-subject s (xs)
+      ((noesis.return s) * (length-noetic-internal s a xs 0)))))
 
 (reduce
   (let xs (list.cons i64 1 (list.cons * 2 (list.cons * 3 (list.nil *)))))
