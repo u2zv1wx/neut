@@ -23,7 +23,7 @@ Here I briefly summarize the basic properties of neut before diving into the det
     - [[#notes-on-polymorphic-functions][Notes on Polymorphic Functions]]
     - [[#summary-so-far][Summary So Far]]
   - [[#manual-optimization-via-borrowing][Manual Optimization via Borrowing]]
-  - [[#manual-optimization-via-noetic-computation][Manual Optimization via Noetic Computation]]
+  - [[#manual-optimization-via-noetic-computation-new-in-0200][Manual Optimization via Noetic Computation (New in 0.2.0.0)]]
   - [[#automatic-optimization-via-mallocfree-cancellation][Automatic Optimization via malloc/free Cancellation]]
   - [[#summary][Summary]]
 - [[#installation][Installation]]
@@ -474,7 +474,7 @@ In short: the resulting code is faster in that it is free from the redundant cop
 
 This is how neut controls resources efficiently, without modifying the type system of the source language.
 
-** Manual Optimization via Noetic Computation
+** Manual Optimization via Noetic Computation (New in 0.2.0.0)
 Still, this is not enough. Suppose we have a term of type =list a=, and are trying to calculate its length. The naive implementation would be something like this:
 #+begin_src neut
 ; length : (a : tau, xs : list a) -> i64
@@ -506,7 +506,115 @@ The code above calculates the desired result. However, we can see that the funct
 #+end_src
 In this implementation, the original list =xs= is totally destructed and reconstructed using =nil= and =cons= from the ground up. Again, this is not a satisfactory behavior.
 
-The solution to this problem is to create an unconsumable, read-only, or "noetic" version of =xs : list a=.
+neut's solution to this problem is two-fold:
+
+1. create an "unconsumable" version of =xs : list a= and use it to avoid redundant copy
+2. find a pattern that allows us to use the unconsumable version of =xs= safely, and turn it into a syntax
+
+Let me explain the former part. Let's call the "unconsumable" version of =xs= a "noema" of =xs=. The noema of =xs= - which is of type =noema (list a)= - is defined as follows.
+
+- The memory representation of the value of a noema is the same as that of =xs=.
+- The noema is copied/discarded exactly the same way as an integer.
+
+For example, consider the following code:
+#+begin_src text
+let xs : list i64 := [1, 2, 3] in
+let a := f xs in
+let b := g xs in
+top.unit
+#+end_src
+Since the =xs= is used twice, the code above is compiled into something like this:
+#+begin_src text
+let xs : list i64 := [1, 2, 3] in
+let xs-copy := copy-as (list i64) xs in
+let a := f xs-copy in
+let b := g xs in
+top.unit
+#+end_src
+
+On the other hand, consider the following code (ignore the initialization part):
+#+begin_src text
+let xs : noema (list i64) := (INITIALIZATION_OF_NOEMA) in
+let a := f xs in
+let b := g xs in
+top.unit
+#+end_src
+The code above is compiled into something like this:
+#+begin_src text
+let xs : noema (list i64) := (INITIALIZATION_OF_NOEMA) in
+let xs-copy := copy-as i64 xs in
+let a := f xs-copy in
+let b := g xs in
+top.unit
+#+end_src
+which is equivalent to:
+#+begin_src text
+let xs : noema (list i64) := (INITIALIZATION_OF_NOEMA) in
+let xs-copy := xs in
+let a := f xs-copy in
+let b := g xs in
+top.unit
+#+end_src
+
+Note that we can easily break the resource management system of neut if we can use this noema without any restrictions. For example, consider the following code:
+#+begin_src text
+let xs : noema (list i64) := (INITIALIZATION_OF_NOEMA) in
+top.unit
+#+end_src
+Since the =xs= is discarded not as a list but as an integer, the pseudo-code above does not free the list that is bound to =xs=. In other words, the code above causes a memory leak. This kind of unsafe behavior will be dealed with in the latter part of this section; Here, let us firstly see how this noema can be utilized for optimization.
+
+We need a way to use a noema. =case-noetic= is what we will use for this purpose. =case-noetic= is basically the read-only version of the the pattern matching operator =case=, and thus their uses are more or less the same:
+#+begin_src text
+let xs : list i64 := [1, 2, 3] in
+case xs of
+  nil ->
+    true
+  cons y ys ->
+    false
+
+let xs : noema (list i64) := (INITIALIZATION) in
+case-noetic xs of
+  nil ->
+    true
+  cons y ys ->
+    false
+#+end_src
+
+The differences between =case= and =case-noetic= are the following three.
+
+The first one: =case= is used for a term of an ordinary data-type (=list i64=), whereas =case-noetic= is used for a term of a noetic data-type (=noema (list i64)=).
+
+The second one: =case= consumes the matched value (=xs=), whereas =case-noetic= does not; =case-noetic= just reads the value. More specifically, a term of type =list i64= is represented as a tuple something like this: =(TYPE_OF_INTERNAL_DATA, INTERNAL_DATA, CONSTRUCTOR_LABEL)=. =case= extracts the elements from this tuple, deallocates the tuple, and then continues computation using the obtained values (e.g. select correct branch according to =CONSTRUCTOR_LABEL=). =case-noetic= also extracts elements from this tuple, but does not deallocate the tuple. In this sense, =case-noetic= does not consume the matched value.
+
+The third one: in =case-noetic=, the types of the newly-bounded variables in the patterns are wrapped with =noema (...)=. For example, if we use =case-noetic= for a term of type =noema (list i64)=, then the =y= and =ys= in =cons y ys= will be of type =noema i64= and =noema (list i64)=, respectively. This is required to prevent an internal piece of a noema from being deallocated; If we were to set the type of =ys= as =list i64=, the code below will deallocate the =ys=:
+#+begin_src text
+let xs : noema (list i64) := (INITIALIZATION) in
+case-noetic xs of
+  nil ->
+    true
+  cons y ys ->
+    false
+#+end_src
+since =ys= is not used. By wrapping this =ys= with =noema (...)=, we can ensure that a noema is always unconsumable and read-only.
+
+If we have such =case-noetic=, then we can write more efficient =length= as follows:
+#+begin_src text
+-- length-internal : (tau, noema (list a)) -> i64
+define length-internal (a : tau) (xs : noema (list a)) :=
+  case-noetic xs of
+    nil ->
+      0
+    cons y ys ->
+      length-internal a ys
+
+-- length : (tau, list a) -> (list a) * i64
+define length (a : tau) (xs (list a)) :=
+  let xs-noema := CREATE_NOEMA &xs in
+  let len := length-internal a xs-noema in
+  (xs, len)
+#+end_src
+
+when we use this noema naively, the resource management system of neut can
 
 Firstly, let us add the following constants to the language:
 #+begin_src text
@@ -2089,6 +2197,7 @@ veka41@protonmail.ch (english/japanese)
 - track the location of a code piece when expanding macros more acculately
 - better pattern matching syntax (like nested pattern)
 - syntax highlighter for editors other than Emacs
+- primitive-level exception
 - wrapper library for parallel computation
 - etc.
 
