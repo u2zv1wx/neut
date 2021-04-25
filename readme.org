@@ -597,7 +597,7 @@ case-noetic xs of
 #+end_src
 since =ys= is not used. By wrapping this =ys= with =noema (...)=, we can ensure that a noema is always unconsumable and read-only.
 
-If we have such =case-noetic=, then we can write more efficient =length= as follows:
+If we have such =case-noetic=, then we can write more efficient =length= basically as follows:
 #+begin_src text
 -- length-internal : (tau, noema (list a)) -> i64
 define length-internal (a : tau) (xs : noema (list a)) :=
@@ -613,8 +613,78 @@ define length (a : tau) (xs (list a)) :=
   let len := length-internal a xs-noema in
   (xs, len)
 #+end_src
+We now need to find a way to create and use noemata safely.
 
-when we use this noema naively, the resource management system of neut can
+Let us move on to the latter part. To achive safety, we will employ the idea of ST monad here.
+
+We firstly declare an opaque type =subject=, and add a tag of type =subject= to a =noema=. In other words, for a term =s : subject=, we redefine =noema a= into =noema s a=. We also define a =subject=-tagged identity monad, and name it a =noesis=; A =noesis s a= is the same as =identity a= except for the additional argument =s=.
+
+We also define a term =noesis.run : Π (a : tau). (Π (s : subject). noesis s a) -> a=. This is defined as follows:
+#+begin_src text
+noesis.run a f =
+  let dummy-subject : subject                = cast i64 subject 0 in
+  let answer        : noesis dummy-subject a = f dummy-subject in
+  cast (noesis dummy-subject a) a answer
+#+end_src
+That is, =noesis.run= executes given =f= by supplying it a dummy argument. This =noesis.run= is something that can be compared to =runST= in ST monad.
+
+Using these new words, we define a syntax =with-subject s (x) computation= as follows:
+#+begin_src text
+  with-subject s (x) computation
+~>
+  noesis.run * $ \(s : subject) -> do
+    let x = cast a (noema s a) x
+    ans <- computation
+    return (cast (noema s a) a x, ans)
+#+end_src
+That is, what =with-subject s (x) computation= does is:
+- cast the =x= into a noema, using the same name, shadowing the original =x : a=
+- do the computation under the condition =s : subject, x : noema s a=
+- return the result of the computation, pairing it with the original =x : a=, which can be obtained by casting =x : noema s a=.
+
+Using this =with-subject=, the noetic =length= can be fully implemented as follows:
+#+begin_src text
+define length-internal (s : subject) (a : tau) (xs : noema s (list a)) :=
+  case-noetic xs of
+    nil ->
+      0
+    cons y ys ->
+      length-internal s a ys
+
+-- length : (a : tau, _ : list a) -> (list a) * i64
+define length (a : tau) (xs (list a)) :=
+  with-subject s (xs)
+    ((noesis.return s) i64 (length-internal s a xs))
+#+end_src
+where the =noesis.return= is the =subject=-tagged version of the return operation of the identity monad.
+
+We can use noemata safely as long as we use it via =with-subject=. Here I used the word "safely" to mean that we can see the following two properties:
+
+(1) The content of every noema will be deallocated later. In other words, no memory leak is possible. This can be ensured since the content is returned as a part of the return value of =with-subject=.
+
+(2) If we can use a noetic variable, then the corresponding resource is always available. In other words, no use-after-free is caused by using a noetic variable. This can be seen by the following reasoning. Firstly, if a use of a noema causes a use-after-free, then the corresponding resource must be deallocated before the use of the noema. Since a use of a noema does not deallocate its content (remember that noetic variable is read-only), if a use of a noema causes a use-after-free, then the original, non-noetic variable must be used to deallocate the resource, before the use of the noema. Since the non-noetic variable is shadowed inside =with-subject=, such situation can only be happen outside the =with-subject=. That is, such situation can only be realized by returning a noema as a result of =with-subject=. However, this cannot happen by the very nature of =noesis.run=. Remember the type of =noesis.run=. That is, =Π (a : tau). (Π (s : subject). noesis s a) -> a=. For this =noesis.run= to return a =noema=, the =a= in the type of =noesis.run= must be something like =noema s b=. Thus, the following type must be well-formed: =(Π (s : subject). noesis s (noema s b)) -> noema s b=. However, this type has an unbounded variable =s=. Therefore, =with-subject= cannot return a =noema=. That's why no use-after-free is possible.
+
+This concludes the latter part. By the way, if you want to use the content of a noema, you can copy the content of the noema according to its type. This is what =noema.incarnate= does. This function can be used to, for example, compute the sum of a list:
+
+#+begin_src text
+-- noema.incarnate : (s : subject, a : tau, x : noema s a) -> (noema s a) * a
+
+-- sum-internal : (s : subject, xs : noema s (list i64)) -> i64
+define sum-internal (s : subject) (xs : noema s (list i64)) :=
+  case-noetic xs of
+    nil ->
+      0
+    cons y ys ->
+      let value = noema.incarnate s i64 &y
+      value + sum-internal s a ys
+
+-- sum : (_ : list i64) -> (list i64) * i64
+define sum (xs (list i64)) :=
+  with-subject s (xs)
+    ((noesis.return s) i64 (sum-internal s a xs))
+#+end_src
+
+To sum up, we can avoid copying operations by combining the resource management system of neut and the idea of ST monad.
 
 Firstly, let us add the following constants to the language:
 #+begin_src text
