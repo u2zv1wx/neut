@@ -148,9 +148,9 @@ Intuitively, what the compiler does is to translate the term above into the foll
 #+BEGIN_SRC haskell
 let str : string := "a";
 let (discard-string, copy-string) := TRANSLATE(string);
-let (str1, tmp) := copy-string(str);
-let (str2, str3) := copy-string(tmp);
-{- THE CODE THAT USES `str1`, `str2`, AND `str3` LINEARLY -}
+let str-copy-1 := copy-string str;
+let str-copy-2 := copy-string str;
+{- THE CODE THAT USES `str-copy-1`, `str-copy-2`, AND `str` LINEARLY -}
 #+END_SRC
 Note that the second line extracts =discard-string= and =copy-string= from the tuple =TRANSLATE(string)=. Every type =X= is translated in this manner; the pair of =discard-X= and =copy-X=. These exponentializers - something that allows us to create n copies of =x= from a single =x= - are used in its continuation so that every variable of this type (=str= in this example) is used linearly.
 
@@ -165,9 +165,9 @@ which is used in the following manner:
 #+BEGIN_SRC haskell
 let str : string := "a";
 let cartesian-string := TRANSLATE(string);
-let (str1, tmp) := cartesian-string(1, tmp);
-let (str2, str3) := cartesian-string(1, tmp);
-{- THE CODE THAT USES `str1`, `str2`, AND `str3` LINEARLY -}
+let str-copy-1 := cartesian-string(1, str);
+let str-copy-2 := cartesian-string(1, str);
+{- THE CODE THAT USES `str-copy-1`, `str-copy-2`, AND `str` LINEARLY -}
 #+END_SRC
 This alternative translation frees us from having to create a tuple every time when we translate a type. Thus, in the actual implementation, every type is translated into a closed function, which is then lowered to a pointer (1 word).
 
@@ -201,13 +201,13 @@ cartesian-closure i closure = do
     return ()
   else do
     -- copy the chain using the type information
-    let (chainA, chainB) := typeOfChain(1, chain);
+    let chainCopy := typeOfChain(1, chain);
     -- construct the 2 closures, and the wrapper tuple (thus do malloc for the 3 times)
-    return ((typeOfChain, chainA, label), (typeOfChain, chainB, label))
+    return (typeOfChain, chainCopy, label)
 #+END_SRC
 Thus, we can translate every Π-type into the function =cartesian-closure=. Every Closure is copied/discarded in the same way, regardless of its actual details. So, information like =i64= or =bool= in =i64 -> bool= is indeed useless here; It simply isn't necessary since every closure knows how to copy/discard itself.
 
-The remaining piece is how a type of a closed chain like =∑ [a : type, x : a]= is translated. This is where eta-expansion plays its role. Suppose we have a term =e= of type =∑ [a : type, x : a]=. Since we already know the type of =e=, we can eta-expand this term as follows:
+The remaining piece is how a type of a closed chain like =∑ [a : type, x : a]= is translated. Suppose we have a term =e= of type =∑ [a : type, x : a]=. Since we already know the type of =e=, we can eta-expand this term as follows:
 #+BEGIN_SRC haskell
 let (a, x) := e in
 (a, x)
@@ -215,30 +215,29 @@ let (a, x) := e in
 Now, at this point, note that if we can copy both =a : type= and =x : a=, we can then copy =e= as follows:
 #+BEGIN_SRC haskell
 let (a, x) := e in
-let (a1, a2) := {COPY_a} a in
-let (x1, x2) := {COPY_x} x in
-((a1, x1), (a2, x2))
+let a-copy := {COPY_a} a in
+let x-copy := {COPY_x} x in
+(a-copy, x-copy)
 #+END_SRC
 Thus, thanks to eta-expansion, the problem of copying/discarding the terms of type =∑ [a : type, x : a]= is reduced into the one of copying/discarding the terms of type =a : type= and =x : a=.
 
 The actual copying function is constructed inductively as follows. The starting point is the following term:
 #+BEGIN_SRC haskell
 let (a, x) := e in
-((a, x), (a, x))
+(a, x)
 #+END_SRC
 Firstly we copy =x= - using its type =a= - so that =x= is used linearly:
 #+BEGIN_SRC haskell
 let (a, x) := e in
-let (x1, x2) := a(1, x) in
-((a, x1), (a, x2))
+let x-copy := a(1, x) in
+(a, x-copy)
 #+END_SRC
-This creates a term that uses =x= linearly. Then we copy the term =a= - using its type =type= - so that =a= is used linearly:
+Then we copy the term =a= - using its type =type= - so that =a= is used linearly:
 #+BEGIN_SRC haskell
 let (a, x) := e in
-let (a1, tmp) := type(1, a) in
-let (a2, a3) := type(1, tmp) in
-let (x1, x2) := a1(1, x) in
-((a2, x1), (a3, x2))
+let a-copy := type(1, a) in
+let x-copy := a-copy(1, x) in
+(a, x-copy)
 #+END_SRC
 where the =type= is a term defined as follows:
 #+BEGIN_SRC haskell
@@ -255,17 +254,16 @@ In conclusion, the copying part of =∑ [a : type, x : a]= is defined by the fol
 #+BEGIN_SRC haskell
 copy-sigma sig :=
   let (a, x) := sig in
-  let (a1, tmp) := type(1, a) in
-  let (a2, a3) := type(1, tmp) in
-  let (x1, x2) := a1(1, x) in
-  ((a2, x1), (a3, x2))
+  let a-copy := type(1, a) in
+  let x-copy := a-copy(1, x) in
+  (a-copy, x-copy)
 #+END_SRC
 By using this term, we can now copy the tuple =(a, x)= in the closure =(∑ [a : type, x : a], (a, x), LABEL)=. The discarding function is defined similarly. That is, we change the starting point to
 #+BEGIN_SRC haskell
 let (a, x) := e in
 ()
 #+END_SRC
-and do the same inductive procedure. Now we just have to construct the following term:
+and do the same procedure. Now we just have to construct the following term:
 #+BEGIN_SRC haskell
 cartesian-sigma i sig :=
   if i == 0
@@ -274,24 +272,10 @@ cartesian-sigma i sig :=
 #+END_SRC
 and translate =∑ [a : type, x : a]= into the =cartesian-sigma= above. In this way we can copy/discard a closure.
 
-# Incidentally, the 3-element representation of a closure can be justified proof-theoretically. Let us consider a depenedent variant of CBPV, where the inference rules =thunk= / =force= can be used only when the assumption is empty:
-# #+BEGIN_SRC text
-# (empty) |- e : N
-# ----------------------- (thunk)
-# (empty) |- thunk e : ↓N
-
-# (empty) |- e : ↓N
-# ----------------------- (force)
-# (empty) |- force e : N
-# #+END_SRC
-# In such a calculus, we have the following type-isomorphism:
-# #+BEGIN_SRC text
-# Π (x : A). B ~ ∑ (C : Univ). C × ↓(Π (x : A, env : C). B)
-# #+END_SRC
-# Regarding the =C= part as the type of environment, this type-isomorphism (left-to-right) can be understood as a description of closure conversion.
+Incidentally, the 3-element representation of a closure is now new. (add references here)
 
 *** Notes on Polymorphic Functions
-Or you may be wondering: "What if a function is polymorphic? If the size of an argument is not fixed, how can that function copy the term?"
+You may be wondering: "What if a function is polymorphic? If the size of an argument is not fixed, how can that function copy the term?"
 
 That is again a valid question, and here comes dependent-type. Firstly, remember that a polymorphic function in dependent-type theory is nothing but an ordinary function with an argument of type =tau=, where =tau= is the type of types. For example, the following is a polymorphic function that creates a pair of any type:
 #+BEGIN_SRC neut
@@ -309,8 +293,8 @@ Note that the type =i64= is used in exactly the same way as =1=; A type is nothi
 #+BEGIN_SRC haskell
 to-tuple :: Π (a : tau, x : a). a * a
 to-tuple a x :=
-  let (x1, x2) := a(1, x) in
-  (x1, x2)
+  let x-copy := a(1, x) in
+  (x-copy, x)
 #+END_SRC
 Thus the answer to the question is: Polymorphic functions can copy/discard its polymorphic argument since the type, which is guaranteed to be passed as an argument, contains information on how to copy/discard the terms of the type.
 
@@ -433,43 +417,43 @@ define i64 @main() {
 #+END_SRC
 Again, the non-schematic output can be found in the [[#llvm-ir-for-the-second-example][appendix]]. The output in this time is actually short enough to include it here (36 lines including comments), though I chose not to. The point here is that the string "a" is reused without copying, as expected.
 
-The resulting assembly code, which can be obtained by =--emit asm=, is reasonably small too (works on macOS; when you compile the same code on Linux, the =write= operations are lowered into the corresponding syscalls):
-#+BEGIN_SRC asm
-	.section	__TEXT,__text,regular,pure_instructions
-	.macosx_version_min 12, 15
-	.globl	_main                   ## -- Begin function main
-	.p2align	4, 0x90
-_main:                                  ## @main
-	.cfi_startproc
-## %bb.0:
-	pushq	%rbx
-	.cfi_def_cfa_offset 16
-	.cfi_offset %rbx, -15
-	movl	$1, %edi                 # 1-byte memory allocation (you can ignore the lines above this line)
-	callq	_malloc
-	movq	%rax, %rbx
-	movb	$97, (%rax)              # write 'a' (= 97) to the allocated memory
-	movl	$1, %edi                 # set the arguments for `_write`
-	movl	$1, %edx
-	movq	%rax, %rsi
-	callq	_write                   # ... and call `_write` (i.e. print 'a')
-	movl	$1, %edi                 # (repeat)
-	movl	$1, %edx
-	movq	%rbx, %rsi
-	callq	_write
-	movl	$1, %edi                 # (repeat)
-	movl	$1, %edx
-	movq	%rbx, %rsi
-	callq	_write
-	movq	%rbx, %rdi               # free the allocated memory
-	callq	_free
-	xorl	%eax, %eax
-	popq	%rbx
-	retq
-	.cfi_endproc
-                                        ## -- End function
-.subsections_via_symbols
-#+END_SRC
+# The resulting assembly code, which can be obtained by =--emit asm=, is reasonably small too (works on macOS; when you compile the same code on Linux, the =write= operations are lowered into the corresponding syscalls):
+# #+BEGIN_SRC asm
+# 	.section	__TEXT,__text,regular,pure_instructions
+# 	.macosx_version_min 12, 15
+# 	.globl	_main                   ## -- Begin function main
+# 	.p2align	4, 0x90
+# _main:                                  ## @main
+# 	.cfi_startproc
+# ## %bb.0:
+# 	pushq	%rbx
+# 	.cfi_def_cfa_offset 16
+# 	.cfi_offset %rbx, -15
+# 	movl	$1, %edi                 # 1-byte memory allocation (you can ignore the lines above this line)
+# 	callq	_malloc
+# 	movq	%rax, %rbx
+# 	movb	$97, (%rax)              # write 'a' (= 97) to the allocated memory
+# 	movl	$1, %edi                 # set the arguments for `_write`
+# 	movl	$1, %edx
+# 	movq	%rax, %rsi
+# 	callq	_write                   # ... and call `_write` (i.e. print 'a')
+# 	movl	$1, %edi                 # (repeat)
+# 	movl	$1, %edx
+# 	movq	%rbx, %rsi
+# 	callq	_write
+# 	movl	$1, %edi                 # (repeat)
+# 	movl	$1, %edx
+# 	movq	%rbx, %rsi
+# 	callq	_write
+# 	movq	%rbx, %rdi               # free the allocated memory
+# 	callq	_free
+# 	xorl	%eax, %eax
+# 	popq	%rbx
+# 	retq
+# 	.cfi_endproc
+#                                         ## -- End function
+# .subsections_via_symbols
+# #+END_SRC
 In short: the resulting code is faster in that it is free from the redundant copying operations we saw in the first example.
 
 This is how neut controls resources efficiently, without modifying the type system of the source language.
