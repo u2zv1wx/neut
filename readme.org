@@ -686,76 +686,14 @@ define sum (xs (list i64)) :=
 
 To sum up, we can avoid copying operations by combining the resource management system of neut and the idea of ST monad.
 
-Firstly, let us add the following constants to the language:
-#+begin_src text
-subject    : tau
-noesis     : Π (s : subject, a : tau). tau
-noema      : Π (s : subject, a : tau). tau
-noema.new  : Π (s : subject, a : tau, value : a). noesis s (a * (noema s a))
-noesis.run : Π (a : tau). (Π (s : subject). noesis s a). a
-#+end_src
-A =subject= is just a tag that is used by =noesis=. =noesis= is the identity monad with additional tag =s : subject=. =noema= is the "unconsumable" version of the original value, which can only be constructed within a noesis monad. =noema.new= is the only way to create a =noema=. =noesis.run= executes the =noesis= monad by applying fake value of type =subject= (like running IO monad).
-
-(If you are familiar with Haskell, you can think of =noesis= as the ST monad, =noema= as the =STRef=, =noema.new= as =newSTRef=, and =noesis.run= as =runST=)
-
-Let me explain the "unconsumable" part. The code below is non-noetic one:
-#+begin_src text
-let xs : list a := (some-initialization) in
-let a := f xs in
-let b := g xs in
-(...)
-#+end_src
-In the code, =xs= is used twice, and thus it is copied. Let's compare the code above to the code below:
-#+begin_src text
-let xs' : noema s (list a) := (some-initialization) in
-let a := f xs' in
-let b := g xs' in
-(...)
-#+end_src
-In this time, the =xs'= is not copied despite the fact that it is used twice. A noema is not copied, nor discarded; It is used as if it were an integer. More specifically, =noema s a= is compiled into the following exponentializer:
-#+begin_src text
-noema s a ~>
-  λ (i, e).
-    if i == 0
-    then ()
-    else (e, e)  # note that `a` is not used in the exponentializer
-#+end_src
-By the way, the internal memory representation of =xs= and =xs'= is exactly the same. That is, =xs'= is not a reference to =xs=, but is =xs= itself.
-
-Of cousre, we need a way to use noema. This is =case-noetic=.
-
-#+begin_src neut
-(define length-internal
-  ((s subject)
-   (a tau)
-   (xs (noema s (list a)))
-   (acc i64))
-  (witness i64
-    (case-noetic xs
-      ((list.nil)
-        acc)
-      ((list.cons _ ys)
-        (length-internal s a ys (add-i64 acc 1))))))
-
-(define length
-  ((a tau)
-   (xs (list a)))
-  (with-region s
-    (let xs-noema (noema.new s (list a) &xs))
-    ((noesis.return s) (product (list a) i64) (tuple xs (length-internal s a xs-noema 0)))))
-#+end_src
-
-
-TBD (write about the efficient implementation of =list.length= via case-noetic)
-
 #+begin_quote
 The tree simpliciter can burn up, be resolved into its chemical elements, etc. But the sense — the sense of this perception, something belonging necessarily to its essence — cannot burn up; it has no chemical elements, no forces, no real properties. —— Edmund Husserl
 #+end_quote
 
 
-As you may have already noticed, this is an approach that uses ST monad to realize named scope.
+# As you may have already noticed, this is an approach that uses ST monad to realize named scope.
 
-The =xs= can be deallocated (burn up). But the noema of =xs= can't be deallocated.
+# The =xs= can be deallocated (burn up). But the noema of =xs= can't be deallocated.
 
 ** Automatic Optimization via malloc/free Cancellation
 neut's static memory management enables not only the "manual" optimization we have just seen, but also another "automatic" optimization. Remember the first example:
