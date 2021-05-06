@@ -1084,10 +1084,80 @@ When parsed, the statement =(unuse PREFIX)= removes =PREFIX= from the prefix env
 
 ** Terms
 *** variable
+**** Syntax
+#+begin_src neut
+LEAF
+#+end_src
+**** Semantics
+#+begin_src text
+x ~> e (if the correspondence x ~> e is registered in the environment)
+#+end_src
+
+**** Note
+If a leaf is not parsed into any other syntactic construct, the leaf is regarded as a variable.
+
+The name of a variable is interpreted in relation with the prefix environment. For example, if the prefix environment is =["foo", "bar", "buz"]=, the name =qux= is interpreted in the following way:
+1. Look up a bound variable named =qux= in current scope.
+2. If not found, look up a bound variable named =foo.qux= in current scope.
+3. If not found, look up a bound variable named =bar.qux= in current scope.
+4. If not found, look up a bound variable named =buz.qux= in current scope.
+5. If not found, report the error: "undefined variable".
 
 *** implication
+**** Example
+#+begin_src neut
+((lambda-meta (x y) `(,x ,y)) `foo `bar) ; ~> `(foo bar)
+
+((lambda-meta (f) (f `foo)) (lambda-meta (x) `(,x ,x ,x))) ; ~> `(foo foo foo)
+
+(fix-meta self (xs)
+  (if (is-nil xs)
+    (node)
+    ()))
+#+end_src
+
+**** Syntax
+#+begin_src neut
+(lambda-meta (LEAF ... LEAF) TREE)
+(lambda-meta-variadic (LEAF ... LEAF) TREE)
+(fix-meta LEAF (LEAF ... LEAF) TREE)
+(fix-meta-variadic LEAF (LEAF ... LEAF) TREE)
+#+end_src
+
+**** Semantics
+#+begin_src neut
+((lambda-meta (x1 ... xn) e) e1 ... en)
+~> e {x1 := e1, ..., xn := en}
+
+((lambda-meta-variadic (x1 ... xn) e) e1 ... en ... em)
+~> e {x1 := e1, ..., x{n-1} := e{n-1}, xn := (en ... em)}
+
+((fix-meta self (x1 ... xn) e) e1 ... en)
+~> e {x1 := e1, ..., xn := en, self := (fix-meta self (x1 ... xn) e)}
+
+((fix-meta-variadic self (x1 ... xn) e) e1 ... en ... em)
+~> e {x1 := e1, ..., x{n-1} := e{n-1}, xn := (en ... em), self := (fix-meta-variadic self (x1 ... xn) e)}
+#+end_src
 
 *** if
+**** Example
+#+begin_src neut
+(use meta.node)
+
+(define-macro map-meta (f xs)
+  (if-meta (is-nil xs)
+    xs
+    (cons (f (head xs)) (map-meta f (tail xs)))))
+
+(map-meta (lambda-meta (x) `(,x ,x)) `(a b c d))
+; ~> `((a a) (b b) (c c) (d d))
+#+end_src
+**** Syntax
+#+begin_src neut
+(if-meta TREE TREE TREE)
+#+end_src
+**** Semantics
+=(if-meta e on-true on-false)= firstly reduces the =e=. If the =e= is reduced into =(node)= (i.e. =`()=, or nil), then this =if-meta= is reduced into =on-false=, and reduction for this term follows. Otherwise, this =if-meta= is reduced into =on-true=, and reduction for this term follows.
 
 *** constant
 
@@ -1400,7 +1470,7 @@ A variable doesn't have any operational semantics by itself.
 **** Notes
 If a leaf is not parsed into any other syntactic construct, the leaf =x= is regarded as a variable.
 
-The name of a variable is interpreted in relation with the keyword environment. For example, if the keyword environment is =["foo", "bar", "buz"]=, the name =qux= is interpreted in the following way:
+The name of a variable is interpreted in relation with the prefix environment. For example, if the prefix environment is =["foo", "bar", "buz"]=, the name =qux= is interpreted in the following way:
 1. Look up a bound variable named =qux= in current scope.
 2. If not found, look up a bound variable named =foo.qux= in current scope.
 3. If not found, look up a bound variable named =bar.qux= in current scope.
