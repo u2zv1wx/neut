@@ -627,7 +627,7 @@ sum (xs (list i64)) :=
 
 To sum up, we can avoid copying operations by combining the resource management system of neut and the idea of ST monad.
 
-Incidentally, the region-flavored application of ST monad is not new. You can find more information by referring the work titled [[https://dl.acm.org/doi/abs/10.1145/1016850.1016867][Monadic Regions]].
+Incidentally, the region-flavored application of ST monad is not new. You can find more information by referring the introduction part of the work titled [[https://dl.acm.org/doi/abs/10.1145/1016850.1016867][Monadic Regions]].
 
 #+begin_quote
 The tree simpliciter can burn up, be resolved into its chemical elements, etc. But the sense — the sense of this perception, something belonging necessarily to its essence — cannot burn up; it has no chemical elements, no forces, no real properties. —— Edmund Husserl
