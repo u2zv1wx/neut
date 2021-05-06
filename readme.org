@@ -52,6 +52,10 @@ Here I briefly summarize the basic properties of neut before diving into the det
   - [[#statements-1][Statements]]
     - [[#enum][enum]]
     - [[#define][define]]
+    - [[#example][Example]]
+    - [[#syntax][Syntax]]
+    - [[#semantics][Semantics]]
+    - [[#note][Note]]
     - [[#define-prefix-remove-prefix-1][define-prefix, remove-prefix]]
     - [[#reduce][reduce]]
     - [[#useunuse-1][use/unuse]]
@@ -78,13 +82,13 @@ Here I briefly summarize the basic properties of neut before diving into the det
     - [[#partial-application][Partial Application]]
 - [[#compiler-subcommands][Compiler Subcommands]]
   - [[#archive][archive]]
-    - [[#example][Example]]
+    - [[#example-1][Example]]
     - [[#notes][Notes]]
   - [[#build][build]]
-    - [[#example-1][Example]]
+    - [[#example-2][Example]]
     - [[#notes-1][Notes]]
   - [[#check][check]]
-    - [[#example-2][Example]]
+    - [[#example-3][Example]]
     - [[#notes-2][Notes]]
 - [[#contribution][Contribution]]
   - [[#development][Development]]
@@ -1233,29 +1237,29 @@ That is, splicing is the operation that "lifts" all the element of a child tree 
 * Syntax and Semantics of the Object Language
 
 ** Statements
-(fixme: the content below is out-of-date)
+# (fixme: the content below is out-of-date)
 
 A program of neut is a list of statements. Each statement is one of the following statements described in this section.
 
-Please note that the descriptions in the followings are not that formal yet.
+# Please note that the descriptions in the followings are not that formal yet.
 
-In the following, I use the symbols =LEAF= and =TREE= defined as follows:
-#+BEGIN_SRC text
-LEAF ::= {a sequence of character that doesn't contain '(', ')', ' ', '\n', or '"'}
-TREE ::= LEAF | (TREE ... TREE)
-#+END_SRC
-I also define the symbol =STRING= to be a double-quoted string.
+# In the following, I use the symbols =LEAF= and =TREE= defined as follows:
+# #+BEGIN_SRC text
+# LEAF ::= {a sequence of character that doesn't contain '(', ')', ' ', '\n', or '"'}
+# TREE ::= LEAF | (TREE ... TREE)
+# #+END_SRC
+# I also define the symbol =STRING= to be a double-quoted string.
 
-Note that the examples codes below usually assumes that the core library is already included.
+# Note that the examples codes below usually assumes that the core library is already included.
 
 
 *** enum
-=enum= declares a new enum-type and its values.
+=define-enum= defines a new enum-type and its values.
 **** Example
 #+BEGIN_SRC neut
-(enum choice left right) ; defines choice : tau, choice.left : choice, and choice.right : choice
+(define-enum choice left right) ; this defines choice : tau, choice.left : choice, and choice.right : choice
 
-(let x choice.left)
+(define x choice.left)
 
 (i64.print
   (enum-elimination x
@@ -1268,7 +1272,7 @@ Note that the examples codes below usually assumes that the core library is alre
 
 (i64.print (unsafe.cast choice i64 choice.right)) ; ~> 1
 
-(enum foo
+(define-enum foo
   (a 100)
   b
   (c 20)
@@ -1285,85 +1289,85 @@ Note that the examples codes below usually assumes that the core library is alre
 #+END_SRC
 **** Syntax
 #+BEGIN_SRC neut
-(enum LEAF LEAF_INT ... LEAF_INT)
+(define-enum LEAF LEAF_INT ... LEAF_INT)
 
 LEAF_INT := LEAF | (LEAF INT)
 #+END_SRC
 **** Semantics
-=(enum x a1 ... an)= updates the state of the compiler so that the specified enum-type =x : tau= and the enum-values =x.a1, ..., x.an : x= can be used in its continuation.
+=(define-enum x a1 ... an)= updates the state of the compiler so that the specified enum-type =x : tau= and the enum-values =x.a1, ..., x.an : x= can be used in its continuation.
 
-Every enum-value has its internal i64 value (discriminant). Those discriminant values can be extracted by using the constant =unsafe.cast=, though usually not recommended.
+Every enum-value has its internal i64 value (discriminant). Those discriminant values can be extracted by using =unsafe.cast=, though usually not recommended.
 
 Discriminant value starts from =0= by default, and increments one by one. The "current" value of this process can be modified by writing, e.g. =(enum foo a (b 100) c d)=. In this example, the discriminant value of =c= is set to be =101=.
 
 All the discriminant values of an enum-type must be distinct.
 
-
 *** define
 # =define= evaluates given term and binds the result to the specified variable.
-TBD
+=define= defines a new top-level variable.
 
-# *** Example
-# #+BEGIN_SRC neut
-# (let foo (i64 10)) ; define a variable `foo` to be `10`
+*** Example
+#+BEGIN_SRC neut
+(define foo (i64 10)) ; define a variable `foo` to be `10`
 
-# (i64.print foo) ; ~> 10 (this is equivalent to `(let _ (i64.print foo))`)
+(i64.print foo) ; ~> 10 (this is equivalent to `(let _ (i64.print foo))`)
 
-# (let (bar i64) 20) ; `let` with type annotation
+; ordinary definition (i.e. 1-mutual definition)
+(define fact ((x i64))
+  (if (icmp-sle-i64 x 0) ; compare two `i64`s as signed integers
+    1
+    (mul-i64 x (fact (sub-i64 x 1)))))
 
-# (i64.print bar) ; ~> 20
+(i64.print (fact foo)) ; ~> 3628800 (= 10!)
 
-# ; `define` is defined in `core/<VERSION>/notation.neut` as follows:
-# ; (notation (define f xts e)
-# ;   (let f (fix f xts e)))
-# ;
-# ; (notation (define f e)
-# ;   (let f e))
-# ;
+; mutual recursion can be realized via the usual way:
+(define even-f ((f (hom i64 bool)) (n i64))
+  (if (icmp-eq-i64 n 0)
+    true
+    (f (sub-i64 n 1))))
 
-# ; ordinary definition (i.e. 1-mutual definition)
-# (define fact ((x i64))
-#   (if (icmp-sle-i64 x 0) ; compare (by less-than-or-equal) two `i64`s as signed integers
-#     1
-#     (mul-i64 x (fact (sub-i64 x 1)))))
+(define odd ((n i64))
+  (if (icmp-eq-i64 n 0)
+    false
+    (even-f odd (sub-i64 n 1))))
 
-# (i64.print (fact foo)) ; ~> 3628800 (= 10!)
+(define even ((n i64))
+  (even-f odd n))
 
-# ; mutual recursion can be realized as in the ordinary way:
-# (define even-f ((f (hom i64 bool)) (n i64))
-#   (if (icmp-eq-i64 n 0)
-#     true
-#     (f (sub-i64 n 1))))
+(i64.print
+  (if (even 10)
+    100
+    1000)) ; ~> 100
+#+END_SRC
+*** Syntax
+#+BEGIN_SRC neut
+(define LEAF_PLUS TREE)
 
-# (define odd ((n i64))
-#   (if (icmp-eq-i64 n 0)
-#     false
-#     (even-f odd (sub-i64 n 1))))
+LEAF_PLUS ::= LEAF | (LEAF TREE)
+#+END_SRC
+*** Semantics
+=(define x e)= checks the type of the term =e=, then registers the correspondence =x ~> e= to the environment of the compiler. After the definition, using the variable =x= is the same as writing =e= in place of =x=.
 
-# (define even ((n i64))
-#   (even-f odd n))
+*** Note
+Note that =define= does not evaluate the term =e=. For example, consider the following code.
+#+begin_src neut
+(define foo
+  (string.print-literal "hello!"))
 
-# (i64.print
-#   (if (even 10)
-#     100
-#     1000)) ; ~> 100
-# #+END_SRC
-# *** Syntax
-# #+BEGIN_SRC neut
-# (let LEAF_PLUS TREE)
-
-# LEAF_PLUS ::= LEAF | (LEAF TREE)
-# #+END_SRC
-# *** Semantics
-# =(let x e)= checks the type of the term =e=, evaluates the term =e=, then defines a variable =x= with =e= as its content. =x= is available in the continuation. The type of =x= can be annotated to be =t= by writing =(let (x t) e)=.
+(reduce
+  (let _ foo)
+  (let _ foo)
+  top.unit)
+#+end_src
+The code prints =hello= twice since the =define= does not reduce the body of the variable.
 
 # If a user input =e= is not parsed as a statement when it is supposed to be, the compiler interprets it as =(let _ e)=.
 
 *** define-prefix, remove-prefix
-TBD
+The behaviors of =define-prefix= and =remove-prefix= are the same as the ones of the meta language.
 
 *** reduce
-TBD
+=reduce= reduces given term.
 
 *** use/unuse
 =use= inserts a prefix to the prefix environment. =unuse= removes a prefix from the prefix environment.
