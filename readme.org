@@ -48,7 +48,6 @@ Here I briefly summarize the basic properties of neut before diving into the det
     - [[#constant][constant]]
     - [[#integer][integer]]
     - [[#leafnode][leaf/node]]
-  - [[#notes-on-quote-unquote-and-splice][Notes on Quote, Unquote and Splice]]
 - [[#syntax-and-semantics-of-the-object-language][Syntax and Semantics of the Object Language]]
   - [[#statements-1][Statements]]
     - [[#enum][enum]]
@@ -801,30 +800,26 @@ These correspondences are used later when the compiler tries to reduce the varia
 =define-prefix= defines an alias for an existing namespace. =remove-prefix= removes an alias that is defined by =define-prefix=.
 **** Example
 #+begin_src neut
-(section foo)
-(section bar)
-(define-macro hoge `a)
-(end bar)
-(end foo)
+(define-macro foo.bar.pohe `a)
 
-(dry-expand foo.bar.hoge) ; ~> `a
-(dry-expand Q.hoge)       ; ~> undefined meta-variable: Q.hoge
+(dry-expand foo.bar.pohe) ; ~> `a
+(dry-expand Q.pohe)       ; ~> undefined meta-variable: Q.pohe
 
 (define-prefix Q foo.bar)
 
-(dry-expand Q.hoge)       ; ~> `a
+(dry-expand Q.pohe)       ; ~> `a
 
 (define-prefix R Q)
 
-(dry-expand R.hoge)       ; ~> `a
+(dry-expand R.pohe)       ; ~> `a
 
 (remove-prefix R Q)
 
-(dry-expand R.hoge)       ; ~> undefined meta-variable: R.hoge
+(dry-expand R.pohe)       ; ~> undefined meta-variable: R.pohe
 
 (remove-prefix Q foo.bar)
 
-(dry-expand Q.hoge)       ; ~> undefined meta-variable: Q.hoge
+(dry-expand Q.pohe)       ; ~> undefined meta-variable: Q.pohe
 #+end_src
 **** Syntax
 #+begin_src neut
@@ -1047,8 +1042,45 @@ sn
 #+end_src
 
 *** use/unuse
-TBD
+=use= inserts a prefix to the prefix environment. =unuse= removes a prefix from the prefix environment.
+**** Example
+#+BEGIN_SRC neut
+(define-macro foo.bar.buz `a)
 
+(dry-expand buz)         ; ~> undefined meta-variable: `buz`
+(dry-expand bar.buz)     ; ~> undefined meta-variable: `bar.buz`
+(dry-expand foo.bar.buz) ; ~> `a
+
+(use foo)
+
+(dry-expand buz)         ; ~> undefined meta-variable: `buz`
+(dry-expand bar.buz)     ; ~> `a
+(dry-expand foo.bar.buz) ; ~> `a
+
+(use foo.bar)
+
+(dry-expand buz)         ; ~> `a
+(dry-expand bar.buz)     ; ~> `a
+(dry-expand foo.bar.buz) ; ~> `a
+
+(unuse foo)
+
+(dry-expand buz)         ; ~> `a
+(dry-expand bar.buz)     ; ~> undefined variable: `bar.buz`
+(dry-expand foo.bar.buz) ; ~> `a
+#+END_SRC
+**** Syntax
+#+BEGIN_SRC neut
+(use LEAF)
+
+(unuse LEAF)
+#+END_SRC
+**** Semantics
+When parsed, the statement =(use PREFIX)= inserts =PREFIX= at the head of the prefix environment, which is a list of prefixes.
+
+When parsed, the statement =(unuse PREFIX)= removes =PREFIX= from the prefix environment. If the =PREFIX= is not contained in the environment, the =unuse= statement does nothing.
+
+# The prefix environment modifies [[#upsilon][how the compiler interprets a variable]].
 
 ** Terms
 *** variable
@@ -1062,8 +1094,10 @@ TBD
 *** integer
 
 *** leaf/node
-
-** Notes on Quote, Unquote and Splice
+**** Example
+**** Syntax
+**** Semantics
+**** Notes on Quote, Unquote and Splice
 
 * Syntax and Semantics of the Object Language
 
