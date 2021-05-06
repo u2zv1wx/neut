@@ -1024,9 +1024,27 @@ In other words, the =section= - =end= statement
 Each =section= must be paired with an =end= with the corresponding name.
 
 *** statement
+=statement= integrates multiple statements into one.
 **** Example
+#+begin_src neut
+(statement
+  (define-macro foo `a)
+  (dry-expand foo)) ; ~> `a
+#+end_src
 **** Syntax
+#+begin_src neut
+(statement TREE ... TREE)
+#+end_src
 **** Semantics
+#+begin_src neut
+(statement s1 ... sn)
+#+end_src
+is equivalent to the following code:
+#+begin_src neut
+s1
+...
+sn
+#+end_src
 
 *** use/unuse
 TBD
