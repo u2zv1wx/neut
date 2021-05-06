@@ -9,10 +9,11 @@ Here I briefly summarize the basic properties of neut before diving into the det
 
 - A compiled language
 - The output is [[https://llvm.org/docs/LangRef.html][LLVM IR]] / assembly / executable binary (the last two are via clang)
-- The type system is CoC + fix + int + float + enum - universe hierarchy (+ unsafe cast)
-- The type inference algorithm is based on [[https://arxiv.org/abs/1505.04324][the one of Lean]]
+- The type system is CoC + fix + int + float + enum - universe hierarchy (+ unsafe nop cast)
 - The evaluation strategy is call-by-value
 - Memory allocation/deallocation is statically determined at compile time
+
+# - The type inference algorithm is based on [[https://arxiv.org/abs/1505.04324][the one of Lean]]
 
 * Table of Contents                                                    :TOC_3:
 - [[#ideas][Ideas]]
@@ -93,9 +94,6 @@ Here I briefly summarize the basic properties of neut before diving into the det
   - [[#donation][Donation]]
 - [[#contact][Contact]]
 - [[#things-left-undone][Things Left Undone]]
-- [[#appendix][Appendix]]
-  - [[#llvm-ir-for-the-first-example][LLVM IR for the First Example]]
-  - [[#llvm-ir-for-the-second-example][LLVM IR for the Second Example]]
 
 * Ideas
 
@@ -104,10 +102,10 @@ Here I briefly summarize the basic properties of neut before diving into the det
 Let's see how neut manages resources. The following code prints the string "a" for the 3 times:
 #+BEGIN_SRC neut
 ; download the core library
-(ensure core/0.1.0.0
-  "https://github.com/u2zv1wx/neut-core/raw/master/release/0.1.0.0.tar.gz")
+(ensure core/0.2.0.0
+  "https://github.com/u2zv1wx/neut-core/raw/master/release/0.2.0.0.tar.gz")
 
-(include "core/0.1.0.0/core.neut")
+(include "core/0.2.0.0/core.neut")
 
 (with identity.bind
   (let str "a")
@@ -117,10 +115,9 @@ Let's see how neut manages resources. The following code prints the string "a" f
 #+END_SRC
 The =(with identity.bind (...))= is the same as the do-notation in Haskell or other languages, specialized to the identity monad.
 
-By running =neut build --no-alloc-cancellation --emit llvm filename.neut=, we obtain schematically the following LLVM IR (the =--no-alloc-cancellation= is to disable certain optimization that we will see later):
+By running =neut build --emit llvm filename.neut=, we obtain schematically the following LLVM IR:
 #+BEGIN_SRC llvm
-declare void @free(i8*)
-declare i8* @write(i8*, i8*, i8*)
+declare i8* @free(i8*)
 declare i8* @malloc(i64)
 define i64 @main() {
   ; Repeat the following for the 3 times:
@@ -130,13 +127,13 @@ define i64 @main() {
   ;   <memory deallocation for the string>
 }
 #+END_SRC
-The non-schematic, actual output can also be found in the [[#llvm-ir-for-the-first-example][appendix]]. I chose not to write the IR here since the output is a bit long (59 lines including comments).
+# The non-schematic, actual output can also be found in the [[#llvm-ir-for-the-first-example][appendix]]. I chose not to write the IR here since the output is a bit long (59 lines including comments).
 
-The resulting LLVM IR creates a string in memory, print it, and free it for the 3 times. The point here is that the resulting code creates 2 copies of the original string. This is because the variable =str= is used for the 3 times; The content of a variable is copied to create n instances when the variable is used for the n times (n > 1). If the variable isn't used at all (n < 1), the content of the variable is discarded (deallocated). If the variable is used exactly once, or linearly (n = 1), the content of the variable is used without any discarding/copying operation.
+The resulting LLVM IR creates a string in memory, print it, and free it for the 3 times. The point here is that the resulting code creates 2 copies of the original string. This is because the variable =str= is used for the 3 times; The content of a variable is copied at the beginning of the scope to create n instances when the variable is used for the n times (n > 1). If the variable isn't used at all (n < 1), the content of the variable is discarded (deallocated) at the end of the scope. If the variable is used exactly once, or linearly (n = 1), the content of the variable is used without any discarding/copying operation.
 
-By translating the source calculus in the way sketched above, every variable is ensured to be used linearly, except for the ones in the functions that realize those copying/discarding operations. Thus, by checking that those exponentializers use resources properly, we can ensure that the target calculus of this translation handles memory properly too. Then we check that those exponentializers are indeed sane - This is the basic storyline.
+By translating the source calculus in the way sketched above, every variable is ensured to be used linearly, except for the ones in the functions that realize those copying/discarding operations. Thus, by checking that those copiers and discarders - or exponentializers - use resources properly, we can ensure that the target calculus of this translation handles memory properly. Then we check that those exponentializers are indeed sane - This is the basic storyline.
 
-The way how a variable is copied/discarded is determined by the type of the variable. For example, if the type of a variable is the array type as in the example above, the copying operation is something that you would do in C to copy an array (memory allocation followed by value insertion). If the type is an immediate type like an integer type, the "copying" operation is the one that uses the original value for the cloned value. Every type is translated into a term that copies/discards the terms of the type, including the type of the types.
+The way how a variable is copied/discarded is determined by the type of the variable. For example, if the type of a variable is the array type as in the example above, the copying operation is something that you would do in C to copy an array; memory allocation followed by value insertion. If the type is an immediate type like an integer type, the "copying" operation is the one that uses the original value for the cloned value. Every type is translated into a term that copies/discards the terms of the type, including the type of the types.
 
 *** Types as Exponentializers
 Let us go a little deeper. Consider the following schematic user input:
@@ -152,11 +149,13 @@ let str-copy-1 := copy-string str;
 let str-copy-2 := copy-string str;
 {- THE CODE THAT USES `str-copy-1`, `str-copy-2`, AND `str` LINEARLY -}
 #+END_SRC
-Note that the second line extracts =discard-string= and =copy-string= from the tuple =TRANSLATE(string)=. Every type =X= is translated in this manner; the pair of =discard-X= and =copy-X=. These exponentializers - something that allows us to create n copies of =x= from a single =x= - are used in its continuation so that every variable of this type (=str= in this example) is used linearly.
+where the function =copy-string= copies given string without modifying the argument. =discard-string= discards given string.
+
+Note that the second line extracts =discard-string= and =copy-string= from the tuple =TRANSLATE(string)=. Every type =X= is conceptually translated in this manner; the pair of =discard-X= and =copy-X=. These exponentializers - something that allows us to create n copies of =x= from a single =x= - are used in its continuation so that every variable of this type (=str= in this example) is used linearly.
 
 Incidentally, in the actual implementation, the result of =TRANSLATE(string)= is not a pair, but a function as in the pseudo-code below:
 #+BEGIN_SRC haskell
-cartesian-string i e :=
+exp-string i e :=
   if i == 0
   then discard-string(e)
   else copy-string(e)
@@ -164,23 +163,25 @@ cartesian-string i e :=
 which is used in the following manner:
 #+BEGIN_SRC haskell
 let str : string := "a";
-let cartesian-string := TRANSLATE(string);
-let str-copy-1 := cartesian-string(1, str);
-let str-copy-2 := cartesian-string(1, str);
+let exp-string := TRANSLATE(string);
+let str-copy-1 := exp-string(1, str);
+let str-copy-2 := exp-string(1, str);
 {- THE CODE THAT USES `str-copy-1`, `str-copy-2`, AND `str` LINEARLY -}
 #+END_SRC
 This alternative translation frees us from having to create a tuple every time when we translate a type. Thus, in the actual implementation, every type is translated into a closed function, which is then lowered to a pointer (1 word).
 
-It would be worth noting here that these functions like =cartesian-string= are β-reduced (inlined) aggressively; These are ordinary functions that can be defined in the target language, after all.
+Also, note that the variable =exp-string= is a closed function. Because of that, we can set the content of the variable =exp-string= as the pointer to the closed function. This allows us to use the variable =exp-string= in non-linear manner without breaking the resource management system.
+
+It would be worth noting here that these functions like =exp-string= are β-reduced (inlined) aggressively; These are ordinary functions that can be defined in the target language, after all.
 
 *** Notes on Closures
-You may be wondering now: "How can we copy/discard a closure? In ordinary closure conversion, a lambda-abstraction is translated into a pair consists of (1) all the free variables in the abstraction, and (2) a pointer to an appropriately-arranged closed function. How can that tuple be copied/discarded just by using type information like =i64 -> bool=, which is seemingly useless here? How should we translate the type =i64 -> bool=?"
+You may be wondering now: "How can we copy/discard a closure? In ordinary closure conversion, a lambda-abstraction is translated into a pair that consists of (1) all the free variables in the abstraction, and (2) a pointer to an appropriately-arranged closed function. How can that tuple be copied/discarded just by using type information like =i64 -> bool=, which is seemingly useless here? How should we translate the type =i64 -> bool=?"
 
 That is a valid question. The key to give the answer to this question is generalizing the concept of "all the free variables". Consider the following term:
 #+BEGIN_SRC haskell
 λ (a : type). λ (x : a). λ (y : i64). (x, y)
 #+END_SRC
-In ordinary closure conversion, the free variables of =λ (y : i64). (x, y)= is calculated to be =[x]= without making a fuss. Here, however, we generalize the concept so that we "trace" all the free variables included in the type of every free variable. In this case, for example, note that the type of =x= is =a=, which is again a free variable if it occurs in =λ (y : i64). (...)=, and thus this =a= is also considered to be a free variable. Since the type of =a= is =type=, which has no free variables, our tracing stops here, resulting a chain of the free variables =[a : type, x : a]=.
+In ordinary closure conversion, the free variables of =λ (y : i64). (x, y)= is calculated to be =[x]= without making a fuss. Here, however, we generalize the concept so that we "trace" all the free variables included in the type of every free variable. In this case, for example, note that the type of =x= is =a=, which is again a free variable if it occurs in =λ (y : i64). (...)=, and thus this =a= is also considered as a free variable. Since the type of =a= is =type=, which has no free variables, our tracing stops here, resulting a chain of the free variables =[a : type, x : a]=.
 
 Note that every result of this procedure is necessarily "closed". That is, if the list =[x1 : A1, ..., xn : An]= is a result of this tracing process, then the set of free variables in =A{i}= is a subset of ={x1, ..., x{i-1}}=. In this way, we extract a closed chain from a lambda-abstraction.
 
@@ -190,7 +191,7 @@ Let us continue the example of =λ (y : i64), (x, y)=. Using the closed chain we
 #+END_SRC
 That is, a lambda-abstraction is translated into a tuple consists of *(0) the type of its closed chain*, (1) its closed chain, and (2) a pointer to an appropriately-arranged closed function. Now, remember that every type is translated into a term that copies/discards the terms of the type. Also remember that every type is translated into a function pointer, which can be copied/discarded without any malloc/free operations. Thus, we can generate a function that copies/discards a closure conceptually as follows:
 #+BEGIN_SRC haskell
-cartesian-closure i closure = do
+exp-closure i closure = do
   -- extract the element of the closure, freeing the outer 3-word tuple
   let (typeOfChain, chain, label) := closure;
   if i == 0
@@ -202,10 +203,10 @@ cartesian-closure i closure = do
   else do
     -- copy the chain using the type information
     let chainCopy := typeOfChain(1, chain);
-    -- construct the 2 closures, and the wrapper tuple (thus do malloc for the 3 times)
+    -- create and return a clone
     return (typeOfChain, chainCopy, label)
 #+END_SRC
-Thus, we can translate every Π-type into the function =cartesian-closure=. Every Closure is copied/discarded in the same way, regardless of its actual details. So, information like =i64= or =bool= in =i64 -> bool= is indeed useless here; It simply isn't necessary since every closure knows how to copy/discard itself.
+Thus, we can translate every Π-type into the function =exp-closure=. Every Closure is copied/discarded in the same way, regardless of its actual details. So, information like =i64= or =bool= in =i64 -> bool= is indeed useless here; It simply isn't necessary since every closure knows how to copy/discard itself.
 
 The remaining piece is how a type of a closed chain like =∑ [a : type, x : a]= is translated. Suppose we have a term =e= of type =∑ [a : type, x : a]=. Since we already know the type of =e=, we can eta-expand this term as follows:
 #+BEGIN_SRC haskell
@@ -226,7 +227,7 @@ The actual copying function is constructed inductively as follows. The starting 
 let (a, x) := e in
 (a, x)
 #+END_SRC
-Firstly we copy =x= - using its type =a= - so that =x= is used linearly:
+Firstly we copy the rightmost element =x= - using its type =a= - so that =x= is used linearly:
 #+BEGIN_SRC haskell
 let (a, x) := e in
 let x-copy := a(1, x) in
@@ -243,10 +244,10 @@ where the =type= is a term defined as follows:
 #+BEGIN_SRC haskell
 type i a =
   if i == 0
-  then ()     -- non-linear (affine) use of `a`
-  else (a, a) -- non-linear (relevant) use of `a`
+  then ()
+  else a
 #+END_SRC
-which is resource-safe since a type is translated into a function pointer. This creates a term that uses both =a= and =x= linearly.
+This is resource-safe since a type is translated into a function pointer. This creates a term that uses both =a= and =x= linearly.
 
 Note that, by its construction, the first element of a closed chain doesn't contain any free variables, and therefore can be copied without using any free variables.
 
@@ -256,7 +257,7 @@ copy-sigma sig :=
   let (a, x) := sig in
   let a-copy := type(1, a) in
   let x-copy := a-copy(1, x) in
-  (a-copy, x-copy)
+  (a, x-copy)
 #+END_SRC
 By using this term, we can now copy the tuple =(a, x)= in the closure =(∑ [a : type, x : a], (a, x), LABEL)=. The discarding function is defined similarly. That is, we change the starting point to
 #+BEGIN_SRC haskell
@@ -265,38 +266,38 @@ let (a, x) := e in
 #+END_SRC
 and do the same procedure. Now we just have to construct the following term:
 #+BEGIN_SRC haskell
-cartesian-sigma i sig :=
+exp-sigma i sig :=
   if i == 0
   then discard-sigma sig
   else copy-sigma sig
 #+END_SRC
-and translate =∑ [a : type, x : a]= into the =cartesian-sigma= above. In this way we can copy/discard a closure.
+and translate =∑ [a : type, x : a]= into the =exp-sigma= above. In this way we can copy/discard a closure.
 
-Incidentally, the 3-element representation of a closure is now new. (add references here)
+Incidentally, this 3-element representation of a closure is not new. Indeed, I was told in [[https://github.com/u2zv1wx/neut/issues/1][a GitHub issue]] that there exists [[https://www.ccs.neu.edu/home/amal/papers/closconvcc.pdf][a work]] that does a similar (the same?) thing, though I have not been able to read it yet. Also, with a quick search, I found [[https://sv.c.titech.ac.jp/minamide/papers/popl96.pdf][a work in 1996 that does a similar thing]]. Thus I emphasize here that I do not claim any originality on this generalization of closure conversion.
 
 *** Notes on Polymorphic Functions
 You may be wondering: "What if a function is polymorphic? If the size of an argument is not fixed, how can that function copy the term?"
 
 That is again a valid question, and here comes dependent-type. Firstly, remember that a polymorphic function in dependent-type theory is nothing but an ordinary function with an argument of type =tau=, where =tau= is the type of types. For example, the following is a polymorphic function that creates a pair of any type:
-#+BEGIN_SRC neut
-; to-tuple : Π (a : tau, x : a). a * a
-(define to-tuple ((a tau) (x a))
-  (tuple x x))
+#+BEGIN_SRC haskell
+to-tuple : Π (a : tau, x : a). a * a
+to-tuple (a : tau) (x : a) :=
+  (x, x)
 #+END_SRC
 This function =to-tuple= is, for example, used as follows:
-#+BEGIN_SRC neut
-(to-tuple i64 1)          ; ~> (tuple 1 1)
-(to-tuple bool bool.true) ; ~> (tuple bool.true bool.true)
-(to-tuple string "a")     ; ~> (tuple "a" "a")
+#+BEGIN_SRC haskell
+to-tuple i64 1           --  ~> (1, 1)
+to-tuple bool bool.true  --  ~> (bool.true, bool.true)
+to-tuple string "a"      --  ~> ("a", "a")
 #+END_SRC
-Note that the type =i64= is used in exactly the same way as =1=; A type is nothing but an ordinary term of type =tau=. And these very terms =i64=, =bool=, and =string= in the example are translated into ordinary closed functions that copies/discards the terms of the types. The =to-tuple= function can therefore copy the resource =x= of type =a= conceptually as follows:
+We can see that the type =i64= is used in exactly the same way as =1=. A type is nothing but an ordinary term of type =tau=. And these very terms =i64=, =bool=, and =string= in the example are translated into ordinary closed functions that copies/discards the terms of the types. The =to-tuple= function can therefore copy the resource =x= of type =a= conceptually as follows:
 #+BEGIN_SRC haskell
 to-tuple :: Π (a : tau, x : a). a * a
 to-tuple a x :=
   let x-copy := a(1, x) in
   (x-copy, x)
 #+END_SRC
-Thus the answer to the question is: Polymorphic functions can copy/discard its polymorphic argument since the type, which is guaranteed to be passed as an argument, contains information on how to copy/discard the terms of the type.
+Thus the answer to the question is: Polymorphic functions can copy/discard its polymorphic argument since the type, which is guaranteed to be passed as an argument, contains information of how to copy/discard the terms of the type.
 
 *** Summary So Far
 - A variable is copied/discarded so that the variable is used linearly
@@ -304,7 +305,7 @@ Thus the answer to the question is: Polymorphic functions can copy/discard its p
 - Closures can be copied/discarded since they know how to copy/discard itself
 - Polymorphic function can copy/discard its polymorphic arguments thanks to the information provided by its type argument
 
-This is the basic behavior of neut's proof-theoretic memory management. As you might already be aware, this naive copying/discarding can result in an inefficient object code. We often use a variable more than once, as in the example of =str=:
+This is the basic behavior of the neut's resource management system. As you might already be aware, this naive copying/discarding can result in an inefficient object code. We often use a variable more than once, as in the example of =str=:
 #+BEGIN_SRC neut
 (with identity.bind
   (let str "a")
@@ -319,10 +320,10 @@ Fortunately, there is a workaround for this performance problem.
 ** Manual Optimization via Borrowing
 The point of the workaround is straightforward: If those copying/discarding operations result from using variables non-linearly, we simply have to use variables linearly. Let's go back to the first example code:
 #+BEGIN_SRC neut
-(ensure core/0.1.0.0
-  "https://github.com/u2zv1wx/neut-core/raw/master/release/0.1.0.0.tar.gz")
+(ensure core/0.2.0.0
+  "https://github.com/u2zv1wx/neut-core/raw/master/release/0.2.0.0.tar.gz")
 
-(include "core/0.1.0.0/core.neut")
+(include "core/0.2.0.0/core.neut")
 
 (with identity.bind
   (let str "a")
@@ -330,14 +331,14 @@ The point of the workaround is straightforward: If those copying/discarding oper
   (let _ (string.print str))
   (string.print str))
 #+END_SRC
-We would like to use the variable =str= linearly. To this end, we can request =string.print= to include the argument =str= in its return value. So, the type of =string.print= shouldn't be something like =string -> top= - where the =top= is the unit type - but should be =string -> string * top=, where the =A * B= means the product type of =A= and =B=. More specifically, the implementation of =string.print= should be something like (in pseudo-code):
+We would like to use the variable =str= linearly. To this end, we can request =string.print= to include the argument =str= in its return value. So, the type of =string.print= shouldn't be something like =string -> top= - where the =top= is the unit type - but should be =string -> string * top=, where the =A * B= means the product type of =A= and =B=. More specifically, the implementation of =string.print= should be something like this:
 #+BEGIN_SRC haskell
 string.print :: string -> string * top
 string.print str = do
-  {print the string `str`}
+  {- print the string `str` -}
   return (str, unit)
 #+END_SRC
-With that definition of =string.print=, we can use the variable =str= linearly (again, in pseudo-code):
+With that definition of =string.print=, we can use the variable =str= linearly:
 #+BEGIN_SRC haskell
 let str1 = "a";
 let (str2, _) := string.print str1;
@@ -345,7 +346,7 @@ let (str3, _) := string.print str2;
 let (str4, _) := string.print str3;
 unit
 #+END_SRC
-Note that the variables =str1=, =str2=, and =str3= are used exactly once, and =str4= for the 0 time. Therefore, the copying operation doesn't occur in the code above. Also, since the =str4= is defined but not used, the =str4= is discarded immediately after its definition.
+Note that the variables =str1=, =str2=, and =str3= are used exactly once, and =str4= for the 0 time. Therefore, the copying operation doesn't occur in the code above. Also, since the =str4= is defined but not used, the =str4= is discarded at the end of its scope.
 
 Now we have seen that those redundant copying/discarding operations can be avoided by writing the code in the manner above. There still remains a problem: code cluttering. It would be much nicer to have more sophisticated notation of that code pattern. Towards that end, firstly note that we can use the same name for the variables =str1=, =str2=, =str3=, and =str4= thanks to variable shadowing:
 #+BEGIN_SRC haskell
@@ -375,10 +376,10 @@ unit
 
 And this is the notation that is implemented in neut. Indeed, the following is a valid code of neut:
 #+BEGIN_SRC neut
-(ensure core/0.1.0.0
-  "https://github.com/u2zv1wx/neut-core/raw/master/release/0.1.0.0.tar.gz")
+(ensure core/0.2.0.0
+  "https://github.com/u2zv1wx/neut-core/raw/master/release/0.2.0.0.tar.gz")
 
-(include "core/0.1.0.0/core.neut")
+(include "core/0.2.0.0/core.neut")
 
 (with identity.bind
   (let str "a")
@@ -389,10 +390,10 @@ And this is the notation that is implemented in neut. Indeed, the following is a
 #+END_SRC
 Or,
 #+BEGIN_SRC neut
-(ensure core/0.1.0.0
-  "https://github.com/u2zv1wx/neut-core/raw/master/release/0.1.0.0.tar.gz")
+(ensure core/0.2.0.0
+  "https://github.com/u2zv1wx/neut-core/raw/master/release/0.2.0.0.tar.gz")
 
-(include "core/0.1.0.0/core.neut")
+(include "core/0.2.0.0/core.neut")
 
 (with identity.bind
   (let str "a")
@@ -402,10 +403,9 @@ Or,
 #+END_SRC
 This notation is "borrowing" in neut. Note that borrowing in neut is nothing but a syntactic translation. Borrowing has nothing to do with, for example, the type system, or the operational semantics, of neut. Indeed, this syntactic translation is processed at the stage of parsing in the compiler.
 
-Let's see how the resulting LLVM IR changes. Is it faster now? We can compile the code above by running =neut build --no-alloc-cancellation --emit llvm filename.neut=. The output is schematically as follows:
+Let's see how the resulting LLVM IR changes. Is it faster now? We can compile the code above by running =neut build --emit llvm filename.neut=. The output is schematically as follows:
 #+BEGIN_SRC llvm
 declare void @free(i8*)
-declare i8* @write(i8*, i8*, i8*)
 declare i8* @malloc(i64)
 define i64 @main() {
   ; <memory allocation for the string>
@@ -415,78 +415,41 @@ define i64 @main() {
   ; <return 0>
 }
 #+END_SRC
-Again, the non-schematic output can be found in the [[#llvm-ir-for-the-second-example][appendix]]. The output in this time is actually short enough to include it here (36 lines including comments), though I chose not to. The point here is that the string "a" is reused without copying, as expected.
+The point here is that the string "a" is reused without copying, as expected.
 
-# The resulting assembly code, which can be obtained by =--emit asm=, is reasonably small too (works on macOS; when you compile the same code on Linux, the =write= operations are lowered into the corresponding syscalls):
-# #+BEGIN_SRC asm
-# 	.section	__TEXT,__text,regular,pure_instructions
-# 	.macosx_version_min 12, 15
-# 	.globl	_main                   ## -- Begin function main
-# 	.p2align	4, 0x90
-# _main:                                  ## @main
-# 	.cfi_startproc
-# ## %bb.0:
-# 	pushq	%rbx
-# 	.cfi_def_cfa_offset 16
-# 	.cfi_offset %rbx, -15
-# 	movl	$1, %edi                 # 1-byte memory allocation (you can ignore the lines above this line)
-# 	callq	_malloc
-# 	movq	%rax, %rbx
-# 	movb	$97, (%rax)              # write 'a' (= 97) to the allocated memory
-# 	movl	$1, %edi                 # set the arguments for `_write`
-# 	movl	$1, %edx
-# 	movq	%rax, %rsi
-# 	callq	_write                   # ... and call `_write` (i.e. print 'a')
-# 	movl	$1, %edi                 # (repeat)
-# 	movl	$1, %edx
-# 	movq	%rbx, %rsi
-# 	callq	_write
-# 	movl	$1, %edi                 # (repeat)
-# 	movl	$1, %edx
-# 	movq	%rbx, %rsi
-# 	callq	_write
-# 	movq	%rbx, %rdi               # free the allocated memory
-# 	callq	_free
-# 	xorl	%eax, %eax
-# 	popq	%rbx
-# 	retq
-# 	.cfi_endproc
-#                                         ## -- End function
-# .subsections_via_symbols
-# #+END_SRC
-In short: the resulting code is faster in that it is free from the redundant copying operations we saw in the first example.
+In short: the resulting code is faster in that it is free from the redundant copying operations that we saw in the first example.
 
 This is how neut controls resources efficiently, without modifying the type system of the source language.
 
 ** Manual Optimization via Noetic Computation (New in 0.2.0.0)
 Still, this is not enough. Suppose we have a term of type =list a=, and are trying to calculate its length. The naive implementation would be something like this:
-#+begin_src neut
-; length : (a : tau, xs : list a) -> i64
-(define length ((a tau) (xs (list a)))
-  (case xs
-    ((nil)
-      0)
-    ((cons y ys)
-      (add-i64 1 (length a ys)))))
+#+begin_src haskell
+-- length : (a : tau, xs : list a) -> i64
+length (a : tau) (xs : (list a)) :=
+  case xs of
+    nil ->
+      0
+    cons y ys ->
+      1 + length a ys
 
-(define some-function ()
-  (with identity.bind
-    (let xs (list.new i64 1 2 3))  ; xs : list i64 := [1, 2, 3]
-    (let len (length i64 xs))
-    (if (< len 3)
-      (foo xs)
-      (bar xs)))))
+-- use the function `length`
+some-function := do
+  let xs := list.new i64 1 2 3
+  let len := length i64 xs
+  if len < 3
+  then foo xs
+  else bar xs
 #+end_src
-The code above calculates the desired result. However, we can see that the function =some-function= uses =xs= in non-linear manner. This means that the =xs= is cloned just to calculate its length. This behavior is far from satisfactory. On the other hand, if we rewrite =length= so that it also returns the original list (to use the optimization that we have just seen), then we need to write something like this:
+The code above calculates the desired result. However, we can see that the function =some-function= uses =xs= twice. This means that the list =xs= is cloned just to calculate its length. This behavior is far from satisfactory. On the other hand, if we rewrite =length= so that it also returns the original list (to use the optimization that we have just seen), then we need to write something like this:
 #+begin_src neut
 ; length : (a : tau, xs : list a) -> (list a) * i64
-(define length ((a tau) (xs (list a)))
-  (case xs
-    ((nil)
-      (tuple (nil i64) 0))
-    ((cons y ys)
-      (let (tuple tmp-list ys-length) (length a ys))
-      (tuple (cons i64 y tmp-list) (add-i64 1 ys-length)))))
+length (a : tau) (xs : (list a)) :=
+  case xs of
+    nil ->
+      (nil i64, 0)
+    cons y ys -> do
+      let (tmp-list, ys-length) := length a ys
+      ((cons i64 y tmp-list), 1 + ys-length)
 #+end_src
 In this implementation, the original list =xs= is totally destructed and reconstructed using =nil= and =cons= from the ground up. Again, this is not a satisfactory behavior.
 
@@ -495,9 +458,9 @@ neut's solution to this problem is two-fold:
 1. create an "unconsumable" version of =xs : list a= and use it to avoid redundant copy
 2. find a pattern that allows us to use the unconsumable version of =xs= safely, and turn it into a syntax
 
-Let me explain the former part. Let's call the "unconsumable" version of =xs= a "noema" of =xs=. The noema of =xs= - which is of type =noema (list a)= - is defined as follows.
+Let me firstly explain the former part. Let's call the "unconsumable" version of =xs= a "noema" of =xs=. The noema of =xs= - which is of type =noema (list a)= - is characterized as follows.
 
-- The memory representation of the value of a noema is the same as that of =xs=.
+- The memory representation of the value of a noema is the same as that of original =xs=.
 - The noema is copied/discarded exactly the same way as an integer.
 
 For example, consider the following code:
@@ -646,7 +609,7 @@ We can use noemata safely as long as we use it via =with-subject=. Here I used t
 
 (1) The content of every noema will be deallocated later. In other words, no memory leak is possible. This can be ensured since the content is returned as a part of the return value of =with-subject=.
 
-(2) If we can use a noetic variable, then the corresponding resource is always available. In other words, no use-after-free is caused by using a noetic variable. This can be seen by the following reasoning. Firstly, if a use of a noema causes a use-after-free, then the corresponding resource must be deallocated before the use of the noema. Since a use of a noema does not deallocate its content (remember that noetic variable is read-only), if a use of a noema causes a use-after-free, then the original, non-noetic variable must be used to deallocate the resource, before the use of the noema. Since the non-noetic variable is shadowed inside =with-subject=, such situation can only be happen outside the =with-subject=. That is, such situation can only be realized by returning a noema as a result of =with-subject=. However, this cannot happen by the very nature of =noesis.run=. Remember the type of =noesis.run=. That is, =Π (a : tau). (Π (s : subject). noesis s a) -> a=. For this =noesis.run= to return a =noema=, the =a= in the type of =noesis.run= must be something like =noema s b=. Thus, the following type must be well-formed: =(Π (s : subject). noesis s (noema s b)) -> noema s b=. However, this type has an unbounded variable =s=. Therefore, =with-subject= cannot return a =noema=. That's why no use-after-free is possible.
+(2) If we can use a noetic variable, then the corresponding resource is always available. In other words, no use-after-free is caused by using a noetic variable. This can be seen by the following reasoning. Firstly, if a use of a noema causes a use-after-free, then the corresponding resource must be deallocated before the use of the noema. Since a use of a noema does not deallocate its content (remember that noetic variable is read-only), if a use of a noema causes a use-after-free, then the original, non-noetic variable must be used to deallocate the resource, before the use of the noema. Since the non-noetic variable is shadowed inside =with-subject=, such situation can only be happen outside the =with-subject=. That is, such situation can only be realized by returning a noema as a result of =with-subject=. However, this cannot happen by the very nature of =noesis.run=. Remember the type of =noesis.run=: =Π (a : tau). (Π (s : subject). noesis s a) -> a=. For this =noesis.run= to return a =noema=, the =a= in the type of =noesis.run= must be something like =noema s b=. Thus, the following type must be well-formed: =(Π (s : subject). noesis s (noema s b)) -> noema s b=. However, this type has an unbounded variable =s=. Therefore, =with-subject= cannot return a =noema=. That's why no use-after-free is possible.
 
 This concludes the latter part. By the way, if you want to use the content of a noema, you can copy the content of the noema according to its type. This is what =noema.incarnate= does. This function can be used to, for example, compute the sum of a list:
 
@@ -674,6 +637,7 @@ To sum up, we can avoid copying operations by combining the resource management 
 The tree simpliciter can burn up, be resolved into its chemical elements, etc. But the sense — the sense of this perception, something belonging necessarily to its essence — cannot burn up; it has no chemical elements, no forces, no real properties. —— Edmund Husserl
 #+end_quote
 
+Incidentally, this region-flavored application of ST monad is not new; (add the reference of monadic regions)
 
 # As you may have already noticed, this is an approach that uses ST monad to realize named scope.
 
@@ -778,7 +742,7 @@ Then, clone the repository and build it:
 #+BEGIN_SRC shell
 git clone https://github.com/u2zv1wx/neut
 cd neut
-git checkout 0.1.0.0
+git checkout 0.2.0.0
 # the following builds the project and tests its behavior
 # it also checks memory sanity via the clang option "-fsanitize=memory"
 stack test --test-arguments test/data --test-arguments test/compiler
@@ -825,10 +789,10 @@ TBD
 
 **** Example
 #+BEGIN_SRC neut
-(ensure core/0.1.0.0
-  "https://github.com/u2zv1wx/neut-core/raw/master/release/0.1.0.0.tar.gz")
+(ensure core/0.2.0.0
+  "https://github.com/u2zv1wx/neut-core/raw/master/release/0.2.0.0.tar.gz")
 
-(include "core/0.1.0.0/core.neut")
+(include "core/0.2.0.0/core.neut")
 #+END_SRC
 **** Syntax
 #+BEGIN_SRC neut
@@ -849,7 +813,7 @@ Archives specified in =ensure= is expected to be the ones created via [[#archive
 # temporary transfers the parsing process to the file specified by given path, if necessary.
 **** Example
 #+BEGIN_SRC neut
-(include "core/0.1.0.0/free.neut")
+(include "core/0.2.0.0/free.neut")
 
 (include "./relative/path/from/the/dir/path/of/this/file.neut")
 #+END_SRC
@@ -1779,11 +1743,11 @@ TBD
 
 # You can easily break the resource management system of neut using this constant. Consider the following example:
 # #+BEGIN_SRC neut
-# (ensure core/0.1.0.0
-#   "https://github.com/u2zv1wx/neut-core/raw/master/release/0.1.0.0.tar.gz")
+# (ensure core/0.2.0.0
+#   "https://github.com/u2zv1wx/neut-core/raw/master/release/0.2.0.0.tar.gz")
 
 # ; (note that this declares the constant unsafe.cast)
-# (include "core/0.1.0.0/core.neut")
+# (include "core/0.2.0.0/core.neut")
 
 # (let z (unsafe.cast i64 (Π ((_ i64)) i64) 1))
 
@@ -2139,7 +2103,7 @@ The =neut= binary provides the subcommands in this section.
 ** archive
 *** Example
 #+BEGIN_SRC shell
-neut archive path/to/source/directory -o path/to/release/directory/0.1.0.0.tar.gz
+neut archive path/to/source/directory -o path/to/release/directory/0.2.0.0.tar.gz
 #+END_SRC
 *** Notes
 The =archive= subcommand creates a tar.gz archive from the specified directory. The [[#ensure][ensure]] statement expects an archive created by this subcommand.
@@ -2179,9 +2143,12 @@ This subcommand is intended to be used with an editor-side syntax checker like [
 *** The Structure of the Compiler
 
 ** Donation
+#+begin_src text
+bitcoin:bc1q689xghadqlrvn05w0hzkm6tswlc8py7nrtqz76
+monero:4B8pz5KokF62tMREEYZ4eEhNVWxhXMVcADXvo7Anp6VRW4KGqstCdHMjZ3xyW7UutYbvdce3NYQNyT7LcNf3qr7R5GNxZoE
+#+end_src
 
 * Contact
-veka41@protonmail.ch (english/japanese)
 
 * Things Left Undone
 - sophistication on library-related things
@@ -2191,125 +2158,126 @@ veka41@protonmail.ch (english/japanese)
 - syntax highlighter for editors other than Emacs
 - primitive-level exception
 - wrapper library for parallel computation
+- (Should I remove the meta-language and implement basic syntaxes in =Parse.Interpret=?)
 - etc.
 
-* Appendix
+# * Appendix
 
-** LLVM IR for the First Example
-#+BEGIN_SRC llvm
-declare void @free(i8*)
-declare i8* @write(i8*, i8*, i8*)
-declare i8* @malloc(i64)
-define i64 @main() {
-  ; <REPETITION 1>
-  ; <memory allocation for the string>
-  %_11875 = getelementptr i8, i8* null, i64 1
-  %_11876 = ptrtoint i8* %_11875 to i64
-  %_11877 = call fastcc i8* @malloc(i64 %_11876)
-  ; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
-  %_11878 = bitcast i8* %_11877 to [1 x i8]*
-  %_11879 = inttoptr i8 97 to i8*
-  %_11880 = ptrtoint i8* %_11879 to i8
-  %_11881 = getelementptr [1 x i8], [1 x i8]* %_11878, i32 0, i64 0
-  store i8 %_11880, i8* %_11881
-  ; <write the string into stdout>
-  %_11882 = inttoptr i64 1 to i8*
-  %_11883 = inttoptr i64 1 to i8*
-  %_11884 = call fastcc i8* @write(i8* %_11882, i8* %_11877, i8* %_11883)
-  %_11885 = bitcast i8* %_11877 to [1 x i8]*
-  %_11886 = getelementptr [1 x i8], [1 x i8]* %_11885, i32 0, i32 0
-  %_11887 = load i8, i8* %_11886
-  %_11888 = bitcast [1 x i8]* %_11885 to i8*
-  ; <memory deallocation for the string>
-  call fastcc void @free(i8* %_11888)
-  %_11889 = inttoptr i8 %_11887 to i8*
-  ; <REPETITION 2>
-  ; <memory allocation for the string>
-  %_11890 = getelementptr i8, i8* null, i64 1
-  %_11891 = ptrtoint i8* %_11890 to i64
-  %_11892 = call fastcc i8* @malloc(i64 %_11891)
-  ; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
-  %_11893 = bitcast i8* %_11892 to [1 x i8]*
-  %_11894 = inttoptr i8 97 to i8*
-  %_11895 = ptrtoint i8* %_11894 to i8
-  %_11896 = getelementptr [1 x i8], [1 x i8]* %_11893, i32 0, i64 0
-  store i8 %_11895, i8* %_11896
-  ; <write the string into stdout>
-  %_11897 = inttoptr i64 1 to i8*
-  %_11898 = inttoptr i64 1 to i8*
-  %_11899 = call fastcc i8* @write(i8* %_11897, i8* %_11892, i8* %_11898)
-  %_11900 = bitcast i8* %_11892 to [1 x i8]*
-  %_11901 = getelementptr [1 x i8], [1 x i8]* %_11900, i32 0, i32 0
-  %_11902 = load i8, i8* %_11901
-  %_11903 = bitcast [1 x i8]* %_11900 to i8*
-  ; <memory deallocation for the string>
-  call fastcc void @free(i8* %_11903)
-  %_11904 = inttoptr i8 %_11902 to i8*
-  ; <REPETITION 3>
-  ; <memory allocation for the string>
-  %_11905 = getelementptr i8, i8* null, i64 1
-  %_11906 = ptrtoint i8* %_11905 to i64
-  %_11907 = call fastcc i8* @malloc(i64 %_11906)
-  ; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
-  %_11908 = bitcast i8* %_11907 to [1 x i8]*
-  %_11909 = inttoptr i8 97 to i8*
-  %_11910 = ptrtoint i8* %_11909 to i8
-  %_11911 = getelementptr [1 x i8], [1 x i8]* %_11908, i32 0, i64 0
-  store i8 %_11910, i8* %_11911
-  ; <write the string into stdout>
-  %_11912 = inttoptr i64 1 to i8*
-  %_11913 = inttoptr i64 1 to i8*
-  %_11914 = call fastcc i8* @write(i8* %_11912, i8* %_11907, i8* %_11913)
-  %_11915 = bitcast i8* %_11907 to [1 x i8]*
-  %_11916 = getelementptr [1 x i8], [1 x i8]* %_11915, i32 0, i32 0
-  %_11917 = load i8, i8* %_11916
-  %_11918 = bitcast [1 x i8]* %_11915 to i8*
-  ; <memory deallocation for the string>
-  call fastcc void @free(i8* %_11918)
-  %_11919 = inttoptr i8 %_11917 to i8*
-  ; <return 0>
-  %_11920 = inttoptr i64 0 to i8*
-  %_11921 = ptrtoint i8* %_11920 to i64
-  ret i64 %_11921
-}
-#+END_SRC
+# ** LLVM IR for the First Example
+# #+BEGIN_SRC llvm
+# declare void @free(i8*)
+# declare i8* @write(i8*, i8*, i8*)
+# declare i8* @malloc(i64)
+# define i64 @main() {
+#   ; <REPETITION 1>
+#   ; <memory allocation for the string>
+#   %_11875 = getelementptr i8, i8* null, i64 1
+#   %_11876 = ptrtoint i8* %_11875 to i64
+#   %_11877 = call fastcc i8* @malloc(i64 %_11876)
+#   ; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
+#   %_11878 = bitcast i8* %_11877 to [1 x i8]*
+#   %_11879 = inttoptr i8 97 to i8*
+#   %_11880 = ptrtoint i8* %_11879 to i8
+#   %_11881 = getelementptr [1 x i8], [1 x i8]* %_11878, i32 0, i64 0
+#   store i8 %_11880, i8* %_11881
+#   ; <write the string into stdout>
+#   %_11882 = inttoptr i64 1 to i8*
+#   %_11883 = inttoptr i64 1 to i8*
+#   %_11884 = call fastcc i8* @write(i8* %_11882, i8* %_11877, i8* %_11883)
+#   %_11885 = bitcast i8* %_11877 to [1 x i8]*
+#   %_11886 = getelementptr [1 x i8], [1 x i8]* %_11885, i32 0, i32 0
+#   %_11887 = load i8, i8* %_11886
+#   %_11888 = bitcast [1 x i8]* %_11885 to i8*
+#   ; <memory deallocation for the string>
+#   call fastcc void @free(i8* %_11888)
+#   %_11889 = inttoptr i8 %_11887 to i8*
+#   ; <REPETITION 2>
+#   ; <memory allocation for the string>
+#   %_11890 = getelementptr i8, i8* null, i64 1
+#   %_11891 = ptrtoint i8* %_11890 to i64
+#   %_11892 = call fastcc i8* @malloc(i64 %_11891)
+#   ; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
+#   %_11893 = bitcast i8* %_11892 to [1 x i8]*
+#   %_11894 = inttoptr i8 97 to i8*
+#   %_11895 = ptrtoint i8* %_11894 to i8
+#   %_11896 = getelementptr [1 x i8], [1 x i8]* %_11893, i32 0, i64 0
+#   store i8 %_11895, i8* %_11896
+#   ; <write the string into stdout>
+#   %_11897 = inttoptr i64 1 to i8*
+#   %_11898 = inttoptr i64 1 to i8*
+#   %_11899 = call fastcc i8* @write(i8* %_11897, i8* %_11892, i8* %_11898)
+#   %_11900 = bitcast i8* %_11892 to [1 x i8]*
+#   %_11901 = getelementptr [1 x i8], [1 x i8]* %_11900, i32 0, i32 0
+#   %_11902 = load i8, i8* %_11901
+#   %_11903 = bitcast [1 x i8]* %_11900 to i8*
+#   ; <memory deallocation for the string>
+#   call fastcc void @free(i8* %_11903)
+#   %_11904 = inttoptr i8 %_11902 to i8*
+#   ; <REPETITION 3>
+#   ; <memory allocation for the string>
+#   %_11905 = getelementptr i8, i8* null, i64 1
+#   %_11906 = ptrtoint i8* %_11905 to i64
+#   %_11907 = call fastcc i8* @malloc(i64 %_11906)
+#   ; <create the string "a" (i.e. write the character 'a' to the allocated memory)>
+#   %_11908 = bitcast i8* %_11907 to [1 x i8]*
+#   %_11909 = inttoptr i8 97 to i8*
+#   %_11910 = ptrtoint i8* %_11909 to i8
+#   %_11911 = getelementptr [1 x i8], [1 x i8]* %_11908, i32 0, i64 0
+#   store i8 %_11910, i8* %_11911
+#   ; <write the string into stdout>
+#   %_11912 = inttoptr i64 1 to i8*
+#   %_11913 = inttoptr i64 1 to i8*
+#   %_11914 = call fastcc i8* @write(i8* %_11912, i8* %_11907, i8* %_11913)
+#   %_11915 = bitcast i8* %_11907 to [1 x i8]*
+#   %_11916 = getelementptr [1 x i8], [1 x i8]* %_11915, i32 0, i32 0
+#   %_11917 = load i8, i8* %_11916
+#   %_11918 = bitcast [1 x i8]* %_11915 to i8*
+#   ; <memory deallocation for the string>
+#   call fastcc void @free(i8* %_11918)
+#   %_11919 = inttoptr i8 %_11917 to i8*
+#   ; <return 0>
+#   %_11920 = inttoptr i64 0 to i8*
+#   %_11921 = ptrtoint i8* %_11920 to i64
+#   ret i64 %_11921
+# }
+# #+END_SRC
 
-** LLVM IR for the Second Example
-#+BEGIN_SRC llvm
-declare void @free(i8*)
-declare i8* @write(i8*, i8*, i8*)
-declare i8* @malloc(i64)
-define i64 @main() {
-  ; memory allocation
-  %_12034 = getelementptr i8, i8* null, i64 1
-  %_12035 = ptrtoint i8* %_12034 to i64
-  %_12036 = call fastcc i8* @malloc(i64 %_12035)
-  ; create the string "a" (i.e. write the character 'a' to the allocated memory)
-  %_12037 = bitcast i8* %_12036 to [1 x i8]*
-  %_12038 = inttoptr i8 97 to i8* ; a = 97
-  %_12039 = ptrtoint i8* %_12038 to i8
-  %_12040 = getelementptr [1 x i8], [1 x i8]* %_12037, i32 0, i64 0 ; where to write 'a'
-  store i8 %_12039, i8* %_12040 ; write a
-  ; write the string into stdout for the three times
-  %_12041 = inttoptr i64 1 to i8* ; this `1` stands for stdout
-  %_12042 = inttoptr i64 1 to i8* ; this `1` is the length of the string in bytes
-  %_12043 = call fastcc i8* @write(i8* %_12041, i8* %_12036, i8* %_12042)
-  %_12044 = inttoptr i64 1 to i8*
-  %_12045 = inttoptr i64 1 to i8*
-  %_12046 = call fastcc i8* @write(i8* %_12044, i8* %_12036, i8* %_12045)
-  %_12047 = inttoptr i64 1 to i8*
-  %_12048 = inttoptr i64 1 to i8*
-  %_12049 = call fastcc i8* @write(i8* %_12047, i8* %_12036, i8* %_12048)
-  ; memory deallocation
-  %_12050 = bitcast i8* %_12036 to [1 x i8]*
-  %_12051 = getelementptr [1 x i8], [1 x i8]* %_12050, i32 0, i32 0
-  %_12052 = load i8, i8* %_12051
-  %_12053 = bitcast [1 x i8]* %_12050 to i8*
-  call fastcc void @free(i8* %_12053)
-  %_12054 = inttoptr i8 %_12052 to i8*
-  ; return 0
-  %_12055 = inttoptr i64 0 to i8*
-  %_12056 = ptrtoint i8* %_12055 to i64
-  ret i64 %_12056
-}
-#+END_SRC
+# ** LLVM IR for the Second Example
+# #+BEGIN_SRC llvm
+# declare void @free(i8*)
+# declare i8* @write(i8*, i8*, i8*)
+# declare i8* @malloc(i64)
+# define i64 @main() {
+#   ; memory allocation
+#   %_12034 = getelementptr i8, i8* null, i64 1
+#   %_12035 = ptrtoint i8* %_12034 to i64
+#   %_12036 = call fastcc i8* @malloc(i64 %_12035)
+#   ; create the string "a" (i.e. write the character 'a' to the allocated memory)
+#   %_12037 = bitcast i8* %_12036 to [1 x i8]*
+#   %_12038 = inttoptr i8 97 to i8* ; a = 97
+#   %_12039 = ptrtoint i8* %_12038 to i8
+#   %_12040 = getelementptr [1 x i8], [1 x i8]* %_12037, i32 0, i64 0 ; where to write 'a'
+#   store i8 %_12039, i8* %_12040 ; write a
+#   ; write the string into stdout for the three times
+#   %_12041 = inttoptr i64 1 to i8* ; this `1` stands for stdout
+#   %_12042 = inttoptr i64 1 to i8* ; this `1` is the length of the string in bytes
+#   %_12043 = call fastcc i8* @write(i8* %_12041, i8* %_12036, i8* %_12042)
+#   %_12044 = inttoptr i64 1 to i8*
+#   %_12045 = inttoptr i64 1 to i8*
+#   %_12046 = call fastcc i8* @write(i8* %_12044, i8* %_12036, i8* %_12045)
+#   %_12047 = inttoptr i64 1 to i8*
+#   %_12048 = inttoptr i64 1 to i8*
+#   %_12049 = call fastcc i8* @write(i8* %_12047, i8* %_12036, i8* %_12048)
+#   ; memory deallocation
+#   %_12050 = bitcast i8* %_12036 to [1 x i8]*
+#   %_12051 = getelementptr [1 x i8], [1 x i8]* %_12050, i32 0, i32 0
+#   %_12052 = load i8, i8* %_12051
+#   %_12053 = bitcast [1 x i8]* %_12050 to i8*
+#   call fastcc void @free(i8* %_12053)
+#   %_12054 = inttoptr i8 %_12052 to i8*
+#   ; return 0
+#   %_12055 = inttoptr i64 0 to i8*
+#   %_12056 = ptrtoint i8* %_12055 to i64
+#   ret i64 %_12056
+# }
+# #+END_SRC
