@@ -1364,51 +1364,69 @@ The code prints =hello= twice since the =define= does not reduce the body of the
 # If a user input =e= is not parsed as a statement when it is supposed to be, the compiler interprets it as =(let _ e)=.
 
 *** define-prefix, remove-prefix
-The behaviors of =define-prefix= and =remove-prefix= are the same as the ones of the meta language.
+The behaviors of =define-prefix= and =remove-prefix= are essentially the same as the ones of the meta language.
 
 *** reduce
 =reduce= reduces given term.
+**** Example
+#+begin_src neut
+(reduce
+  (with identity.bind
+    (let x (i64 1))
+    (let y (i64 2))
+    (add-i64 x y))) ; ~> 3
+
+(reduce
+  (string.print-literal "hello, world!\n")) ; ~> (prints "hello, world!\n")
+#+end_src
+**** Syntax
+#+begin_src neut
+(reduce TREE)
+#+end_src
+**** Semantics
+=(reduce e)= reduces (evaluates) the term =e=.
 
 *** use/unuse
-=use= inserts a prefix to the prefix environment. =unuse= removes a prefix from the prefix environment.
-**** Example
-#+BEGIN_SRC neut
-(let foo.bar.buz (i64 10))
+The behaviors of =use= and =unuse= are essentially the same as the ones of the meta language.
+# =use= inserts a prefix to the prefix environment. =unuse= removes a prefix from the prefix environment.
+# **** Example
+# #+BEGIN_SRC neut
+# (let foo.bar.buz (i64 10))
 
-(i64.print buz)         ; ~> undefined variable: `buz`
-(i64.print bar.buz)     ; ~> undefined variable: `bar.buz`
-(i64.print foo.bar.buz) ; ~> 10
+# (i64.print buz)         ; ~> undefined variable: `buz`
+# (i64.print bar.buz)     ; ~> undefined variable: `bar.buz`
+# (i64.print foo.bar.buz) ; ~> 10
 
-(use foo)
+# (use foo)
 
-(i64.print buz)         ; ~> undefined variable: `buz`
-(i64.print bar.buz)     ; ~> 10
-(i64.print foo.bar.buz) ; ~> 10
+# (i64.print buz)         ; ~> undefined variable: `buz`
+# (i64.print bar.buz)     ; ~> 10
+# (i64.print foo.bar.buz) ; ~> 10
 
-(use foo.bar)
+# (use foo.bar)
 
-(i64.print buz)         ; ~> 10
-(i64.print bar.buz)     ; ~> 10
-(i64.print foo.bar.buz) ; ~> 10
+# (i64.print buz)         ; ~> 10
+# (i64.print bar.buz)     ; ~> 10
+# (i64.print foo.bar.buz) ; ~> 10
 
-(unuse foo)
+# (unuse foo)
 
-(i64.print buz)         ; ~> 10
-(i64.print bar.buz)     ; ~> undefined variable: `bar.buz`
-(i64.print foo.bar.buz) ; ~> 10
-#+END_SRC
-**** Syntax
-#+BEGIN_SRC neut
-(use LEAF)
+# (i64.print buz)         ; ~> 10
+# (i64.print bar.buz)     ; ~> undefined variable: `bar.buz`
+# (i64.print foo.bar.buz) ; ~> 10
+# #+END_SRC
+# **** Syntax
+# #+BEGIN_SRC neut
+# (use LEAF)
 
-(unuse LEAF)
-#+END_SRC
-**** Semantics
-When parsed, the statement =(use PREFIX)= inserts =PREFIX= at the head of the prefix environment, which is a list of prefixes.
+# (unuse LEAF)
+# #+END_SRC
+# **** Semantics
+# When parsed, the statement =(use PREFIX)= inserts =PREFIX= at the head of the prefix environment, which is a list of prefixes.
 
-When parsed, the statement =(unuse PREFIX)= removes =PREFIX= from the prefix environment. If the =PREFIX= is not contained in the environment, the =unuse= statement does nothing.
+# When parsed, the statement =(unuse PREFIX)= removes =PREFIX= from the prefix environment. If the =PREFIX= is not contained in the environment, the =unuse= statement does nothing.
 
-The prefix environment modifies [[#upsilon][how the compiler interprets a variable]].
+# The prefix environment modifies [[#upsilon][how the compiler interprets a variable]].
 
 *** section/end
 =section= - =end= automatically adds the specified prefix to the variables defined by =let=.
