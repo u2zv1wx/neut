@@ -1190,18 +1190,45 @@ The declarations of all the constants are found in =src/Data/MetaTerm.hs=. Their
 LEAF
 #+end_src
 **** Semantics
-Integers do not have reduction rule.
+Integers do not have reduction rule. These are intended to be used in combination with constants like =meta.int.add=.
 
 *** leaf/node
 **** Example
 #+begin_src neut
 (dry-expand (leaf a)) ; ~> `a
-(dry-expand `a) ; ~> `a
+(dry-expand `a)       ; ~> `a
 
+(dry-expand (node (leaf a) (node) (leaf b))) ; ~> `(a () b)
+(dry-expand `(a () b))                       ; ~> `(a () b)
 #+end_src
 **** Syntax
+#+begin_src neut
+(leaf LEAF)
+(node TREE ... TREE)
+#+end_src
 **** Semantics
+If =e1 ~> v1=, ..., =en ~> vn=, then =(node e1 ... en) ~> (node v1 ... vn)=. These reductions occur from left to right.
+
 **** Notes on Quote, Unquote and Splice
+We can use lisp-like quote and unquote to achive concise notation.
+
+We can quote a term =e= by writing =(quote e)=. We can also write it as =`e=.
+
+In a quotation, a symbol is regarded as a leaf. For example, =`a= is equivalent to =(leaf a)=. Also, in a quotation, a term of the form =(e1 ... en)= is regarded as a node. For example, =`(a b c)= is regarded as =(node (leaf a) (leaf b) (leaf c))=.
+
+We can cancel the effect of a quotation by using an unquote. Unquotation of =e= is represented by =(unquote e)= or =,e=. This cancels the effect of the surrounding quotation. For example, =`(a b ,c)= is parsed as =(node (leaf a) (leaf b) c)=. Thus, if the variable =c= is not defined, the term =`(a b ,c)= causes the error of undefined variable.
+
+You can compare this with the string interpolation in other languages:
+#+begin_src text
+"hello, #{my-name}" -- string interpolation
+`(hello ,x)         -- quote/unquote
+#+end_src
+
+The final one is splicing. I beleive that this one is something that can be best explained by example. Let us see one.
+#+begin_src text
+`(foo bar @(a (b c) d) buz) ; ~> `(foo bar a (b c) d buz)
+#+end_src
+That is, splicing is the operation that "lifts" all the element of a child tree of a node to its parent.
 
 * Syntax and Semantics of the Object Language
 
