@@ -463,23 +463,7 @@ Let me firstly explain the former part. Let's call the "unconsumable" version of
 - The memory representation of the value of a noema is the same as that of original =xs=.
 - The noema is copied/discarded exactly the same way as an integer.
 
-For example, consider the following code:
-#+begin_src text
-let xs : list i64 := [1, 2, 3] in
-let a := f xs in
-let b := g xs in
-top.unit
-#+end_src
-Since the =xs= is used twice, the code above is compiled into something like this:
-#+begin_src text
-let xs : list i64 := [1, 2, 3] in
-let xs-copy := copy-as (list i64) xs in
-let a := f xs-copy in
-let b := g xs in
-top.unit
-#+end_src
-
-On the other hand, consider the following code (ignore the initialization part):
+For example, consider the following code (ignore the initialization part):
 #+begin_src text
 let xs : noema (list i64) := (INITIALIZATION_OF_NOEMA) in
 let a := f xs in
@@ -498,6 +482,15 @@ which is equivalent to:
 #+begin_src text
 let xs : noema (list i64) := (INITIALIZATION_OF_NOEMA) in
 let xs-copy := xs in
+let a := f xs-copy in
+let b := g xs in
+top.unit
+#+end_src
+
+We can compare the code above with the code for =list i64=:
+#+begin_src text
+let xs : list i64 := [1, 2, 3] in
+let xs-copy := copy-as (list i64) xs in
 let a := f xs-copy in
 let b := g xs in
 top.unit
@@ -533,7 +526,7 @@ The first one: =case= is used for a term of an ordinary data-type (=list i64=), 
 
 The second one: =case= consumes the matched value (=xs=), whereas =case-noetic= does not; =case-noetic= just reads the value. More specifically, a term of type =list i64= is represented as a tuple something like this: =(TYPE_OF_INTERNAL_DATA, INTERNAL_DATA, CONSTRUCTOR_LABEL)=. =case= extracts the elements from this tuple, deallocates the tuple, and then continues computation using the obtained values (e.g. select correct branch according to =CONSTRUCTOR_LABEL=). =case-noetic= also extracts elements from this tuple, but does not deallocate the tuple. In this sense, =case-noetic= does not consume the matched value.
 
-The third one: in =case-noetic=, the types of the newly-bounded variables in the patterns are wrapped with =noema (...)=. For example, if we use =case-noetic= for a term of type =noema (list i64)=, then the =y= and =ys= in =cons y ys= will be of type =noema i64= and =noema (list i64)=, respectively. This is required to prevent an internal piece of a noema from being deallocated; If we were to set the type of =ys= as =list i64=, the code below will deallocate the =ys=:
+The third one: in =case-noetic=, the types of the newly-bounded variables in the patterns are wrapped with =noema (...)=. For example, if we use =case-noetic= for a term of type =noema (list i64)=, then the =y= and =ys= in =cons y ys= will be of type =noema i64= and =noema (list i64)=, respectively. This is required to prevent an internal piece of a noema from being deallocated. If we were to set the type of =ys= as =list i64=, the code below will deallocate the =ys=:
 #+begin_src text
 let xs : noema (list i64) := (INITIALIZATION) in
 case-noetic xs of
@@ -542,12 +535,12 @@ case-noetic xs of
   cons y ys ->
     false
 #+end_src
-since =ys= is not used. By wrapping this =ys= with =noema (...)=, we can ensure that a noema is always unconsumable and read-only.
+since =ys= is not used. By wrapping this =ys= with =noema (...)=, we can ensure that a noema is always unconsumable.
 
 If we have such =case-noetic=, then we can write more efficient =length= basically as follows:
 #+begin_src text
 -- length-internal : (tau, noema (list a)) -> i64
-define length-internal (a : tau) (xs : noema (list a)) :=
+length-internal (a : tau) (xs : noema (list a)) :=
   case-noetic xs of
     nil ->
       0
@@ -555,7 +548,7 @@ define length-internal (a : tau) (xs : noema (list a)) :=
       length-internal a ys
 
 -- length : (tau, list a) -> (list a) * i64
-define length (a : tau) (xs (list a)) :=
+length (a : tau) (xs (list a)) :=
   let xs-noema := CREATE_NOEMA &xs in
   let len := length-internal a xs-noema in
   (xs, len)
@@ -564,13 +557,13 @@ We now need to find a way to create and use noemata safely.
 
 Let us move on to the latter part. To achive safety, we will employ the idea of ST monad here.
 
-We firstly declare an opaque type =subject=, and add a tag of type =subject= to a =noema=. In other words, for a term =s : subject=, we redefine =noema a= into =noema s a=. We also define a =subject=-tagged identity monad, and name it a =noesis=; A =noesis s a= is the same as =identity a= except for the additional argument =s=.
+We firstly declare an opaque type =subject=, and add a tag of type =subject= to a =noema=. In other words, for a term =s : subject=, we redefine =noema a= into =noema s a=. We also define a =subject=-tagged identity monad, and name it a =noesis=; A =noesis s a= is the same as =identity a= except for the additional argument =s : subject=.
 
 We also define a term =noesis.run : Π (a : tau). (Π (s : subject). noesis s a) -> a=. This is defined as follows:
 #+begin_src text
 noesis.run a f =
-  let dummy-subject : subject                = cast i64 subject 0 in
-  let answer        : noesis dummy-subject a = f dummy-subject in
+  let dummy-subject = cast i64 subject 0 in
+  let answer        = f dummy-subject in
   cast (noesis dummy-subject a) a answer
 #+end_src
 That is, =noesis.run= executes given =f= by supplying it a dummy argument. This =noesis.run= is something that can be compared to =runST= in ST monad.
@@ -579,19 +572,20 @@ Using these new words, we define a syntax =with-subject s (x) computation= as fo
 #+begin_src text
   with-subject s (x) computation
 ~>
-  noesis.run * $ \(s : subject) -> do
-    let x = cast a (noema s a) x
+  -- (the `?M`s below are meta-variables and are inferred by the compiler)
+  noesis.run ?M $ \(s : subject) -> do
+    let x = cast ?M (noema s ?M) x
     ans <- computation
-    return (cast (noema s a) a x, ans)
+    return (cast (noema s ?M) ?M x, ans)
 #+end_src
 That is, what =with-subject s (x) computation= does is:
 - cast the =x= into a noema, using the same name, shadowing the original =x : a=
 - do the computation under the condition =s : subject, x : noema s a=
-- return the result of the computation, pairing it with the original =x : a=, which can be obtained by casting =x : noema s a=.
+- return the result of the computation, pairing it with the original =x : a=, which can be obtained by uncasting =x=.
 
 Using this =with-subject=, the noetic =length= can be fully implemented as follows:
 #+begin_src text
-define length-internal (s : subject) (a : tau) (xs : noema s (list a)) :=
+length-internal (s : subject) (a : tau) (xs : noema s (list a)) :=
   case-noetic xs of
     nil ->
       0
@@ -599,7 +593,7 @@ define length-internal (s : subject) (a : tau) (xs : noema s (list a)) :=
       length-internal s a ys
 
 -- length : (a : tau, _ : list a) -> (list a) * i64
-define length (a : tau) (xs (list a)) :=
+length (a : tau) (xs (list a)) :=
   with-subject s (xs)
     ((noesis.return s) i64 (length-internal s a xs))
 #+end_src
@@ -609,15 +603,15 @@ We can use noemata safely as long as we use it via =with-subject=. Here I used t
 
 (1) The content of every noema will be deallocated later. In other words, no memory leak is possible. This can be ensured since the content is returned as a part of the return value of =with-subject=.
 
-(2) If we can use a noetic variable, then the corresponding resource is always available. In other words, no use-after-free is caused by using a noetic variable. This can be seen by the following reasoning. Firstly, if a use of a noema causes a use-after-free, then the corresponding resource must be deallocated before the use of the noema. Since a use of a noema does not deallocate its content (remember that noetic variable is read-only), if a use of a noema causes a use-after-free, then the original, non-noetic variable must be used to deallocate the resource, before the use of the noema. Since the non-noetic variable is shadowed inside =with-subject=, such situation can only be happen outside the =with-subject=. That is, such situation can only be realized by returning a noema as a result of =with-subject=. However, this cannot happen by the very nature of =noesis.run=. Remember the type of =noesis.run=: =Π (a : tau). (Π (s : subject). noesis s a) -> a=. For this =noesis.run= to return a =noema=, the =a= in the type of =noesis.run= must be something like =noema s b=. Thus, the following type must be well-formed: =(Π (s : subject). noesis s (noema s b)) -> noema s b=. However, this type has an unbounded variable =s=. Therefore, =with-subject= cannot return a =noema=. That's why no use-after-free is possible.
+(2) If we can use a noetic variable, then the corresponding resource is always available. In other words, no use-after-free is caused by using a noetic variable. This can be seen by the following reasoning. Firstly, if a use of a noema causes a use-after-free, then the corresponding resource must be deallocated before the use of the noema. Since a use of a noema does not deallocate its content, if a use of a noema causes a use-after-free, then the original, non-noetic variable must be used to deallocate the resource, before the use of the noema. Since the non-noetic variable is shadowed inside =with-subject=, such situation can only be happen outside the =with-subject=. That is, such situation can only be realized by returning a noema as a result of =with-subject=. However, this cannot happen by the very nature of =noesis.run=. Remember the type of =noesis.run=: =Π (a : tau). (Π (s : subject). noesis s a) -> a=. For this =noesis.run= to return a =noema=, the =a= in the type of =noesis.run= must be something like =noema s b=. Thus, the following type must be well-formed: =(Π (s : subject). noesis s (noema s b)) -> noema s b=. However, this type has an unbounded variable =s=. Therefore, =with-subject= cannot return a =noema=. That's why no use-after-free is possible.
 
-This concludes the latter part. By the way, if you want to use the content of a noema, you can copy the content of the noema according to its type. This is what =noema.incarnate= does. This function can be used to, for example, compute the sum of a list:
+This concludes the latter part. By the way, if you want to use the content of a noema, you can "copy" the content of the noema along its type. This is what =noema.incarnate= does. This function can be used to, for example, compute the sum of a list:
 
 #+begin_src text
 -- noema.incarnate : (s : subject, a : tau, x : noema s a) -> (noema s a) * a
 
 -- sum-internal : (s : subject, xs : noema s (list i64)) -> i64
-define sum-internal (s : subject) (xs : noema s (list i64)) :=
+sum-internal (s : subject) (xs : noema s (list i64)) :=
   case-noetic xs of
     nil ->
       0
@@ -626,22 +620,18 @@ define sum-internal (s : subject) (xs : noema s (list i64)) :=
       value + sum-internal s a ys
 
 -- sum : (_ : list i64) -> (list i64) * i64
-define sum (xs (list i64)) :=
+sum (xs (list i64)) :=
   with-subject s (xs)
     ((noesis.return s) i64 (sum-internal s a xs))
 #+end_src
 
 To sum up, we can avoid copying operations by combining the resource management system of neut and the idea of ST monad.
 
+Incidentally, the region-flavored application of ST monad is not new. You can find more information by referring the work titled [[https://dl.acm.org/doi/abs/10.1145/1016850.1016867][Monadic Regions]].
+
 #+begin_quote
 The tree simpliciter can burn up, be resolved into its chemical elements, etc. But the sense — the sense of this perception, something belonging necessarily to its essence — cannot burn up; it has no chemical elements, no forces, no real properties. —— Edmund Husserl
 #+end_quote
-
-Incidentally, this region-flavored application of ST monad is not new; (add the reference of monadic regions)
-
-# As you may have already noticed, this is an approach that uses ST monad to realize named scope.
-
-# The =xs= can be deallocated (burn up). But the noema of =xs= can't be deallocated.
 
 ** Automatic Optimization via malloc/free Cancellation
 neut's static memory management enables not only the "manual" optimization we have just seen, but also another "automatic" optimization. Remember the first example:
