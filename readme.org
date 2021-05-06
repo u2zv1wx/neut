@@ -1388,113 +1388,9 @@ The behaviors of =define-prefix= and =remove-prefix= are essentially the same as
 
 *** use/unuse
 The behaviors of =use= and =unuse= are essentially the same as the ones of the meta language.
-# =use= inserts a prefix to the prefix environment. =unuse= removes a prefix from the prefix environment.
-# **** Example
-# #+BEGIN_SRC neut
-# (let foo.bar.buz (i64 10))
-
-# (i64.print buz)         ; ~> undefined variable: `buz`
-# (i64.print bar.buz)     ; ~> undefined variable: `bar.buz`
-# (i64.print foo.bar.buz) ; ~> 10
-
-# (use foo)
-
-# (i64.print buz)         ; ~> undefined variable: `buz`
-# (i64.print bar.buz)     ; ~> 10
-# (i64.print foo.bar.buz) ; ~> 10
-
-# (use foo.bar)
-
-# (i64.print buz)         ; ~> 10
-# (i64.print bar.buz)     ; ~> 10
-# (i64.print foo.bar.buz) ; ~> 10
-
-# (unuse foo)
-
-# (i64.print buz)         ; ~> 10
-# (i64.print bar.buz)     ; ~> undefined variable: `bar.buz`
-# (i64.print foo.bar.buz) ; ~> 10
-# #+END_SRC
-# **** Syntax
-# #+BEGIN_SRC neut
-# (use LEAF)
-
-# (unuse LEAF)
-# #+END_SRC
-# **** Semantics
-# When parsed, the statement =(use PREFIX)= inserts =PREFIX= at the head of the prefix environment, which is a list of prefixes.
-
-# When parsed, the statement =(unuse PREFIX)= removes =PREFIX= from the prefix environment. If the =PREFIX= is not contained in the environment, the =unuse= statement does nothing.
-
-# The prefix environment modifies [[#upsilon][how the compiler interprets a variable]].
 
 *** section/end
-=section= - =end= automatically adds the specified prefix to the variables defined by =let=.
-
-**** Example
-#+BEGIN_SRC neut
-(section pohe)
-
-(let foo (i64 10))
-
-(section qux)
-
-(let bar (i64 20))
-
-(i64.print foo)          ; ~> 10
-(i64.print pohe.foo)     ; ~> 10
-
-(i64.print bar)          ; ~> 20
-(i64.print qux.bar)      ; ~> 20
-(i64.print pohe.qux.bar) ; ~> 20
-
-(end qux)
-
-(i64.print foo)          ; ~> 10
-(i64.print pohe.foo)     ; ~> 10
-
-(i64.print bar)          ; ~> undefined variable
-(i64.print qux.bar)      ; ~> 20
-(i64.print pohe.qux.bar) ; ~> 20
-
-(end pohe)
-
-(i64.print foo)          ; ~> undefined variable
-(i64.print pohe.foo)     ; ~> 10
-
-(i64.print bar)          ; ~> undefined variable
-(i64.print qux.bar)      ; ~> undefined variable
-(i64.print pohe.qux.bar) ; ~> 20
-#+END_SRC
-**** Syntax
-#+BEGIN_SRC neut
-(section LEAF)
-
-(end LEAF)
-#+END_SRC
-**** Semantics
-The list of statement
-#+BEGIN_SRC neut
-(section FOO)
-(let x1 e1)
-...
-(let xn en)
-(end FOO)
-#+END_SRC
-is equivalent to:
-#+BEGIN_SRC neut
-(use FOO)
-(let FOO.x1 e1)
-...
-(let FOO.xn en)
-(unuse FOO)
-#+END_SRC
-In other words, the =section= - =end= statement
-- inserts [[#useunuse][use / unuse]] at the beginning and the end of the section
-- adds the name of the section as a prefix of the variables defined by =let=
-- keeps all the other statements in the section intact
-
-Each =section= must be paired with an =end= with the corresponding name.
+The behaviors of =section= and =end= are essentially the same as the ones of the meta language.
 
 ** Terms
 *** tau
@@ -1576,7 +1472,7 @@ The name of a variable is interpreted in relation with the prefix environment. F
 
 ; nullary Π-introduction
 (let f1
-  (lambda () (i64 1))) ; 'lambda' can be used instead of 'Π-introduction'
+  (lambda () (i64 1))) ; 'lambda' can be used instead of 'Π-introduction' (we just have to write `(define-macro lambda Π-introduction)`)
 
 ; binary Π-introduction
 (let f3
