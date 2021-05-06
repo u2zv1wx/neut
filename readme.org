@@ -688,7 +688,7 @@ define TYPE @FUNCTION_NAME(...) {
   (...)
 }
 #+END_SRC
-In other words, the compiler can cancel the memory deallocation at =(*1)= and the allocation at =(*2)=, reusing the allocated memory in its continuation. This is automatic malloc/free cancellation. By this fallback optimization, the compiler can emit somewhat more performant code even if a user wrote code in an inefficient way.
+In other words, the compiler can cancel the memory deallocation at =(*1)= and the allocation at =(*2)=, reusing the allocated memory in its continuation. This is automatic malloc/free cancellation. By this fallback optimization, the compiler can emit somewhat more performant code even when a user wrote code in an inefficient way.
 
 Note that the "create the string" parts are not optimized away from the resulting LLVM IR, in contrast to the one of borrowing:
 #+BEGIN_SRC llvm
@@ -713,13 +713,15 @@ Although the compiler can cancel memory allocations/deallocations, it cannot can
 - Linearity tends to result in an efficient code
 - Non-linearity tends to result in an inefficient code
 - Borrowing can be used as a convenient syntactic tool when accomplishing linearity
+- The ST-monadic approach can be combined with neut's resource management system for better performance
 - Redundant malloc/free can be reduced by automatic malloc/free cancellation
 - Borrowing-based, or "manually" optimized code is faster than cancellation-based, or "automatically" optimized code
 
 * Installation
-The currently supported platforms are: Linux (x64), macOS (x64).
+The currently supported platforms is: Linux (x64).
+# The currently supported platforms are: Linux (x64), macOS (x64).
 
-Make sure that you have already installed [[https://zlib.net/][zlib]] (>= 1.2.11), [[https://wiki.openssl.org/index.php/Libssl_API][libssl]] (>= 1.1.1), [[https://docs.haskellstack.org/en/stable/README/][stack]] (>= 2.3.0) and [[https://clang.llvm.org/][clang]] (>= 10.0.0). On Debian, for example, the first three can be installed as follows:
+Make sure that you have already installed [[https://zlib.net/][zlib]] (>= 1.2.11), [[https://wiki.openssl.org/index.php/Libssl_API][libssl]] (>= 1.1.1), [[https://docs.haskellstack.org/en/stable/README/][stack]] (>= 2.3.0) and [[https://clang.llvm.org/][clang]] (>= 11.0.0). On Debian, for example, the first three can be installed as follows:
 #+BEGIN_SRC shell
 sudo apt install zlib1g-dev libssl-dev haskell-stack
 stack upgrade --binary-only # not required if your stack is already up-to-date
@@ -733,6 +735,7 @@ Then, clone the repository and build it:
 git clone https://github.com/u2zv1wx/neut
 cd neut
 git checkout 0.2.0.0
+stack build
 # the following builds the project and tests its behavior
 # it also checks memory sanity via the clang option "-fsanitize=memory"
 stack test --test-arguments test/data --test-arguments test/compiler
