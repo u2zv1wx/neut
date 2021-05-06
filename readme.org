@@ -764,13 +764,97 @@ That pretty much should do it. I hope you enjoy this language.
 ** Statements
 
 *** define-macro, define-macro-variadic
-TBD
+=define-macro= / =define-macro-variadic= defines a term of the meta-level language.
+**** Example
+#+begin_src neut
+(define-macro foo (arg-1 arg-2 arg-3)
+  `(pohe ,arg-1 ,arg-2 ,arg-3))
+
+(dry-expand `symbol-1 `symbol-2 `symbol-3)
+; ~> `(pohe symbol-1 symbol-2 symbol-3)
+
+(define-macro-variadic foo-variadic (arg-1 rest)
+  `(pohe ,arg-1 rest))
+
+(dry-expand (foo-varidaic `symbol-1 `symbol-2 `symbol-3))
+; ~> `(pohe symbol-1 (symbol-2 symbol-3))
+#+end_src
+
+**** Syntax
+#+begin_src neut
+(define-macro LEAF TREE)
+(define-macro LEAF (LEAF ... LEAF) TREE)
+(define-macro-variadic LEAF TREE)
+(define-macro-variadic LEAF (LEAF ... LEAF) TREE)
+#+end_src
+
+**** Semantics
+=(define-macro x e)= inserts the correspondence =x ~> e= in the environment.
+
+=(define-macro f (x1 ... xn) e)= inserts the correspondence =f ~> fix (x1, ..., xn). e= in the environment.
+
+=(define-macro-variadic f (x1 ... xn) e)= inserts the correspondence =f ~> fix-variadic (x1, ..., xn). e= in the environment. This correspondence is used later when the compiler tries to reduce the variable =f=.
+
+These correspondences are used later when the compiler tries to reduce the variables.
 
 *** define-prefix, remove-prefix
-TBD
+=define-prefix= defines an alias for an existing namespace. =remove-prefix= removes an alias that is defined by =define-prefix=.
+**** Example
+#+begin_src neut
+(section foo)
+(section bar)
+(define-macro hoge `a)
+(end bar)
+(end foo)
+
+(dry-expand foo.bar.hoge) ; ~> `a
+(dry-expand Q.hoge)       ; ~> undefined meta-variable: Q.hoge
+
+(define-prefix Q foo.bar)
+
+(dry-expand Q.hoge)       ; ~> `a
+
+(define-prefix R Q)
+
+(dry-expand R.hoge)       ; ~> `a
+
+(remove-prefix R Q)
+
+(dry-expand R.hoge)       ; ~> undefined meta-variable: R.hoge
+
+(remove-prefix Q foo.bar)
+
+(dry-expand Q.hoge)       ; ~> undefined meta-variable: Q.hoge
+#+end_src
+**** Syntax
+#+begin_src neut
+(define-prefix LEAF LEAF)
+(remove-prefix LEAF LEAF LEAF)
+#+end_src
+**** Semantics
+=(define-prefix new-prefix old-prefix)= registers a new prefix correpondence =new-prefix ~> old-prefix=. This information is used for namespace resolution.
+
+=(remove-prefix new-prefix old-prefix)= removes given prefix correspondence.
 
 *** dry-expand
-TBD
+=dry-expand= outputs the result of meta-level reduction for the given term to the stdout.
+
+**** Example
+#+begin_src neut
+(dry-expand ((lambda-meta (x) `(,x ,x)) `foo))
+; ~> `(foo foo)
+#+end_src
+
+**** Syntax
+#+begin_src neut
+(dry-expand TREE)
+#+end_src
+
+**** Semantics
+Semantically, =dry-expand= does nothing.
+
+**** Notes
+This statement is for debugging purpose; We can use this statement to see how a macro is expanded.
 
 *** ensure
 =ensure= fetches the content of the specified URL for later use.
@@ -795,10 +879,8 @@ This statement is intended to be used in harmony with [[#include][include]].
 
 Archives specified in =ensure= is expected to be the ones created via [[#archive][archive]].
 
-
 *** include
 =include= "pastes" the content of the specified file.
-# temporary transfers the parsing process to the file specified by given path, if necessary.
 **** Example
 #+BEGIN_SRC neut
 (include "core/0.2.0.0/free.neut")
@@ -825,8 +907,8 @@ Archives specified in =ensure= is expected to be the ones created via [[#archive
 
 {CODE_2}
 #+END_SRC
-With the following notes:
 
+**** Notes
 (1) If the first character of the path is dot ("."), the path is interpreted as a relative one. That is, the path is calculated using the current file's directory as the base path. Otherwise, the base path is set to be the library path (i.e. =~/.local/share/neut/NEUT_VERSION/library=).
 
 (2) If the file is already included, =include= does nothing.
@@ -834,9 +916,6 @@ With the following notes:
 (3) When including a file, [[#useunuse][the prefix environment]] must be empty.
 
 (4) Cyclic inclusion is invalid.
-
-
-
 
 *** introspect
 =introspect= introspects the state of the compiler and selects statements by those information.
@@ -877,10 +956,77 @@ The =var= in =(introspect var (...))= must be a valid compile-time variable. The
 | architecture          | x86_64, aarch64, (etc.) |
 
 *** section/end
-TBD
+=section= / =end= automatically adds the specified prefix to the meta-variables defined by =define-macro= / =define-macro-variadic=.
+
+**** Example
+#+BEGIN_SRC neut
+(section pohe)
+
+(define-macro foo `a)
+
+(section qux)
+
+(define-macro bar `b)
+
+(dry-reduce foo)       ; ~> `a
+(dry-reduce pohe.foo)  ; ~> `a
+
+(dry-reduce bar)          ; ~> 20
+(dry-reduce qux.bar)      ; ~> 20
+(dry-reduce pohe.qux.bar) ; ~> 20
+
+(end qux)
+
+(dry-reduce foo)       ; ~> `a
+(dry-reduce pohe.foo)  ; ~> `a
+
+(dry-reduce bar)          ; ~> undefined variable
+(dry-reduce qux.bar)      ; ~> 20
+(dry-reduce pohe.qux.bar) ; ~> 20
+
+(end pohe)
+
+(dry-reduce foo)       ; ~> undefined variable
+(dry-reduce pohe.foo)  ; ~> `a
+
+(dry-reduce bar)          ; ~> undefined variable
+(dry-reduce qux.bar)      ; ~> undefined variable
+(dry-reduce pohe.qux.bar) ; ~> 20
+#+END_SRC
+**** Syntax
+#+BEGIN_SRC neut
+(section LEAF)
+
+(end LEAF)
+#+END_SRC
+**** Semantics
+The list of statement
+#+BEGIN_SRC neut
+(section FOO)
+(define-macro x1 e1)
+...
+(define-macro xn en)
+(end FOO)
+#+END_SRC
+is equivalent to:
+#+BEGIN_SRC neut
+(use FOO)
+(define-macro FOO.x1 e1)
+...
+(define-macro FOO.xn en)
+(unuse FOO)
+#+END_SRC
+In other words, the =section= - =end= statement
+- inserts [[#useunuse][use / unuse]] at the beginning and the end of the section
+- adds the name of the section as a prefix of the variables defined by =define-macro= / =define-macro-variadic=
+- keeps all the other statements in the section intact
+
+Each =section= must be paired with an =end= with the corresponding name.
 
 *** statement
-TBD
+**** Example
+**** Syntax
+**** Semantics
 
 *** use/unuse
 TBD
