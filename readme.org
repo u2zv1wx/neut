@@ -1157,14 +1157,48 @@ The name of a variable is interpreted in relation with the prefix environment. F
 (if-meta TREE TREE TREE)
 #+end_src
 **** Semantics
-=(if-meta e on-true on-false)= firstly reduces the =e=. If the =e= is reduced into =(node)= (i.e. =`()=, or nil), then this =if-meta= is reduced into =on-false=, and reduction for this term follows. Otherwise, this =if-meta= is reduced into =on-true=, and reduction for this term follows.
+=(if-meta e on-true on-false)= firstly reduces the =e= into a value. If the =e= is reduced into =(node)= (i.e. =`()=, or nil), then this =if-meta= is reduced into =on-false=, and reduction for this term follows. Otherwise, this =if-meta= is reduced into =on-true=, and reduction for this term follows.
 
 *** constant
+**** Example
+#+begin_src neut
+(dry-expand (meta.node.head `(a b c d))) ; ~> `a
+(dry-expand (meta.node.tail `(a b c d))) ; ~> `(b c d)
+(dry-expand (meta.leaf.new-symbol `foo)) ; ~> foo;147
+(dry-expand (meta.node.replicate 3 `foo)) ; ~> `(foo foo foo)
+(dry-expand (meta.node.reverse `(a b c d))) ; ~> `(d c b a)
+#+end_src
+**** Syntax
+#+begin_src neut
+LEAF
+#+end_src
+**** Semantics
+Every constant has its own semantics. For example, =meta.node.length= returns the length of given node:
+#+begin_src text
+(meta.node.length `(a b c d e)) ~> 5
+#+end_src
+The declarations of all the constants are found in =src/Data/MetaTerm.hs=. Their behaviors are defined in the function =reduceConstApp=, which can be found in =src/Reduce/MetaTerm.hs=.
 
 *** integer
+**** Example
+#+begin_src neut
+(dry-expand (meta.int.add 3 4)) ; ~> 7
+(dry-expand (if-meta (meta.int.lt 0 10) `a `b)) ; ~> `a
+#+end_src
+**** Syntax
+#+begin_src neut
+LEAF
+#+end_src
+**** Semantics
+Integers do not have reduction rule.
 
 *** leaf/node
 **** Example
+#+begin_src neut
+(dry-expand (leaf a)) ; ~> `a
+(dry-expand `a) ; ~> `a
+
+#+end_src
 **** Syntax
 **** Semantics
 **** Notes on Quote, Unquote and Splice
