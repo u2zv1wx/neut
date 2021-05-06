@@ -718,17 +718,9 @@ Although the compiler can cancel memory allocations/deallocations, it cannot can
 - Borrowing-based, or "manually" optimized code is faster than cancellation-based, or "automatically" optimized code
 
 * Installation
-The currently supported platforms is: Linux (x64).
-# The currently supported platforms are: Linux (x64), macOS (x64).
+The currently supported platform is: Linux (x64). macOS support is currently dropped since I do not have any macOS machine right now (I'm waiting for the 16-inch M1 MacBook Pro).
 
-Make sure that you have already installed [[https://zlib.net/][zlib]] (>= 1.2.11), [[https://wiki.openssl.org/index.php/Libssl_API][libssl]] (>= 1.1.1), [[https://docs.haskellstack.org/en/stable/README/][stack]] (>= 2.3.0) and [[https://clang.llvm.org/][clang]] (>= 11.0.0). On Debian, for example, the first three can be installed as follows:
-#+BEGIN_SRC shell
-sudo apt install zlib1g-dev libssl-dev haskell-stack
-stack upgrade --binary-only # not required if your stack is already up-to-date
-#+END_SRC
-=clang= can be installed in the way described [[https://apt.llvm.org/][here]].
-
-Also make sure that you have =~/.local/bin= in your =$PATH=.
+Make sure that you have already installed =tar=, =curl=, =stack= (>= 2.3.0) and =clang= (>= 11.0.0). Also make sure that you have =~/.local/bin= in your =$PATH=.
 
 Then, clone the repository and build it:
 #+BEGIN_SRC shell
