@@ -764,6 +764,7 @@ Now I think you are basically ready to, for example, start reading [[https://git
 That pretty much should do it. I hope you enjoy this language.
 
 * Syntax and Semantics of the Meta Language
+
 ** Statements
 
 *** define-macro, define-macro-variadic
@@ -1237,21 +1238,9 @@ That is, splicing is the operation that "lifts" all the element of a child tree 
 * Syntax and Semantics of the Object Language
 
 ** Statements
-# (fixme: the content below is out-of-date)
-
 A program of neut is a list of statements. Each statement is one of the following statements described in this section.
 
-# Please note that the descriptions in the followings are not that formal yet.
-
-# In the following, I use the symbols =LEAF= and =TREE= defined as follows:
-# #+BEGIN_SRC text
-# LEAF ::= {a sequence of character that doesn't contain '(', ')', ' ', '\n', or '"'}
-# TREE ::= LEAF | (TREE ... TREE)
-# #+END_SRC
-# I also define the symbol =STRING= to be a double-quoted string.
-
-# Note that the examples codes below usually assumes that the core library is already included.
-
+Note that the examples codes below usually assumes that the core library is included.
 
 *** enum
 =define-enum= defines a new enum-type and its values.
@@ -1303,7 +1292,6 @@ Discriminant value starts from =0= by default, and increments one by one. The "c
 All the discriminant values of an enum-type must be distinct.
 
 *** define
-# =define= evaluates given term and binds the result to the specified variable.
 =define= defines a new top-level variable.
 
 *** Example
@@ -1342,10 +1330,13 @@ All the discriminant values of an enum-type must be distinct.
 *** Syntax
 #+BEGIN_SRC neut
 (define LEAF_PLUS TREE)
+(define LEAF_PLUS (LEAF_PLUS ... LEAF_PLUS) TREE)
 
 LEAF_PLUS ::= LEAF | (LEAF TREE)
 #+END_SRC
 *** Semantics
+=(define f (xt-1 ... xt-n) e)= is equivalent to =(define f (fix f (xt-1 ... xt-n) e))=.
+
 =(define x e)= checks the type of the term =e=, then registers the correspondence =x ~> e= to the environment of the compiler. After the definition, using the variable =x= is the same as writing =e= in place of =x=.
 
 *** Note
@@ -1359,9 +1350,7 @@ Note that =define= does not evaluate the term =e=. For example, consider the fol
   (let _ foo)
   top.unit)
 #+end_src
-The code prints =hello= twice since the =define= does not reduce the body of the variable.
-
-# If a user input =e= is not parsed as a statement when it is supposed to be, the compiler interprets it as =(let _ e)=.
+The code prints =hello= not once but twice, since the =define= does not reduce the body of the variable.
 
 *** define-prefix, remove-prefix
 The behaviors of =define-prefix= and =remove-prefix= are essentially the same as the ones of the meta language.
@@ -1384,7 +1373,9 @@ The behaviors of =define-prefix= and =remove-prefix= are essentially the same as
 (reduce TREE)
 #+end_src
 **** Semantics
-=(reduce e)= reduces (evaluates) the term =e=.
+=(reduce e1 ... en)= is equivalent to =(reduce (with identity.bind e1 ... en))= when =n > 1=.
+
+=(reduce e)= reduces - evaluates - the term =e=.
 
 *** use/unuse
 The behaviors of =use= and =unuse= are essentially the same as the ones of the meta language.
@@ -1422,11 +1413,11 @@ well-formed(Γ)
 *** variable
 **** Example
 #+BEGIN_SRC neut
-(let x (i64 10))
+(define x (i64 10))
 
 (i64.print x) ; ~> 10
 
-(let _ (i64 20)) ; anonymous variable
+(define _ (i64 20)) ; anonymous variable
 #+END_SRC
 **** Syntax
 #+BEGIN_SRC neut
@@ -1460,8 +1451,12 @@ The name of a variable is interpreted in relation with the prefix environment. F
 =Π= is the universal quantification.
 **** Example
 #+BEGIN_SRC neut
+; nullary Π-introduction
+(define f1
+  (lambda () (i64 1))) ; 'lambda' can be used instead of 'Π-introduction' (we just have to write `(define-macro lambda Π-introduction)`)
+
 ; unary Π-introduction
-(let f2
+(define f2
   (Π-introduction ((x i64)) x))
 
 ; Π-elimination
@@ -1470,22 +1465,26 @@ The name of a variable is interpreted in relation with the prefix environment. F
 ; Π-elimination with the familar (or, implicit) syntax
 (i64.print (f2 2))
 
-; nullary Π-introduction
-(let f1
-  (lambda () (i64 1))) ; 'lambda' can be used instead of 'Π-introduction' (we just have to write `(define-macro lambda Π-introduction)`)
-
 ; binary Π-introduction
-(let f3
+(define f3
   (λ ((x i64)   ; an argument with type annotation
       y)        ; an argument without type annotation
     (i64.add x y)))
 
 (i64.print (f3 1 2))
+
+; fix
+(define fact
+  (Π-introduction-fix self ((x i64))
+    (if (icmp-sle-i64 x 0) ; i.e. if x <= 0
+      1
+      (mul-i64 x (self (sub-i64 x 1))))))
 #+END_SRC
 **** Syntax
 #+BEGIN_SRC neut
 (Π (LEAF_PLUS*) B)
 (Π-introduction (LEAF_PLUS*) e)
+(Π-introduction-fix LEAF_PLUS (LEAF_PLUS*) e)
 (Π-elimination TREE+)
 (TREE+)
 
@@ -1503,6 +1502,11 @@ LEAF_PLUS ::= LEAF | (LEAF TREE)
  Γ |- (Π-introduction ((x1 A1) ... (xn An)) e) : (Π ((x1 A1) ... (xn An)) B)
 
 
+       Γ, f : (Π ((x1 A1) ... (xn An)) B), x1 : A1, ..., xn : An |- e : B
+--------------------------------------------------------------------------------- (Π-introduction-fix)
+Γ |- (Π-introduction-fix f ((x1 A1) ... (xn An)) e) : (Π ((x1 A1) ... (xn An)) B)
+
+
 Γ |- e : (Π ((x1 A1) ... (xn An)) B)   Γ |- e1 : A1   (...)   Γ |- en : An {xi := ei}
 -------------------------------------------------------------------------------------- (Π-elimination)
               Γ |- (Π-elimination e e1 ... en) : B {xi := ei}
@@ -1514,28 +1518,20 @@ LEAF_PLUS ::= LEAF | (LEAF TREE)
 
 (Π-elimination (Π-introduction ((x1 A1) ... (xn An)) e) v1 ... vn)
 ~> e {x1 := v1, ..., xn := vn}
+
+(Π-elimination (Π-introduction-fix self ((x1 A1) ... (xn An)) e) v1 ... vn)
+~> e {x1 := v1,
+      ...,
+      xn := vn,
+      self := (Π-introduction-fix self ((x1 A1) ... (xn An)) e)}
 #+END_SRC
 **** Notes
 If a tree =(e e1 ... en)= is not parsed into any other terms, the tree is regarded as =(Π-elimination e e1 ... en)=.
 
-If the name of an argument of a Π-introduction is "_", the compiler automatically generates a fresh name so that the variable cannot be used in its scope.
+If the name of an argument of a Π-introduction is =_=, the compiler automatically generates a fresh name so that the variable cannot be used in its scope.
 
 Note that the arguments of a lambda-abstraction is generalized from unary to n-ary. This enables the compiler to emit more performant code when a lambda-abstraction receives multiple arguments; Without that generalization, the arguments must be represented as a tuple, discarding the possibility to pass the arguments of a function using multiple registers.
 
-Some additional notations for Π are defined in =core/VERSION/notation.neut=:
-#+BEGIN_SRC neut
-(notation forall Π)
-
-(notation Pi Π)
-
-(notation lambda Π-introduction)
-
-(notation λ Π-introduction)
-
-; tells the compiler that the type of `e` is `t`
-(notation (witness t e)
-  ((λ ((x t)) x) e))
-#+END_SRC
 Incidentally, I personally recommend you to use the =witness= notation above when defining a function to write the resulting type of the function explicitly. For example, the code
 #+BEGIN_SRC neut
 (define fact ((x i64))
@@ -1552,42 +1548,9 @@ is preferred to:
     (mul-i64 x (fact (sub-i64 x 1)))))
 #+END_SRC
 
-*** COMMENT Π-introduction-fix
-=Π-introduction-fix= is for recursion.
-**** Example
-#+BEGIN_SRC neut
-(let fact
-  (fix self ((x i64))
-    (if (icmp-sle-i64 x 0) ; i.e. if x <= 0
-      1
-      (mul-i64 x (self (sub-i64 x 1))))))
-#+END_SRC
-**** Syntax
-#+BEGIN_SRC neut
-(fix LEAF_PLUS (LEAF_PLUS ... LEAF_PLUS) TREE)
+As for =Π-introduction-fix=, every tail call is optimized into a loop.
 
-LEAF_PLUS ::= LEAF | (LEAF TREE)
-#+END_SRC
-**** Inference Rule
-#+BEGIN_SRC text
-Γ, f : (Π ((x1 A1) ... (xn An)) B), x1 : A1, ..., xn : An |- e : B
--------------------------------------------------------------------- (fix)
-Γ |- (fix f ((x1 A1) ... (xn An)) e) : (Π ((x1 A1) ... (xn An)) B)
-#+END_SRC
-**** Semantics
-#+BEGIN_SRC neut
-(Π-elimination (fix self ((x1 A1) ... (xn An)) e) v1 ... vn)
-~> e {x1 := v1,
-      ...,
-      xn := vn,
-      self := (fix self ((x1 A1) ... (xn An)) e)}
-#+END_SRC
-**** Notes
-Every tail call is optimized into a loop.
-
-The logic of neut doesn't adopt the universe hierarchy, and thus inconsistent. This means that the Z combinator can be written in the source language as an ordinary term. In other words, from the viewpoint of expressive power, =fix= is simply redundant. The existence of =fix= is just for optimization purpose.
-
-# (By the way, can it be said that the weakly-normalizing fragment of CoC-without-universe-hierarchy (CoC-) is consistent? If it is true, it seems to me that we can prove a theorem by taking a proof term of CoC- and check if it halts by trying to reduce the term into its normal form; Or just a delusion?)
+Also, remember that the logic of neut doesn't adopt the universe hierarchy, and thus inconsistent. This means that the Z combinator can be written in the source language as an ordinary term. In other words, from the viewpoint of expressive power, =Π-introduction-fix= is simply redundant. The existence of =fix= is just for optimization purpose.
 
 *** constant
 =constant= is for external constants.
