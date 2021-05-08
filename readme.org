@@ -1696,144 +1696,11 @@ well-formed(Γ)   {`l` is a value of enum-type `(enum E)`}
 **** Notes
 The cases of an enum-elimination must be exhaustive.
 
-# ** array
-# =array= is the array type in LLVM.
-# *** Example
-# #+BEGIN_SRC neut
-# ; float array
-# (let _
-#   (array-introduction f16 3.28 2.14 2.0 9.82))
-
-# (let xs
-#   (array-introduction i64 1 2 -30 20))
-
-# (let k
-#   (with identity.bind
-#     (let a (i64.array-access 0 4 &xs))
-#     (let b (i64.array-access 1 4 &xs))
-#     (let c (i64.array-access 2 4 &xs))
-#     (let d (i64.array-access 3 4 &xs))
-#     (erase xs)
-#     (i64.add a (i64.add b (i64.add c d)))))
-
-# (i64.print k) ; -7
-
-# (i64.print
-#   (array-elimination i64 (a b c d) xs
-#     (i64.add a (i64.add b (i64.add c d))))) ; -7
-# #+END_SRC
-# *** Syntax
-# #+BEGIN_SRC text
-# ; the array type
-# (array TREE LOWTYPE)
-
-# (array-introduction LOWTYPE TREE ... TREE)
-
-# (array-elimination LOWTYPE (LEAF_PLUS ... LEAF_PLUS) TREE TREE)
-
-# LOWTYPE ::= i{n} | f{n}
-
-# LEAF_PLUS ::= LEAF | (LEAF TREE)
-# #+END_SRC
-# *** Inference Rule
-# #+BEGIN_SRC text
-# Γ |- len : i64    {`k` is an integer type or a float type}
-# ----------------------------------------------------------- (array)
-#               Γ |- (array len k) : tau
-
-
-# Γ |- l1 : k   ...  Γ |- ln : k      {`k` is an integer type or a float type}
-# ----------------------------------------------------------------------------- (array-introduction)
-#        Γ |- (array-introduction k l1 ... ln) : (array (i64 n) k)
-
-
-# Γ |- e1 : (array (i64 n) k)     Γ, x1 : k, ..., xn : k |- e2 : B
-# ------------------------------------------------------------------- (array-elimination)
-#  Γ |- (array-elimination k (x1 ... xn) e1 e2) : B
-# #+END_SRC
-# *** Semantics
-# #+BEGIN_SRC neut
-# (array-elimination _ (x1 ... xn) (array-introduction _ e1 ... en) e)
-# ~> e {x1 := e1,
-#       ...,
-#       xn := en}
-# #+END_SRC
-# *** Notes
-# The type of elements of an array must be the integer type, or the float type.
-
-# The memory layout of an array is the same as the one of LLVM; For example, an array of type =i8= is aligned as in the array =[0 x i8]= in LLVM.
-
-# The array type can be used, for example, to implement string.
-
-# You won't use =array-elimination= in actual code; You would use the constant =array-access= instead.
-
-# ** struct
-# =struct= is the struct type in LLVM.
-# *** Example
-# #+BEGIN_SRC neut
-# (let st
-#   (struct-introduction
-#     (f16 3.8)
-#     (i8 8)
-#     (i16 -300)
-#     (f32 33.0)
-#     (i64 30)
-#     (i64 10)
-#     (f64 -329444.4444444)
-#     (i8 9)))
-
-# (i64.print
-#   (struct-elimination
-#     ((_ f16) (_ i8) (_ i16) (_ f32) (z i64) (w i64) (_ f64) (_ i8))
-#     st
-#     (i64.add z w))) ; ~> 40
-# #+END_SRC
-# *** Syntax
-# #+BEGIN_SRC neut
-# ; the struct type
-# (struct LOWTYPE ... LOWTYPE)
-
-# (struct-introduction (LOWTYPE TREE) ... (LOWTYPE TREE))
-
-# (struct-elimination ((LEAF LOWTYPE) ... (LEAF LOWTYPE)) TREE TREE)
-
-# LOWTYPE ::= i{n} | f{n}
-# #+END_SRC
-# *** Inference Rule
-# #+BEGIN_SRC text
-# well-formed(Γ)    {Every `ki` in {`k1`, ..., `kn`} is either an integer type or a float type}
-# ---------------------------------------------------------------------------------------------- (struct)
-#                          Γ |- (struct k1 ... kn) : tau
-
-
-# Γ |- e1 : k1   (...)   Γ |- en : kn      Γ |- (struct k1 ... kn) : tau
-# -------------------------------------------------------------------------- (struct-introduction)
-#    Γ |- (struct-introduction (e1 k1) ... (en kn)) : (struct k1 ... kn)
-
-
-# Γ |- e1 : (struct k1 ... kn)       Γ, x1 : k1, ..., xn : kn |- e2 : B
-# --------------------------------------------------------------------------- (struct-elimination)
-#     Γ |- (struct-elimination ((x1 k1) ... (xn kn)) e1 e2) : B
-# #+END_SRC
-# *** Semantics
-# #+BEGIN_SRC text
-# (struct-elimination (x1 _) ... (xn _) (struct-introduction (_ e1) ... (_ en)) e)
-# ~> e {x1 := e1,
-#       ...,
-#       xn := en}
-# #+END_SRC
-# *** Notes
-# Note that an element of a struct type in neut is restricted into an integer or a float. This means, among others, that you can't write a struct that contains another struct, or a memory region. This might get in the way when you implement an interface of a syscall; You might want to use the constant =unsafe.cast= in that case, or "flatten" the struct.
-
-# The memory layout of a struct is the same as the one of LLVM; For example, a struct of type =(struct i8 f16 i32)= is aligned as in a struct of type ={i8, f16, f32}= in LLVM.
-
-# The struct type is intended to be used for implementation of interfaces of syscalls.
-
 *** question
 =question= requests the compiler to show the type of a term.
 **** Example
 #+BEGIN_SRC neut
-(let x top.unit)
+(define x top.unit)
 
 (question x)
 #+END_SRC
@@ -1858,102 +1725,84 @@ The cases of an enum-elimination must be exhaustive.
 The type of a term wrapped by =question= is reported by the compiler. This might be useful when used in harmony with a linter like flycheck.
 
 *** derangement
-TBD
-# ** LLVM-Based Primitives
-# neut currently supports the following LLVM instructions: =fneg, add, fadd, sub, fsub, mul, fmul, udiv, sdiv, fdiv, urem, srem, frem, shl, lshr, ashr, and, or, xor, trunc, zext, sext, fptrunc, fpext, fptoui, fptosi, uitofp, sitofp, icmp, fcmp=.
+A =derangement= is something that can be used to utilize an extra-linguistic feature, such as syscall.
+**** Example
+#+begin_src neut
+; call an external function "malloc"
+(define allocate ((size i64))
+  (witness unsafe.pointer
+    (derangement (external malloc) size)))
 
-# Each instruction is "separated" according to its type. Let us take the instruction =fneg= for example. This instruction can be applied to =half=, =float=, and =double= in LLVM. Thus, neut has the following three constants as primitives: =fneg-f16, fneg-f32, fneg-f64=. For the instruction =add=, the constants =add-i1, add-i2, ..., add-i64= is available.
+; use LLVM store instruction
+(define store-i8 ((value i8) (ptr unsafe.pointer))
+  (witness top
+    (derangement (store i8) ptr value)))
 
-# The instructions with two type arguments like =fptosi= is named as =fptosi-f64-i32, fptosi-f32-i1, fptosi-f16-i5=, etc.
+; use nop to define the unsafe cast
+(define unsafe.cast ((A tau) (B tau) (x A))
+  (witness B
+    (derangement nop x)))
 
-# As for the comparison operators =icmp= and =fcmp=, the names are of the form ={icmp, fcmp}-{CONDITION}-{TYPE}=. For example, =icmp-eq-i16, icmp-ult-i32, icmp-sge-i64, fcmp-ogt-f32, fcmp-ord-f16, fcmp-ueq-f64= are all valid.
+; using a syscall (write)
+(define write ((out file-descriptor) (buf unsafe.pointer) (len i64))
+  (witness i64
+    (derangement (syscall 1) out buf len)))
+#+end_src
+**** Syntax
+#+begin_src text
+(derangement DERANGEMENT-KIND TREE ... TREE)
 
-# The semantics of these instructions is as specified in the [[https://llvm.org/docs/LangRef.html][LLVM Language Reference Manual]].
+DERANGEMENT_KIND :=
+  (syscall INT) |
+  (external LEAF) |
+  (load LOW_TYPE) |
+  (store LOW_TYPE) |
+  (create-array LOW_TYPE) |
+  (create-struct LOW_TYPE ... LOW_TYPE) |
+  nop
 
-# ** Syscalls
-# neut supports syscalls, although its current support is far from complete. As you can see in =core/VERSION/constant/{linux, darwin}.neut=, only basic syscalls like =read, write, exit, open, close= are supported. This is not something that is caused by theoretical difficulties; Rather, this is simply because of my limited resource of time.
+LOW_TYPE :=
+  i{n} |
+  f{n} |
+  (pointer LOW_TYPE) |
+  (array INT LOW_TYPE) |
+  (struct LOW_TYPE ... LOW_TYPE)
+#+end_src
+**** Inference Rule
+#+BEGIN_SRC text
+Γ |- e1 : A1   ...   Γ |- en : An   (k is a derengemnt-kind)    Γ |- B : Type
+------------------------------------------------------------------------------- (derangement)
+             Γ |- (derangement k e1 ... en) : B
+#+END_SRC
+**** Semantics
+=(derangement (syscall k) e1 ... en)= calls the syscall =k= with =e1=, ..., =en= as its argument.
 
-# It would be worth noting that a syscall can't produce/consume a resource. For example, the syscall =write= is declared to have the following type in neut:
-# #+BEGIN_SRC neut
-# (constant os.write
-#   (Π
-#     ((len i64)
-#      (out file-descriptor)
-#      (buf (array len i8))
-#      (nbyte i64))
-#     (product (array len i8) i64)))
-# #+END_SRC
-# Compare the type above with the C signature of =write=:
-# #+BEGIN_SRC c
-# ssize_t write(int fildes, const void *buf, size_t nbyte);
-# #+END_SRC
-# Ignoring the =(len i64)= part that is necessary to receive an array of arbitrary length, the crucial difference here is the types of the codomains. While the latter one returns ordinary =ssize_t= (integer), the former one also returns the original array. This is because the syscall =write= doesn't consume (i.e. deallocate) given string. If =write= in neut didn't return the original string, the string would be never freed in the succeeding program, causing space leak.
+=(derangement (external f) e1 ... en)= calls the external function =f= with =e1=, ..., =en= as its argument.
 
-# Regarding macOS: You may note that the "syscalls" are lowered to some external interface functions on macOS. This is because macOS doesn't support a direct use of a syscall; Indeed, for example, if we were to use the syscall =fork= directly (0x2000002), a succeeding =malloc= causes a fatal error, saying something like =mach_vm_map(size=1048576) failed (error code=268435459)=.
+=(derangement (load t) e)= loads the value from the pointer specified by =e=, assuming that the value is of type =t=.
 
-# Implementation note: A syscall can be added via the following procedure:
-# 1. Declare corresponding constant (like =os.write=) using the [[#constant][constant]] statement
-# 2. Register its argument information and the syscall number in =src/Data/Syscall.hs=
-# 3. Rebuild the compiler and run some test codes to check if it really works
-# Here, the "argument information" is a list consists of one of the following tags: "immediate", "struct", "array", and "unused". This information is necessary to generate a corresponding syscall without writing each function definition explicitly. For example, consider you add a syscall =foo= with its argument information ["unused", "immediate", "struct", "array"]. This creates a function with 4 arguments. Let us call these arguments =x1=, =x2=, =x3=, and =x4=. The compiler then generates a function that calls the syscall, assuming that the "struct"- and "array"-tagged arguments are borrowed one. That is, the compiler generates a function that is defined schematically as follows:
-# #+BEGIN_SRC haskell
-# syscall-foo x1 x2 x3 x4 :=
-#   let result := CALL_SYSCALL(foo, x2, x3, x4) in
-#   return (x2, x3, result)
-# #+END_SRC
-# Using this mechanism, for example, the actual implementation of the syscall =os.write= above can be generated from ["unused", "immediate", "array", "immediate"]:
-# #+BEGIN_SRC haskell
-# syscall-os.write A out buf nbyte :=
-#   let result := CALL_SYSCALL(write, out, buf, nbyte) in
-#   return (buf, result)
-# #+END_SRC
+=(derangement (store t) e v)= stores the value =v= to the pointer specified by =e=, assuming that the value is of type =t=.
 
-# ** Array Indexing
-# neut offers a family of constants that allows us to access an element of an array. The names of these constants are of the form ={LOWTYPE}.array-access=, where the ={LOWTYPE}= is either =i{n}= or =f{n}=. For example, =i8.array-access= can be used for indexing of an array of type =(array N i8)=.
+=(derangement (create-array t) e1 ... en)= creates an array =[e1, ..., en]=, assuming that the values are of type =t=. The behavior of =create-array= can be illustrated as follows:
+#+begin_src text
+let p := malloc(size-of(t) * n) in
+let _ := store(p + (size-of(t) * 0), e1) in
+let _ := store(p + (size-of(t) * 1), e2) in
+...
+let _ := store(p + (size-of(t) * (n-1)), en) in
+p
+#+end_src
 
-# The types of these accesser are of the following form:
-# #+BEGIN_SRC neut
-# (Π
-#   ((i i64)
-#    (n i64)
-#    (_ (array n LOWTYPE)))
-#   (product (array n LOWTYPE) LOWTYPE))
-# #+END_SRC
-# where the first argument =i= specifies the index of the array, and the second argument =n= specifies the length of the array. Using this constant, one can use an element of an array without consuming the array as follows:
-# #+BEGIN_SRC neut
-# (let xs
-#   (array-introduction i64 1 2 -30 20))
+=(derangement (create-struct t1 ... tn) e1 ... en)= creates a struct ={t1, ..., tn}=, assuming that the value =ei= is of type =ti=.
 
-# (with identity.bind
-#   (let a (i64.array-access 0 * &xs)) ; the `*` is inferred to be `4`, since the length of `xs` is 4
-#   (let b (i64.array-access 1 * &xs))
-#   (let c (i64.array-access 2 * &xs))
-#   (let d (i64.array-access 3 * &xs))
-#   (i64.add a (i64.add b (i64.add c d)))) ; 1 + 2 + (-30) + 20
-# #+END_SRC
+=(derangement nop e)= simply returns the =e=.
 
-# ** Unsafe Cast
-# The constant =unsafe.cast : Pi (A : tau, B : tau, x : A). B= is available (assuming that the constant is declared using the statement [[#constant][constant]]). The semantics of this constant is the no-op cast:
-# #+BEGIN_SRC neut
-# (unsafe.cast t1 t2 e)
-# ~> e
-# #+END_SRC
+**** Note
+The arguments and the resulting type of a derangement do not have any restrictions, and thus a derangement is inherently unsafe. Derangements are intended to be used with wrapper functions.
 
-# You can easily break the resource management system of neut using this constant. Consider the following example:
-# #+BEGIN_SRC neut
-# (ensure core/0.2.0.0
-#   "https://github.com/u2zv1wx/neut-core/raw/master/release/0.2.0.0.tar.gz")
+The resulting type must be annotated using something like =witness= since there is no way to determine it by the =derangement= itself.
 
-# ; (note that this declares the constant unsafe.cast)
-# (include "core/0.2.0.0/core.neut")
-
-# (let z (unsafe.cast i64 (Π ((_ i64)) i64) 1))
-
-# (let foo z) ; (*1)
-
-# (let bar z) ; (*2)
-# #+END_SRC
-# The code above uses the variable =z= for the two times. Since =z= is casted to a Π-type, The resulting code tries to copy the integer =1= as if it were a closure. Since the internal representation of a closure at least uses 3 words, this causes an access to an invalid memory region, that is, a segmentation fault.
+Incidentally, the behavior of =unsafe.pointer= from the viewpoint of resource management is the same as an integer.
 
 ** Auxiliary Statements
 
@@ -2116,7 +1965,10 @@ TBD
 # The other destructors are defined similarly.
 
 *** define-resource-type
-TBD
+=define-resource-type= creates a new type by specifying how the terms of the type is copied/discarded.
+**** Example
+**** Syntax
+**** Semantics
 
 
 ** Auxiliary Terms
