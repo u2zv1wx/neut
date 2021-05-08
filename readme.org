@@ -72,6 +72,9 @@ Here I briefly summarize the basic properties of neut before diving into the det
     - [[#derangement][derangement]]
   - [[#auxiliary-statements][Auxiliary Statements]]
     - [[#define-data][define-data]]
+    - [[#example-1][Example]]
+    - [[#syntax-1][Syntax]]
+    - [[#semantics-1][Semantics]]
     - [[#define-codata][define-codata]]
     - [[#define-resource-type][define-resource-type]]
   - [[#auxiliary-terms][Auxiliary Terms]]
@@ -82,13 +85,13 @@ Here I briefly summarize the basic properties of neut before diving into the det
     - [[#partial-application][Partial Application]]
 - [[#compiler-subcommands][Compiler Subcommands]]
   - [[#archive][archive]]
-    - [[#example-1][Example]]
+    - [[#example-2][Example]]
     - [[#notes][Notes]]
   - [[#build][build]]
-    - [[#example-2][Example]]
+    - [[#example-3][Example]]
     - [[#notes-1][Notes]]
   - [[#check][check]]
-    - [[#example-3][Example]]
+    - [[#example-4][Example]]
     - [[#notes-2][Notes]]
 - [[#contribution][Contribution]]
   - [[#development][Development]]
@@ -1807,94 +1810,45 @@ Incidentally, the behavior of =unsafe.pointer= from the viewpoint of resource ma
 ** Auxiliary Statements
 
 *** define-data
-TBD
-# =inductive= defines an inductive type, its introduction rules (constructors), and its pattern match function.
-# *** Example
-# #+BEGIN_SRC neut
-# (inductive list ((a tau))
-#   (nil ()
-#     (list a))
-#   (cons ((_ a) (_ (list a)))
-#     (list a)))
+=define-data= defines an algebraic data type.
 
-# (define length
-#   ((a tau)
-#    (xs (list a)))
-#   (list.case i64 a xs
-#     (λ ()
-#       0)
-#     (λ (_ ys)
-#       (add-i64 1 (length a ys)))))
+*** Example
+#+BEGIN_SRC neut
+; this defines `list`, `list.nil` and `list.cons`
+(define-data list ((a tau))
+  (nil)
+  (cons (head-value a) (tail-value (list a))))
 
-# (let xs (list.cons * 10 (list.cons * 20 (list.nil i64))))
+(define is-null
+  ((a tau)
+   (xs (list a)))
+  (witness bool
+    (case xs
+      ((list.nil)
+        bool.true)
+      ((list.cons _ _)
+        bool.false))))
 
-# (i64.print (length xs)) ; ~> 2
+(define-data free ((g (hom tau tau)) (a tau))
+  (pure (_ a))  ; the name of a constructor argument can be "_"
+  (impure
+    (b tau) ; dependence
+    (_ (g b))
+    (_ (hom b (free g a)))))
+#+END_SRC
+*** Syntax
+#+BEGIN_SRC neut
+(define-data LEAF ((LEAF TREE) ... (LEAF TREE))
+  (LEAF ((LEAF TREE) ... (LEAF TREE))
+    TREE)
+  ...
+  (LEAF ((LEAF TREE) ... (LEAF TREE))
+    TREE))
+#+END_SRC
+*** Semantics
+A =define-data= defines a so-called algebraic data type and its introduction rules (or the constructors of the inductive type). It also registers the type as an algebraic data type so that it can be used in combination with =case= and =case-noetic=.
 
-# ; mutually inductive types
-# (inductive
-#   (even ((_ (nat)))
-#     (zero-is-even
-#       ()
-#       (even (nat.zero)))
-#     (succ-of-odd-is-even
-#       ((n (nat))
-#        (_ (odd n)))
-#       (even (nat.succ n))))
-#   (odd ((_ (nat)))
-#     (succ-of-even-is-odd
-#       ((n (nat))
-#        (_ (even n)))
-#       (odd (nat.succ n)))))
-# #+END_SRC
-# *** Syntax
-# #+BEGIN_SRC neut
-# (inductive LEAF ((LEAF TREE) ... (LEAF TREE))
-#   (LEAF ((LEAF TREE) ... (LEAF TREE))
-#     TREE)
-#   ...
-#   (LEAF ((LEAF TREE) ... (LEAF TREE))
-#     TREE))
-
-# ; n-mutual inductive type
-# (inductive
-#   (LEAF ((LEAF TREE) ... (LEAF TREE))
-#     (LEAF ((LEAF TREE) ... (LEAF TREE))
-#       TREE)
-#     ...
-#     (LEAF ((LEAF TREE) ... (LEAF TREE))
-#       TREE))
-#   ...
-#   (LEAF ((LEAF TREE) ... (LEAF TREE))
-#     (LEAF ((LEAF TREE) ... (LEAF TREE))
-#       TREE)
-#     ...
-#     (LEAF ((LEAF TREE) ... (LEAF TREE))
-#       TREE)))
-# #+END_SRC
-# *** Semantics
-# When parsed, the =inductive= statement is translated into the =let= statements that defines (1) the inductive type, (2) the introduction rules (or the constructors of the inductive type), and (3) the pattern match function. For example, consider the following =inductive= statement:
-# #+BEGIN_SRC neut
-# (inductive list ((a tau))
-#   (nil ()
-#     (list a))
-#   (cons ((_ a) (_ (list a)))
-#     (list a)))
-# #+END_SRC
-# Given this statement, the compiler generates the =let= statements that define the followings:
-# 1. The inductive type =list : Pi (a : tau). tau=
-# 2. The introduction rules (constructors) of the type:
-#    - =list.nil : Pi (a : tau). list a=
-#    - =list.cons : Pi (a : tau, _ : a, _ : list a). list a=
-# 3. The pattern matching function of the type:
-#    - =list.case : Π (z : tau, a : tau, _ : list a, on-nil : Π (). z, on-cons : Π (_ : a, _ : list a). z). z=
-# The structure of a pattern matching function is: =Π (RESULT_TYPE : tau, {ARGUMENTS_OF_THE_INDUCTIVE_TYPE}, {THE_TERM_BEING_MATCHED}, {LIST_OF_CLAUSES}). RESULT_TYPE=.
-
-# The codomain of each constructor must be of the form =(a e1 ... en)=, where the =a= is the inductive type being defined. For example,
-# #+BEGIN_SRC neut
-# (inductive foo ((x bool))
-#   (bar () i64))
-# #+END_SRC
-# is an invalid =inductive= statement, since the codomain of =bar= is not of the form =(foo _)=, but =i64=.
+TBD: write about =case=
 
 *** define-codata
 TBD
