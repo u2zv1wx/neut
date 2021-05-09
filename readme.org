@@ -72,9 +72,6 @@ Here I briefly summarize the basic properties of neut before diving into the det
     - [[#derangement][derangement]]
   - [[#auxiliary-statements][Auxiliary Statements]]
     - [[#define-data][define-data]]
-    - [[#example-1][Example]]
-    - [[#syntax-1][Syntax]]
-    - [[#semantics-1][Semantics]]
     - [[#define-codata][define-codata]]
     - [[#define-resource-type][define-resource-type]]
   - [[#auxiliary-terms][Auxiliary Terms]]
@@ -85,13 +82,13 @@ Here I briefly summarize the basic properties of neut before diving into the det
     - [[#partial-application][Partial Application]]
 - [[#compiler-subcommands][Compiler Subcommands]]
   - [[#archive][archive]]
-    - [[#example-2][Example]]
+    - [[#example-1][Example]]
     - [[#notes][Notes]]
   - [[#build][build]]
-    - [[#example-3][Example]]
+    - [[#example-2][Example]]
     - [[#notes-1][Notes]]
   - [[#check][check]]
-    - [[#example-4][Example]]
+    - [[#example-3][Example]]
     - [[#notes-2][Notes]]
 - [[#contribution][Contribution]]
   - [[#development][Development]]
@@ -1812,7 +1809,7 @@ Incidentally, the behavior of =unsafe.pointer= from the viewpoint of resource ma
 *** define-data
 =define-data= defines an algebraic data type.
 
-*** Example
+**** Example
 #+BEGIN_SRC neut
 ; this defines `list`, `list.nil` and `list.cons`
 (define-data list ((a tau))
@@ -1836,94 +1833,111 @@ Incidentally, the behavior of =unsafe.pointer= from the viewpoint of resource ma
     (_ (g b))
     (_ (hom b (free g a)))))
 #+END_SRC
-*** Syntax
+**** Syntax
 #+BEGIN_SRC neut
 (define-data LEAF ((LEAF TREE) ... (LEAF TREE))
-  (LEAF ((LEAF TREE) ... (LEAF TREE))
-    TREE)
+  (LEAF (LEAF TREE) ... (LEAF TREE))
   ...
-  (LEAF ((LEAF TREE) ... (LEAF TREE))
-    TREE))
+  (LEAF (LEAF TREE) ... (LEAF TREE)))
 #+END_SRC
-*** Semantics
+**** Semantics
 A =define-data= defines a so-called algebraic data type and its introduction rules (or the constructors of the inductive type). It also registers the type as an algebraic data type so that it can be used in combination with =case= and =case-noetic=.
 
-TBD: write about =case=
+(TBD: write about =case= and =case-noetic=)
 
 *** define-codata
-TBD
-# The =record= statement creates a record type, its elimination rules (destructors), and its introduction rule.
-# *** Example
-# #+BEGIN_SRC neut
-# (record my-record ((a tau))
-#   (item-1
-#     a)
-#   (item-2
-#     i64)
-#   (item-3
-#     top))
+=define-codata= defines a record type that can also be recursive.
+**** Example
+#+begin_src neut
+(define-codata monad ((m (hom tau tau)))
+  (as-functor
+    (functor m))
+  (return
+    (return-type m))
+  (bind
+    (bind-type m)))
 
-# (let item
-#   (my-record.new
-#     i64
-#     10
-#     20
-#     top.unit))
+(define-data option ((a tau))
+  (none)
+  (some (value a)))
 
-# (i64.print (my-record.item-1 i64 item)) ; ~> 10
+(define option.as-functor
+  (witness (functor option)
+    ...))
 
-# (i64.print (my-record.item-2 i64 item)) ; ~> 20
-# #+END_SRC
-# *** Syntax
-# #+BEGIN_SRC neut
-# (record LEAF ((LEAF TREE) ... (LEAF TREE))
-#   (LEAF TREE)
-#   ...
-#   (LEAF TREE))
-# #+END_SRC
-# *** Semantics
-# When parsed, the =record= statement is translated into =let= statements that defines (1) the record type, (2) the elimination rules (or the destructors of the record type), and (3) the introduction rule. For example, consider the following =record= statement:
-# #+BEGIN_SRC neut
-# (record my-record ((a tau))
-#   (item-1
-#     a)
-#   (item-2
-#     i64)
-#   (item-3
-#     top))
-# #+END_SRC
-# Given this statement, the compiler generates [[#definelet][let]] statements that define the followings:
-# 1. The record type =my-record : Pi (a : tau). tau=
-# 2. The elimination rules (destructors) of the type:
-#    - =my-record.item-1 : Pi (a : tau, _ : my-record a). a=
-#    - =my-record.item-2 : Pi (a : tau, _ : my-record a). i64=
-#    - =my-record.item-3 : Pi (a : tau, _ : my-record a). top=
-# 3. The introduction rule of the type:
-#    - =my-record.new : Π (a : tau, item-1 : a, item-2 : i64, item-3 : top). my-record a=
+(define option.return
+  (witness (return-type option)
+    ...))
 
-# Internally, every record statement is translated into the corresponding [[#inductive][inductive]] statement. For example, given the =record= statement above, the compiler translates it into the following =inductive= statement:
-# #+BEGIN_SRC neut
-# (inductive my-record ((a tau))
-#   (new
-#     ((item-1 a)
-#      (item-2 i64)
-#      (item-3 top))
-#     (my-record a)))
-# #+END_SRC
-# The compiler then processes this statement in the same way ordinary =inductive= statement, generating the record type =my-record= and the introduction rule =my-record.new=, and the pattern matching function =my-record.case=. After that, the compiler automatically generates destructors from this definition via =my-record.case=. For example, the generated definition of =my-record.item-1= is as follows:
-# #+BEGIN_SRC neut
-# (define my-record.item-1 ((a tau) (record-value (my-record a)))
-#   (my-record.case a record-value
-#     (λ (item-1 item-2 item-3) item-1)))
-# #+END_SRC
-# The other destructors are defined similarly.
+(define option.bind
+  (witness (bind-type option)
+    ...))
+
+(define option.as-monad
+  (witness (monad option)
+    (monad.new
+      option
+      option.as-functor
+      option.return
+      option.bind)))
+
+; projection (extract the value for the key `bind`)
+(define to-bind ((m (hom tau tau)) (dict (monad m)))
+  (monad.bind m dict))
+
+(define-codata stream ((a tau))
+  (head a)
+  (tail (Π () (stream a))))
+
+(define int-stream ((k i64))
+  (witness (stream i64)
+    (stream.new
+      i64
+      k
+      (lambda () (int-stream (add-i64 k 1))))))
+
+(define stream-from-zero
+  (witness (stream i64)
+    (int-stream 0)))
+#+end_src
+**** Syntax
+#+BEGIN_SRC neut
+(define-codata LEAF ((LEAF TREE) ... (LEAF TREE))
+  (LEAF TREE)
+  ...
+  (LEAF TREE))
+#+END_SRC
+**** Semantics
+=(define-codata a bts ct-1 ... ct-n)= firstly creates the statement =(define-data a bts (new ct-1 ... ct-n))= and evaluates it.
+After that, it also generates the projections for each =ct-i=.
 
 *** define-resource-type
 =define-resource-type= creates a new type by specifying how the terms of the type is copied/discarded.
 **** Example
+#+begin_src neut
+(define-resource-type some-new-type
+  ; discarder
+  (lambda (ptr)
+    (with identity.bind
+      <discard the ptr using, for example, the external function `free`, using a derangement>
+      top.unit))
+  ; copier
+  (lambda (ptr)
+    (with identity.bind
+      (let new-ptr <copy the argument ptr>)
+      new-ptr)))
+#+end_src
 **** Syntax
+#+begin_src neut
+(define-resource-type name copier discarder)
+#+end_src
 **** Semantics
+=(define-resource-type name copier discarder)= defines a new opaque type by its resource behavior. The terms of the type are discarded using the function =copier=, which is of type =unsafe.pointer -> top=. The terms are copied using =discarder=, which is of type =unsafe.pointer -> unsafe.pointer=.
 
+**** Note
+Since every resulting type of =define-resource-type= does not have any introduction rules or elimination rules, the library designer must define them explicitly, using, for example, the unsafe cast.
+
+The core library uses this statement to define the type of =i8-array=, =i16-array=, etc. For example, an =i8-array= is internally represented as a tuple which is something like =(LENGTH, ACTUAL_ARRAY)=. The =discarder= for this type is something that deallocates the outer tuple and the =ACTUAL_ARRAY=, whereas the =copier= for this function is something that allocates new array using =malloc= and =LENGTH=, copies the original values, and then returns the newly-created array. You can find the actual implementations of them in =array.neut= of the core library.
 
 ** Auxiliary Terms
 *** asterisk
