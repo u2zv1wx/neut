@@ -5,7 +5,7 @@ Theoretically, this is made possible by translating every type of the language i
 
 Practically, this means that you can write your program in the ordinary lambda-calculus without any extra restrictions or annotations, and at the same time are allowed to control how resources are used in the program. If you want an ordinary-lambda-calculus based programming language with a human-predictable semantics (including its memory management), this might be for you.
 
-Here I briefly summarize the basic properties of neut before diving into the details:
+Here I briefly summarize the basic properties of neut before diving into details:
 
 - A compiled language
 - The output is [[https://llvm.org/docs/LangRef.html][LLVM IR]] / assembly / executable binary (the last two are via clang)
@@ -1841,7 +1841,7 @@ Incidentally, the behavior of =unsafe.pointer= from the viewpoint of resource ma
 **** Semantics
 A =define-data= defines a so-called algebraic data type and its introduction rules (or the constructors of the inductive type). It also registers the type as an algebraic data type so that it can be used in combination with =case= and =case-noetic=.
 
-(TBD: write about =case= and =case-noetic=)
+An algebraic data type can be used in combination with =case= and =case-noetic=.
 
 *** define-codata
 =define-codata= defines a record type that can also be recursive.
@@ -2129,7 +2129,100 @@ The =e= in =(let x e)= is automatically surrounded by =with=.
 #+end_src
 
 *** case, case-noetic
-TBD
+**** Example
+#+begin_src neut
+(define-data option ((a tau))
+  (none)
+  (some (value a)))
+
+(define from-option
+  ((a tau)
+   (x a)
+   (m (option a)))
+  (witness a
+    (case m
+      ((option.none)
+        x)
+      ((option.some y)
+        y))))
+
+(define-data list ((a tau))
+  (nil)
+  (cons (_ a) (_ (list a))))
+
+(define length-internal
+  ((s subject)
+   (a tau)
+   (xs (noema s (list a)))
+   (acc i64))
+  (witness i64
+    (case-noetic xs
+      ((list.nil)
+        acc)
+      ((list.cons _ ys)
+        (length-internal s a ys (add-i64 acc 1))))))
+#+end_src
+**** Syntax
+#+begin_src neut
+(case TREE
+  (PATTERN TREE)
+  ...
+  (PATTERN TREE))
+
+(case-noetic TREE
+  (PATTERN TREE)
+  ...
+  (PATTERN TREE))
+
+PATTERN := (LEAF ... LEAF)
+#+end_src
+**** Semantics
+#+begin_src neut
+(case e clause-1 ... clause-n) ~> (case v clause-1 ... clause-n)
+(case-noetic e clause-1 ... clause-n) ~> (case-noetic v clause-1 ... clause-n)
+
+(case (ci v1 ... vm)
+  ((c1 x{1, 1} ... x{1, m1}) e1)
+  ...
+  ((cn x{n, 1} ... x{n, mn}) en)) ~> ei {xi := vi}
+
+(case-noetic (ci v1 ... vm)
+  ((c1 x{1, 1} ... x{1, m1}) e1)
+  ...
+  ((cn x{n, 1} ... x{n, mn}) en)) ~> ei {xi := vi}
+#+end_src
+**** Note
+The clauses of a =case= / =case-noetic= must be ordered as in its corresponding definition in =define-data=:
+#+begin_src neut
+(define-data option ((a tau))
+  (none)
+  (some (value a)))
+
+; valid
+(define from-option
+  ((a tau)
+   (x a)
+   (m (option a)))
+  (witness a
+    (case m
+      ((option.none)
+        x)
+      ((option.some y)
+        y))))
+
+; invalid
+(define from-option
+  ((a tau)
+   (x a)
+   (m (option a)))
+  (witness a
+    (case m
+      ((option.some y)
+        y)
+      ((option.none)
+        x))))
+#+end_src
+This restriction is not an essential one; The generalization has not been done yet simply because of the priority thing.
 
 *** Partial Application
 **** Example
