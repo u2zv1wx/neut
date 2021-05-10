@@ -99,7 +99,7 @@ Let's see how neut manages resources. The following code prints the string "a" f
 #+BEGIN_SRC neut
 ; download the core library
 (ensure core/0.2.0.0
-  "https://github.com/u2zv1wx/neut-core/raw/master/release/0.2.0.0.tar.gz")
+  "https://github.com/veka41/neut-core/raw/master/release/0.2.0.0.tar.gz")
 
 (include "core/0.2.0.0/core.neut")
 
@@ -269,7 +269,7 @@ exp-sigma i sig :=
 #+END_SRC
 and translate =∑ [a : type, x : a]= into the =exp-sigma= above. In this way we can copy/discard a closure.
 
-Incidentally, this 3-element representation of a closure is not new. Indeed, I was told in [[https://github.com/u2zv1wx/neut/issues/1][a GitHub issue]] that there exists [[https://www.ccs.neu.edu/home/amal/papers/closconvcc.pdf][a work]] that does a similar (the same?) thing, though I have not been able to read it yet. Also, with a quick search, I found [[https://sv.c.titech.ac.jp/minamide/papers/popl96.pdf][a work in 1996 that does a similar thing]]. Thus I emphasize here that I do not claim any originality on this generalization of closure conversion.
+Incidentally, this 3-element representation of a closure is not new. Indeed, I was told in [[https://github.com/veka41/neut/issues/1][a GitHub issue]] that there exists [[https://www.ccs.neu.edu/home/amal/papers/closconvcc.pdf][a work]] that does a similar (the same?) thing, though I have not been able to read it yet. Also, with a quick search, I found [[https://sv.c.titech.ac.jp/minamide/papers/popl96.pdf][a work in 1996 that does a similar thing]]. Thus I emphasize here that I do not claim any originality on this generalization of closure conversion.
 
 *** Notes on Polymorphic Functions
 You may be wondering: "What if a function is polymorphic? If the size of an argument is not fixed, how can that function copy the term?"
@@ -317,7 +317,7 @@ Fortunately, there is a workaround for this performance problem.
 The point of the workaround is straightforward: If those copying/discarding operations result from using variables non-linearly, we simply have to use variables linearly. Let's go back to the first example code:
 #+BEGIN_SRC neut
 (ensure core/0.2.0.0
-  "https://github.com/u2zv1wx/neut-core/raw/master/release/0.2.0.0.tar.gz")
+  "https://github.com/veka41/neut-core/raw/master/release/0.2.0.0.tar.gz")
 
 (include "core/0.2.0.0/core.neut")
 
@@ -373,7 +373,7 @@ unit
 And this is the notation that is implemented in neut. Indeed, the following is a valid code of neut:
 #+BEGIN_SRC neut
 (ensure core/0.2.0.0
-  "https://github.com/u2zv1wx/neut-core/raw/master/release/0.2.0.0.tar.gz")
+  "https://github.com/veka41/neut-core/raw/master/release/0.2.0.0.tar.gz")
 
 (include "core/0.2.0.0/core.neut")
 
@@ -387,7 +387,7 @@ And this is the notation that is implemented in neut. Indeed, the following is a
 Or,
 #+BEGIN_SRC neut
 (ensure core/0.2.0.0
-  "https://github.com/u2zv1wx/neut-core/raw/master/release/0.2.0.0.tar.gz")
+  "https://github.com/veka41/neut-core/raw/master/release/0.2.0.0.tar.gz")
 
 (include "core/0.2.0.0/core.neut")
 
@@ -720,7 +720,7 @@ Make sure that you have already installed =tar=, =curl=, =stack= (>= 2.3.0) and 
 
 Then, clone the repository and build it:
 #+BEGIN_SRC shell
-git clone https://github.com/u2zv1wx/neut
+git clone https://github.com/veka41/neut
 cd neut
 git checkout 0.2.0.0
 stack build
@@ -732,7 +732,7 @@ stack install
 #+END_SRC
 To uninstall, you just have to remove the binary =~/.local/bin/neut= and the directory =~/.local/share/neut=.
 
-As for editor support, you can currently try [[https://github.com/u2zv1wx/neut-mode][neut-mode]] and [[https://github.com/u2zv1wx/flycheck-neut][flycheck-neut]] if you're using Emacs. The former package is for syntax highlighting, and the latter one for linting.
+As for editor support, you can currently try [[https://github.com/veka41/neut-mode][neut-mode]] and [[https://github.com/veka41/flycheck-neut][flycheck-neut]] if you're using Emacs. The former package is for syntax highlighting, and the latter one for linting.
 
 * Language Overview
 
@@ -753,7 +753,7 @@ Next. Notes on primitives: (0) The following primitive types are available: =i1=
 
 Next. Notes on the compiler subcommands. (0) You can build a program with =neut build path/to/file.neut=. (1) You can create an =tar.gz= archive of a project via =neut archive path/to/dir=. Then you can upload the archive to somewhere, allowing others to =ensure= and =include= it.
 
-Now I think you are basically ready to, for example, start reading [[https://github.com/u2zv1wx/neut/tree/master/test/data][the files in the test directory]], or [[https://github.com/u2zv1wx/neut-core][the files in the core library]], referring the sections below as necessary. After that you should know how to write lambdas, recursive functions, inductive types, tuples, etc.
+Now I think you are basically ready to, for example, start reading [[https://github.com/veka41/neut/tree/master/test/data][the files in the test directory]], or [[https://github.com/veka41/neut-core][the files in the core library]], referring the sections below as necessary. After that you should know how to write lambdas, recursive functions, inductive types, tuples, etc.
 
 That pretty much should do it. I hope you enjoy this language.
 
@@ -856,7 +856,7 @@ This statement is for debugging purpose; We can use this statement to see how a 
 **** Example
 #+BEGIN_SRC neut
 (ensure core/0.2.0.0
-  "https://github.com/u2zv1wx/neut-core/raw/master/release/0.2.0.0.tar.gz")
+  "https://github.com/veka41/neut-core/raw/master/release/0.2.0.0.tar.gz")
 
 (include "core/0.2.0.0/core.neut")
 #+END_SRC
