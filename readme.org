@@ -2340,6 +2340,7 @@ Some words on each foundational modules:
 =src/Emit.hs= simply translates LLVM IR into actual byte string, using =Data.ByteString.Builder= instead of =ByteString= just for performance.
 
 ** Donation
+Feel free to buy me an apple juice:
 #+begin_src text
 bitcoin:bc1q689xghadqlrvn05w0hzkm6tswlc8py7nrtqz76
 monero:4B8pz5KokF62tMREEYZ4eEhNVWxhXMVcADXvo7Anp6VRW4KGqstCdHMjZ3xyW7UutYbvdce3NYQNyT7LcNf3qr7R5GNxZoE
