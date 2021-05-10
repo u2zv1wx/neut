@@ -2343,12 +2343,12 @@ monero:4B8pz5KokF62tMREEYZ4eEhNVWxhXMVcADXvo7Anp6VRW4KGqstCdHMjZ3xyW7UutYbvdce3N
 #+end_src
 
 * Things Left Undone
-- sophistication on library-related things
 - incremental compilation
-- track the location of a code piece when expanding macros more acculately
-- better pattern matching syntax (like nested pattern)
 - syntax highlighter for editors other than Emacs
 - primitive-level exception
+- better pattern matching syntax (like nested pattern)
 - wrapper library for parallel computation
-- (Should I remove the meta-language and implement syntaxes simply in =Parse.Interpret=?)
+- track the location of a code piece when expanding macros more acculately
+- sophistication on library-related things
+- (Should I remove the meta-language and implement syntactic constructs simply in =Parse.Interpret=?)
 - etc.
