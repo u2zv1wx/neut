@@ -50,10 +50,6 @@ Here I briefly summarize the basic properties of neut before diving into details
   - [[#statements-1][Statements]]
     - [[#enum][enum]]
     - [[#define][define]]
-    - [[#example][Example]]
-    - [[#syntax][Syntax]]
-    - [[#semantics][Semantics]]
-    - [[#note][Note]]
     - [[#define-prefix-remove-prefix-1][define-prefix, remove-prefix]]
     - [[#reduce][reduce]]
     - [[#useunuse-1][use/unuse]]
@@ -81,13 +77,13 @@ Here I briefly summarize the basic properties of neut before diving into details
     - [[#partial-application][Partial Application]]
 - [[#compiler-subcommands][Compiler Subcommands]]
   - [[#archive][archive]]
-    - [[#example-1][Example]]
+    - [[#example][Example]]
     - [[#notes][Notes]]
   - [[#build][build]]
-    - [[#example-2][Example]]
+    - [[#example-1][Example]]
     - [[#notes-1][Notes]]
   - [[#check][check]]
-    - [[#example-3][Example]]
+    - [[#example-2][Example]]
     - [[#notes-2][Notes]]
 - [[#contribution][Contribution]]
   - [[#development][Development]]
@@ -1292,7 +1288,7 @@ All the discriminant values of an enum-type must be distinct.
 *** define
 =define= defines a new top-level variable.
 
-*** Example
+**** Example
 #+BEGIN_SRC neut
 (define foo (i64 10)) ; define a variable `foo` to be `10`
 
@@ -1325,19 +1321,19 @@ All the discriminant values of an enum-type must be distinct.
     100
     1000)) ; ~> 100
 #+END_SRC
-*** Syntax
+**** Syntax
 #+BEGIN_SRC neut
 (define LEAF_PLUS TREE)
 (define LEAF_PLUS (LEAF_PLUS ... LEAF_PLUS) TREE)
 
 LEAF_PLUS ::= LEAF | (LEAF TREE)
 #+END_SRC
-*** Semantics
+**** Semantics
 =(define f (xt-1 ... xt-n) e)= is equivalent to =(define f (fix f (xt-1 ... xt-n) e))=.
 
 =(define x e)= checks the type of the term =e=, then registers the correspondence =x ~> e= to the environment of the compiler. After the definition, using the variable =x= is the same as writing =e= in place of =x=.
 
-*** Note
+**** Note
 Note that =define= does not evaluate the term =e=. For example, consider the following code.
 #+begin_src neut
 (define foo
