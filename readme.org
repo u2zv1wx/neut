@@ -13,8 +13,6 @@ Here I briefly summarize the basic properties of neut before diving into the det
 - The evaluation strategy is call-by-value
 - Memory allocation/deallocation is statically determined at compile time
 
-# - The type inference algorithm is based on [[https://arxiv.org/abs/1505.04324][the one of Lean]]
-
 * Table of Contents                                                    :TOC_3:
 - [[#ideas][Ideas]]
   - [[#memory-management-based-on-linearity][Memory Management Based on Linearity]]
@@ -78,6 +76,7 @@ Here I briefly summarize the basic properties of neut before diving into the det
     - [[#asterisk][asterisk]]
     - [[#sigma][sigma]]
     - [[#with][with]]
+    - [[#with-subject][with-subject]]
     - [[#case-case-noetic][case, case-noetic]]
     - [[#partial-application][Partial Application]]
 - [[#compiler-subcommands][Compiler Subcommands]]
@@ -2083,6 +2082,52 @@ Note that the =bind= operator is not restricted to monadic bind; You can put any
 
 The =e= in =(let x e)= is automatically surrounded by =with=.
 
+*** with-subject
+**** Example
+#+begin_src neut
+(define length-internal
+  ((s subject)
+   (a tau)
+   (xs (noema s (list a)))
+   (acc i64))
+  (witness i64
+    (case-noetic xs
+      ((list.nil)
+        acc)
+      ((list.cons _ ys)
+        (length-internal s a ys (add-i64 acc 1))))))
+
+(define length
+  ((a tau)
+   (xs (list a)))
+  (witness (product (list a) i64)
+    (with-subject s (xs)
+      ((noesis.return s) i64 (length-internal s a xs 0)))))
+#+end_src
+**** Syntax
+#+begin_src text
+(with-subject LEAF (LEAF ... LEAF) TREE ... TREE)
+#+end_src
+**** Semantics
+#+begin_src neut
+(with-subject s (x1 ... xn) e1 ... em)
+~> (noesis.run *
+     (lambda ((s subject))
+       (with (noesis.bind s)
+         ; cast to noema
+         (let x1 (unsafe.cast t1 (noema s t1) x1))
+         ...
+         (let xn (unsafe.cast tn (noema s tn) xn))
+         ; perform actual computation
+         (let answer (with (noesis.bind s) e1 ... em))
+         ; uncast from noema
+         (let x1 (unsafe.cast (noema s t1) t1 x1))
+         ...
+         (let xn (unsafe.cast (noema s tn) tn xn))
+         ; return result
+         (tuple x1 ... xn answer))))
+#+end_src
+
 *** case, case-noetic
 TBD
 
@@ -2187,7 +2232,7 @@ clang              ↓
              (object code)
 #+end_src
 
-Some words on each foundational modules.
+Some words on each foundational modules:
 
 =src/Preprocess.hs= reads given file and generate a list of AST, expanding all the macros. More specifically, it firstly parses the string in the given file into a list of trees (=[Tree]=), visiting other files if necessary. After that, the module interprets those trees as the terms of the meta calculus (=[MetaTerm]=), and tries to normalize them. For each of them, if the result of normalization is an AST (that is, a term that consists of =leaf= and =node=), then =src/Preprocess.hs= translates the =MetaTerm= into a =Tree= so that they can be parsed as terms of the object language later. If the result is not an AST value (e.g. =(lambda (x) x)= is not an AST value since it contains the syntactic construct =lambda=), it simply reports an error.
 
