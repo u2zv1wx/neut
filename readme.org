@@ -1962,7 +1962,7 @@ The core library uses this statement to define the type of =i8-array=, =i16-arra
 
 If the type is not determined, the compiler raises an error; For example, the type of =x= in the following code is not determined:
 #+BEGIN_SRC neut
-(let x 10)
+(define x 10)
 #+END_SRC
 since the =10= cannot be determined to be =i32=, =i16=, or =i64=, etc.
 
