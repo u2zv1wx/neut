@@ -18,6 +18,7 @@ import Path.IO
 import Preprocess.Discern
 import Preprocess.Interpret
 import Preprocess.Tokenize
+import Preprocess.Parse
 import Reduce.MetaTerm
 import System.Exit
 import qualified System.Info as System
@@ -27,6 +28,23 @@ import Text.Read (readMaybe)
 preprocess :: Path Abs File -> IO [TreePlus]
 preprocess mainFilePath = do
   pushTrace mainFilePath
+  item0 <- parse "buz qux"
+  p' item0
+  -- item0 <- parse "lambda (x : AAA) (y : B). buz buz foge"
+  -- p' item0
+  item <- parse "lambda (x : AAA) (y : B). pi (foo : bar). buz qux pohe"
+  p' item
+  item2 <- parse "switch lambda (x : AAA). B with - foo -> bar pohe hoge - buz -> qux"
+  p' item2
+  item3 <- parse "match-noetic xs with - list.nil -> foo - list.cons y ys -> hogehgo"
+  p' item3
+  item4 <- parse "match xs with - list.nil -> foo - list.cons y ys -> hogehgo"
+  p' item4
+  item5 <- parse "new somerecord with - item-1 <- top.unit   - item-2 <- hogehgo"
+  p' item5
+  item6 <- parse "let x = foo in lambda (x : A). let? p = q r \"hello, \nworld!\" s in f B hoge pohe"
+  p' item6
+  _ <- undefined
   visit mainFilePath
 
 visit :: Path Abs File -> IO [TreePlus]
