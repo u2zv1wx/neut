@@ -8,9 +8,9 @@ import Data.Basic
 import Data.Global
 import Data.IORef
 import Data.Log
+import Data.PreTerm
 import qualified Data.Set as S
 import qualified Data.Text as T
-import Data.PreTerm
 import System.IO.Unsafe (unsafePerformIO)
 
 type EscapeFlag =
@@ -38,53 +38,46 @@ parse input = do
   term
 
 term :: IO PreTermPlus
-term = do
-  termPi <|> termPiIntro <|> termEnumElim <|> termQuestion <|> termCase <|> termCaseNoetic <|> termCocase <|> termLet <|> termLetCoproduct <|> termPiElim <|> termString <|> termSymbol
-
-termSymbol :: IO PreTermPlus
-termSymbol = do
-  m <- currentHint
-  x <- symbol
-  skip
-  if isKeyword x
-    then raiseParseError "found a keyword, expecting a symbol"
-    else return (m, PreTermSymbol x)
+term =
+  do
+    termPi
+    <|> termPiIntro
+    <|> termEnumElim
+    <|> termQuestion
+    <|> termCase
+    <|> termCaseNoetic
+    <|> termCocase
+    <|> termLet
+    <|> termLetCoproduct
+    <|> termIf
+    <|> termPiElim
+    <|> termString
+    <|> termSymbol
 
 termPi :: IO PreTermPlus
 termPi = do
   m <- currentHint
   token "pi"
-  skip
   varList <- many ascription
-  skip
-  char '.'
-  skip
+  char '.' >> skip
   e <- term
-  skip
   return (m, PreTermPi varList e)
 
-termPiIntro ::  IO PreTermPlus
+termPiIntro :: IO PreTermPlus
 termPiIntro = do
   m <- currentHint
   token "lambda"
-  skip
   varList <- many ascription
-  skip
-  char '.'
-  skip
+  char '.' >> skip
   e <- term
-  skip
   return (m, PreTermPiIntro varList e)
 
 termPiElim :: IO PreTermPlus
 termPiElim = do
   m <- currentHint
   e1 <- termSimple
-  skip
   e2 <- termSimple
-  skip
   es <- sepEndBy termSimple skip
-  skip
   return (m, PreTermPiElim e1 (e2 : es))
 
 termSimple :: IO PreTermPlus
@@ -99,92 +92,76 @@ termString = do
   return (m, PreTermString s)
 
 termParen :: IO PreTermPlus
-termParen = do
-  char '('
-  skip
-  e <- term
-  skip
-  char ')'
-  skip
-  return e
+termParen =
+  inParen term
 
 termEnumElim :: IO PreTermPlus
 termEnumElim = do
   m <- currentHint
   token "switch"
-  skip
   e <- term
   token "with"
-  skip
   clauseList <- many enumClause
-  skip
+  token "end"
   return (m, PreTermEnumElim e clauseList)
 
 enumClause :: IO (T.Text, PreTermPlus)
 enumClause = do
-  token "-"
-  skip
-  c <- symbol
-  skip
-  token "->"
-  skip
-  body <- term
-  skip
-  return (c, body)
+  flag <- lookAheadSymbol "end"
+  if flag
+    then raiseParseError "end"
+    else do
+      token "-"
+      c <- symbol
+      token "->"
+      body <- term
+      skip
+      return (c, body)
 
 termQuestion :: IO PreTermPlus
 termQuestion = do
   m <- currentHint
   token "question"
-  skip
   e <- term
-  skip
   return (m, PreTermQuestion e)
 
 termCase :: IO PreTermPlus
 termCase = do
   m <- currentHint
   token "match"
-  skip
   e <- term
   token "with"
-  skip
   clauseList <- many caseClause
-  skip
+  token "end"
   return (m, PreTermCase False e clauseList)
-
-
 
 termCaseNoetic :: IO PreTermPlus
 termCaseNoetic = do
   m <- currentHint
   token "match-noetic"
-  skip
   e <- term
   token "with"
-  skip
   clauseList <- many caseClause
-  skip
+  token "end"
   return (m, PreTermCase True e clauseList)
-
 
 caseClause :: IO (PrePattern, PreTermPlus)
 caseClause = do
-  token "-"
-  skip
-  pa <- pat
-  skip
-  body <- term
-  skip
-  return (pa, body)
+  flag <- lookAheadSymbol "end"
+  if flag
+    then raiseParseError "end"
+    else do
+      token "-"
+      c <- pat
+      body <- term
+      skip
+      return (c, body)
 
 pat :: IO PrePattern
 pat = do
   m <- currentHint
   c <- symbol
-  skip
   argList <- patArg
-  skip
   return (m, c, argList)
 
 patArg :: IO [T.Text]
@@ -195,63 +172,49 @@ patArg = do
     then return []
     else do
       tmp <- patArg
-      skip
       return $ x : tmp
 
 termCocase :: IO PreTermPlus
 termCocase = do
   m <- currentHint
   token "new"
-  skip
   x <- symbol
-  skip
   token "with"
-  skip
-  clauseList <- many cocaseClause
-  skip
+  clauseList <- many $ do
+    token "-"
+    c <- symbol
+    token "<-"
+    body <- term
+    return (c, body)
   return (m, PreTermCocase x clauseList)
-
-cocaseClause :: IO (T.Text, PreTermPlus)
-cocaseClause = do
-  token "-"
-  skip
-  c <- symbol
-  skip
-  token "<-"
-  skip
-  body <- term
-  skip
-  return (c, body)
 
 -- (x : A)
 ascription :: IO PreIdentPlus
 ascription = do
   m <- currentHint
-  char '('
-  skip
-  x <- symbol
-  skip
-  char ':'
-  skip
-  a <- term
-  skip
-  char ')'
-  skip
-  return (m, x, a)
+  inParen $ do
+    x <- symbol
+    char ':'
+    skip
+    a <- term
+    return (m, x, a)
+
+inParen :: IO a -> IO a
+inParen f = do
+  char '(' >> skip
+  item <- f
+  char ')' >> skip
+  return item
 
 termLet :: IO PreTermPlus
 termLet = do
   m <- currentHint
   token "let"
-  skip
   x <- symbol
-  skip
   char '='
   skip
   e1 <- term
-  skip
   token "in"
-  skip
   e2 <- term
   return (m, PreTermLet x e1 e2)
 
@@ -259,25 +222,40 @@ termLetCoproduct :: IO PreTermPlus
 termLetCoproduct = do
   m <- currentHint
   token "let?"
-  skip
   x <- symbol
-  skip
   char '='
   skip
   e1 <- term
-  skip
   token "in"
-  skip
   e2 <- term
   return (m, PreTermLetCoproduct x e1 e2)
 
+termIf :: IO PreTermPlus
+termIf = do
+  m <- currentHint
+  token "if"
+  e1 <- term
+  token "then"
+  e2 <- term
+  token "else"
+  e3 <- term
+  token "end"
+  return (m, PreTermIf e1 e2 e3)
+
+termSymbol :: IO PreTermPlus
+termSymbol = do
+  m <- currentHint
+  x <- symbol
+  if isKeyword x
+    then raiseParseError $ "found a keyword `" <> x <> "`, expecting a symbol"
+    else return (m, PreTermSymbol x)
 
 token :: T.Text -> IO ()
-token s = do
-  x <- symbol
-  if x == s
+token expected = do
+  actual <- symbol
+  if actual == expected
     then return ()
-    else raiseParseError "foo"
+    else raiseParseError $ "found an unexpected token `" <> actual <> "`, expecting: " <> expected
 
 char :: Char -> IO ()
 char c = do
@@ -339,6 +317,13 @@ helper s g _ = do
   writeIORef text s
   g
 
+lookAheadSymbol :: T.Text -> IO Bool
+lookAheadSymbol atom = do
+  s <- readIORef text
+  headSymbol <- symbol
+  writeIORef text s
+  return $ headSymbol == atom
+
 sepEndBy :: IO a -> IO () -> IO [a]
 sepEndBy f g =
   sepEndBy' (f >>= return . Right) g []
@@ -363,6 +348,7 @@ symbol = do
   let x = T.takeWhile isSymbolChar s
   let rest = T.dropWhile isSymbolChar s
   updateStreamC (T.length x) rest
+  skip
   if T.null x
     then raiseParseError "empty symbol"
     else return x
@@ -373,14 +359,8 @@ string = do
   len <- headStringLengthOf False s 1
   let (x, s') = T.splitAt len s
   modifyIORef' text $ \_ -> s'
+  skip
   return x
-
-  -- let rest = T.tail s -- T.head s is known to be '"'
-  -- len <- headStringLengthOf False rest 1
-  -- let (x, rest') = T.splitAt len s
-  -- modifyIORef' text $ \_ -> rest'
-  -- return x
-
 
 headStringLengthOf :: EscapeFlag -> T.Text -> Int -> IO Int
 headStringLengthOf flag s i =
@@ -460,14 +440,4 @@ raiseParseError txt = do
 
 isKeyword :: T.Text -> Bool
 isKeyword s =
-  s `elem` ["define", "-", "with", "let", "let?", "in", "match", "new", "match-noetic", "->"]
-
-
--- {-# INLINE readMacroMap #-}
--- readMacroMap :: Map.HashMap Char T.Text
--- readMacroMap =
---   Map.fromList
---     [ ('`', "quote"),
---       (',', "unquote"),
---       ('@', "splice")
---     ]
+  s `elem` ["define", "-", "with", "let", "let?", "in", "match", "new", "match-noetic", "->", "end"]

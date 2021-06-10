@@ -18,6 +18,7 @@ data PreTerm
   | PreTermCocase T.Text [(T.Text, PreTermPlus)]
   | PreTermLet T.Text PreTermPlus PreTermPlus
   | PreTermLetCoproduct T.Text PreTermPlus PreTermPlus
+  | PreTermIf PreTermPlus PreTermPlus PreTermPlus
   deriving (Show)
 
 type IsNoetic = Bool
