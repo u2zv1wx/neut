@@ -1,20 +1,30 @@
 module Preprocess.Parse
-  ( parse,
+  ( parseWeakTerm,
   )
 where
 
+import Codec.Binary.UTF8.String
 import Control.Exception.Safe
+import Control.Monad (forM)
 import Data.Basic
 import Data.Global
 import Data.IORef
 import Data.Log
-import Data.PreTerm
+import Data.LowType
 import qualified Data.Set as S
 import qualified Data.Text as T
+import Data.WeakTerm
 import System.IO.Unsafe (unsafePerformIO)
+import Text.Read (readMaybe)
 
 type EscapeFlag =
   Bool
+
+--
+-- states
+--
+
+-- raiseParseErrorはhintを受け取るようにするべきかも。
 
 {-# NOINLINE text #-}
 text :: IORef T.Text
@@ -31,224 +41,587 @@ column :: IORef Int
 column =
   unsafePerformIO (newIORef 1)
 
-parse :: T.Text -> IO PreTermPlus
-parse input = do
+parseWeakTerm :: T.Text -> IO WeakTermPlus
+parseWeakTerm input = do
   modifyIORef' text $ \_ -> input
   skip
-  term
+  weakTerm
 
-term :: IO PreTermPlus
-term =
-  do
-    termPi
-    <|> termPiIntro
-    <|> termEnumElim
-    <|> termQuestion
-    <|> termCase
-    <|> termCaseNoetic
-    <|> termCocase
-    <|> termLet
-    <|> termLetCoproduct
-    <|> termIf
-    <|> termPiElim
-    <|> termString
-    <|> termSymbol
+--
+-- parser for WeakTerm
+--
 
-termPi :: IO PreTermPlus
-termPi = do
+weakTerm :: IO WeakTermPlus
+weakTerm = do
+  headSymbol <- lookAhead symbolMaybe
+  case headSymbol of
+    Just "tau" ->
+      weakTermTau
+    Just "pi" ->
+      weakTermPi
+    Just "lambda" ->
+      weakTermPiIntro
+    Just "fix" ->
+      weakTermPiIntroFix
+    Just "*" ->
+      weakTermAster
+    Just "switch" ->
+      weakTermEnumElim
+    Just "question" ->
+      weakTermQuestion
+    Just "derangement" ->
+      weakTermDerangement
+    Just "match" ->
+      weakTermMatch
+    Just "match-noetic" ->
+      weakTermMatchNoetic
+    Just "let" ->
+      weakTermLet
+    Just "let?" ->
+      weakTermLetCoproduct
+    Just "if" ->
+      weakTermIf
+    Just "sigma" ->
+      weakTermSigma
+    Just "product" ->
+      weakTermProduct
+    _ ->
+      weakTermAux
+
+weakTermTau :: IO WeakTermPlus
+weakTermTau = do
+  m <- currentHint
+  token "tau"
+  return (m, WeakTermTau)
+
+weakTermAster :: IO WeakTermPlus
+weakTermAster = do
+  m <- currentHint
+  token "*"
+  h <- newAster m
+  return h
+
+weakTermPi :: IO WeakTermPlus
+weakTermPi = do
   m <- currentHint
   token "pi"
-  varList <- many ascription
+  varList <- many weakIdentPlus
   char '.' >> skip
-  e <- term
-  return (m, PreTermPi varList e)
+  e <- weakTerm
+  return (m, WeakTermPi varList e)
 
-termPiIntro :: IO PreTermPlus
-termPiIntro = do
+weakTermPiIntro :: IO WeakTermPlus
+weakTermPiIntro = do
   m <- currentHint
   token "lambda"
-  varList <- many ascription
+  varList <- many weakIdentPlus
   char '.' >> skip
-  e <- term
-  return (m, PreTermPiIntro varList e)
+  e <- weakTerm
+  return (m, WeakTermPiIntro OpacityTransparent LamKindNormal varList e)
 
-termPiElim :: IO PreTermPlus
-termPiElim = do
+weakTermPiIntroFix :: IO WeakTermPlus
+weakTermPiIntroFix = do
   m <- currentHint
-  e1 <- termSimple
-  e2 <- termSimple
-  es <- sepEndBy termSimple skip
-  return (m, PreTermPiElim e1 (e2 : es))
+  token "fix"
+  self <- weakIdentPlus
+  varList <- many weakIdentPlus
+  char '.' >> skip
+  e <- weakTerm
+  return (m, WeakTermPiIntro OpacityTransparent (LamKindFix self) varList e)
 
-termSimple :: IO PreTermPlus
-termSimple =
-  termString <|> termSymbol <|> termParen
-
-termString :: IO PreTermPlus
-termString = do
+weakTermAux :: IO WeakTermPlus
+weakTermAux = do
   m <- currentHint
-  char '"'
-  s <- string
-  return (m, PreTermString s)
+  e <- weakTermSimple
+  es <- many weakTermSimple
+  if null es
+    then return e
+    else return (m, WeakTermPiElim e es)
 
-termParen :: IO PreTermPlus
-termParen =
-  inParen term
-
-termEnumElim :: IO PreTermPlus
-termEnumElim = do
+weakTermEnumElim :: IO WeakTermPlus
+weakTermEnumElim = do
   m <- currentHint
   token "switch"
-  e <- term
+  e <- weakTerm
   token "with"
-  clauseList <- many enumClause
+  clauseList <- many weakTermEnumClause
   token "end"
-  return (m, PreTermEnumElim e clauseList)
+  h <- newAster m
+  return (m, WeakTermEnumElim (e, h) clauseList)
 
-enumClause :: IO (T.Text, PreTermPlus)
-enumClause = do
-  flag <- lookAheadSymbol "end"
-  if flag
+weakTermEnumClause :: IO (EnumCasePlus, WeakTermPlus)
+weakTermEnumClause = do
+  headSymbol <- lookAhead symbol
+  if headSymbol == "end"
     then raiseParseError "end"
     else do
+      m <- currentHint
       token "-"
       c <- symbol
       token "->"
-      body <- term
-      skip
-      return (c, body)
+      body <- weakTerm
+      case c of
+        "default" ->
+          return ((m, EnumCaseDefault), body)
+        _ ->
+          return ((m, EnumCaseLabel c), body)
 
-termQuestion :: IO PreTermPlus
-termQuestion = do
+-- question e
+weakTermQuestion :: IO WeakTermPlus
+weakTermQuestion = do
   m <- currentHint
   token "question"
-  e <- term
-  return (m, PreTermQuestion e)
+  e <- weakTerm
+  h <- newAster m
+  return (m, WeakTermQuestion e h)
 
-termCase :: IO PreTermPlus
-termCase = do
+-- derangement KIND with
+-- - arg-1
+-- - ...
+-- - arg-n
+-- end
+weakTermDerangement :: IO WeakTermPlus
+weakTermDerangement = do
+  m <- currentHint
+  token "derangement"
+  k <- weakTermDerangementKind
+  token "with"
+  es <- many (token "-" >> weakTerm)
+  token "end"
+  return (m, WeakTermDerangement k es)
+
+weakTermDerangementKind :: IO Derangement
+weakTermDerangementKind = do
+  s <- saveState
+  headSymbol <- symbol
+  case headSymbol of
+    "nop" ->
+      return DerangementNop
+    "store" -> do
+      t <- lowType
+      return $ DerangementStore t
+    "load" -> do
+      t <- lowType
+      return $ DerangementLoad t
+    "create-array" -> do
+      t <- lowType
+      return $ DerangementCreateArray t
+    "create-struct" -> do
+      ts <- many lowType
+      return $ DerangementCreateStruct ts
+    "syscall" -> do
+      syscallNum <- integer
+      return $ DerangementSyscall syscallNum
+    "external" -> do
+      f <- symbol
+      return $ DerangementExternal f
+    _ -> do
+      loadState s
+      raiseParseError "derangement"
+
+-- t ::= i{n} | f{n} | pointer t | array INT t | struct t ... t
+lowType :: IO LowType
+lowType = do
+  s <- saveState
+  headSymbol <- symbol
+  case headSymbol of
+    "pointer" -> do
+      t <- lowTypeSimple
+      return $ LowTypePointer t
+    "array" -> do
+      intValue <- integer
+      t <- lowTypeSimple
+      return $ LowTypeArray (fromInteger intValue) t
+    "struct" -> do
+      ts <- many lowTypeSimple
+      return $ LowTypeStruct ts
+    _
+      | Just size <- asLowInt headSymbol ->
+        return $ LowTypeInt size
+      | Just size <- asLowFloat headSymbol ->
+        return $ LowTypeFloat size
+      | otherwise -> do
+        loadState s
+        raiseParseError "lowType"
+
+lowTypeSimple :: IO LowType
+lowTypeSimple = do
+  s <- saveState
+  headSymbol <- symbol
+  case T.uncons headSymbol of
+    Just ('(', _) ->
+      betweenParen lowType
+    _
+      | Just size <- asLowInt headSymbol ->
+        return $ LowTypeInt size
+      | Just size <- asLowFloat headSymbol ->
+        return $ LowTypeFloat size
+      | otherwise -> do
+        loadState s
+        raiseParseError "lowTypeSimple"
+
+weakTermMatch :: IO WeakTermPlus
+weakTermMatch = do
   m <- currentHint
   token "match"
-  e <- term
+  e <- weakTerm
   token "with"
-  clauseList <- many caseClause
+  clauseList <- many weakTermMatchClause
   token "end"
-  return (m, PreTermCase False e clauseList)
+  return (m, WeakTermCase (doNotCare m) Nothing (e, doNotCare m) clauseList)
 
-termCaseNoetic :: IO PreTermPlus
-termCaseNoetic = do
+weakTermMatchNoetic :: IO WeakTermPlus
+weakTermMatchNoetic = do
   m <- currentHint
   token "match-noetic"
-  e <- term
+  e <- weakTerm
   token "with"
-  clauseList <- many caseClause
+  s <- newAster m
+  t <- newAster m
+  let e' = castFromNoema s t e
+  clauseList <- many weakTermMatchClause
   token "end"
-  return (m, PreTermCase True e clauseList)
+  let clauseList' = map (modifyWeakPattern s) clauseList
+  return (m, WeakTermCase (doNotCare m) (Just s) (e', doNotCare m) clauseList')
 
-caseClause :: IO (PrePattern, PreTermPlus)
-caseClause = do
-  flag <- lookAheadSymbol "end"
-  if flag
+weakTermMatchClause :: IO (WeakPattern, WeakTermPlus)
+weakTermMatchClause = do
+  headSymbol <- lookAhead symbol
+  if headSymbol == "end"
     then raiseParseError "end"
     else do
       token "-"
-      c <- pat
-      body <- term
-      skip
-      return (c, body)
+      pat <- weakTermPattern
+      body <- weakTerm
+      return (pat, body)
 
-pat :: IO PrePattern
-pat = do
+modifyWeakPattern :: WeakTermPlus -> (WeakPattern, WeakTermPlus) -> (WeakPattern, WeakTermPlus)
+modifyWeakPattern s ((m, a, xts), body) =
+  ((m, a, xts), modifyWeakPatternBody s xts body)
+
+modifyWeakPatternBody :: WeakTermPlus -> [WeakIdentPlus] -> WeakTermPlus -> WeakTermPlus
+modifyWeakPatternBody s xts body =
+  case xts of
+    [] ->
+      body
+    ((m, x, t) : rest) -> do
+      ( m,
+        WeakTermPiElim
+          ( m,
+            WeakTermPiIntro
+              OpacityTransparent
+              LamKindNormal
+              [(m, x, wrapWithNoema s t)]
+              (modifyWeakPatternBody s rest body)
+          )
+          [castToNoema s t (m, WeakTermVar VarKindLocal x)]
+        )
+
+weakTermPattern :: IO WeakPattern
+weakTermPattern = do
   m <- currentHint
-  c <- symbol
-  argList <- patArg
-  return (m, c, argList)
+  c <- simpleSymbol
+  argList <- weakTermPatternArgument
+  return (m, asIdent c, argList)
 
-patArg :: IO [T.Text]
-patArg = do
+weakTermPatternArgument :: IO [WeakIdentPlus]
+weakTermPatternArgument = do
+  m <- currentHint
   x <- symbol
   skip
   if x == "->"
     then return []
     else do
-      tmp <- patArg
-      return $ x : tmp
+      tmp <- weakTermPatternArgument
+      h <- newAster m
+      return $ (m, asIdent x, h) : tmp
 
-termCocase :: IO PreTermPlus
-termCocase = do
+-- let x : A = e1 in e2
+-- let x     = e1 in e2
+weakTermLet :: IO WeakTermPlus
+weakTermLet = do
   m <- currentHint
-  token "new"
-  x <- symbol
-  token "with"
-  clauseList <- many $ do
-    token "-"
-    c <- symbol
-    token "<-"
-    body <- term
-    return (c, body)
-  return (m, PreTermCocase x clauseList)
+  token "let"
+  x <- weakTermLetVar
+  char '=' >> skip
+  e1 <- weakTerm
+  token "in"
+  e2 <- weakTerm
+  return (m, WeakTermPiElim (m, WeakTermPiIntro OpacityTransparent LamKindNormal [x] e2) [e1])
 
--- (x : A)
-ascription :: IO PreIdentPlus
-ascription = do
+-- let? x : A = e1 in e2
+-- let? x     = e1 in e2
+weakTermLetCoproduct :: IO WeakTermPlus
+weakTermLetCoproduct = do
   m <- currentHint
-  inParen $ do
+  token "let?"
+  x <- weakTermLetVar
+  char '=' >> skip
+  e1 <- weakTerm
+  token "in"
+  e2 <- weakTerm
+  err <- newIdentFromText "err"
+  -- let doNotCare = (m, WeakTermTau)
+  typeOfLeft <- newAster m
+  typeOfRight <- newAster m
+  let coproductLeft = asIdent "coproduct.left"
+  return
+    ( m,
+      WeakTermCase
+        (doNotCare m)
+        Nothing
+        (e1, doNotCare m)
+        [ ( (m, coproductLeft, [(m, err, typeOfLeft)]),
+            (m, WeakTermPiElim (m, WeakTermVar VarKindLocal coproductLeft) [typeOfLeft, typeOfRight, (m, WeakTermVar VarKindLocal err)])
+          ),
+          ( (m, asIdent "coproduct.right", [x]),
+            e2
+          )
+        ]
+    )
+
+weakTermLetVar :: IO WeakIdentPlus
+weakTermLetVar = do
+  m <- currentHint
+  tryPlanList
+    [ do
+        x <- simpleSymbol
+        char ':'
+        skip
+        a <- weakTerm
+        return (m, asIdent x, a),
+      do
+        x <- simpleSymbol
+        h <- newAster m
+        return (m, asIdent x, h)
+    ]
+
+weakTermIf :: IO WeakTermPlus
+weakTermIf = do
+  m <- currentHint
+  token "if"
+  e1 <- weakTerm
+  token "then"
+  e2 <- weakTerm
+  token "else"
+  e3 <- weakTerm
+  token "end"
+  h <- newAster m
+  return
+    ( m,
+      WeakTermEnumElim
+        (e1, h)
+        [ ((m, EnumCaseLabel "bool.true"), e2),
+          ((m, EnumCaseLabel "bool.false"), e3)
+        ]
+    )
+
+-- sigma (x1 : A1) ... (xn : An). B
+weakTermSigma :: IO WeakTermPlus
+weakTermSigma = do
+  m <- currentHint
+  token "sigma"
+  varList <- many weakIdentPlus
+  char '.' >> skip
+  cod <- weakTerm
+  h <- newIdentFromText "_"
+  toSigma m $ varList ++ [(m, h, cod)]
+
+-- product e1 ... en
+weakTermProduct :: IO WeakTermPlus
+weakTermProduct = do
+  m <- currentHint
+  token "product"
+  ts <- many weakTermSimple
+  xs <- mapM (const $ newIdentFromText "_") ts
+  toSigma m $ zipWith (\x t -> (m, x, t)) xs ts
+
+-- (e1, ..., en) (n >= 2)
+weakTermSigmaIntro :: IO WeakTermPlus
+weakTermSigmaIntro = do
+  m <- currentHint
+  betweenParen $ do
+    es <- sepBy2 weakTerm (char ',' >> skip)
+    xts <- forM es $ \_ -> do
+      x <- newIdentFromText "_"
+      t <- newAster m
+      return (m, x, t)
+    sigVar <- newIdentFromText "_"
+    k <- newIdentFromText "_"
+    return
+      ( m,
+        WeakTermPi
+          [ (m, sigVar, (m, WeakTermTau)),
+            (m, k, (m, WeakTermPi xts (m, WeakTermVar VarKindLocal sigVar)))
+          ]
+          (m, WeakTermPiElim (m, WeakTermVar VarKindLocal k) es)
+      )
+
+--
+-- term-related helper functions
+--
+
+weakTermSimple :: IO WeakTermPlus
+weakTermSimple = do
+  tryPlanList
+    [ weakTermSigmaIntro,
+      betweenParen weakTerm,
+      weakTermTau,
+      weakTermString,
+      weakTermInteger,
+      weakTermFloat,
+      weakTermVar
+    ]
+
+weakIdentPlus :: IO WeakIdentPlus
+weakIdentPlus = do
+  tryPlanList
+    [ weakAscription,
+      weakAscription'
+    ]
+
+weakAscription :: IO WeakIdentPlus
+weakAscription = do
+  betweenParen $ do
+    m <- currentHint
     x <- symbol
-    char ':'
-    skip
-    a <- term
-    return (m, x, a)
+    char ':' >> skip
+    a <- weakTerm
+    return (m, asIdent x, a)
 
-inParen :: IO a -> IO a
-inParen f = do
+weakAscription' :: IO WeakIdentPlus
+weakAscription' = do
+  (m, x) <- weakSimpleIdent
+  h <- newAster m
+  return (m, x, h)
+
+weakSimpleIdent :: IO (Hint, Ident)
+weakSimpleIdent = do
+  m <- currentHint
+  x <- simpleSymbol
+  if isKeyword x
+    then raiseParseError $ "found a keyword `" <> x <> "`, expecting a variable"
+    else return (m, asIdent x)
+
+weakTermVar :: IO WeakTermPlus
+weakTermVar = do
+  m <- currentHint
+  x <- symbol
+  if isKeyword x
+    then raiseParseError $ "found a keyword `" <> x <> "`, expecting a variable"
+    else return (m, WeakTermVar VarKindLocal $ asIdent x)
+
+weakTermString :: IO WeakTermPlus
+weakTermString = do
+  m <- currentHint
+  s <- string
+  let i8s = encode $ T.unpack s
+  -- let len = length i8s
+  -- let query =
+  --       "let p = memory.allocate 16 in "<>
+  --       "let _ = store-i64-with-index #{T.pack (show len)} 0 in " <>
+  --       "let _ = store-pointer-with-index ..."
+  -- -- (len, [array len i8])
+  return (m, undefined i8s)
+
+weakTermInteger :: IO WeakTermPlus
+weakTermInteger = do
+  m <- currentHint
+  intValue <- integer
+  h <- newAster m
+  return (m, WeakTermInt h intValue)
+
+integer :: IO Integer
+integer = do
+  x <- symbol
+  case readMaybe (T.unpack x) of
+    Just intValue ->
+      return intValue
+    Nothing ->
+      raiseParseError $ "unexpected symbol: " <> x <> "\n expecting: an integer"
+
+weakTermFloat :: IO WeakTermPlus
+weakTermFloat = do
+  m <- currentHint
+  x <- symbol
+  case readMaybe (T.unpack x) of
+    Just floatValue -> do
+      h <- newAster m
+      return (m, WeakTermFloat h floatValue)
+    Nothing ->
+      raiseParseError $ "unexpected symbol: " <> x <> "\n expecting: an integer"
+
+toSigma :: Hint -> [WeakIdentPlus] -> IO WeakTermPlus
+toSigma m xts = do
+  sigVar <- newIdentFromText "sig"
+  h <- newIdentFromText "_"
+  return
+    ( m,
+      WeakTermPi
+        [ (m, sigVar, (m, WeakTermTau)),
+          (m, h, (m, WeakTermPi xts (m, WeakTermVar VarKindLocal sigVar)))
+        ]
+        (m, WeakTermVar VarKindLocal sigVar)
+    )
+
+castFromNoema :: WeakTermPlus -> WeakTermPlus -> WeakTermPlus -> WeakTermPlus
+castFromNoema subject baseType tree = do
+  let m = fst tree
+  ( m,
+    WeakTermPiElim
+      (m, WeakTermVar VarKindLocal (asIdent "unsafe.cast"))
+      [ wrapWithNoema subject baseType,
+        baseType,
+        tree
+      ]
+    )
+
+castToNoema :: WeakTermPlus -> WeakTermPlus -> WeakTermPlus -> WeakTermPlus
+castToNoema subject baseType tree = do
+  let m = fst tree
+  ( m,
+    WeakTermPiElim
+      (m, WeakTermVar VarKindLocal (asIdent "unsafe.cast"))
+      [ baseType,
+        wrapWithNoema subject baseType,
+        tree
+      ]
+    )
+
+wrapWithNoema :: WeakTermPlus -> WeakTermPlus -> WeakTermPlus
+wrapWithNoema subject baseType = do
+  let m = fst baseType
+  (m, WeakTermPiElim (m, WeakTermVar VarKindLocal (asIdent "noema")) [subject, baseType])
+
+doNotCare :: Hint -> WeakTermPlus
+doNotCare m =
+  (m, WeakTermTau)
+
+--
+-- basic functions for the parser combinator
+--
+
+type ParserState = (T.Text, Int, Int)
+
+saveState :: IO ParserState
+saveState = do
+  s <- readIORef text
+  l <- readIORef line
+  c <- readIORef column
+  return (s, l, c)
+
+loadState :: ParserState -> IO ()
+loadState (s, l, c) = do
+  writeIORef text s
+  writeIORef line l
+  writeIORef column c
+
+betweenParen :: IO a -> IO a
+betweenParen f = do
   char '(' >> skip
   item <- f
   char ')' >> skip
   return item
-
-termLet :: IO PreTermPlus
-termLet = do
-  m <- currentHint
-  token "let"
-  x <- symbol
-  char '='
-  skip
-  e1 <- term
-  token "in"
-  e2 <- term
-  return (m, PreTermLet x e1 e2)
-
-termLetCoproduct :: IO PreTermPlus
-termLetCoproduct = do
-  m <- currentHint
-  token "let?"
-  x <- symbol
-  char '='
-  skip
-  e1 <- term
-  token "in"
-  e2 <- term
-  return (m, PreTermLetCoproduct x e1 e2)
-
-termIf :: IO PreTermPlus
-termIf = do
-  m <- currentHint
-  token "if"
-  e1 <- term
-  token "then"
-  e2 <- term
-  token "else"
-  e3 <- term
-  token "end"
-  return (m, PreTermIf e1 e2 e3)
-
-termSymbol :: IO PreTermPlus
-termSymbol = do
-  m <- currentHint
-  x <- symbol
-  if isKeyword x
-    then raiseParseError $ "found a keyword `" <> x <> "`, expecting a symbol"
-    else return (m, PreTermSymbol x)
 
 token :: T.Text -> IO ()
 token expected = do
@@ -307,22 +680,37 @@ many :: IO a -> IO [a]
 many f =
   sepEndBy f (return ())
 
-(<|>) :: IO a -> IO a -> IO a
-(<|>) f g = do
-  s <- readIORef text
-  catch f (helper s g)
+tryPlanList :: [IO a] -> IO a
+tryPlanList planList =
+  case planList of
+    [] ->
+      raiseParseError "planList"
+    f : fs -> do
+      -- s <- readIORef text
+      s <- saveState
+      catch f (helper s (tryPlanList fs))
 
-helper :: T.Text -> IO a -> Error -> IO a
+helper :: ParserState -> IO a -> Error -> IO a
 helper s g _ = do
-  writeIORef text s
+  loadState s
+  -- writeIORef text s
   g
 
-lookAheadSymbol :: T.Text -> IO Bool
-lookAheadSymbol atom = do
-  s <- readIORef text
-  headSymbol <- symbol
-  writeIORef text s
-  return $ headSymbol == atom
+lookAhead :: IO a -> IO a
+lookAhead f = do
+  s <- saveState
+  -- s <- readIORef text
+  result <- f
+  loadState s
+  -- writeIORef text s
+  return result
+
+sepBy2 :: IO a -> IO b -> IO [a]
+sepBy2 f sep = do
+  item1 <- f
+  item2 <- f
+  itemList <- many $ sep >> f
+  return $ item1 : item2 : itemList
 
 sepEndBy :: IO a -> IO () -> IO [a]
 sepEndBy f g =
@@ -347,6 +735,28 @@ symbol = do
   s <- readIORef text
   let x = T.takeWhile isSymbolChar s
   let rest = T.dropWhile isSymbolChar s
+  updateStreamC (T.length x) rest
+  skip
+  if T.null x
+    then raiseParseError "empty symbol"
+    else return x
+
+symbolMaybe :: IO (Maybe T.Text)
+symbolMaybe = do
+  s <- readIORef text
+  let x = T.takeWhile isSymbolChar s
+  let rest = T.dropWhile isSymbolChar s
+  updateStreamC (T.length x) rest
+  skip
+  if T.null x
+    then return Nothing
+    else return $ Just x
+
+simpleSymbol :: IO T.Text
+simpleSymbol = do
+  s <- readIORef text
+  let x = T.takeWhile isSimpleSymbolChar s
+  let rest = T.dropWhile isSimpleSymbolChar s
   updateStreamC (T.length x) rest
   skip
   if T.null x
@@ -395,6 +805,11 @@ isSymbolChar :: Char -> Bool
 isSymbolChar c =
   c `S.notMember` nonSymbolSet
 
+{-# INLINE isSimpleSymbolChar #-}
+isSimpleSymbolChar :: Char -> Bool
+isSimpleSymbolChar c =
+  c `S.notMember` nonSimpleSymbolSet
+
 {-# INLINE spaceSet #-}
 spaceSet :: S.Set Char
 spaceSet =
@@ -408,7 +823,12 @@ newlineSet =
 {-# INLINE nonSymbolSet #-}
 nonSymbolSet :: S.Set Char
 nonSymbolSet =
-  S.fromList $ "() \"\n;"
+  S.fromList $ "() \"\n;,"
+
+{-# INLINE nonSimpleSymbolSet #-}
+nonSimpleSymbolSet :: S.Set Char
+nonSimpleSymbolSet =
+  S.fromList $ "() \"\n;."
 
 {-# INLINE updateStreamL #-}
 updateStreamL :: T.Text -> IO ()
@@ -438,6 +858,34 @@ raiseParseError txt = do
   m <- currentHint
   throw $ Error [logError (getPosInfo m) txt]
 
+-- asKeyword :: T.Text -> Maybe Keywordみたいにすべきかも。
 isKeyword :: T.Text -> Bool
 isKeyword s =
-  s `elem` ["define", "-", "with", "let", "let?", "in", "match", "new", "match-noetic", "->", "end"]
+  S.member s keywordSet
+
+-- s `S.elem` ["define", "-", "with", "let", "let?", "in", "match", "new", "match-noetic", "->", "end"]
+
+keywordSet :: S.Set T.Text
+keywordSet =
+  S.fromList
+    [ "define",
+      "-",
+      "tau",
+      "pi",
+      "lambda",
+      ".",
+      "switch",
+      "->",
+      "=",
+      "with",
+      "question",
+      "derangement",
+      "match",
+      "match-noetic",
+      "new",
+      "let",
+      "let?",
+      "in",
+      "new",
+      "end"
+    ]
