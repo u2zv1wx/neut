@@ -85,6 +85,8 @@ weakTerm = do
       weakTermSigma
     Just "product" ->
       weakTermProduct
+    Just "with-subject" ->
+      undefined
     _ ->
       weakTermAux
 
@@ -516,13 +518,20 @@ weakTermString = do
   m <- currentHint
   s <- string
   let i8s = encode $ T.unpack s
-  -- let len = length i8s
-  -- let query =
-  --       "let p = memory.allocate 16 in "<>
-  --       "let _ = store-i64-with-index #{T.pack (show len)} 0 in " <>
-  --       "let _ = store-pointer-with-index ..."
-  -- -- (len, [array len i8])
-  return (m, undefined i8s)
+  let len = toInteger $ length i8s
+  let i8s' = map (\x -> (m, WeakTermInt (m, WeakTermConst "i8") (toInteger x))) i8s
+  return
+    ( m,
+      WeakTermPiElim
+        (m, WeakTermVar VarKindLocal (asIdent "unsafe.create-new-string"))
+        [ (m, WeakTermInt (m, WeakTermConst "i64") len),
+          ( m,
+            WeakTermDerangement
+              (DerangementCreateArray (LowTypeInt 32))
+              i8s'
+          )
+        ]
+    )
 
 weakTermInteger :: IO WeakTermPlus
 weakTermInteger = do
