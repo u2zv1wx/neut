@@ -95,12 +95,10 @@ stmt = do
     Just "unuse" -> do
       stmtUnuse
       stmt
-    Just other -> do
-      p "other"
-      p' other
-      undefined
-    Nothing ->
-      return []
+    _ -> do
+      s <- stmtAux
+      ss <- stmt
+      return $ s : ss
 
 --
 -- parser for statements
@@ -195,6 +193,13 @@ stmtUnuse = do
   token "unuse"
   name <- varText
   unuse name
+
+stmtAux :: IO WeakStmt
+stmtAux = do
+  m <- currentHint
+  e <- weakTerm >>= discern
+  t <- newAster m
+  return $ WeakStmtDef m Nothing t e
 
 stmtDefinePrefix :: IO ()
 stmtDefinePrefix = do
