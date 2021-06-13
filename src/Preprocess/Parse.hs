@@ -70,7 +70,7 @@ stmt = do
       stmtDefineEnum
       stmt
     Just "include" ->
-      undefined
+      stmtInclude
     Just "define-data" ->
       undefined
     Just "define-codata" ->
@@ -88,9 +88,9 @@ stmt = do
     Just "remove-prefix" ->
       undefined
     Just "use" ->
-      undefined
+      stmtUse >> stmt
     Just "unuse" ->
-      undefined
+      stmtUnuse >> stmt
     Just other -> do
       p "other"
       p' other
@@ -170,21 +170,33 @@ stmtDefineEnumClauseWithoutDiscriminant = do
 stmtSection :: IO [WeakStmt]
 stmtSection = do
   token "section"
-  item <- symbol
+  item <- varText
   handleSection item stmt
 
 stmtEnd :: IO [WeakStmt]
 stmtEnd = do
   m <- currentHint
   token "end"
-  item <- symbol
+  item <- varText
   handleEnd m item stmt
+
+stmtUse :: IO ()
+stmtUse = do
+  token "use"
+  name <- varText
+  use name
+
+stmtUnuse :: IO ()
+stmtUnuse = do
+  token "unuse"
+  name <- varText
+  unuse name
 
 -- let piType = (m, WeakTermPi argList codType)
 -- let e' = (m, WeakTermPiIntro OpacityTransparent (LamKindFix (m, asIdent funName, piType)) argList e)
 -- return $ WeakStmtDef m (Just (True, asIdent funName)) piType e'
 
-stmtInclude :: IO WeakStmt
+stmtInclude :: IO [WeakStmt]
 stmtInclude =
   undefined
 
