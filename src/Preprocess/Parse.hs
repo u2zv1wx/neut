@@ -47,6 +47,8 @@ parseWeakTerm input = do
   skip
   weakTerm
 
+-- many (token "-" >> weakTerm)
+
 --
 -- parser for WeakTerm
 --
@@ -200,16 +202,16 @@ weakTermDerangementKind = do
     "nop" ->
       return DerangementNop
     "store" -> do
-      t <- lowType
+      t <- lowTypeSimple
       return $ DerangementStore t
     "load" -> do
-      t <- lowType
+      t <- lowTypeSimple
       return $ DerangementLoad t
     "create-array" -> do
-      t <- lowType
+      t <- lowTypeSimple
       return $ DerangementCreateArray t
     "create-struct" -> do
-      ts <- many lowType
+      ts <- many lowTypeSimple
       return $ DerangementCreateStruct ts
     "syscall" -> do
       syscallNum <- integer
@@ -248,19 +250,30 @@ lowType = do
 
 lowTypeSimple :: IO LowType
 lowTypeSimple = do
-  s <- saveState
+  tryPlanList
+    [ betweenParen lowType,
+      lowTypeInt,
+      lowTypeFloat,
+      raiseParseError "lowTypeSimple"
+    ]
+
+lowTypeInt :: IO LowType
+lowTypeInt = do
   headSymbol <- symbol
-  case T.uncons headSymbol of
-    Just ('(', _) ->
-      betweenParen lowType
-    _
-      | Just size <- asLowInt headSymbol ->
-        return $ LowTypeInt size
-      | Just size <- asLowFloat headSymbol ->
-        return $ LowTypeFloat size
-      | otherwise -> do
-        loadState s
-        raiseParseError "lowTypeSimple"
+  case asLowInt headSymbol of
+    Just size ->
+      return $ LowTypeInt size
+    Nothing ->
+      raiseParseError "lowTypeInt"
+
+lowTypeFloat :: IO LowType
+lowTypeFloat = do
+  headSymbol <- symbol
+  case asLowFloat headSymbol of
+    Just size ->
+      return $ LowTypeFloat size
+    Nothing ->
+      raiseParseError "lowTypeFloat"
 
 weakTermMatch :: IO WeakTermPlus
 weakTermMatch = do
@@ -341,7 +354,11 @@ weakTermPatternArgument = do
 -- let x : A = e1 in e2
 -- let x     = e1 in e2
 weakTermLet :: IO WeakTermPlus
-weakTermLet = do
+weakTermLet =
+  tryPlanList [weakTermLetSigmaElim, weakTermLetNormal]
+
+weakTermLetNormal :: IO WeakTermPlus
+weakTermLetNormal = do
   m <- currentHint
   token "let"
   x <- weakTermLetVar
@@ -350,6 +367,30 @@ weakTermLet = do
   token "in"
   e2 <- weakTerm
   return (m, WeakTermPiElim (m, WeakTermPiIntro OpacityTransparent LamKindNormal [x] e2) [e1])
+
+weakTermSigmaElimVar :: IO WeakIdentPlus
+weakTermSigmaElimVar =
+  tryPlanList [ascriptionInner, weakAscription']
+
+-- let (x1 : A1, ..., xn : An) = e1 in e2
+weakTermLetSigmaElim :: IO WeakTermPlus
+weakTermLetSigmaElim = do
+  m <- currentHint
+  token "let"
+  xts <- betweenParen $ sepBy2 weakTermSigmaElimVar (char ',' >> skip)
+  token "="
+  e1 <- weakTerm
+  token "in"
+  e2 <- weakTerm
+  resultType <- newAster m
+  return
+    ( m,
+      WeakTermPiElim
+        e1
+        [ resultType,
+          (m, WeakTermPiIntro OpacityTransparent LamKindNormal xts e2)
+        ]
+    )
 
 -- let? x : A = e1 in e2
 -- let? x     = e1 in e2
@@ -447,11 +488,13 @@ weakTermSigmaIntro = do
       x <- newIdentFromText "_"
       t <- newAster m
       return (m, x, t)
-    sigVar <- newIdentFromText "_"
-    k <- newIdentFromText "_"
+    sigVar <- newIdentFromText "sigvar"
+    k <- newIdentFromText "sig-k"
     return
       ( m,
-        WeakTermPi
+        WeakTermPiIntro
+          OpacityTransparent
+          LamKindNormal
           [ (m, sigVar, (m, WeakTermTau)),
             (m, k, (m, WeakTermPi xts (m, WeakTermVar VarKindLocal sigVar)))
           ]
@@ -527,14 +570,23 @@ weakIdentPlus = do
       weakAscription'
     ]
 
+ascriptionInner :: IO WeakIdentPlus
+ascriptionInner = do
+  m <- currentHint
+  x <- symbol
+  char ':' >> skip
+  a <- weakTerm
+  return (m, asIdent x, a)
+
 weakAscription :: IO WeakIdentPlus
 weakAscription = do
-  betweenParen $ do
-    m <- currentHint
-    x <- symbol
-    char ':' >> skip
-    a <- weakTerm
-    return (m, asIdent x, a)
+  betweenParen ascriptionInner
+
+-- m <- currentHint
+-- x <- symbol
+-- char ':' >> skip
+-- a <- weakTerm
+-- return (m, asIdent x, a)
 
 weakAscription' :: IO WeakIdentPlus
 weakAscription' = do
@@ -555,7 +607,7 @@ var = do
   m <- currentHint
   x <- symbol
   if isKeyword x
-    then raiseParseError $ "found a keyword `" <> x <> "`, expecting a variable"
+    then raiseParseError $ "found a reserved symbol `" <> x <> "`, expecting a variable"
     else return (m, asIdent x)
 
 weakTermVar :: IO WeakTermPlus
@@ -736,14 +788,30 @@ comment = do
       return ()
 
 many :: IO a -> IO [a]
-many f =
-  sepEndBy f (return ())
+many f = do
+  tryPlanList
+    [ do
+        x <- f
+        xs <- many f
+        return $ x : xs,
+      return []
+    ]
+
+-- s <- saveState
+-- item <- catch f (helper s (loadState s >> return []))
+-- sepEndBy f (return ())
+
+-- many :: IO a -> IO [a]
+-- many f =
+--   sepEndBy f (return ())
 
 tryPlanList :: [IO a] -> IO a
 tryPlanList planList =
   case planList of
     [] ->
-      raiseParseError "planList"
+      raiseParseError "empty planList"
+    [f] ->
+      f
     f : fs -> do
       s <- saveState
       catch f (helper s (tryPlanList fs))
@@ -763,27 +831,28 @@ lookAhead f = do
 sepBy2 :: IO a -> IO b -> IO [a]
 sepBy2 f sep = do
   item1 <- f
+  _ <- sep
   item2 <- f
   itemList <- many $ sep >> f
   return $ item1 : item2 : itemList
 
-sepEndBy :: IO a -> IO () -> IO [a]
-sepEndBy f g =
-  sepEndBy' (f >>= return . Right) g []
+-- sepEndBy :: IO a -> IO () -> IO [a]
+-- sepEndBy f g =
+--   sepEndBy' (f >>= return . Right) g []
 
-sepEndBy' :: IO (Either [a] a) -> IO () -> [a] -> IO [a]
-sepEndBy' f g acc = do
-  itemOrResult <- catch f (finalize acc)
-  g
-  case itemOrResult of
-    Right item ->
-      sepEndBy' f g (item : acc)
-    Left result ->
-      return result
+-- sepEndBy' :: IO (Either [a] a) -> IO () -> [a] -> IO [a]
+-- sepEndBy' f g acc = do
+--   itemOrResult <- catch f (finalize acc)
+--   g
+--   case itemOrResult of
+--     Right item ->
+--       sepEndBy' f g (item : acc)
+--     Left result ->
+--       return result
 
-finalize :: [a] -> Error -> IO (Either [a] a)
-finalize acc _ =
-  return $ Left $ reverse acc
+-- finalize :: [a] -> Error -> IO (Either [a] a)
+-- finalize acc _ =
+--   return $ Left $ reverse acc
 
 symbol :: IO T.Text
 symbol = do
@@ -883,7 +952,9 @@ nonSymbolSet =
 {-# INLINE nonSimpleSymbolSet #-}
 nonSimpleSymbolSet :: S.Set Char
 nonSimpleSymbolSet =
-  S.fromList $ "() \"\n;."
+  S.insert ',' nonSymbolSet
+
+-- S.fromList $ "() \"\n;."
 
 {-# INLINE updateStreamL #-}
 updateStreamL :: T.Text -> IO ()
@@ -921,26 +992,28 @@ isKeyword s =
 keywordSet :: S.Set T.Text
 keywordSet =
   S.fromList
-    [ "define",
-      "-",
-      "tau",
-      "pi",
-      "lambda",
-      ".",
-      "switch",
-      "over",
+    [ "-",
       "->",
+      ".",
       "=",
-      "with",
-      "question",
+      "define",
       "derangement",
+      "else",
+      "end",
+      "if",
+      "in",
+      "lambda",
+      "let",
+      "let?",
       "match",
       "match-noetic",
       "new",
-      "let",
-      "with-subject",
-      "let?",
-      "in",
-      "new",
-      "end"
+      "over",
+      "pi",
+      "question",
+      "switch",
+      "tau",
+      "then",
+      "with",
+      "with-subject"
     ]
