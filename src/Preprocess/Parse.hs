@@ -80,9 +80,9 @@ stmt = do
     Just "ensure" ->
       undefined
     Just "section" ->
-      undefined
+      stmtSection
     Just "end" ->
-      undefined
+      stmtEnd
     Just "define-prefix" ->
       undefined
     Just "remove-prefix" ->
@@ -166,6 +166,19 @@ stmtDefineEnumClauseWithoutDiscriminant = do
   token "-"
   item <- varText
   return (item, Nothing)
+
+stmtSection :: IO [WeakStmt]
+stmtSection = do
+  token "section"
+  item <- symbol
+  handleSection item stmt
+
+stmtEnd :: IO [WeakStmt]
+stmtEnd = do
+  m <- currentHint
+  token "end"
+  item <- symbol
+  handleEnd m item stmt
 
 -- let piType = (m, WeakTermPi argList codType)
 -- let e' = (m, WeakTermPiIntro OpacityTransparent (LamKindFix (m, asIdent funName, piType)) argList e)
