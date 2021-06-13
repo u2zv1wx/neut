@@ -85,8 +85,8 @@ weakTerm = do
       weakTermSigma
     Just "product" ->
       weakTermProduct
-    Just "with-subject" ->
-      undefined
+    Just "idealize" ->
+      weakTermIdealize
     _ ->
       weakTermAux
 
@@ -363,7 +363,6 @@ weakTermLetCoproduct = do
   token "in"
   e2 <- weakTerm
   err <- newIdentFromText "err"
-  -- let doNotCare = (m, WeakTermTau)
   typeOfLeft <- newAster m
   typeOfRight <- newAster m
   let coproductLeft = asIdent "coproduct.left"
@@ -459,6 +458,52 @@ weakTermSigmaIntro = do
           (m, WeakTermPiElim (m, WeakTermVar VarKindLocal k) es)
       )
 
+weakTermIdealize :: IO WeakTermPlus
+weakTermIdealize = do
+  m <- currentHint
+  token "idealize"
+  varList <- many var
+  token "over"
+  mSubject <- currentHint
+  subject <- simpleSymbol
+  token "in"
+  e <- weakTerm
+  resultType <- newAster m
+  let subjectTerm = (mSubject, WeakTermVar VarKindLocal (asIdent subject))
+  ts <- mapM (\(mx, _) -> newAster mx) varList
+  return
+    ( m,
+      WeakTermPiElim
+        (m, WeakTermVar VarKindLocal (asIdent "idea.run"))
+        [ resultType,
+          ( m,
+            WeakTermPiIntro
+              OpacityTransparent
+              LamKindNormal
+              [(mSubject, asIdent subject, (m, WeakTermVar VarKindLocal (asIdent "subject")))]
+              (castLet subjectTerm (zip varList ts) e)
+          )
+        ]
+    )
+
+castLet :: WeakTermPlus -> [((Hint, Ident), WeakTermPlus)] -> WeakTermPlus -> WeakTermPlus
+castLet subject xts cont =
+  case xts of
+    [] ->
+      cont
+    ((m, x), t) : rest ->
+      ( m,
+        WeakTermPiElim
+          ( m,
+            WeakTermPiIntro
+              OpacityTransparent
+              LamKindNormal
+              [(m, x, wrapWithNoema subject t)] -- shadowing
+              (castLet subject rest cont)
+          )
+          [castToNoema subject t (m, WeakTermVar VarKindLocal x)] -- FIXME: ここでxをdo-not-consumeに包むべき
+      )
+
 --
 -- term-related helper functions
 --
@@ -505,13 +550,18 @@ weakSimpleIdent = do
     then raiseParseError $ "found a keyword `" <> x <> "`, expecting a variable"
     else return (m, asIdent x)
 
-weakTermVar :: IO WeakTermPlus
-weakTermVar = do
+var :: IO (Hint, Ident)
+var = do
   m <- currentHint
   x <- symbol
   if isKeyword x
     then raiseParseError $ "found a keyword `" <> x <> "`, expecting a variable"
-    else return (m, WeakTermVar VarKindLocal $ asIdent x)
+    else return (m, asIdent x)
+
+weakTermVar :: IO WeakTermPlus
+weakTermVar = do
+  (m, x) <- var
+  return (m, WeakTermVar VarKindLocal x)
 
 weakTermString :: IO WeakTermPlus
 weakTermString = do
@@ -695,23 +745,19 @@ tryPlanList planList =
     [] ->
       raiseParseError "planList"
     f : fs -> do
-      -- s <- readIORef text
       s <- saveState
       catch f (helper s (tryPlanList fs))
 
 helper :: ParserState -> IO a -> Error -> IO a
 helper s g _ = do
   loadState s
-  -- writeIORef text s
   g
 
 lookAhead :: IO a -> IO a
 lookAhead f = do
   s <- saveState
-  -- s <- readIORef text
   result <- f
   loadState s
-  -- writeIORef text s
   return result
 
 sepBy2 :: IO a -> IO b -> IO [a]
@@ -872,8 +918,6 @@ isKeyword :: T.Text -> Bool
 isKeyword s =
   S.member s keywordSet
 
--- s `S.elem` ["define", "-", "with", "let", "let?", "in", "match", "new", "match-noetic", "->", "end"]
-
 keywordSet :: S.Set T.Text
 keywordSet =
   S.fromList
@@ -884,6 +928,7 @@ keywordSet =
       "lambda",
       ".",
       "switch",
+      "over",
       "->",
       "=",
       "with",
@@ -893,6 +938,7 @@ keywordSet =
       "match-noetic",
       "new",
       "let",
+      "with-subject",
       "let?",
       "in",
       "new",
