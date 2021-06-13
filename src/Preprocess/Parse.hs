@@ -83,14 +83,18 @@ stmt = do
       stmtSection
     Just "end" ->
       stmtEnd
-    Just "define-prefix" ->
-      undefined
-    Just "remove-prefix" ->
-      undefined
-    Just "use" ->
-      stmtUse >> stmt
-    Just "unuse" ->
-      stmtUnuse >> stmt
+    Just "define-prefix" -> do
+      stmtDefinePrefix
+      stmt
+    Just "remove-prefix" -> do
+      stmtRemovePrefix
+      stmt
+    Just "use" -> do
+      stmtUse
+      stmt
+    Just "unuse" -> do
+      stmtUnuse
+      stmt
     Just other -> do
       p "other"
       p' other
@@ -191,6 +195,22 @@ stmtUnuse = do
   token "unuse"
   name <- varText
   unuse name
+
+stmtDefinePrefix :: IO ()
+stmtDefinePrefix = do
+  token "define-prefix"
+  from <- varText
+  token "="
+  to <- varText
+  modifyIORef' nsEnv $ \env -> (from, to) : env
+
+stmtRemovePrefix :: IO ()
+stmtRemovePrefix = do
+  token "remove-prefix"
+  from <- varText
+  token "="
+  to <- varText
+  modifyIORef' nsEnv $ \env -> filter (/= (from, to)) env
 
 -- let piType = (m, WeakTermPi argList codType)
 -- let e' = (m, WeakTermPiIntro OpacityTransparent (LamKindFix (m, asIdent funName, piType)) argList e)
