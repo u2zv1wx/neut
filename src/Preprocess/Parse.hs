@@ -582,12 +582,6 @@ weakAscription :: IO WeakIdentPlus
 weakAscription = do
   betweenParen ascriptionInner
 
--- m <- currentHint
--- x <- symbol
--- char ':' >> skip
--- a <- weakTerm
--- return (m, asIdent x, a)
-
 weakAscription' :: IO WeakIdentPlus
 weakAscription' = do
   (m, x) <- weakSimpleIdent
@@ -952,7 +946,7 @@ nonSymbolSet =
 {-# INLINE nonSimpleSymbolSet #-}
 nonSimpleSymbolSet :: S.Set Char
 nonSimpleSymbolSet =
-  S.insert ',' nonSymbolSet
+  S.insert '.' nonSymbolSet
 
 -- S.fromList $ "() \"\n;."
 
