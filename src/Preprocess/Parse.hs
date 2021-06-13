@@ -6,7 +6,7 @@ where
 
 import Codec.Binary.UTF8.String
 import Control.Exception.Safe
-import Control.Monad (forM)
+import Control.Monad (forM, when)
 import Data.Basic
 import Data.Global
 import qualified Data.HashMap.Lazy as Map
@@ -91,7 +91,9 @@ stmt = do
       undefined
     Just "unuse" ->
       undefined
-    Just _ ->
+    Just other -> do
+      p "other"
+      p' other
       undefined
     Nothing ->
       return []
@@ -129,17 +131,41 @@ stmtDefineEnum = do
   token "define-enum"
   name <- varText >>= withSectionPrefix
   itemList <- many stmtDefineEnumClause
-  insEnumEnv m name (zip itemList [0 ..])
+  let itemList' = arrangeEnumItemList name 0 itemList
+  when (not (isLinear (map snd itemList'))) $
+    raiseError m "found a collision of discriminant"
+  insEnumEnv m name itemList'
 
-stmtDefineEnumClause :: IO T.Text
+arrangeEnumItemList :: T.Text -> Int -> [(T.Text, Maybe Int)] -> [(T.Text, Int)]
+arrangeEnumItemList name currentValue clauseList =
+  case clauseList of
+    [] ->
+      []
+    (item, Nothing) : rest ->
+      (name <> nsSep <> item, currentValue) : arrangeEnumItemList name (currentValue + 1) rest
+    (item, Just v) : rest ->
+      (name <> nsSep <> item, v) : arrangeEnumItemList name (v + 1) rest
+
+stmtDefineEnumClause :: IO (T.Text, Maybe Int)
 stmtDefineEnumClause = do
-  headSymbol <- lookAhead symbol
-  if headSymbol /= "-"
-    then raiseParseError "enum-clause"
-    else do
-      token "-"
-      item <- varText
-      return item
+  tryPlanList
+    [ stmtDefineEnumClauseWithDiscriminant,
+      stmtDefineEnumClauseWithoutDiscriminant
+    ]
+
+stmtDefineEnumClauseWithDiscriminant :: IO (T.Text, Maybe Int)
+stmtDefineEnumClauseWithDiscriminant = do
+  token "-"
+  item <- varText
+  token "<-"
+  discriminant <- integer
+  return (item, Just (fromInteger discriminant))
+
+stmtDefineEnumClauseWithoutDiscriminant :: IO (T.Text, Maybe Int)
+stmtDefineEnumClauseWithoutDiscriminant = do
+  token "-"
+  item <- varText
+  return (item, Nothing)
 
 -- let piType = (m, WeakTermPi argList codType)
 -- let e' = (m, WeakTermPiIntro OpacityTransparent (LamKindFix (m, asIdent funName, piType)) argList e)
@@ -157,8 +183,6 @@ weakTerm :: IO WeakTermPlus
 weakTerm = do
   headSymbol <- lookAhead symbolMaybe
   case headSymbol of
-    Just "tau" ->
-      weakTermTau
     Just "pi" ->
       weakTermPi
     Just "lambda" ->
@@ -1130,3 +1154,19 @@ insEnumEnv m name xis = do
       let rev = Map.fromList $ zip xs (zip (repeat name) is)
       modifyIORef' enumEnv $ \env -> Map.insert name xis env
       modifyIORef' revEnumEnv $ \env -> Map.union rev env
+
+{-# INLINE isLinear #-}
+isLinear :: [Int] -> Bool
+isLinear =
+  isLinear' S.empty
+
+isLinear' :: S.Set Int -> [Int] -> Bool
+isLinear' found input =
+  case input of
+    [] ->
+      True
+    (x : xs)
+      | x `S.member` found ->
+        False
+      | otherwise ->
+        isLinear' (S.insert x found) xs
