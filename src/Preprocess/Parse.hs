@@ -9,7 +9,9 @@ import Control.Exception.Safe
 import Control.Monad (forM)
 import Data.Basic
 import Data.Global
+import qualified Data.HashMap.Lazy as Map
 import Data.IORef
+import Data.List (find)
 import Data.Log
 import Data.LowType
 import Data.Namespace
@@ -56,8 +58,6 @@ parseWeakTerm input = do
   skip
   weakTerm
 
--- many (token "-" >> weakTerm)
-
 stmt :: IO [WeakStmt]
 stmt = do
   headSymbol <- lookAhead symbolMaybe
@@ -66,13 +66,14 @@ stmt = do
       s <- stmtDefine
       stmtList <- stmt
       return $ s : stmtList
+    Just "define-enum" -> do
+      stmtDefineEnum
+      stmt
     Just "include" ->
       undefined
     Just "define-data" ->
       undefined
     Just "define-codata" ->
-      undefined
-    Just "define-enum" ->
       undefined
     Just "introspect" ->
       undefined
@@ -104,7 +105,8 @@ stmtDefine :: IO WeakStmt
 stmtDefine = do
   m <- currentHint
   token "define"
-  funName <- symbol >>= withSectionPrefix
+  (mFun, funName) <- var
+  funName' <- withSectionPrefix funName
   argList <- many weakIdentPlus
   token ":"
   codType <- weakTerm
@@ -112,18 +114,36 @@ stmtDefine = do
   e <- weakTerm
   case argList of
     [] -> do
-      -- e' <- discern e
-      -- (_, funName', codType') <- discernIdentPlus (m, asIdent funName, codType)
-      -- return $ WeakStmtDef m (Just (True, funName')) codType' e'
-      return $ WeakStmtDef m (Just (True, asIdent funName)) codType e
+      e' <- discern e
+      (_, funName'', codType') <- discernIdentPlus (mFun, asIdent funName', codType)
+      return $ WeakStmtDef m (Just (True, funName'')) codType' e'
     _ -> do
-      -- let e' = (m, WeakTermPiIntro OpacityTransparent LamKindNormal argList e)
-      -- e' <- discern (m, WeakTermPiIntro OpacityTransparent LamKindNormal argList e)
-      -- (_, funName', piType) <- discernIdentPlus (m, asIdent funName, (m, WeakTermPi argList codType))
-      -- return $ WeakStmtDef m (Just (True, funName)) piType e'
       let piType = (m, WeakTermPi argList codType)
-      let e' = (m, WeakTermPiIntro OpacityTransparent (LamKindFix (m, asIdent funName, piType)) argList e)
-      return $ WeakStmtDef m (Just (True, asIdent funName)) piType e'
+      (_, funName'', piType') <- discernIdentPlus (m, asIdent funName', piType)
+      e' <- discern (m, WeakTermPiIntro OpacityTransparent (LamKindFix (mFun, asIdent funName', piType)) argList e)
+      return $ WeakStmtDef m (Just (True, funName'')) piType' e'
+
+stmtDefineEnum :: IO ()
+stmtDefineEnum = do
+  m <- currentHint
+  token "define-enum"
+  name <- varText >>= withSectionPrefix
+  itemList <- many stmtDefineEnumClause
+  insEnumEnv m name (zip itemList [0 ..])
+
+stmtDefineEnumClause :: IO T.Text
+stmtDefineEnumClause = do
+  headSymbol <- lookAhead symbol
+  if headSymbol /= "-"
+    then raiseParseError "enum-clause"
+    else do
+      token "-"
+      item <- varText
+      return item
+
+-- let piType = (m, WeakTermPi argList codType)
+-- let e' = (m, WeakTermPiIntro OpacityTransparent (LamKindFix (m, asIdent funName, piType)) argList e)
+-- return $ WeakStmtDef m (Just (True, asIdent funName)) piType e'
 
 stmtInclude :: IO WeakStmt
 stmtInclude =
@@ -586,6 +606,7 @@ weakTermIdealize = do
   m <- currentHint
   token "idealize"
   varList <- many var
+  let varList' = fmap (fmap asIdent) varList
   token "over"
   mSubject <- currentHint
   subject <- simpleSymbol
@@ -604,7 +625,7 @@ weakTermIdealize = do
               OpacityTransparent
               LamKindNormal
               [(mSubject, asIdent subject, (m, WeakTermVar VarKindLocal (asIdent "subject")))]
-              (castLet subjectTerm (zip varList ts) e)
+              (castLet subjectTerm (zip varList' ts) e)
           )
         ]
     )
@@ -676,18 +697,22 @@ weakSimpleIdent = do
     then raiseParseError $ "found a keyword `" <> x <> "`, expecting a variable"
     else return (m, asIdent x)
 
-var :: IO (Hint, Ident)
+var :: IO (Hint, T.Text)
 var = do
   m <- currentHint
   x <- symbol
   if isKeyword x
     then raiseParseError $ "found a reserved symbol `" <> x <> "`, expecting a variable"
-    else return (m, asIdent x)
+    else return (m, x)
+
+varText :: IO T.Text
+varText =
+  snd <$> var
 
 weakTermVar :: IO WeakTermPlus
 weakTermVar = do
   (m, x) <- var
-  return (m, WeakTermVar VarKindLocal x)
+  return (m, WeakTermVar VarKindLocal $ asIdent x)
 
 weakTermString :: IO WeakTermPlus
 weakTermString = do
@@ -1092,3 +1117,16 @@ keywordSet =
       "then",
       "with"
     ]
+
+insEnumEnv :: Hint -> T.Text -> [(T.Text, Int)] -> IO ()
+insEnumEnv m name xis = do
+  eenv <- readIORef enumEnv
+  let definedEnums = Map.keys eenv ++ map fst (concat (Map.elems eenv))
+  case find (`elem` definedEnums) $ name : map fst xis of
+    Just x ->
+      raiseError m $ "the constant `" <> x <> "` is already defined [ENUM]"
+    _ -> do
+      let (xs, is) = unzip xis
+      let rev = Map.fromList $ zip xs (zip (repeat name) is)
+      modifyIORef' enumEnv $ \env -> Map.insert name xis env
+      modifyIORef' revEnumEnv $ \env -> Map.union rev env
