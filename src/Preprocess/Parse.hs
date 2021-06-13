@@ -1,5 +1,6 @@
 module Preprocess.Parse
   ( parseWeakTerm,
+    parseStmt,
   )
 where
 
@@ -11,9 +12,11 @@ import Data.Global
 import Data.IORef
 import Data.Log
 import Data.LowType
+import Data.Namespace
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.WeakTerm
+import Parse.Discern
 import System.IO.Unsafe (unsafePerformIO)
 import Text.Read (readMaybe)
 
@@ -41,6 +44,12 @@ column :: IORef Int
 column =
   unsafePerformIO (newIORef 1)
 
+parseStmt :: T.Text -> IO [WeakStmt]
+parseStmt input = do
+  modifyIORef' text $ \_ -> input
+  skip
+  stmt
+
 parseWeakTerm :: T.Text -> IO WeakTermPlus
 parseWeakTerm input = do
   modifyIORef' text $ \_ -> input
@@ -48,6 +57,77 @@ parseWeakTerm input = do
   weakTerm
 
 -- many (token "-" >> weakTerm)
+
+stmt :: IO [WeakStmt]
+stmt = do
+  headSymbol <- lookAhead symbolMaybe
+  case headSymbol of
+    Just "define" -> do
+      s <- stmtDefine
+      stmtList <- stmt
+      return $ s : stmtList
+    Just "include" ->
+      undefined
+    Just "define-data" ->
+      undefined
+    Just "define-codata" ->
+      undefined
+    Just "define-enum" ->
+      undefined
+    Just "introspect" ->
+      undefined
+    Just "ensure" ->
+      undefined
+    Just "section" ->
+      undefined
+    Just "end" ->
+      undefined
+    Just "define-prefix" ->
+      undefined
+    Just "remove-prefix" ->
+      undefined
+    Just "use" ->
+      undefined
+    Just "unuse" ->
+      undefined
+    Just _ ->
+      undefined
+    Nothing ->
+      return []
+
+--
+-- parser for statements
+--
+
+-- define name (x1 : A1) ... (xn : An) : A = e
+stmtDefine :: IO WeakStmt
+stmtDefine = do
+  m <- currentHint
+  token "define"
+  funName <- symbol >>= withSectionPrefix
+  argList <- many weakIdentPlus
+  token ":"
+  codType <- weakTerm
+  token "="
+  e <- weakTerm
+  case argList of
+    [] -> do
+      -- e' <- discern e
+      -- (_, funName', codType') <- discernIdentPlus (m, asIdent funName, codType)
+      -- return $ WeakStmtDef m (Just (True, funName')) codType' e'
+      return $ WeakStmtDef m (Just (True, asIdent funName)) codType e
+    _ -> do
+      -- let e' = (m, WeakTermPiIntro OpacityTransparent LamKindNormal argList e)
+      -- e' <- discern (m, WeakTermPiIntro OpacityTransparent LamKindNormal argList e)
+      -- (_, funName', piType) <- discernIdentPlus (m, asIdent funName, (m, WeakTermPi argList codType))
+      -- return $ WeakStmtDef m (Just (True, funName)) piType e'
+      let piType = (m, WeakTermPi argList codType)
+      let e' = (m, WeakTermPiIntro OpacityTransparent (LamKindFix (m, asIdent funName, piType)) argList e)
+      return $ WeakStmtDef m (Just (True, asIdent funName)) piType e'
+
+stmtInclude :: IO WeakStmt
+stmtInclude =
+  undefined
 
 --
 -- parser for WeakTerm
@@ -990,10 +1070,12 @@ keywordSet =
       "->",
       ".",
       "=",
+      ":",
       "define",
       "derangement",
       "else",
       "end",
+      "idealize",
       "if",
       "in",
       "lambda",
@@ -1008,6 +1090,5 @@ keywordSet =
       "switch",
       "tau",
       "then",
-      "with",
-      "with-subject"
+      "with"
     ]
