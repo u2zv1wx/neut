@@ -1,6 +1,5 @@
 module Preprocess.Parse
-  ( parseWeakTerm,
-    parseStmt,
+  ( visitP,
   )
 where
 
@@ -17,8 +16,11 @@ import Data.LowType
 import Data.Namespace
 import qualified Data.Set as S
 import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 import Data.WeakTerm
 import Parse.Discern
+import Path
+import Path.IO
 import System.IO.Unsafe (unsafePerformIO)
 import Text.Read (readMaybe)
 
@@ -46,59 +48,100 @@ column :: IORef Int
 column =
   unsafePerformIO (newIORef 1)
 
-parseStmt :: T.Text -> IO [WeakStmt]
-parseStmt input = do
-  modifyIORef' text $ \_ -> input
-  skip
-  stmt
+-- parseStmt :: T.Text -> IO [WeakStmt]
+-- parseStmt input = do
+--   modifyIORef' text $ \_ -> input
+--   skip
+--   stmt
 
-parseWeakTerm :: T.Text -> IO WeakTermPlus
-parseWeakTerm input = do
-  modifyIORef' text $ \_ -> input
-  skip
-  weakTerm
+-- parseWeakTerm :: T.Text -> IO WeakTermPlus
+-- parseWeakTerm input = do
+--   modifyIORef' text $ \_ -> input
+--   skip
+--   weakTerm
+
+visitP :: Path Abs File -> IO [WeakStmt]
+visitP path = do
+  pushTrace path
+  modifyIORef' fileEnv $ \env -> Map.insert path VisitInfoActive env
+  withNestedState $ do
+    TIO.readFile (toFilePath path) >>= initializeState
+    skip
+    stmt
+
+-- initializeStateみたいなのがいる？
+
+-- return
+
+-- state <- saveState
+-- modifyIORef' text $ \_ -> content
+-- skip
+-- defList <- stmt
+-- loadState state
+-- return defList
+
+-- tokenize content >>= preprocess'
+
+leave :: IO [WeakStmt]
+leave = do
+  path <- getCurrentFilePath
+  modifyIORef' fileEnv $ \env -> Map.insert path VisitInfoFinish env
+  popTrace
+  return []
+
+pushTrace :: Path Abs File -> IO ()
+pushTrace path =
+  modifyIORef' traceEnv $ \env -> path : env
+
+popTrace :: IO ()
+popTrace =
+  modifyIORef' traceEnv $ \env -> tail env
 
 stmt :: IO [WeakStmt]
 stmt = do
-  headSymbol <- lookAhead symbolMaybe
-  case headSymbol of
-    Just "define" -> do
-      s <- stmtDefine
-      stmtList <- stmt
-      return $ s : stmtList
-    Just "define-enum" -> do
-      stmtDefineEnum
-      stmt
-    Just "include" ->
-      stmtInclude
-    Just "define-data" ->
-      undefined
-    Just "define-codata" ->
-      undefined
-    Just "introspect" ->
-      undefined
-    Just "ensure" ->
-      undefined
-    Just "section" ->
-      stmtSection
-    Just "end" ->
-      stmtEnd
-    Just "define-prefix" -> do
-      stmtDefinePrefix
-      stmt
-    Just "remove-prefix" -> do
-      stmtRemovePrefix
-      stmt
-    Just "use" -> do
-      stmtUse
-      stmt
-    Just "unuse" -> do
-      stmtUnuse
-      stmt
-    _ -> do
-      s <- stmtAux
-      ss <- stmt
-      return $ s : ss
+  s <- readIORef text
+  if T.null s
+    then leave
+    else do
+      headSymbol <- lookAhead symbolMaybe
+      case headSymbol of
+        Just "define" -> do
+          def <- stmtDefine
+          stmtList <- stmt
+          return $ def : stmtList
+        Just "define-enum" -> do
+          stmtDefineEnum
+          stmt
+        Just "include" ->
+          stmtInclude
+        Just "define-data" ->
+          undefined
+        Just "define-codata" ->
+          undefined
+        Just "introspect" ->
+          undefined
+        Just "ensure" ->
+          undefined
+        Just "section" ->
+          stmtSection
+        Just "end" ->
+          stmtEnd
+        Just "define-prefix" -> do
+          stmtDefinePrefix
+          stmt
+        Just "remove-prefix" -> do
+          stmtRemovePrefix
+          stmt
+        Just "use" -> do
+          stmtUse
+          stmt
+        Just "unuse" -> do
+          stmtUnuse
+          stmt
+        _ -> do
+          def <- stmtAux
+          defList <- stmt
+          return $ def : defList
 
 --
 -- parser for statements
@@ -222,8 +265,63 @@ stmtRemovePrefix = do
 -- return $ WeakStmtDef m (Just (True, asIdent funName)) piType e'
 
 stmtInclude :: IO [WeakStmt]
-stmtInclude =
-  undefined
+stmtInclude = do
+  m <- currentHint
+  ensureEnvSanity m
+  token "include"
+  path <- T.unpack <$> string
+  dirPath <-
+    if head path == '.'
+      then getCurrentDirPath
+      else getLibraryDirPath
+  newPath <- resolveFile dirPath path
+  ensureFileExistence m newPath
+  denv <- readIORef fileEnv
+  case Map.lookup newPath denv of
+    Just VisitInfoActive -> do
+      tenv <- readIORef traceEnv
+      let cyclicPath = dropWhile (/= newPath) (reverse tenv) ++ [newPath]
+      raiseError m $ "found a cyclic inclusion:\n" <> showCyclicPath cyclicPath
+    Just VisitInfoFinish ->
+      stmt
+    Nothing -> do
+      defList1 <- visitP newPath
+      defList2 <- stmt
+      return $ defList1 ++ defList2
+
+ensureEnvSanity :: Hint -> IO ()
+ensureEnvSanity m = do
+  penv <- readIORef prefixEnv
+  if null penv
+    then return ()
+    else raiseError m $ "`include` can only be used with no `use`, but the current `use` is: " <> T.intercalate ", " penv
+
+ensureFileExistence :: Hint -> Path Abs File -> IO ()
+ensureFileExistence m path = do
+  b <- doesFileExist path
+  if b
+    then return ()
+    else raiseError m $ "no such file: " <> T.pack (toFilePath path)
+
+showCyclicPath :: [Path Abs File] -> T.Text
+showCyclicPath pathList =
+  case pathList of
+    [] ->
+      ""
+    [path] ->
+      T.pack (toFilePath path)
+    (path : ps) ->
+      "     " <> T.pack (toFilePath path) <> showCyclicPath' ps
+
+showCyclicPath' :: [Path Abs File] -> T.Text
+showCyclicPath' pathList =
+  case pathList of
+    [] ->
+      ""
+    [path] ->
+      "\n  ~> " <> T.pack (toFilePath path)
+    (path : ps) ->
+      "\n  ~> " <> T.pack (toFilePath path) <> showCyclicPath' ps
 
 --
 -- parser for WeakTerm
@@ -900,6 +998,21 @@ loadState (s, l, c) = do
   writeIORef line l
   writeIORef column c
 
+initializeState :: T.Text -> IO ()
+initializeState fileContent = do
+  writeIORef line 1
+  writeIORef column 1
+  writeIORef text fileContent
+
+-- modifyIORef' text $ \_ -> content
+
+withNestedState :: IO a -> IO a
+withNestedState comp = do
+  state <- saveState
+  value <- comp
+  loadState state
+  return value
+
 betweenParen :: IO a -> IO a
 betweenParen f = do
   char '(' >> skip
@@ -1062,15 +1175,37 @@ simpleSymbol = do
 
 string :: IO T.Text
 string = do
+  char '"'
   s <- readIORef text
-  len <- headStringLengthOf False s 1
+  len <- stringLengthOf False s 0
   let (x, s') = T.splitAt len s
-  modifyIORef' text $ \_ -> s'
+  writeIORef text $ T.tail s'
   skip
   return x
 
-headStringLengthOf :: EscapeFlag -> T.Text -> Int -> IO Int
-headStringLengthOf flag s i =
+-- headStringLengthOf :: EscapeFlag -> T.Text -> Int -> IO Int
+-- headStringLengthOf flag s i =
+--   case T.uncons s of
+--     Nothing ->
+--       raiseParseError "unexpected end of input while parsing string"
+--     Just (c, rest)
+--       | c == '"' -> do
+--         incrementColumn
+--         if flag
+--           then headStringLengthOf False rest (i + 1)
+--           else return $ i + 1
+--       | c == '\\' -> do
+--         incrementColumn
+--         headStringLengthOf (not flag) rest (i + 1)
+--       | c `S.member` newlineSet -> do
+--         incrementLine
+--         headStringLengthOf False rest (i + 1)
+--       | otherwise -> do
+--         incrementColumn
+--         headStringLengthOf False rest (i + 1)
+
+stringLengthOf :: EscapeFlag -> T.Text -> Int -> IO Int
+stringLengthOf flag s i =
   case T.uncons s of
     Nothing ->
       raiseParseError "unexpected end of input while parsing string"
@@ -1078,17 +1213,17 @@ headStringLengthOf flag s i =
       | c == '"' -> do
         incrementColumn
         if flag
-          then headStringLengthOf False rest (i + 1)
-          else return $ i + 1
+          then stringLengthOf False rest (i + 1)
+          else return i
       | c == '\\' -> do
         incrementColumn
-        headStringLengthOf (not flag) rest (i + 1)
+        stringLengthOf (not flag) rest (i + 1)
       | c `S.member` newlineSet -> do
         incrementLine
-        headStringLengthOf False rest (i + 1)
+        stringLengthOf False rest (i + 1)
       | otherwise -> do
         incrementColumn
-        headStringLengthOf False rest (i + 1)
+        stringLengthOf False rest (i + 1)
 
 currentHint :: IO Hint
 currentHint = do
