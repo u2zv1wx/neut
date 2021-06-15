@@ -18,10 +18,13 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import Data.WeakTerm
+import GHC.IO.Handle
 import Parse.Discern
 import Path
 import Path.IO
+import System.Exit
 import System.IO.Unsafe (unsafePerformIO)
+import System.Process hiding (env)
 import Text.Read (readMaybe)
 
 type EscapeFlag =
@@ -120,8 +123,9 @@ stmt = do
           undefined
         Just "introspect" ->
           undefined
-        Just "ensure" ->
-          undefined
+        Just "ensure" -> do
+          stmtEnsure
+          stmt
         Just "section" ->
           stmtSection
         Just "end" ->
@@ -211,6 +215,50 @@ stmtDefineEnumClauseWithoutDiscriminant = do
   token "-"
   item <- varText
   return (item, Nothing)
+
+stmtEnsure :: IO ()
+stmtEnsure = do
+  token "ensure"
+  pkgStr <- symbol
+  mUrl <- currentHint
+  urlStr <- string
+  libDirPath <- getLibraryDirPath
+  pkgStr' <- parseRelDir $ T.unpack pkgStr
+  let pkgStrDirPath = libDirPath </> pkgStr'
+  isAlreadyInstalled <- doesDirExist pkgStrDirPath
+  when (not isAlreadyInstalled) $ do
+    ensureDir pkgStrDirPath
+    urlStr' <- readStrOrThrow mUrl urlStr
+    let curlCmd = proc "curl" ["-s", "-S", "-L", urlStr']
+    let tarCmd = proc "tar" ["xJf", "-", "-C", toFilePath pkgStr', "--strip-components=1"]
+    (_, Just stdoutHandler, Just curlErrorHandler, curlHandler) <-
+      createProcess curlCmd {cwd = Just (toFilePath libDirPath), std_out = CreatePipe, std_err = CreatePipe}
+    (_, _, Just tarErrorHandler, tarHandler) <-
+      createProcess tarCmd {cwd = Just (toFilePath libDirPath), std_in = UseHandle stdoutHandler, std_err = CreatePipe}
+    note' $ "downloading " <> pkgStr <> " from " <> T.pack urlStr'
+    curlExitCode <- waitForProcess curlHandler
+    raiseIfFailure mUrl "curl" curlExitCode curlErrorHandler pkgStrDirPath
+    note' $ "extracting " <> pkgStr <> " into " <> T.pack (toFilePath pkgStrDirPath)
+    tarExitCode <- waitForProcess tarHandler
+    raiseIfFailure mUrl "tar" tarExitCode tarErrorHandler pkgStrDirPath
+
+readStrOrThrow :: (Read a) => Hint -> T.Text -> IO a
+readStrOrThrow m quotedStr =
+  case readMaybe (T.unpack quotedStr) of
+    Nothing ->
+      raiseError m "the atom here must be a string"
+    Just str ->
+      return str
+
+raiseIfFailure :: Hint -> String -> ExitCode -> Handle -> Path Abs Dir -> IO ()
+raiseIfFailure m procName exitCode h pkgDirPath =
+  case exitCode of
+    ExitSuccess ->
+      return ()
+    ExitFailure i -> do
+      removeDir pkgDirPath
+      errStr <- hGetContents h
+      raiseError m $ T.pack $ "the child process `" ++ procName ++ "` failed with the following message (exitcode = " ++ show i ++ "):\n" ++ errStr
 
 stmtSection :: IO [WeakStmt]
 stmtSection = do
