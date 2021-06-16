@@ -72,19 +72,6 @@ visitP path = do
     skip
     stmt
 
--- initializeStateみたいなのがいる？
-
--- return
-
--- state <- saveState
--- modifyIORef' text $ \_ -> content
--- skip
--- defList <- stmt
--- loadState state
--- return defList
-
--- tokenize content >>= preprocess'
-
 leave :: IO [WeakStmt]
 leave = do
   path <- getCurrentFilePath
@@ -121,10 +108,6 @@ stmt = do
           undefined
         Just "define-codata" ->
           undefined
-        -- Just "introspect" -> do
-        --   stmtList1 <- stmtIntrospect
-        --   stmtList2 <- stmt
-        --   return $ stmtList1 ++ stmtList2
         Just "ensure" -> do
           stmtEnsure
           stmt
@@ -218,20 +201,6 @@ stmtDefineEnumClauseWithoutDiscriminant = do
   item <- varText
   return (item, Nothing)
 
--- stmtIntrospect :: IO [WeakStmt]
--- stmtIntrospect = do
---   undefined
-
--- retrieveCompileTimeVarValue :: Hint -> T.Text -> IO T.Text
--- retrieveCompileTimeVarValue m var =
---   case var of
---     "OS" ->
---       return $ T.pack $ System.os
---     "architecture" ->
---       return $ T.pack $ System.arch
---     _ ->
---       raiseError m $ "no such compile-time variable defined: " <> var
-
 stmtEnsure :: IO ()
 stmtEnsure = do
   token "ensure"
@@ -323,10 +292,6 @@ stmtRemovePrefix = do
   token "="
   to <- varText
   modifyIORef' nsEnv $ \env -> filter (/= (from, to)) env
-
--- let piType = (m, WeakTermPi argList codType)
--- let e' = (m, WeakTermPiIntro OpacityTransparent (LamKindFix (m, asIdent funName, piType)) argList e)
--- return $ WeakStmtDef m (Just (True, asIdent funName)) piType e'
 
 stmtInclude :: IO [WeakStmt]
 stmtInclude = do
@@ -926,6 +891,7 @@ weakTermSimple = do
       weakTermString,
       weakTermInteger,
       weakTermFloat,
+      weakTermBuiltin,
       weakTermVar
     ]
 
@@ -973,6 +939,16 @@ var = do
 varText :: IO T.Text
 varText =
   snd <$> var
+
+weakTermBuiltin :: IO WeakTermPlus
+weakTermBuiltin = do
+  m <- currentHint
+  x <- symbol
+  case x of
+    "__TARGET__" ->
+      return (m, WeakTermVar VarKindLocal (asIdent "linux-amd64"))
+    _ ->
+      raiseParseError $ "no such builtin variable: " <> x
 
 weakTermVar :: IO WeakTermPlus
 weakTermVar = do
@@ -1183,14 +1159,6 @@ many1 f = do
   itemList <- many f
   return $ item : itemList
 
--- tryPlanList
---   [ do
---       x <- f
---       xs <- many f
---       return $ x : xs,
---     return []
---   ]
-
 tryPlanList :: [IO a] -> IO a
 tryPlanList planList =
   case planList of
@@ -1221,24 +1189,6 @@ sepBy2 f sep = do
   item2 <- f
   itemList <- many $ sep >> f
   return $ item1 : item2 : itemList
-
--- sepEndBy :: IO a -> IO () -> IO [a]
--- sepEndBy f g =
---   sepEndBy' (f >>= return . Right) g []
-
--- sepEndBy' :: IO (Either [a] a) -> IO () -> [a] -> IO [a]
--- sepEndBy' f g acc = do
---   itemOrResult <- catch f (finalize acc)
---   g
---   case itemOrResult of
---     Right item ->
---       sepEndBy' f g (item : acc)
---     Left result ->
---       return result
-
--- finalize :: [a] -> Error -> IO (Either [a] a)
--- finalize acc _ =
---   return $ Left $ reverse acc
 
 symbol :: IO T.Text
 symbol = do
@@ -1282,27 +1232,6 @@ string = do
   writeIORef text $ T.tail s'
   skip
   return x
-
--- headStringLengthOf :: EscapeFlag -> T.Text -> Int -> IO Int
--- headStringLengthOf flag s i =
---   case T.uncons s of
---     Nothing ->
---       raiseParseError "unexpected end of input while parsing string"
---     Just (c, rest)
---       | c == '"' -> do
---         incrementColumn
---         if flag
---           then headStringLengthOf False rest (i + 1)
---           else return $ i + 1
---       | c == '\\' -> do
---         incrementColumn
---         headStringLengthOf (not flag) rest (i + 1)
---       | c `S.member` newlineSet -> do
---         incrementLine
---         headStringLengthOf False rest (i + 1)
---       | otherwise -> do
---         incrementColumn
---         headStringLengthOf False rest (i + 1)
 
 stringLengthOf :: EscapeFlag -> T.Text -> Int -> IO Int
 stringLengthOf flag s i =
@@ -1361,8 +1290,6 @@ nonSymbolSet =
 nonSimpleSymbolSet :: S.Set Char
 nonSimpleSymbolSet =
   S.insert '.' nonSymbolSet
-
--- S.fromList $ "() \"\n;."
 
 {-# INLINE updateStreamL #-}
 updateStreamL :: T.Text -> IO ()
