@@ -121,8 +121,10 @@ stmt = do
           undefined
         Just "define-codata" ->
           undefined
-        Just "introspect" ->
-          undefined
+        -- Just "introspect" -> do
+        --   stmtList1 <- stmtIntrospect
+        --   stmtList2 <- stmt
+        --   return $ stmtList1 ++ stmtList2
         Just "ensure" -> do
           stmtEnsure
           stmt
@@ -215,6 +217,20 @@ stmtDefineEnumClauseWithoutDiscriminant = do
   token "-"
   item <- varText
   return (item, Nothing)
+
+-- stmtIntrospect :: IO [WeakStmt]
+-- stmtIntrospect = do
+--   undefined
+
+-- retrieveCompileTimeVarValue :: Hint -> T.Text -> IO T.Text
+-- retrieveCompileTimeVarValue m var =
+--   case var of
+--     "OS" ->
+--       return $ T.pack $ System.os
+--     "architecture" ->
+--       return $ T.pack $ System.arch
+--     _ ->
+--       raiseError m $ "no such compile-time variable defined: " <> var
 
 stmtEnsure :: IO ()
 stmtEnsure = do
@@ -410,7 +426,10 @@ weakTerm = do
     Just "idealize" ->
       weakTermIdealize
     _ ->
-      weakTermAux
+      tryPlanList
+        [ weakTermArrow,
+          weakTermAux
+        ]
 
 weakTermTau :: IO WeakTermPlus
 weakTermTau = do
@@ -461,6 +480,32 @@ weakTermAux = do
   if null es
     then return e
     else return (m, WeakTermPiElim e es)
+
+weakTermArrow :: IO WeakTermPlus
+weakTermArrow = do
+  m <- currentHint
+  xt <- weakTermArrowItem
+  xts <- many1 $ (token "->" >> weakTermArrowItem)
+  let (_, _, cod) = last xts
+  return (m, WeakTermPi (xt : init xts) cod)
+
+weakTermArrowItem :: IO WeakIdentPlus
+weakTermArrowItem = do
+  tryPlanList
+    [ weakAscription,
+      do
+        m <- currentHint
+        a <- tryPlanList [betweenParen weakTerm, weakTermTau, weakTermVar]
+        h <- newIdentFromText "_"
+        return (m, h, a)
+    ]
+
+-- weakIdentPlus :: IO WeakIdentPlus
+-- weakIdentPlus = do
+--   tryPlanList
+--     [ weakAscription,
+--       weakAscription'
+--     ]
 
 weakTermEnumElim :: IO WeakTermPlus
 weakTermEnumElim = do
@@ -1100,7 +1145,8 @@ skip = do
   s <- readIORef text
   case T.uncons s of
     Just (c, rest)
-      | c == ';' ->
+      | c == '-',
+        Just ('-', _) <- T.uncons rest ->
         comment
       | c `S.member` newlineSet ->
         updateStreamL rest >> skip
@@ -1131,13 +1177,19 @@ many f = do
       return []
     ]
 
--- s <- saveState
--- item <- catch f (helper s (loadState s >> return []))
--- sepEndBy f (return ())
+many1 :: IO a -> IO [a]
+many1 f = do
+  item <- f
+  itemList <- many f
+  return $ item : itemList
 
--- many :: IO a -> IO [a]
--- many f =
---   sepEndBy f (return ())
+-- tryPlanList
+--   [ do
+--       x <- f
+--       xs <- many f
+--       return $ x : xs,
+--     return []
+--   ]
 
 tryPlanList :: [IO a] -> IO a
 tryPlanList planList =
