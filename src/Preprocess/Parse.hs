@@ -101,8 +101,10 @@ stmt = do
           stmtList1 <- stmtDefineData
           stmtList2 <- stmt
           return $ stmtList1 ++ stmtList2
-        Just "define-codata" ->
-          undefined
+        Just "define-codata" -> do
+          stmtList1 <- stmtDefineCodata
+          stmtList2 <- stmt
+          return $ stmtList1 ++ stmtList2
         Just "ensure" -> do
           stmtEnsure
           stmt
@@ -368,6 +370,18 @@ stmtDefineData = do
   a <- varText >>= withSectionPrefix
   xts <- many weakAscription
   bts <- many stmtDefineDataClause
+  defineData m mFun a xts bts
+
+-- z <- newIdentFromText "cod"
+-- let lamArgs = (m, z, (m, WeakTermTau)) : map (toPiTypeWith z) bts
+-- let baseType = (m, WeakTermPi lamArgs (m, WeakTermVar VarKindLocal z))
+-- setAsData a (length xts) bts
+-- formRule <- define False m mFun a xts (m, WeakTermTau) baseType
+-- introRuleList <- mapM (stmtDefineDataConstructor m lamArgs baseType a xts) bts
+-- return $ formRule : introRuleList
+
+defineData :: Hint -> Hint -> T.Text -> [WeakIdentPlus] -> [(Hint, T.Text, [WeakIdentPlus])] -> IO [WeakStmt]
+defineData m mFun a xts bts = do
   z <- newIdentFromText "cod"
   let lamArgs = (m, z, (m, WeakTermTau)) : map (toPiTypeWith z) bts
   let baseType = (m, WeakTermPi lamArgs (m, WeakTermVar VarKindLocal z))
@@ -421,6 +435,39 @@ stmtDefineDataClauseArg = do
       weakTermToWeakIdent m weakTermTau,
       weakTermToWeakIdent m weakTermVar
     ]
+
+stmtDefineCodata :: IO [WeakStmt]
+stmtDefineCodata = do
+  m <- currentHint
+  token "define-codata"
+  mFun <- currentHint
+  a <- varText >>= withSectionPrefix
+  xts <- many weakAscription
+  yts <- many (token "-" >> ascriptionInner)
+  formRule <- defineData m mFun a xts [(m, "new", yts)]
+  elimRuleList <- mapM (stmtDefineCodataElim m a xts yts) yts
+  return $ formRule ++ elimRuleList
+
+stmtDefineCodataElim :: Hint -> T.Text -> [WeakIdentPlus] -> [WeakIdentPlus] -> WeakIdentPlus -> IO WeakStmt
+stmtDefineCodataElim m a xts yts (mY, y, elemType) = do
+  let codataType = (m, WeakTermPiElim (weakVar m a) (map identPlusToVar xts))
+  recordVarText <- newText
+  let projArgs = xts ++ [(m, asIdent recordVarText, codataType)]
+  let projType = (m, WeakTermPi projArgs elemType)
+  define
+    True
+    m
+    mY
+    (a <> nsSep <> asText y)
+    projArgs
+    projType
+    ( m,
+      WeakTermCase
+        elemType
+        Nothing
+        (weakVar m recordVarText, codataType)
+        [((m, asIdent (a <> nsSep <> "new"), yts), weakVar m (asText y))]
+    )
 
 weakTermToWeakIdent :: Hint -> IO WeakTermPlus -> IO WeakIdentPlus
 weakTermToWeakIdent m f = do
@@ -728,6 +775,7 @@ weakTermMatchNoetic = do
 weakTermMatchClause :: IO (WeakPattern, WeakTermPlus)
 weakTermMatchClause = do
   headSymbol <- lookAhead symbol
+  -- fixme: このendって不要な気がする。どうせsymbolが失敗するでしょう？
   if headSymbol == "end"
     then raiseParseError "end"
     else do
@@ -1431,6 +1479,7 @@ keywordSet =
       ":",
       "define",
       "define-data",
+      "define-codata",
       "define-opaque",
       "derangement",
       "else",
