@@ -105,6 +105,10 @@ stmt = do
           stmtList1 <- stmtDefineCodata
           stmtList2 <- stmt
           return $ stmtList1 ++ stmtList2
+        Just "define-resource-type" -> do
+          def <- stmtDefineResourceType
+          stmtList <- stmt
+          return $ def : stmtList
         Just "ensure" -> do
           stmtEnsure
           stmt
@@ -467,6 +471,63 @@ stmtDefineCodataElim m a xts yts (mY, y, elemType) = do
         Nothing
         (weakVar m recordVarText, codataType)
         [((m, asIdent (a <> nsSep <> "new"), yts), weakVar m (asText y))]
+    )
+
+stmtDefineResourceType :: IO WeakStmt
+stmtDefineResourceType = do
+  m <- currentHint
+  _ <- token "define-resource-type"
+  name <- varText >>= withSectionPrefix
+  mFun <- currentHint
+  discarder <- weakTermSimple
+  copier <- weakTermSimple
+  flag <- newIdentFromText "flag"
+  value <- newIdentFromText "value"
+  define
+    True
+    m
+    mFun
+    name
+    []
+    (m, WeakTermTau)
+    ( m,
+      WeakTermPiElim
+        (weakVar m "unsafe.cast")
+        [ ( m,
+            WeakTermPi
+              [ (m, flag, weakVar m "bool"),
+                (m, value, weakVar m "unsafe.pointer")
+              ]
+              (weakVar m "unsafe.pointer")
+          ),
+          (m, WeakTermTau),
+          ( m,
+            WeakTermPiIntro
+              OpacityTransparent
+              LamKindResourceHandler
+              [ (m, flag, (weakVar m "bool")),
+                (m, value, (weakVar m "unsafe.pointer"))
+              ]
+              ( m,
+                WeakTermEnumElim
+                  ((weakVar m (asText flag)), (weakVar m "bool"))
+                  [ ( (m, EnumCaseLabel "bool.true"),
+                      (m, WeakTermPiElim copier [weakVar m (asText value)])
+                    ),
+                    ( (m, EnumCaseLabel "bool.false"),
+                      ( m,
+                        WeakTermPiElim
+                          (weakVar m "unsafe.cast")
+                          [ (weakVar m "top"),
+                            (weakVar m "unsafe.pointer"),
+                            (m, WeakTermPiElim discarder [weakVar m (asText value)])
+                          ]
+                      )
+                    )
+                  ]
+              )
+          )
+        ]
     )
 
 weakTermToWeakIdent :: Hint -> IO WeakTermPlus -> IO WeakIdentPlus
@@ -1481,6 +1542,7 @@ keywordSet =
       "define-data",
       "define-codata",
       "define-opaque",
+      "define-resource-type",
       "derangement",
       "else",
       "end",
