@@ -248,8 +248,12 @@ toText term =
           if isOpaque opacity
             then showCons ["fix-irreducible", showVariable x, argStr, toText e]
             else showCons ["fix", showVariable x, argStr, toText e]
-        LamKindCons _ _ ->
-          "<cons>"
+        LamKindCons _ _ -> do
+          let argStr = inParen $ showItems $ map showArg xts
+          if isTransparent opacity
+            then showCons ["λ", argStr, toText e]
+            else showCons ["λ-irreducible", argStr, toText e]
+        -- "<cons>"
         _ -> do
           let argStr = inParen $ showItems $ map showArg xts
           if isTransparent opacity

@@ -5,7 +5,7 @@ where
 
 import Codec.Binary.UTF8.String
 import Control.Exception.Safe
-import Control.Monad (forM, when)
+import Control.Monad (forM, forM_, when)
 import Data.Basic
 import Data.Global
 import qualified Data.HashMap.Lazy as Map
@@ -24,6 +24,7 @@ import Path
 import Path.IO
 import System.Exit
 import System.IO.Unsafe (unsafePerformIO)
+import qualified System.Info as System
 import System.Process hiding (env)
 import Text.Read (readMaybe)
 
@@ -50,18 +51,6 @@ line =
 column :: IORef Int
 column =
   unsafePerformIO (newIORef 1)
-
--- parseStmt :: T.Text -> IO [WeakStmt]
--- parseStmt input = do
---   modifyIORef' text $ \_ -> input
---   skip
---   stmt
-
--- parseWeakTerm :: T.Text -> IO WeakTermPlus
--- parseWeakTerm input = do
---   modifyIORef' text $ \_ -> input
---   skip
---   weakTerm
 
 visitP :: Path Abs File -> IO [WeakStmt]
 visitP path = do
@@ -96,7 +85,11 @@ stmt = do
       headSymbol <- lookAhead symbolMaybe
       case headSymbol of
         Just "define" -> do
-          def <- stmtDefine
+          def <- stmtDefine True
+          stmtList <- stmt
+          return $ def : stmtList
+        Just "define-opaque" -> do
+          def <- stmtDefine False
           stmtList <- stmt
           return $ def : stmtList
         Just "define-enum" -> do
@@ -104,8 +97,10 @@ stmt = do
           stmt
         Just "include" ->
           stmtInclude
-        Just "define-data" ->
-          undefined
+        Just "define-data" -> do
+          stmtList1 <- stmtDefineData
+          stmtList2 <- stmt
+          return $ stmtList1 ++ stmtList2
         Just "define-codata" ->
           undefined
         Just "ensure" -> do
@@ -137,8 +132,8 @@ stmt = do
 --
 
 -- define name (x1 : A1) ... (xn : An) : A = e
-stmtDefine :: IO WeakStmt
-stmtDefine = do
+stmtDefine :: Bool -> IO WeakStmt
+stmtDefine isReducible = do
   m <- currentHint
   token "define"
   (mFun, funName) <- var
@@ -152,12 +147,25 @@ stmtDefine = do
     [] -> do
       e' <- discern e
       (_, funName'', codType') <- discernIdentPlus (mFun, asIdent funName', codType)
-      return $ WeakStmtDef m (Just (True, funName'')) codType' e'
+      return $ WeakStmtDef m (Just (isReducible, funName'')) codType' e'
     _ -> do
       let piType = (m, WeakTermPi argList codType)
       (_, funName'', piType') <- discernIdentPlus (m, asIdent funName', piType)
       e' <- discern (m, WeakTermPiIntro OpacityTransparent (LamKindFix (mFun, asIdent funName', piType)) argList e)
-      return $ WeakStmtDef m (Just (True, funName'')) piType' e'
+      return $ WeakStmtDef m (Just (isReducible, funName'')) piType' e'
+
+define :: IsReducible -> Hint -> Hint -> T.Text -> [WeakIdentPlus] -> WeakTermPlus -> WeakTermPlus -> IO WeakStmt
+define isReducible m mFun funName' argList codType e = do
+  case argList of
+    [] -> do
+      e' <- discern e
+      (_, funName'', codType') <- discernIdentPlus (mFun, asIdent funName', codType)
+      return $ WeakStmtDef m (Just (isReducible, funName'')) codType' e'
+    _ -> do
+      let piType = (m, WeakTermPi argList codType)
+      (_, funName'', piType') <- discernIdentPlus (m, asIdent funName', piType)
+      e' <- discern (m, WeakTermPiIntro OpacityTransparent (LamKindFix (mFun, asIdent funName', piType)) argList e)
+      return $ WeakStmtDef m (Just (isReducible, funName'')) piType' e'
 
 stmtDefineEnum :: IO ()
 stmtDefineEnum = do
@@ -351,6 +359,94 @@ showCyclicPath' pathList =
       "\n  ~> " <> T.pack (toFilePath path)
     (path : ps) ->
       "\n  ~> " <> T.pack (toFilePath path) <> showCyclicPath' ps
+
+stmtDefineData :: IO [WeakStmt]
+stmtDefineData = do
+  m <- currentHint
+  token "define-data"
+  mFun <- currentHint
+  a <- varText >>= withSectionPrefix
+  xts <- many weakAscription
+  bts <- many stmtDefineDataClause
+  z <- newIdentFromText "cod"
+  let lamArgs = (m, z, (m, WeakTermTau)) : map (toPiTypeWith z) bts
+  let baseType = (m, WeakTermPi lamArgs (m, WeakTermVar VarKindLocal z))
+  setAsData a (length xts) bts
+  formRule <- define False m mFun a xts (m, WeakTermTau) baseType
+  introRuleList <- mapM (stmtDefineDataConstructor m lamArgs baseType a xts) bts
+  return $ formRule : introRuleList
+
+stmtDefineDataConstructor :: Hint -> [WeakIdentPlus] -> WeakTermPlus -> T.Text -> [WeakIdentPlus] -> (Hint, T.Text, [WeakIdentPlus]) -> IO WeakStmt
+stmtDefineDataConstructor m lamArgs baseType a xts (mb, b, yts) = do
+  let indType = (m, WeakTermPiElim (weakVar m a) (map identPlusToVar xts))
+  let consArgs = xts ++ yts
+  let args = map identPlusToVar consArgs
+  let b' = a <> nsSep <> b
+  define
+    True
+    m
+    mb
+    b'
+    consArgs
+    indType
+    ( m,
+      WeakTermPiElim
+        (weakVar m "unsafe.cast")
+        [ baseType,
+          indType,
+          ( m,
+            WeakTermPiIntro
+              OpacityTransparent
+              (LamKindCons a b')
+              lamArgs
+              (m, WeakTermPiElim (weakVar m b) args)
+          )
+        ]
+    )
+
+stmtDefineDataClause :: IO (Hint, T.Text, [WeakIdentPlus])
+stmtDefineDataClause = do
+  token "-"
+  m <- currentHint
+  b <- symbol
+  yts <- many stmtDefineDataClauseArg
+  return (m, b, yts)
+
+stmtDefineDataClauseArg :: IO WeakIdentPlus
+stmtDefineDataClauseArg = do
+  m <- currentHint
+  tryPlanList
+    [ weakAscription,
+      weakTermToWeakIdent m (betweenParen weakTerm),
+      weakTermToWeakIdent m weakTermTau,
+      weakTermToWeakIdent m weakTermVar
+    ]
+
+weakTermToWeakIdent :: Hint -> IO WeakTermPlus -> IO WeakIdentPlus
+weakTermToWeakIdent m f = do
+  a <- f
+  h <- newIdentFromText "_"
+  return (m, h, a)
+
+setAsData :: T.Text -> Int -> [(Hint, T.Text, [WeakIdentPlus])] -> IO ()
+setAsData a i bts = do
+  let proj (_, y, _) = y
+  bs <- mapM (withSectionPrefix . proj) bts
+  modifyIORef' dataEnv $ \env -> Map.insert a bs env
+  forM_ (zip bs [0 ..]) $ \(x, k) ->
+    modifyIORef' constructorEnv $ \env -> Map.insert x (i, k) env
+
+weakVar :: Hint -> T.Text -> WeakTermPlus
+weakVar m str =
+  (m, WeakTermVar VarKindLocal (asIdent str))
+
+toPiTypeWith :: Ident -> (Hint, T.Text, [WeakIdentPlus]) -> WeakIdentPlus
+toPiTypeWith cod (m, b, yts) =
+  (m, asIdent b, (m, WeakTermPi yts (m, WeakTermVar VarKindLocal cod)))
+
+identPlusToVar :: WeakIdentPlus -> WeakTermPlus
+identPlusToVar (m, x, _) =
+  (m, WeakTermVar VarKindLocal x)
 
 --
 -- parser for WeakTerm
@@ -945,10 +1041,11 @@ weakTermBuiltin = do
   m <- currentHint
   x <- symbol
   case x of
-    "__TARGET__" ->
-      return (m, WeakTermVar VarKindLocal (asIdent "linux-amd64"))
+    "target-platform" -> do
+      target <- getTarget
+      return (m, WeakTermVar VarKindLocal (asIdent $ "target" <> nsSep <> target))
     _ ->
-      raiseParseError $ "no such builtin variable: " <> x
+      raiseParseError $ "no such builtin constant: " <> x
 
 weakTermVar :: IO WeakTermPlus
 weakTermVar = do
@@ -1333,6 +1430,8 @@ keywordSet =
       "=",
       ":",
       "define",
+      "define-data",
+      "define-opaque",
       "derangement",
       "else",
       "end",
@@ -1348,9 +1447,12 @@ keywordSet =
       "over",
       "pi",
       "question",
+      "section",
       "switch",
       "tau",
       "then",
+      "use",
+      "unuse",
       "with"
     ]
 
@@ -1382,3 +1484,23 @@ isLinear' found input =
         False
       | otherwise ->
         isLinear' (S.insert x found) xs
+
+getTarget :: IO T.Text
+getTarget = do
+  mx <- readIORef targetPlatform
+  case mx of
+    Just x ->
+      return x
+    Nothing ->
+      return $ T.pack System.os <> "-" <> defaultTargetArch
+
+-- cf. https://www.debian.org/ports/
+defaultTargetArch :: T.Text
+defaultTargetArch =
+  case System.arch of
+    "aarch64" ->
+      "arm64"
+    "x86_64" ->
+      "amd64"
+    other ->
+      T.pack other

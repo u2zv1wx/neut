@@ -80,6 +80,11 @@ metaTermCtx :: IORef SubstMetaTerm
 metaTermCtx =
   unsafePerformIO (newIORef IntMap.empty)
 
+{-# NOINLINE targetPlatform #-}
+targetPlatform :: IORef (Maybe T.Text)
+targetPlatform =
+  unsafePerformIO (newIORef Nothing)
+
 {-# NOINLINE fileEnv #-}
 fileEnv :: IORef (Map.HashMap (Path Abs File) VisitInfo)
 fileEnv =

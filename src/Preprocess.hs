@@ -27,22 +27,59 @@ import Text.Read (readMaybe)
 
 preprocess :: Path Abs File -> IO [TreePlus]
 preprocess mainFilePath = do
-  pushTrace mainFilePath
-  -- item0 <- parse "buz qux"
-  -- p' item0
+  -- parseStmt "" >>= p'
+  -- parseStmt "define foo (x : i64) : bar = lambda (x : foo) (y : bar). buz define pohe : i64 = tau" >>= p'
+  -- parseStmt "define foo x y : tau = tau" >>= p'
+  visitP mainFilePath >>= p'
+  -- parseStmt "define-enum item - foo - bar - qux define foo x y : tau = tau" >>= p'
+  -- parseStmt "define-enum paniponi - foo <- 10 - bar - qux <- 3 - pohe - hoge <- 8 define pohe x y : tau = item.foo" >>= p'
+  -- parseStmt "define bar x y : tau = tau paniponi.foo item.bar" >>= p'
+  -- parseStmt "define-enum hoe - foo - bar - qux <- 3 - pohe - hoge <- 8 define bar x y : tau = tau paniponi.foo item.bar" >>= p'
+  -- parseWeakTerm "buz" >>= p'
+  -- parseWeakTerm "buz qux" >>= p'
+  -- parseWeakTerm "lambda (x : AAA) (y : B). foo" >>= p'
+  -- -- parseWeakTerm "lambda z. foo" >>= p'
+  -- parseWeakTerm "lambda (x : AAA) (y : B) z. foo bar::buz qux" >>= p'
+  -- parseWeakTerm "(lambda (x : AAA) (y : B). bar.foo) bar buz tau" >>= p'
+  -- parseWeakTerm "switch SWI with - foo -> bar pohe hoge - buz -> qux pohe end" >>= p'
+  -- parseWeakTerm "fix self (x : AAA). B" >>= p'
+  -- parseWeakTerm "fix self (x : AAA) (y : BBB). body" >>= p'
+  -- parseWeakTerm "fix self. *" >>= p'
+  -- parseWeakTerm "question (fix self. *)" >>= p'
+  -- parseWeakTerm "derangement store i64 with - foo - bar buz - qux end" >>= p'
+  -- parseWeakTerm "derangement create-array i8 with - foo - bar buz - qux end" >>= p'
+  -- parseWeakTerm "derangement create-struct i8 (pointer i64) (pointer (array 10 f32)) with - foo - bar buz - qux end" >>= p'
+  -- parseWeakTerm "match xs with - list.nil -> foo - list.cons y ys -> hogehgo end" >>= p'
+  -- parseWeakTerm "match-noetic xs with - list.nil -> foo - list.cons y ys -> hogehgo end" >>= p'
+  -- -- parseWeakTerm "switch fix self (x : AAA). B with - foo -> bar end" >>= p'
+  -- p "=====LET_SEQUENCES==========="
+  -- parseWeakTerm "let foo = pohe qux in bar" >>= p'
+  -- parseWeakTerm "let foo : i64 = pohe qux in bar" >>= p'
+  -- parseWeakTerm "let foo : i64 = switch lambda (x : AAA). B with - foo -> bar pohe hoge - buz -> qux pohe end in bar" >>= p'
+  -- parseWeakTerm "let foo : i64 = pohe qux in (lambda (x : AAA) (y : B). bar.foo) bar buz tau" >>= p'
+  -- parseWeakTerm "let foo = match lambda (x : AAA). B with - foo -> bar pohe hoge - buz -> qux pohe end in bar" >>= p'
+  -- parseWeakTerm "let? foo : i64 = pohe qux in bar" >>= p'
+  -- parseWeakTerm "if foo bar then buz qux else pohe end" >>= p'
+  -- parseWeakTerm "(foo, bar)" >>= p'
+  -- parseWeakTerm "sigma (x : A) (y : B). C" >>= p'
+  -- parseWeakTerm "product A B C" >>= p'
+  -- parseWeakTerm "let (foo, bar) = e1 in e2" >>= p'
+  -- parseWeakTerm "let (foo : AAA, bar) = e1 in e2" >>= p'
+  -- parseWeakTerm "lambda (x : AAA) (y : B). pi (foo : bar). buz qux pohe" >>= p'
   -- item <- parse "lambda (x : AAA) (y : B). pi (foo : bar). buz qux pohe"
   -- p' item
   -- item2 <- parse "switch lambda (x : AAA). B with - foo -> bar pohe hoge - buz -> qux pohe end"
   -- p' item2
-  item3 <- parse "match-noetic xs with - list.nil -> foo - list.cons y ys -> hogehgo end"
-  p' item3
-  item4 <- parse "match xs with - list.nil -> foo - list.cons y ys -> hogehgo end"
-  p' item4
+  -- item3 <- parse "match-noetic xs with - list.nil -> foo - list.cons y ys -> hogehgo end"
+  -- p' item3
+  -- item4 <- parse "match xs with - list.nil -> foo - list.cons y ys -> hogehgo end"
+  -- p' item4
   -- item5 <- parse "new somerecord with - item-1 <- top.unit   - item-2 <- hogehgo end"
   -- p' item5
   -- item6 <- parse "let x = foo in lambda (x : A). let? p = q r \"hello, \nworld!\" s in f B hoge pohe"
   -- p' item6
   _ <- undefined
+  pushTrace mainFilePath
   visit mainFilePath
 
 visit :: Path Abs File -> IO [TreePlus]
