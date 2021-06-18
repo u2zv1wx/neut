@@ -49,9 +49,11 @@ throwTypeErrors :: IO a
 throwTypeErrors = do
   q <- readIORef suspendedConstraintEnv
   sub <- readIORef substEnv
+  oenv <- readIORef opaqueEnv
+  let sub' = foldr IntMap.delete sub (map asInt $ S.toList oenv)
   errorList <- forM (Q.toList q) $ \(SuspendedConstraint (_, _, (_, (expected, actual)))) -> do
-    expected' <- substWeakTermPlus sub expected >>= reduceWeakTermPlus
-    actual' <- substWeakTermPlus sub actual >>= reduceWeakTermPlus
+    expected' <- substWeakTermPlus sub' expected >>= reduceWeakTermPlus
+    actual' <- substWeakTermPlus sub' actual >>= reduceWeakTermPlus
     return $ logError (getPosInfo (fst actual)) $ constructErrorMsg actual' expected'
   throw $ Error errorList
 
