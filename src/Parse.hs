@@ -77,6 +77,10 @@ stmt = do
         Just "define-enum" -> do
           stmtDefineEnum
           stmt
+        Just "reduce" -> do
+          def <- stmtReduce
+          stmtList <- stmt
+          return $ def : stmtList
         Just "include" ->
           stmtInclude
         Just "define-data" -> do
@@ -131,16 +135,10 @@ stmtDefine isReducible = do
   codType <- weakTerm
   token "="
   e <- weakTerm
-  define isReducible m mFun funName' argList codType e
+  defineFunction isReducible m mFun funName' argList codType e
 
-define :: IsReducible -> Hint -> Hint -> T.Text -> [WeakIdentPlus] -> WeakTermPlus -> WeakTermPlus -> IO WeakStmt
-define isReducible m mFun funName' argList codType e = do
-  -- case argList of
-  --   [] -> do
-  --     (_, funName'', codType') <- discernIdentPlus (m, asIdent funName', codType)
-  --     e' <- discern e
-  --     return $ WeakStmtDef m (Just (isReducible, funName'')) codType' e'
-  --   _ -> do
+defineFunction :: IsReducible -> Hint -> Hint -> T.Text -> [WeakIdentPlus] -> WeakTermPlus -> WeakTermPlus -> IO WeakStmt
+defineFunction isReducible m mFun funName' argList codType e = do
   let piType = (m, WeakTermPi argList codType)
   (_, funName'', piType') <- discernIdentPlus (m, asIdent funName', piType)
   e' <- discern (m, WeakTermPiIntro OpacityTranslucent (LamKindFix (mFun, asIdent funName', piType)) argList e)
@@ -193,6 +191,14 @@ stmtDefineEnumClauseWithoutDiscriminant = do
   token "-"
   item <- varText
   return (item, Nothing)
+
+stmtReduce :: IO WeakStmt
+stmtReduce = do
+  m <- currentHint
+  token "reduce"
+  e <- weakTerm >>= discern
+  t <- newAster m
+  return $ WeakStmtDef m Nothing t e
 
 stmtEnsure :: IO ()
 stmtEnsure = do
@@ -358,20 +364,17 @@ stmtDefineData = do
 defineData :: Hint -> Hint -> T.Text -> [WeakIdentPlus] -> [(Hint, T.Text, [WeakIdentPlus])] -> IO [WeakStmt]
 defineData m mFun a xts bts = do
   setAsData a (length xts) bts
+  z <- newIdentFromText "cod"
+  let lamArgs = (m, z, (m, WeakTermTau)) : map (toPiTypeWith z) bts
+  let baseType = (m, WeakTermPi lamArgs (m, WeakTermVar VarKindLocal z))
   case xts of
     [] -> do
       (_, a', tau) <- discernIdentPlus (m, asIdent a, (m, WeakTermTau))
       let formRule = WeakStmtDef m (Just (False, a')) tau (m, WeakTermPi [] (m, WeakTermTau)) -- fake type
-      z <- newIdentFromText "cod"
-      let lamArgs = (m, z, (m, WeakTermTau)) : map (toPiTypeWith z) bts
-      let baseType = (m, WeakTermPi lamArgs (m, WeakTermVar VarKindLocal z))
       introRuleList <- mapM (stmtDefineDataConstructor m lamArgs baseType a xts) bts
       return $ formRule : introRuleList
     _ -> do
-      z <- newIdentFromText "cod"
-      let lamArgs = (m, z, (m, WeakTermTau)) : map (toPiTypeWith z) bts
-      let baseType = (m, WeakTermPi lamArgs (m, WeakTermVar VarKindLocal z))
-      formRule <- define False m mFun a xts (m, WeakTermTau) baseType
+      formRule <- defineFunction False m mFun a xts (m, WeakTermTau) baseType
       introRuleList <- mapM (stmtDefineDataConstructor m lamArgs baseType a xts) bts
       return $ formRule : introRuleList
 
@@ -408,7 +411,7 @@ stmtDefineDataConstructor m lamArgs baseType a xts (mb, b, yts) = do
             ]
         )
     _ ->
-      define
+      defineFunction
         True
         m
         mb
@@ -466,7 +469,7 @@ stmtDefineCodataElim m a xts yts (mY, y, elemType) = do
   recordVarText <- newText
   let projArgs = xts ++ [(m, asIdent recordVarText, codataType)]
   let projType = (m, WeakTermPi projArgs elemType)
-  define
+  defineFunction
     True
     m
     mY
@@ -491,7 +494,7 @@ stmtDefineResourceType = do
   copier <- weakTermSimple
   flag <- newIdentFromText "flag"
   value <- newIdentFromText "value"
-  define
+  defineFunction
     True
     m
     mFun
