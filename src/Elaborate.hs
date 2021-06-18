@@ -158,6 +158,11 @@ elaborate' term =
             S.member name oenv -> do
             patList' <- elaboratePatternList m bs patList
             return (m, TermCase resultType' mSubject' (e', t') patList')
+        (_, TermVar _ name)
+          | Just bs <- Map.lookup (asText name) denv,
+            S.member name oenv -> do
+            patList' <- elaboratePatternList m bs patList
+            return (m, TermCase resultType' mSubject' (e', t') patList')
         _ -> do
           raiseError (fst t) $ "the type of this term must be a data-type, but its type is:\n" <> showTree (toTree $ weaken t')
 

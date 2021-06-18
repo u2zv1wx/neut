@@ -135,16 +135,22 @@ stmtDefine isReducible = do
 
 define :: IsReducible -> Hint -> Hint -> T.Text -> [WeakIdentPlus] -> WeakTermPlus -> WeakTermPlus -> IO WeakStmt
 define isReducible m mFun funName' argList codType e = do
-  case argList of
-    -- [] -> do
-    --   e' <- discern e
-    --   (_, funName'', codType') <- discernIdentPlus (mFun, asIdent funName', codType)
-    --   return $ WeakStmtDef m (Just (isReducible, funName'')) codType' e'
-    _ -> do
-      let piType = (m, WeakTermPi argList codType)
-      (_, funName'', piType') <- discernIdentPlus (m, asIdent funName', piType)
-      e' <- discern (m, WeakTermPiIntro OpacityTranslucent (LamKindFix (mFun, asIdent funName', piType)) argList e)
-      return $ WeakStmtDef m (Just (isReducible, funName'')) piType' e'
+  -- case argList of
+  --   [] -> do
+  --     (_, funName'', codType') <- discernIdentPlus (m, asIdent funName', codType)
+  --     e' <- discern e
+  --     return $ WeakStmtDef m (Just (isReducible, funName'')) codType' e'
+  --   _ -> do
+  let piType = (m, WeakTermPi argList codType)
+  (_, funName'', piType') <- discernIdentPlus (m, asIdent funName', piType)
+  e' <- discern (m, WeakTermPiIntro OpacityTranslucent (LamKindFix (mFun, asIdent funName', piType)) argList e)
+  return $ WeakStmtDef m (Just (isReducible, funName'')) piType' e'
+
+defineTerm :: IsReducible -> Hint -> T.Text -> WeakTermPlus -> WeakTermPlus -> IO WeakStmt
+defineTerm isReducible m funName' codType e = do
+  (_, funName'', codType') <- discernIdentPlus (m, asIdent funName', codType)
+  e' <- discern e
+  return $ WeakStmtDef m (Just (isReducible, funName'')) codType' e'
 
 stmtDefineEnum :: IO ()
 stmtDefineEnum = do
@@ -351,13 +357,19 @@ stmtDefineData = do
 
 defineData :: Hint -> Hint -> T.Text -> [WeakIdentPlus] -> [(Hint, T.Text, [WeakIdentPlus])] -> IO [WeakStmt]
 defineData m mFun a xts bts = do
+  setAsData a (length xts) bts
   case xts of
-    [] ->
-      undefined
+    [] -> do
+      (_, a', tau) <- discernIdentPlus (m, asIdent a, (m, WeakTermTau))
+      let formRule = WeakStmtDef m (Just (False, a')) tau (m, WeakTermPi [] (m, WeakTermTau)) -- fake type
+      z <- newIdentFromText "cod"
+      let lamArgs = (m, z, (m, WeakTermTau)) : map (toPiTypeWith z) bts
+      let baseType = (m, WeakTermPi lamArgs (m, WeakTermVar VarKindLocal z))
+      introRuleList <- mapM (stmtDefineDataConstructor m lamArgs baseType a xts) bts
+      return $ formRule : introRuleList
     _ -> do
       z <- newIdentFromText "cod"
       let lamArgs = (m, z, (m, WeakTermTau)) : map (toPiTypeWith z) bts
-      setAsData a (length xts) bts
       let baseType = (m, WeakTermPi lamArgs (m, WeakTermVar VarKindLocal z))
       formRule <- define False m mFun a xts (m, WeakTermTau) baseType
       introRuleList <- mapM (stmtDefineDataConstructor m lamArgs baseType a xts) bts
@@ -365,31 +377,58 @@ defineData m mFun a xts bts = do
 
 stmtDefineDataConstructor :: Hint -> [WeakIdentPlus] -> WeakTermPlus -> T.Text -> [WeakIdentPlus] -> (Hint, T.Text, [WeakIdentPlus]) -> IO WeakStmt
 stmtDefineDataConstructor m lamArgs baseType a xts (mb, b, yts) = do
-  let indType = (m, WeakTermPiElim (weakVar m a) (map identPlusToVar xts))
   let consArgs = xts ++ yts
   let args = map identPlusToVar yts
   let b' = a <> nsSep <> b
-  define
-    True
-    m
-    mb
-    b'
-    consArgs
-    indType
-    ( m,
-      WeakTermPiElim
-        (weakVar m "unsafe.cast")
-        [ baseType,
-          indType,
-          ( m,
-            WeakTermPiIntro
-              OpacityTransparent
-              (LamKindCons a b')
-              lamArgs
-              (m, WeakTermPiElim (weakVar m b) args)
-          )
-        ]
-    )
+  let indType =
+        case xts of
+          [] ->
+            weakVar m a
+          _ ->
+            (m, WeakTermPiElim (weakVar m a) (map identPlusToVar xts))
+  case consArgs of
+    [] ->
+      defineTerm
+        True
+        m
+        b'
+        indType
+        ( m,
+          WeakTermPiElim
+            (weakVar m "unsafe.cast")
+            [ baseType,
+              indType,
+              ( m,
+                WeakTermPiIntro
+                  OpacityTransparent
+                  (LamKindCons a b')
+                  lamArgs
+                  (m, WeakTermPiElim (weakVar m b) args)
+              )
+            ]
+        )
+    _ ->
+      define
+        True
+        m
+        mb
+        b'
+        consArgs
+        indType
+        ( m,
+          WeakTermPiElim
+            (weakVar m "unsafe.cast")
+            [ baseType,
+              indType,
+              ( m,
+                WeakTermPiIntro
+                  OpacityTransparent
+                  (LamKindCons a b')
+                  lamArgs
+                  (m, WeakTermPiElim (weakVar m b) args)
+              )
+            ]
+        )
 
 stmtDefineDataClause :: IO (Hint, T.Text, [WeakIdentPlus])
 stmtDefineDataClause = do
@@ -508,8 +547,9 @@ weakTermToWeakIdent m f = do
 
 setAsData :: T.Text -> Int -> [(Hint, T.Text, [WeakIdentPlus])] -> IO ()
 setAsData a i bts = do
-  let proj (_, y, _) = y
-  bs <- mapM (withSectionPrefix . proj) bts
+  -- let proj (_, y, _) = y
+  let bs = map (\(_, b, _) -> a <> nsSep <> b) bts
+  -- bs <- mapM (withSectionPrefix . proj) bts
   modifyIORef' dataEnv $ \env -> Map.insert a bs env
   forM_ (zip bs [0 ..]) $ \(x, k) ->
     modifyIORef' constructorEnv $ \env -> Map.insert x (i, k) env

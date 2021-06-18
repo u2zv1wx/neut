@@ -132,8 +132,12 @@ infer' ctx term =
                 insConstraintEnv resultType tBody
                 let xs = map (\(mx, x, t) -> ((mx, WeakTermVar VarKindLocal x), t)) xts'
                 tCons <- lookupWeakTypeEnv m name
-                (_, tPat) <- inferPiElim ctx m ((m, WeakTermVar VarKindLocal name), tCons) (holeList ++ xs)
-                insConstraintEnv tPat t'
+                case holeList ++ xs of
+                  [] ->
+                    insConstraintEnv tCons t'
+                  _ -> do
+                    (_, tPat) <- inferPiElim ctx m ((m, WeakTermVar VarKindLocal name), tCons) (holeList ++ xs)
+                    insConstraintEnv tPat t'
                 return ((mPat, name, xts'), body')
               return ((m, WeakTermCase resultType mSubject' (e', t') clauseList'), resultType)
 
