@@ -38,6 +38,8 @@ elaborateStmt' stmt =
       -- cs <- readIORef constraintEnv
       -- p "==========================================================="
       -- forM_ cs $ \(e1, e2) -> do
+      --   p' e1
+      --   p' e2
       --   p $ T.unpack $ toText e1
       --   p $ T.unpack $ toText e2
       --   p "---------------------"
@@ -48,7 +50,8 @@ elaborateStmt' stmt =
         Just (isReducible, x) -> do
           insWeakTypeEnv x $ weaken t''
           modifyIORef' substEnv $ \env -> IntMap.insert (asInt x) (weaken e'') env
-          when (not isReducible) $ modifyIORef' opaqueEnv $ \env -> S.insert x env
+          when (not isReducible) $
+            modifyIORef' opaqueEnv $ \env -> S.insert x env
           cont' <- elaborateStmt' cont
           return $ StmtDef m (Just x) t'' e'' : cont'
         Nothing -> do

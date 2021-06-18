@@ -17,7 +17,7 @@ import Options.Applicative
 import Parse
 import Path
 import Path.IO
-import Preprocess
+-- import Preprocess
 import System.Exit
 import System.Process hiding (env)
 import Text.Read (readMaybe)
@@ -276,11 +276,19 @@ constructOutputArchivePath inputPath mPath =
 
 runBuild :: Path Abs File -> IO Builder
 runBuild =
-  preprocess >=> parse >=> elaborate >=> clarify >=> lower >=> emit
+  parse >=> elaborate >=> clarify >=> lower >=> emit
 
 runCheck :: Path Abs File -> IO ()
 runCheck =
-  preprocess >=> parse >=> elaborate >=> \_ -> return ()
+  parse >=> elaborate >=> \_ -> return ()
+
+-- runBuild :: Path Abs File -> IO Builder
+-- runBuild =
+--   preprocess >=> parse >=> elaborate >=> clarify >=> lower >=> emit
+
+-- runCheck :: Path Abs File -> IO ()
+-- runCheck =
+--   preprocess >=> parse >=> elaborate >=> \_ -> return ()
 
 clangOptWith :: OutputKind -> Path Abs File -> [String]
 clangOptWith kind outputPath =

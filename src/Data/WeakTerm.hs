@@ -374,7 +374,7 @@ showTypeArgs args =
 
 showVariable :: Ident -> T.Text
 showVariable x =
-  asText x
+  asText' x
 
 showCaseClause :: (WeakPattern, WeakTermPlus) -> T.Text
 showCaseClause (pat, e) =
