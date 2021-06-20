@@ -52,6 +52,11 @@ throwTypeErrors = do
   oenv <- readIORef opaqueEnv
   let sub' = foldr IntMap.delete sub (map asInt $ S.toList oenv)
   errorList <- forM (Q.toList q) $ \(SuspendedConstraint (_, _, (_, (expected, actual)))) -> do
+    -- p' foo
+    -- p $ T.unpack $ toText l
+    -- p $ T.unpack $ toText r
+    -- p' (expected, actual)
+    -- p' sub
     expected' <- substWeakTermPlus sub' expected >>= reduceWeakTermPlus
     actual' <- substWeakTermPlus sub' actual >>= reduceWeakTermPlus
     return $ logError (getPosInfo (fst actual)) $ constructErrorMsg actual' expected'
@@ -124,6 +129,8 @@ simplify constraintList =
           | length es1 == length es2,
             i1 == i2 -> do
             simplify $ map (\pair -> (pair, orig)) (zip es1 es2) ++ cs
+        ((_, WeakTermIgnore e1), (_, WeakTermIgnore e2)) ->
+          simplify $ ((e1, e2), orig) : cs
         (e1, e2) -> do
           sub <- readIORef substEnv
           let fvs1 = varWeakTermPlus e1

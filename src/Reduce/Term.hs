@@ -158,6 +158,9 @@ substTermPlus sub term =
         (xts', body') <- substTermPlus' sub xts body
         return ((mPat, name, xts'), body')
       return (m, TermCase resultType' mSubject' (e', t') clauseList')
+    (m, TermIgnore e) -> do
+      e' <- substTermPlus sub e
+      return (m, TermIgnore e')
 
 substTermPlus' ::
   SubstTerm ->

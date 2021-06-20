@@ -99,6 +99,8 @@ distinguishComp z term =
               writeIORef count countBefore
               distinguishComp z e
           return (concat $ [vs, head vss], (m, CompEnumElim d' (zip cs es')))
+    (_, CompIgnore _) ->
+      return ([], term)
 
 distinguishPrimitive :: Ident -> Primitive -> IO ([Ident], Primitive)
 distinguishPrimitive z term =

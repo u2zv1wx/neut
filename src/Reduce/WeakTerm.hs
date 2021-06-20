@@ -175,6 +175,9 @@ substWeakTermPlus sub term =
         (xts', body') <- substWeakTermPlus' sub xts body
         return ((mPat, name, xts'), body')
       return (m, WeakTermCase resultType' mSubject' (e', t') clauseList')
+    (m, WeakTermIgnore e) -> do
+      e' <- substWeakTermPlus sub e
+      return (m, WeakTermIgnore e')
 
 substWeakTermPlus' ::
   SubstWeakTerm ->

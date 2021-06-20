@@ -29,6 +29,7 @@ data WeakTerm
       (Maybe WeakTermPlus) -- noetic subject (this is for `case-noetic`)
       (WeakTermPlus, WeakTermPlus) -- (pattern-matched value, its type)
       [(WeakPattern, WeakTermPlus)]
+  | WeakTermIgnore WeakTermPlus
   deriving (Show)
 
 type WeakPattern =
@@ -65,6 +66,7 @@ type MetaVarSet =
 data ConstraintKind
   = ConstraintKindDelta Constraint
   | ConstraintKindOther
+  deriving (Show)
 
 newtype SuspendedConstraint
   = SuspendedConstraint (MetaVarSet, ConstraintKind, (Constraint, Constraint))
@@ -148,6 +150,8 @@ varWeakTermPlus term =
       let xs4 = varWeakTermPlus t
       let xs5 = S.unions $ map (\((_, _, xts), body) -> varWeakTermPlus' xts [body]) patList
       S.unions [xs1, xs2, xs3, xs4, xs5]
+    (_, WeakTermIgnore e) ->
+      varWeakTermPlus e
 
 varWeakTermPlus' :: [WeakIdentPlus] -> [WeakTermPlus] -> S.Set Ident
 varWeakTermPlus' binder es =
@@ -202,6 +206,8 @@ asterWeakTermPlus term =
       let xs4 = asterWeakTermPlus t
       let xs5 = S.unions $ map (\((_, _, xts), body) -> asterWeakTermPlus' xts body) patList
       S.unions [xs1, xs2, xs3, xs4, xs5]
+    (_, WeakTermIgnore e) ->
+      asterWeakTermPlus e
 
 asterWeakTermPlus' :: [WeakIdentPlus] -> WeakTermPlus -> S.Set Int
 asterWeakTermPlus' binder e =
@@ -261,14 +267,14 @@ toText term =
             else showCons ["λ-irreducible", argStr, toText e]
     (_, WeakTermPiElim e es) ->
       case e of
-        (_, WeakTermAster _) ->
-          "*"
+        -- (_, WeakTermAster _) ->
+        --   "*"
         _ ->
           showCons $ map toText $ e : es
     (_, WeakTermConst x) ->
       x
-    (_, WeakTermAster _) ->
-      "*"
+    (_, WeakTermAster i) ->
+      "?M" <> T.pack (show i)
     (_, WeakTermInt _ a) ->
       T.pack $ show a
     (_, WeakTermFloat _ a) ->
@@ -292,61 +298,63 @@ toText term =
           showCons $ "case" : toText e : map showCaseClause caseClause
         Just _ -> do
           showCons $ "case-noetic" : toText e : map showCaseClause caseClause
+    (_, WeakTermIgnore e) ->
+      showCons ["ignore", toText e]
 
-toTree :: WeakTermPlus -> TreePlus
-toTree term =
-  case term of
-    (m, WeakTermTau) ->
-      (m, TreeLeaf "tau")
-    (m, WeakTermVar _ x) ->
-      (m, TreeLeaf (showVariable x))
-    (m, WeakTermPi xts cod) ->
-      (m, TreeNode [(m, TreeLeaf "Π"), (m, TreeNode (map toTreeArg xts)), toTree cod])
-    (m, WeakTermPiIntro isReducible kind xts e) -> do
-      case kind of
-        LamKindNormal ->
-          (m, TreeNode [(m, TreeLeaf "λ"), (m, TreeNode (map toTreeArg xts)), toTree e])
-        LamKindFix (_, self, _)
-          | isReducible == OpacityOpaque ->
-            (m, TreeNode [(m, TreeLeaf "Π-introduction-fix-irreducible"), (m, TreeLeaf $ showVariable self), (m, TreeNode (map toTreeArg xts)), toTree e])
-          | otherwise ->
-            (m, TreeNode [(m, TreeLeaf "Π-introduction-fix"), (m, TreeLeaf $ showVariable self), (m, TreeNode (map toTreeArg xts)), toTree e])
-        LamKindCons _ consName ->
-          (m, TreeLeaf $ "<" <> consName <> ">")
-        LamKindResourceHandler ->
-          (m, TreeLeaf $ "<resource-handler>")
-    (m, WeakTermPiElim e es) ->
-      case e of
-        (_, WeakTermAster _) ->
-          (m, TreeLeaf "*")
-        _ ->
-          (m, TreeNode (map toTree $ e : es))
-    (m, WeakTermConst x) ->
-      (m, TreeLeaf x)
-    (m, WeakTermAster _) ->
-      (m, TreeLeaf "*")
-    (m, WeakTermInt _ a) ->
-      (m, TreeLeaf (T.pack $ show a))
-    (m, WeakTermFloat _ a) ->
-      (m, TreeLeaf (T.pack $ show a))
-    (m, WeakTermEnum l) ->
-      (m, TreeLeaf l)
-    (m, WeakTermEnumIntro v) ->
-      (m, TreeLeaf v)
-    (m, WeakTermEnumElim (e, _) mles) -> do
-      let (mls, es) = unzip mles
-      let les = zip (map snd mls) es
-      (m, TreeNode ((m, TreeLeaf "switch") : toTree e : (map toTreeClause les)))
-    (_, WeakTermQuestion e _) ->
-      toTree e
-    (m, WeakTermDerangement i es) ->
-      (m, TreeNode ((m, TreeLeaf "derangement") : (m, TreeLeaf (T.pack (show i))) : map toTree es))
-    (m, WeakTermCase _ mSubject (e, _) caseClause) -> do
-      case mSubject of
-        Nothing -> do
-          (m, TreeNode ((m, TreeLeaf "case") : toTree e : map toTreeCaseClause caseClause))
-        Just _ -> do
-          (m, TreeNode ((m, TreeLeaf "case-noetic") : toTree e : map toTreeCaseClause caseClause))
+-- toTree :: WeakTermPlus -> TreePlus
+-- toTree term =
+--   case term of
+--     (m, WeakTermTau) ->
+--       (m, TreeLeaf "tau")
+--     (m, WeakTermVar _ x) ->
+--       (m, TreeLeaf (showVariable x))
+--     (m, WeakTermPi xts cod) ->
+--       (m, TreeNode [(m, TreeLeaf "Π"), (m, TreeNode (map toTreeArg xts)), toTree cod])
+--     (m, WeakTermPiIntro isReducible kind xts e) -> do
+--       case kind of
+--         LamKindNormal ->
+--           (m, TreeNode [(m, TreeLeaf "λ"), (m, TreeNode (map toTreeArg xts)), toTree e])
+--         LamKindFix (_, self, _)
+--           | isReducible == OpacityOpaque ->
+--             (m, TreeNode [(m, TreeLeaf "Π-introduction-fix-irreducible"), (m, TreeLeaf $ showVariable self), (m, TreeNode (map toTreeArg xts)), toTree e])
+--           | otherwise ->
+--             (m, TreeNode [(m, TreeLeaf "Π-introduction-fix"), (m, TreeLeaf $ showVariable self), (m, TreeNode (map toTreeArg xts)), toTree e])
+--         LamKindCons _ consName ->
+--           (m, TreeLeaf $ "<" <> consName <> ">")
+--         LamKindResourceHandler ->
+--           (m, TreeLeaf $ "<resource-handler>")
+--     (m, WeakTermPiElim e es) ->
+--       case e of
+--         (_, WeakTermAster _) ->
+--           (m, TreeLeaf "*")
+--         _ ->
+--           (m, TreeNode (map toTree $ e : es))
+--     (m, WeakTermConst x) ->
+--       (m, TreeLeaf x)
+--     (m, WeakTermAster _) ->
+--       (m, TreeLeaf "*")
+--     (m, WeakTermInt _ a) ->
+--       (m, TreeLeaf (T.pack $ show a))
+--     (m, WeakTermFloat _ a) ->
+--       (m, TreeLeaf (T.pack $ show a))
+--     (m, WeakTermEnum l) ->
+--       (m, TreeLeaf l)
+--     (m, WeakTermEnumIntro v) ->
+--       (m, TreeLeaf v)
+--     (m, WeakTermEnumElim (e, _) mles) -> do
+--       let (mls, es) = unzip mles
+--       let les = zip (map snd mls) es
+--       (m, TreeNode ((m, TreeLeaf "switch") : toTree e : (map toTreeClause les)))
+--     (_, WeakTermQuestion e _) ->
+--       toTree e
+--     (m, WeakTermDerangement i es) ->
+--       (m, TreeNode ((m, TreeLeaf "derangement") : (m, TreeLeaf (T.pack (show i))) : map toTree es))
+--     (m, WeakTermCase _ mSubject (e, _) caseClause) -> do
+--       case mSubject of
+--         Nothing -> do
+--           (m, TreeNode ((m, TreeLeaf "case") : toTree e : map toTreeCaseClause caseClause))
+--         Just _ -> do
+--           (m, TreeNode ((m, TreeLeaf "case-noetic") : toTree e : map toTreeCaseClause caseClause))
 
 inParen :: T.Text -> T.Text
 inParen s =
@@ -356,9 +364,9 @@ showArg :: (Hint, Ident, WeakTermPlus) -> T.Text
 showArg (_, x, t) =
   inParen $ showVariable x <> " " <> toText t
 
-toTreeArg :: (Hint, Ident, WeakTermPlus) -> TreePlus
-toTreeArg (m, x, t) =
-  (m, TreeNode [(m, TreeLeaf (showVariable x)), toTree t])
+-- toTreeArg :: (Hint, Ident, WeakTermPlus) -> TreePlus
+-- toTreeArg (m, x, t) =
+--   (m, TreeNode [(m, TreeLeaf (showVariable x)), toTree t])
 
 showTypeArgs :: [WeakIdentPlus] -> T.Text
 showTypeArgs args =
@@ -380,10 +388,10 @@ showCaseClause :: (WeakPattern, WeakTermPlus) -> T.Text
 showCaseClause (pat, e) =
   inParen $ showPattern pat <> " " <> toText e
 
-toTreeCaseClause :: (WeakPattern, WeakTermPlus) -> TreePlus
-toTreeCaseClause (pat, e) = do
-  let m = fst e
-  (m, TreeNode [toTreePattern m pat, toTree e])
+-- toTreeCaseClause :: (WeakPattern, WeakTermPlus) -> TreePlus
+-- toTreeCaseClause (pat, e) = do
+--   let m = fst e
+--   (m, TreeNode [toTreePattern m pat, toTree e])
 
 toTreePattern :: Hint -> WeakPattern -> TreePlus
 toTreePattern m (mf, f, xts) = do
@@ -403,10 +411,10 @@ showClause :: (EnumCase, WeakTermPlus) -> T.Text
 showClause (c, e) =
   inParen $ showCase c <> " " <> toText e
 
-toTreeClause :: (EnumCase, WeakTermPlus) -> TreePlus
-toTreeClause (c, e) = do
-  let m = fst e
-  (m, TreeNode [(m, TreeLeaf (showCase c)), toTree e])
+-- toTreeClause :: (EnumCase, WeakTermPlus) -> TreePlus
+-- toTreeClause (c, e) = do
+--   let m = fst e
+--   (m, TreeNode [(m, TreeLeaf (showCase c)), toTree e])
 
 showCase :: EnumCase -> T.Text
 showCase c =

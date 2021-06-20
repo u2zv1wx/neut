@@ -133,6 +133,9 @@ clarifyTerm tenv term =
                 (m, CompEnumElim tagVar branchList)
             )
         )
+    (m, TermIgnore e) -> do
+      e' <- clarifyTerm tenv e
+      return (m, CompIgnore e')
 
 newClosureNames :: Hint -> IO ((Ident, ValuePlus), Ident, (Ident, ValuePlus), (Ident, ValuePlus))
 newClosureNames m = do
@@ -342,6 +345,8 @@ chainOf tenv term =
       let xs2 = chainOf tenv e
       let xs3 = concat $ (flip map patList $ \((_, _, xts), body) -> chainOf' tenv xts [body])
       xs1 ++ xs2 ++ xs3
+    (_, TermIgnore e) ->
+      chainOf tenv e
 
 chainOf' :: TypeEnv -> [IdentPlus] -> [TermPlus] -> [IdentPlus]
 chainOf' tenv binder es =

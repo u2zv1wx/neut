@@ -15,7 +15,6 @@ import Data.LowType
 import qualified Data.Set as S
 import Data.Term
 import qualified Data.Text as T
-import Data.Tree
 import Data.WeakTerm
 import Elaborate.Infer
 import Elaborate.Unify
@@ -38,8 +37,6 @@ elaborateStmt' stmt =
       -- cs <- readIORef constraintEnv
       -- p "==========================================================="
       -- forM_ cs $ \(e1, e2) -> do
-      --   p' e1
-      --   p' e2
       --   p $ T.unpack $ toText e1
       --   p $ T.unpack $ toText e2
       --   p "---------------------"
@@ -164,7 +161,10 @@ elaborate' term =
             patList' <- elaboratePatternList m bs patList
             return (m, TermCase resultType' mSubject' (e', t') patList')
         _ -> do
-          raiseError (fst t) $ "the type of this term must be a data-type, but its type is:\n" <> showTree (toTree $ weaken t')
+          raiseError (fst t) $ "the type of this term must be a data-type, but its type is:\n" <> (toText $ weaken t')
+    (m, WeakTermIgnore e) -> do
+      e' <- elaborate' e
+      return (m, TermIgnore e')
 
 -- for now
 elaboratePatternList :: Hint -> [T.Text] -> [(WeakPattern, WeakTermPlus)] -> IO [(Pattern, TermPlus)]

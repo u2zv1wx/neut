@@ -104,6 +104,9 @@ discern' nenv term =
           Nothing ->
             raiseError m $ "no such constructor is defined: " <> asText constructorName
       return (m, WeakTermCase resultType' mSubject' (e', t') clauseList')
+    (m, WeakTermIgnore e) -> do
+      e' <- discern' nenv e
+      return (m, WeakTermIgnore e')
 
 discernBinder ::
   NameEnv ->

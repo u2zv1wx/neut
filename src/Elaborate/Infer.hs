@@ -140,12 +140,36 @@ infer' ctx term =
                     insConstraintEnv tPat t'
                 return ((mPat, name, xts'), body')
               return ((m, WeakTermCase resultType mSubject' (e', t') clauseList'), resultType)
+    (m, WeakTermIgnore e) -> do
+      (e', t') <- infer' ctx e
+      return ((m, WeakTermIgnore e'), t')
 
 inferSubject :: Hint -> Context -> WeakTermPlus -> IO WeakTermPlus
 inferSubject m ctx subject = do
   (subject', tSub) <- infer' ctx subject
   insConstraintEnv (m, WeakTermTau) tSub
   return subject'
+
+-- inferArgs ::
+--   Hint ->
+--   [(WeakTermPlus, WeakTermPlus)] ->
+--   [WeakIdentPlus] ->
+--   WeakTermPlus ->
+--   IO WeakTermPlus
+-- inferArgs m args1 args2 cod =
+--   case (args1, args2) of
+--     ([], []) ->
+--       return cod
+--     ((e, t) : ets, (_, x, tx) : xts) -> do
+--       insConstraintEnv tx t
+--       p $ T.unpack $ "ins: " <> T.pack (show x) <> " ~> " <> toText e
+--       modifyIORef' substEnv $ \env -> IntMap.insert (asInt x) e env
+--       -- tx' <- substWeakTermPlus sub tx
+--       -- t' <- substWeakTermPlus sub t
+--       -- insConstraintEnv tx' t'
+--       inferArgs m ets xts cod
+--     _ ->
+--       raiseCritical m "invalid argument passed to inferArgs"
 
 inferArgs ::
   SubstWeakTerm ->
@@ -221,6 +245,7 @@ inferPiElim ctx m (e, t) ets = do
     (_, WeakTermPi xts (_, cod))
       | length xts == length ets -> do
         cod' <- inferArgs IntMap.empty m ets xts (m, cod)
+        -- cod' <- inferArgs m ets xts (m, cod)
         return ((m, WeakTermPiElim e es), cod')
     _ -> do
       ys <- mapM (const $ newIdentFromText "arg") es
@@ -228,6 +253,7 @@ inferPiElim ctx m (e, t) ets = do
       cod <- newTypeAsterInCtx (ctx ++ yts) m
       insConstraintEnv (metaOf e, WeakTermPi yts cod) t
       cod' <- inferArgs IntMap.empty m ets yts cod
+      -- cod' <- inferArgs m ets yts cod
       return ((m, WeakTermPiElim e es), cod')
 
 -- In a context (x1 : A1, ..., xn : An), this function creates metavariables

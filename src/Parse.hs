@@ -23,7 +23,6 @@ import Path
 import Path.IO
 import System.Exit
 import System.Process hiding (env)
-import Text.Read (readMaybe)
 
 --
 -- core functions
@@ -127,7 +126,10 @@ stmt = do
 stmtDefine :: Bool -> IO WeakStmt
 stmtDefine isReducible = do
   m <- currentHint
-  token "define"
+  if isReducible
+    then token "define"
+    else token "define-opaque"
+  -- token "define" -- fixme: define-opaque
   (mFun, funName) <- var
   funName' <- withSectionPrefix funName
   argList <- many weakIdentPlus
@@ -135,7 +137,11 @@ stmtDefine isReducible = do
   codType <- weakTerm
   token "="
   e <- weakTerm
-  defineFunction isReducible m mFun funName' argList codType e
+  case argList of
+    [] ->
+      defineTerm isReducible m funName' codType e
+    _ ->
+      defineFunction isReducible m mFun funName' argList codType e
 
 defineFunction :: IsReducible -> Hint -> Hint -> T.Text -> [WeakIdentPlus] -> WeakTermPlus -> WeakTermPlus -> IO WeakStmt
 defineFunction isReducible m mFun funName' argList codType e = do
@@ -212,7 +218,9 @@ stmtEnsure = do
   isAlreadyInstalled <- doesDirExist pkgStrDirPath
   when (not isAlreadyInstalled) $ do
     ensureDir pkgStrDirPath
-    urlStr' <- readStrOrThrow mUrl urlStr
+    -- urlStr' <- readStrOrThrow mUrl urlStr
+    let urlStr' = T.unpack urlStr
+    p urlStr'
     let curlCmd = proc "curl" ["-s", "-S", "-L", urlStr']
     let tarCmd = proc "tar" ["xJf", "-", "-C", toFilePath pkgStr', "--strip-components=1"]
     (_, Just stdoutHandler, Just curlErrorHandler, curlHandler) <-
@@ -226,13 +234,15 @@ stmtEnsure = do
     tarExitCode <- waitForProcess tarHandler
     raiseIfFailure mUrl "tar" tarExitCode tarErrorHandler pkgStrDirPath
 
-readStrOrThrow :: (Read a) => Hint -> T.Text -> IO a
-readStrOrThrow m quotedStr =
-  case readMaybe (T.unpack quotedStr) of
-    Nothing ->
-      raiseError m "the atom here must be a string"
-    Just str ->
-      return str
+-- readStrOrThrow :: Hint -> T.Text -> IO String
+-- readStrOrThrow m quotedStr =
+--   case readMaybe (T.unpack $ "\"" <> quotedStr) of
+--     Nothing -> do
+--       p' quotedStr
+--       p' (T.unpack quotedStr)
+--       raiseError m "the atom here must be a string"
+--     Just str ->
+--       return str
 
 raiseIfFailure :: Hint -> String -> ExitCode -> Handle -> Path Abs Dir -> IO ()
 raiseIfFailure m procName exitCode h pkgDirPath =
@@ -465,17 +475,21 @@ stmtDefineCodata = do
 
 stmtDefineCodataElim :: Hint -> T.Text -> [WeakIdentPlus] -> [WeakIdentPlus] -> WeakIdentPlus -> IO WeakStmt
 stmtDefineCodataElim m a xts yts (mY, y, elemType) = do
-  let codataType = (m, WeakTermPiElim (weakVar m a) (map identPlusToVar xts))
+  let codataType =
+        case xts of
+          [] ->
+            weakVar m a
+          _ ->
+            (m, WeakTermPiElim (weakVar m a) (map identPlusToVar xts))
   recordVarText <- newText
   let projArgs = xts ++ [(m, asIdent recordVarText, codataType)]
-  let projType = (m, WeakTermPi projArgs elemType)
   defineFunction
     True
     m
     mY
     (a <> nsSep <> asText y)
     projArgs
-    projType
+    elemType
     ( m,
       WeakTermCase
         elemType
@@ -489,17 +503,14 @@ stmtDefineResourceType = do
   m <- currentHint
   _ <- token "define-resource-type"
   name <- varText >>= withSectionPrefix
-  mFun <- currentHint
   discarder <- weakTermSimple
   copier <- weakTermSimple
   flag <- newIdentFromText "flag"
   value <- newIdentFromText "value"
-  defineFunction
+  defineTerm
     True
     m
-    mFun
     name
-    []
     (m, WeakTermTau)
     ( m,
       WeakTermPiElim
@@ -541,6 +552,53 @@ stmtDefineResourceType = do
         ]
     )
 
+-- defineFunction
+--   True
+--   m
+--   mFun
+--   name
+--   []
+--   (m, WeakTermTau)
+--   ( m,
+--     WeakTermPiElim
+--       (weakVar m "unsafe.cast")
+--       [ ( m,
+--           WeakTermPi
+--             [ (m, flag, weakVar m "bool"),
+--               (m, value, weakVar m "unsafe.pointer")
+--             ]
+--             (weakVar m "unsafe.pointer")
+--         ),
+--         (m, WeakTermTau),
+--         ( m,
+--           WeakTermPiIntro
+--             OpacityTransparent
+--             LamKindResourceHandler
+--             [ (m, flag, (weakVar m "bool")),
+--               (m, value, (weakVar m "unsafe.pointer"))
+--             ]
+--             ( m,
+--               WeakTermEnumElim
+--                 ((weakVar m (asText flag)), (weakVar m "bool"))
+--                 [ ( (m, EnumCaseLabel "bool.true"),
+--                     (m, WeakTermPiElim copier [weakVar m (asText value)])
+--                   ),
+--                   ( (m, EnumCaseLabel "bool.false"),
+--                     ( m,
+--                       WeakTermPiElim
+--                         (weakVar m "unsafe.cast")
+--                         [ (weakVar m "top"),
+--                           (weakVar m "unsafe.pointer"),
+--                           (m, WeakTermPiElim discarder [weakVar m (asText value)])
+--                         ]
+--                     )
+--                   )
+--                 ]
+--             )
+--         )
+--       ]
+--   )
+
 weakTermToWeakIdent :: Hint -> IO WeakTermPlus -> IO WeakIdentPlus
 weakTermToWeakIdent m f = do
   a <- f
@@ -556,10 +614,6 @@ setAsData a i bts = do
   modifyIORef' dataEnv $ \env -> Map.insert a bs env
   forM_ (zip bs [0 ..]) $ \(x, k) ->
     modifyIORef' constructorEnv $ \env -> Map.insert x (i, k) env
-
-weakVar :: Hint -> T.Text -> WeakTermPlus
-weakVar m str =
-  (m, WeakTermVar VarKindLocal (asIdent str))
 
 toPiTypeWith :: Ident -> (Hint, T.Text, [WeakIdentPlus]) -> WeakIdentPlus
 toPiTypeWith cod (m, b, yts) =

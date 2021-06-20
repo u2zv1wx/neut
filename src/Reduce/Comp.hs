@@ -79,6 +79,9 @@ reduceCompPlus term =
           let (ls, es) = unzip les
           es' <- mapM reduceCompPlus es
           return (m, CompEnumElim v (zip ls es'))
+    (m, CompIgnore e) -> do
+      e' <- reduceCompPlus e
+      return (m, CompIgnore e')
 
 substValuePlus :: SubstValuePlus -> NameEnv -> ValuePlus -> ValuePlus
 substValuePlus sub nenv term =
@@ -126,6 +129,9 @@ substCompPlus sub nenv term =
       let (cs, es) = unzip branchList
       es' <- mapM (substCompPlus sub nenv) es
       return (m, CompEnumElim v' (zip cs es'))
+    (m, CompIgnore e) -> do
+      e' <- substCompPlus sub nenv e
+      return (m, CompIgnore e')
 
 substPrimitive :: SubstValuePlus -> NameEnv -> Primitive -> Primitive
 substPrimitive sub nenv c =

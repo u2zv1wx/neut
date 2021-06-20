@@ -22,6 +22,7 @@ data Comp
   | CompUpElim Ident CompPlus CompPlus
   | CompEnumElim ValuePlus [(EnumCase, CompPlus)]
   | CompPrimitive Primitive
+  | CompIgnore CompPlus
   deriving (Show)
 
 data Primitive
@@ -74,3 +75,5 @@ varComp c =
           S.unions $ map varValue vs
         PrimitiveDerangement _ vs ->
           S.unions $ map varValue vs
+    (_, CompIgnore e) ->
+      varComp e

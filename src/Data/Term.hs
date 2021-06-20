@@ -26,6 +26,7 @@ data Term
       (Maybe TermPlus) -- noetic subject (this is for `case-noetic`)
       (TermPlus, TermPlus) -- (pattern-matched value, its type)
       [(Pattern, TermPlus)]
+  | TermIgnore TermPlus
   deriving (Show)
 
 type Pattern =
@@ -99,6 +100,8 @@ weaken term =
       let t' = weaken t
       let patList' = map (\((mp, p, xts), body) -> ((mp, p, map weakenIdentPlus xts), weaken body)) patList
       (m, WeakTermCase resultType' mSubject' (e', t') patList')
+    (m, TermIgnore e) ->
+      (m, WeakTermIgnore (weaken e))
 
 weakenIdentPlus :: (Hint, Ident, TermPlus) -> (Hint, Ident, WeakTermPlus)
 weakenIdentPlus (m, x, t) =

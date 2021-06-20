@@ -56,6 +56,8 @@ lowerComp term =
           let t = LowTypeInt 64
           (cast, castThen) <- llvmCast (Just "enum-base") v t
           castThen $ LowCompSwitch (cast, t) defaultCase caseList
+    (_, CompIgnore e) ->
+      lowerComp e
 
 uncastList :: [(Ident, (Ident, LowType))] -> CompPlus -> IO LowComp
 uncastList args e =
