@@ -1,8 +1,9 @@
-(include "../header.neut")
+include "../header.neut"
 
-(define (x *) (i64 1))
+define x : * =
+  let a : i64 = 1 in
+  a
 
-(define (y *)
-  (with identity.bind
-    (let (z *) x)
-    z))
+define y : * =
+  let z : * = x in
+  z

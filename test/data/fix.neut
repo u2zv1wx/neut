@@ -1,38 +1,43 @@
-(include "../header.neut")
+include "../header.neut"
 
-; degenerates to (λ () (i64 0))
-(define f0
-  (fix _ ()
-    (i64 0)))
+define f0 : top -> i64 =
+  fix _ (_ : top). 0
 
-(reduce (i64.print (f0)))
+reduce
+  i64.print (f0 top.unit)
 
-(define fact
-  (fix self ((x i64))
-    (if (icmp-sle-i64 x 0)
+define fact : i64 -> i64 =
+  fix self (x : i64).
+    if icmp-sle-i64 x 0 then
       1
-      (mul-i64 x (self (sub-i64 x 1))))))
+    else
+      mul-i64 x (self (sub-i64 x 1))
+    end
 
-(reduce (i64.print (fact 10))) ; 3628800
+reduce
+  i64.print (fact 10)
 
-; fix with type annotation
-(define fact'
-  (fix (self (hom i64 i64)) ((x i64))
-    (if (icmp-sle-i64 x 0)
+define fact' : i64 -> i64 =
+  fix (self : i64 -> i64) (x : i64).
+    if icmp-sle-i64 x 0 then
       1
-      (mul-i64 x (self (sub-i64 x 1))))))
+    else
+      mul-i64 x (self (sub-i64 x 1))
+    end
 
-(reduce (i64.print (fact' 5))) ; 120
+reduce
+  i64.print (fact' 5)
 
-; https://mathworld.wolfram.com/TAKFunction.html
-(define tak
-  (fix self (x y z)
-    (if (icmp-sle-i64 x y)
+define tak : i64 -> i64 -> i64 -> i64 =
+  fix self x y z.
+    if icmp-sle-i64 x y then
       y
-      (with identity.bind
-        (let x' (self (sub-i64 x 1) y z))
-        (let y' (self (sub-i64 y 1) z x))
-        (let z' (self (sub-i64 z 1) x y))
-        (self x' y' z')))))
+    else
+      let x' = self (sub-i64 x 1) y z in
+      let y' = self (sub-i64 y 1) z x in
+      let z' = self (sub-i64 z 1) x y in
+      self x' y' z'
+    end
 
-(reduce (i64.print (tak 12 6 0))) ; 12
+reduce
+  i64.print (tak 12 6 0)

@@ -1,43 +1,36 @@
-(include "../header.neut")
+include "../header.neut"
 
-; nullary lambda (Π-introduction)
-(define f1
-  (Π-introduction () (i64 1)))
+define f2 : i64 -> i64 =
+  lambda (x : i64). x
 
-(reduce (i64.print (f1)))
+reduce
+  i64.print (f2 2)
 
-; unary lambda
-(define f2
-  (lambda ((x i64)) x))
+define f3 : i64 -> i64 -> i64 =
+  lambda x y. add-i64 x y
 
-(reduce (i64.print (f2 2)))
+reduce
+  i64.print (f3 1 2)
 
-; binary lambda
-(define f3
-  (lambda ((x i64) (y i64)) (i64.add x y)))
+define f4 : (a : tau) -> (a -> a) -> a -> a =
+  lambda a f x. f x
 
-(reduce (i64.print (f3 1 2)))
+reduce
+  i64.print (f4 i64 (lambda x. add-i64 x 1) 3)
 
-; a function that takes another function as an argument
-(define f4
-  (lambda ((a tau) (f (hom a a)) (x a)) (f x)))
+define f5 (x : i64) : i64 -> i64 =
+  let adder = lambda y. add-i64 x y in
+  adder
 
-(reduce (i64.print (f4 i64 (lambda (x) (i64.add x 1)) 3)))
+define add-3 : i64 -> i64 =
+  f5 3
 
-; a function with a free variable
-(define f5 ((x i64))
-  (with identity.bind
-    (let adder (lambda (y) (i64.add x y)))
-    adder))
+reduce
+  i64.print (add-3 2)
 
-(define add-3 (f5 3))
+define f6 (g : i64 -> i64) : i64 -> i64 =
+  let app = lambda y. g y in
+  app
 
-(reduce (i64.print (add-3 2)))
-
-; a function with a free variable of type pi
-(define f6 ((g (hom i64 i64)))
-  (with identity.bind
-    (let app (lambda (y) (g y)))
-    app))
-
-(reduce (i64.print ((f6 f2) 6)))
+reduce
+  i64.print ((f6 f2) 6)

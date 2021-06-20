@@ -1,22 +1,20 @@
-(include "../header.neut")
+include "../header.neut"
 
-(define-codata my-record ((a tau))
-  (item-1
-    a)
-  (item-2
-    i64)
-  (item-3
-    top))
+define-codata pohe (a : tau)
+- item-1 : a
+- item-2 : i64
+- item-3 : top
 
-(define item
-  (my-record.new
-    i64
+define item : pohe i64 =
+  pohe.new i64
     10
     20
-    top.unit))
+    top.unit
 
-(reduce (i64.print (my-record.item-1 i64 item)))
+reduce
+  i64.print (pohe.item-1 i64 item)
 
-(reduce (i64.print (my-record.item-2 i64 item)))
+reduce
+  i64.print (pohe.item-2 i64 item)
 
-(define-codata empty-record ())
+define-codata empty

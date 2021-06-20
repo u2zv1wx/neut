@@ -1,4 +1,8 @@
-(ensure core/0.2.0.0
-  "https://github.com/veka41/neut-core/raw/master/release/0.2.0.0.tar.xz")
+ensure core/0.3.0.0 "https://github.com/veka41/neut-core/raw/master/release/0.3.0.0.tar.xz"
 
-(include "core/0.2.0.0/core.neut")
+include "core/0.3.0.0/core.neut"
+
+-- (ensure core/0.2.0.0
+--   "https://github.com/veka41/neut-core/raw/master/release/0.2.0.0.tar.xz")
+
+-- (include "core/0.2.0.0/core.neut")

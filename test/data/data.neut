@@ -1,95 +1,42 @@
-(include "../header.neut")
+include "../header.neut"
 
-(section hidden)
+section hidden
 
-; simple data
-(define-data nat ()
-  (zero)
-  (succ
-    (_ (nat))))
+define-data nat
+- zero
+- succ nat
 
-; simple data (2)
-(define-data my-list ((A tau))
-  (nil)
-  (cons (_ A) (_ (my-list A))))
+define-data my-list (a : tau)
+- nil
+- cons a (my-list a)
 
-(define-data my-list2 ((A tau))
-  (nil)
-  (cons (_ A) (_ (my-list2 A))))
+define-data my-list2 (a : tau)
+- nil
+- cons a (my-list2 a)
 
-; dependent inductive type with GADT
-; (data vec ((A tau) (_ (nat)))
-;   (nil
-;     ()
-;     (vec A (nat.zero)))
-;   (cons
-;     ((m (nat))
-;      (_ A)
-;      (_ (vec A m)))
-;     (vec A (nat.succ m))))
+define-data item (a : tau)
+- cons
+- cons0 (item a) (my-list (my-list2 (my-list (item a))))
+- cons1 (item a) (my-list (item a))
+- cons2 (item a) (my-list (my-list (my-list2 (item a))))
+- cons3 (item a) (my-list (my-list (item a)))
+- cons4 (item a) (my-list2 (my-list (item a)))
+- cons5 a (item a)
 
-; nested inductive type
-(define-data item ((A tau))
-  (cons)
-  (cons0
-    (_ (item A))
-    (_ (my-list (my-list2 (my-list (item A))))))
-  (cons1
-    (_ (item A))
-    (_ (my-list (item A))))
-  (cons2
-    (_ (item A))
-    (_ (my-list (my-list (my-list2 (item A))))))
-  (cons3
-    (_ (item A))
-    (_ (my-list (my-list (item A)))))
-  (cons4
-    (_ (item A))
-    (_ (my-list2 (my-list (item A)))))
-  (cons5
-    (_ A)
-    (_ (item A))))
+-- ; ; mutually inductive type
+-- ; (data
+-- ;   (even ((_ (nat)))
+-- ;     (zero-is-even
+-- ;       ()
+-- ;       (even (nat.zero)))
+-- ;     (succ-of-odd-is-even
+-- ;       ((n (nat))
+-- ;        (_ (odd n)))
+-- ;       (even (nat.succ n))))
+-- ;   (odd ((_ (nat)))
+-- ;     (succ-of-even-is-odd
+-- ;       ((n (nat))
+-- ;        (_ (even n)))
+-- ;       (odd (nat.succ n)))))
 
-; (data item2 ((A tau) (self tau))
-;   (cons ()
-;     (item2 A self))
-;   (cons0
-;     ((_ self)
-;      (_ (my-list (my-list2 (my-list self)))))
-;     (item2 A self))
-;   (cons1
-;     ((_ self)
-;      (_ (my-list self)))
-;     (item2 A self))
-;   (cons2
-;     ((_ self)
-;      (_ (my-list (my-list (my-list2 self)))))
-;     (item2 A self))
-;   (cons3
-;     ((_ self)
-;      (_ (my-list (my-list self))))
-;     (item2 A self))
-;   (cons4
-;     ((_ self)
-;      (_ (my-list2 (my-list self))))
-;     (item2 A self))
-;   (cons5
-;     ((_ A)
-;      (_ self))
-;     (item2 A self)))
-
-; ; mutually inductive type
-; (data
-;   (even ((_ (nat)))
-;     (zero-is-even
-;       ()
-;       (even (nat.zero)))
-;     (succ-of-odd-is-even
-;       ((n (nat))
-;        (_ (odd n)))
-;       (even (nat.succ n))))
-;   (odd ((_ (nat)))
-;     (succ-of-even-is-odd
-;       ((n (nat))
-;        (_ (even n)))
-;       (odd (nat.succ n)))))
+end hidden

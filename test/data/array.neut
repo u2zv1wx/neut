@@ -1,47 +1,47 @@
-(include "../header.neut")
+include "../header.neut"
 
-; empty array
-; (define _
-;   (unsafe.create-raw-array i64))
+define empty-array : i8-array =
+  array-introduction i8
 
-(define _
-  (i64-array.new ()))
+define xs : i64-array =
+  array-introduction i64 1 2 -30 20
 
+define fs1 : f16-array =
+  array-introduction f16 3.28 2.14 2.0 -9.82
 
-; (define xs
-;   (unsafe.create-raw-array i64 1 2 -30 20))
+define fs2 : f32-array =
+  array-introduction f32 3.28 2.14 2.0 -9.82
 
-(define xs
-  (i64-array.new ((i64 1) (i64 2) (i64 -30) (i64 20))))
+define fs3 : f64-array =
+  array-introduction f64 3.28 2.14 2.0 -9.82
 
+define l (xs : i64-array) : i64 =
+  idealize xs over s in
+  let a = i64-array-access * xs 0 in
+  let b = i64-array-access * xs 1 in
+  let c = i64-array-access * xs 2 in
+  let d = i64-array-access * xs 3 in
+  add-i64 a (add-i64 b (add-i64 c d))
 
-; float array
-(define _
-  (f16-array.new ((f16 3.28) (f16 2.14) (f16 2.0) (f16 -9.82))))
+-- こう書くと壊れる：
+-- define l : i64 =
+--   idealize xs over s in
+--   let a = i64-array-access * xs 0 in
+--   let b = i64-array-access * xs 1 in
+--   let c = i64-array-access * xs 2 in
+--   let d = i64-array-access * xs 3 in
+--   add-i64 a (add-i64 b (add-i64 c d))
+-- グローバル変数としてのxsがarrayを割り当てて、んでそれがまさにグローバル変数であるっていう理由によって解放されないから、だろうな。
 
-(define _
-  (f32-array.new ((f32 3.28) (f32 2.14) (f32 2.0) (f32 -9.82))))
+-- こう書くと安全：
+-- define l' : i64 =
+--   let ys = xs in
+--   idealize ys over s in
+--   let a = i64-array-access * ys 0 in
+--   let b = i64-array-access * ys 1 in
+--   let c = i64-array-access * ys 2 in
+--   let d = i64-array-access * ys 3 in
+--   add-i64 a (add-i64 b (add-i64 c d))
 
-(define _
-  (f64-array.new ((f64 3.28) (f64 2.14) (f64 2.0) (f64 -9.82))))
-
-(use unsafe)
-
-; (define i64.array-access ((xs unsafe.pointer) (i i64))
-;   (unsafe.load-with-offset i64 xs (mul-i64 8 i)))
-
-(define l
-  (with identity.bind
-    (let a (i64-array-access &xs 0))
-    (let b (i64-array-access &xs 1))
-    (let c (i64-array-access &xs 2))
-    (let d (i64-array-access &xs 3))
-    ; (let a (i64.array-access 0 * &xs))
-    ; (let b (i64.array-access 1 4 &xs))
-    ; (let c (i64.array-access 2 4 &xs))
-    ; (let d (i64.array-access 3 * &xs))q
-    (add-i64 a (add-i64 b (add-i64 c d)))))
-
-
-(reduce
-  (i64.print l))
+reduce
+  i64.print (l xs)

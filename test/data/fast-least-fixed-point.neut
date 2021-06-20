@@ -1,57 +1,43 @@
-(include "../header.neut")
+include "../header.neut"
 
-(section hidden)
+section hidden
 
-(define mu
-  ((f (hom tau tau)))
-  (Π
-    ((F (hom (hom tau tau) tau))
-     (_ (Π ((b tau) (_ (f b))) (F f))))
-    (F f)))
+define mu (f : tau -> tau) : tau =
+  (F : (tau -> tau) -> tau) ->
+  ((b : tau) -> f b -> F f) ->
+  F f
 
-(define mu.in
-  ((f (hom tau tau))
-   (x (f (mu f))))
-  (witness (mu f)
-    (unsafe.cast (f (mu f)) (mu f) x)))
+define mu.in (f : tau -> tau) (x : f (mu f)) : mu f =
+  unsafe.cast (f (mu f)) (mu f) x
 
-(define mu.out
-  ((f (hom tau tau))
-   (x (mu f)))
-  (witness (f (mu f))
-    (unsafe.cast (mu f) (f (mu f)) x)))
+define mu.out (f : tau -> tau) (x : mu f) : f (mu f) =
+  unsafe.cast (mu f) (f (mu f)) x
 
-(define-data my-list-f ((a tau) (r tau))
-  (nil)
-  (cons (_ a) (_ r)))
+define-data my-list-f (a : tau) (r : tau)
+- nil
+- cons a r
 
-(define my-list
-  ((a tau))
-  (mu (my-list-f a _)))
+define my-list (a : tau) : tau =
+  mu (lambda r. my-list-f a r)
 
-(define my-list.nil
-  ((a tau))
-  (witness (my-list a)
-    (mu.in (my-list-f a _) (my-list-f.nil a (my-list a)))))
+define my-list.nil (a : tau) : my-list a =
+  mu.in (lambda r. my-list-f a r) (my-list-f.nil a (my-list a))
 
-(define my-list.cons
-  ((a tau)
-   (x a)
-   (xs (my-list a)))
-  (witness (my-list a)
-    (mu.in (my-list-f a _) (my-list-f.cons a (my-list a) x xs))))
+define my-list.cons (a : tau) (x : a) (xs : my-list a) : my-list a =
+  mu.in (lambda r. my-list-f a r) (my-list-f.cons a (my-list a) x xs)
 
-(define length
-  ((a tau)
-   (xs (my-list a)))
-  (witness i64
-    (case (mu.out (my-list-f a _) xs)
-      ((my-list-f.nil)
-        0)
-      ((my-list-f.cons y ys)
-        (add-i64 1 (length a ys))))))
+define length (a : tau) (xs : my-list a) : i64 =
+  match mu.out (lambda r. my-list-f a r) xs with
+  - my-list-f.nil ->
+    0
+  - my-list-f.cons y ys ->
+    add-i64 1 (length a ys)
+  end
 
-(define xs
-  (my-list.cons i64 0 (my-list.cons * 1 (my-list.cons * 2 (my-list.nil *)))))
+define xs : my-list i64 =
+  my-list.cons i64 0 (my-list.cons i64 1 (my-list.cons i64 2 (my-list.nil i64)))
 
-(reduce (i64.print (length i64 xs)))
+reduce
+  i64.print (length * xs)
+
+end hidden

@@ -1,35 +1,47 @@
-(include "../header.neut")
+include "../header.neut"
 
-(define f ((n i64))
-  (i64.add n 1))
+define f (n : i64) : i64 =
+  add-i64 n 1
 
-(reduce (i64.print (f 0)))
+reduce
+  i64.print (f 0)
 
-(use bool)
+use bool
+use i64
 
-(use i64)
-
-(define even-f ((f (hom i64 bool)) (n i64))
-  (if (icmp-eq-i64 n 0)
+define even-f (f : i64 -> bool) (n : i64) : bool =
+  if icmp-eq-i64 n 0 then
     true
-    (f (sub-i64 n 1))))
+  else
+    f (sub-i64 n 1)
+  end
 
-(define odd ((n i64))
-  (if (icmp-eq-i64 n 0)
+define odd (n : i64) : bool =
+  if icmp-eq-i64 n 0 then
     false
-    (even-f odd (sub-i64 n 1))))
+  else
+    even-f odd (sub-i64 n 1)
+  end
 
-(define even ((n i64))
-  (even-f odd n))
+define even (n : i64) : bool =
+  even-f odd n
 
-(reduce
-  (print
-    (if (even 10)
+reduce
+  let val =
+    if even 10 then
       100
-      1000)))
+    else
+      1000
+    end
+  in
+  print val
 
-(reduce
-  (print
-    (if (odd 10)
+reduce
+  let val =
+    if odd 10 then
       100
-      1000)))
+    else
+      1000
+    end
+  in
+  print val
