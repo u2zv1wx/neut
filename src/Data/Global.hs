@@ -8,7 +8,6 @@ import qualified Data.IntMap as IntMap
 import Data.Log
 import Data.LowComp
 import Data.LowType
-import Data.MetaTerm
 import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
 import Data.Term
@@ -75,10 +74,10 @@ topMetaNameEnv :: IORef (Map.HashMap T.Text Ident)
 topMetaNameEnv =
   unsafePerformIO (newIORef Map.empty)
 
-{-# NOINLINE metaTermCtx #-}
-metaTermCtx :: IORef SubstMetaTerm
-metaTermCtx =
-  unsafePerformIO (newIORef IntMap.empty)
+-- {-# NOINLINE metaTermCtx #-}
+-- metaTermCtx :: IORef SubstMetaTerm
+-- metaTermCtx =
+--   unsafePerformIO (newIORef IntMap.empty)
 
 {-# NOINLINE targetPlatform #-}
 targetPlatform :: IORef (Maybe T.Text)

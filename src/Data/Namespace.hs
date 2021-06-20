@@ -6,9 +6,9 @@ import qualified Data.HashMap.Lazy as Map
 import Data.IORef
 import Data.Log
 import Data.LowType
-import Data.MetaTerm
+-- import Data.MetaTerm
 import qualified Data.Text as T
-import Data.Tree
+-- import Data.Tree
 import Data.WeakTerm hiding (asVar)
 
 nsSepChar :: Char
@@ -58,21 +58,21 @@ getCurrentSection' nameStack =
     (n : ns) ->
       getCurrentSection' ns <> nsSep <> n
 
-prefixTextPlus :: TreePlus -> IO TreePlus
-prefixTextPlus tree =
-  case tree of
-    (_, TreeLeaf "_") ->
-      return tree
-    (m, TreeLeaf x) -> do
-      x' <- withSectionPrefix x
-      return (m, TreeLeaf x')
-    (m, TreeNode [(mx, TreeLeaf "_"), t]) ->
-      return (m, TreeNode [(mx, TreeLeaf "_"), t])
-    (m, TreeNode [(mx, TreeLeaf x), t]) -> do
-      x' <- withSectionPrefix x
-      return (m, TreeNode [(mx, TreeLeaf x'), t])
-    t ->
-      raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
+-- prefixTextPlus :: TreePlus -> IO TreePlus
+-- prefixTextPlus tree =
+--   case tree of
+--     (_, TreeLeaf "_") ->
+--       return tree
+--     (m, TreeLeaf x) -> do
+--       x' <- withSectionPrefix x
+--       return (m, TreeLeaf x')
+--     (m, TreeNode [(mx, TreeLeaf "_"), t]) ->
+--       return (m, TreeNode [(mx, TreeLeaf "_"), t])
+--     (m, TreeNode [(mx, TreeLeaf x), t]) -> do
+--       x' <- withSectionPrefix x
+--       return (m, TreeNode [(mx, TreeLeaf x'), t])
+--     t ->
+--       raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
 
 handleSection :: T.Text -> IO a -> IO a
 handleSection s cont = do
@@ -153,10 +153,10 @@ asVar :: Hint -> Map.HashMap T.Text Ident -> T.Text -> (Ident -> a) -> Maybe (Hi
 asVar m nenv var f =
   Map.lookup var nenv >>= \x -> return (m, f x)
 
-{-# INLINE asMetaVar #-}
-asMetaVar :: Hint -> Map.HashMap T.Text Ident -> T.Text -> Maybe MetaTermPlus
-asMetaVar m nenv var =
-  asVar m nenv var MetaTermVar
+-- {-# INLINE asMetaVar #-}
+-- asMetaVar :: Hint -> Map.HashMap T.Text Ident -> T.Text -> Maybe MetaTermPlus
+-- asMetaVar m nenv var =
+--   asVar m nenv var MetaTermVar
 
 {-# INLINE asWeakVar #-}
 asWeakVar :: Hint -> Map.HashMap T.Text Ident -> T.Text -> Maybe WeakTermPlus
@@ -175,12 +175,12 @@ findThenModify env f name = do
     then Just $ f name
     else Nothing
 
-{-# INLINE asMetaConstant #-}
-asMetaConstant :: Hint -> T.Text -> Maybe MetaTermPlus
-asMetaConstant m name =
-  if Map.member name metaConstants
-    then Just (m, MetaTermConst name)
-    else Nothing
+-- {-# INLINE asMetaConstant #-}
+-- asMetaConstant :: Hint -> T.Text -> Maybe MetaTermPlus
+-- asMetaConstant m name =
+--   if Map.member name metaConstants
+--     then Just (m, MetaTermConst name)
+--     else Nothing
 
 {-# INLINE asWeakConstant #-}
 asWeakConstant :: Hint -> T.Text -> Maybe WeakTermPlus
