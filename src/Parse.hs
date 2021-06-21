@@ -444,9 +444,7 @@ stmtDefineDataClauseArg = do
   m <- currentHint
   tryPlanList
     [ weakAscription,
-      weakTermToWeakIdent m (betweenParen weakTerm),
-      weakTermToWeakIdent m weakTermTau,
-      weakTermToWeakIdent m weakTermVar
+      weakTermToWeakIdent m weakTermSimple
     ]
 
 stmtDefineCodata :: IO [WeakStmt]
@@ -590,3 +588,7 @@ insEnumEnv m name xis = do
       let rev = Map.fromList $ zip xs (zip (repeat name) is)
       modifyIORef' enumEnv $ \env -> Map.insert name xis env
       modifyIORef' revEnumEnv $ \env -> Map.union rev env
+
+varText :: IO T.Text
+varText =
+  snd <$> var

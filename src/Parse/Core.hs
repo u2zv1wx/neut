@@ -9,6 +9,7 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.WeakTerm
 import System.IO.Unsafe (unsafePerformIO)
+import Text.Read (readMaybe)
 
 type EscapeFlag =
   Bool
@@ -139,6 +140,26 @@ many1 f = do
   itemList <- many f
   return $ item : itemList
 
+integer :: IO Integer
+integer = do
+  m <- currentHint
+  x <- symbol
+  case readMaybe (T.unpack x) of
+    Just intValue ->
+      return intValue
+    Nothing ->
+      raiseParseError m $ "unexpected symbol: " <> x <> "\n expecting: an integer"
+
+float :: IO Double
+float = do
+  m <- currentHint
+  x <- symbol
+  case readMaybe (T.unpack x) of
+    Just floatValue ->
+      return floatValue
+    Nothing ->
+      raiseParseError m $ "unexpected symbol: " <> x <> "\n expecting: an integer"
+
 tryPlanList :: [IO a] -> IO a
 tryPlanList planList =
   case planList of
@@ -203,6 +224,14 @@ symbolMaybe predicate = do
   if T.null x
     then return Nothing
     else return $ Just x
+
+var :: IO (Hint, T.Text)
+var = do
+  m <- currentHint
+  x <- symbol
+  if isKeyword x
+    then raiseParseError m $ "found a reserved symbol `" <> x <> "`, expecting a variable"
+    else return (m, x)
 
 string :: IO T.Text
 string = do

@@ -1,4 +1,11 @@
-module Parse.WeakTerm where
+module Parse.WeakTerm
+  ( weakTerm,
+    weakTermSimple,
+    weakIdentPlus,
+    weakAscription,
+    ascriptionInner,
+  )
+where
 
 import Codec.Binary.UTF8.String
 import Control.Monad (forM)
@@ -11,7 +18,6 @@ import qualified Data.Text as T
 import Data.WeakTerm
 import Parse.Core
 import qualified System.Info as System
-import Text.Read (readMaybe)
 
 --
 -- parser for WeakTerm
@@ -224,32 +230,6 @@ weakTermDerangementKind = do
   case headSymbol of
     "nop" ->
       return DerangementNop
-    "store" -> do
-      t <- lowTypeSimple
-      return $ DerangementStore t
-    "load" -> do
-      t <- lowTypeSimple
-      return $ DerangementLoad t
-    "create-array" -> do
-      t <- lowTypeSimple
-      return $ DerangementCreateArray t
-    "create-struct" -> do
-      ts <- many lowTypeSimple
-      return $ DerangementCreateStruct ts
-    "syscall" -> do
-      syscallNum <- integer
-      return $ DerangementSyscall syscallNum
-    "external" -> do
-      f <- symbol
-      return $ DerangementExternal f
-    _ -> do
-      raiseParseError m "invalid derangement kind"
-
-weakTermDerangementKind' :: IO Derangement
-weakTermDerangementKind' = do
-  m <- currentHint
-  headSymbol <- symbol
-  case headSymbol of
     "store" -> do
       t <- lowTypeSimple
       return $ DerangementStore t
@@ -726,18 +706,6 @@ weakSimpleIdent = do
     then raiseParseError m $ "found a keyword `" <> x <> "`, expecting a variable"
     else return (m, asIdent x)
 
-var :: IO (Hint, T.Text)
-var = do
-  m <- currentHint
-  x <- symbol
-  if isKeyword x
-    then raiseParseError m $ "found a reserved symbol `" <> x <> "`, expecting a variable"
-    else return (m, x)
-
-varText :: IO T.Text
-varText =
-  snd <$> var
-
 weakTermBuiltin :: IO WeakTermPlus
 weakTermBuiltin = do
   m <- currentHint
@@ -781,26 +749,12 @@ weakTermInteger = do
   h <- newAster m
   return (m, WeakTermInt h intValue)
 
-integer :: IO Integer
-integer = do
-  m <- currentHint
-  x <- symbol
-  case readMaybe (T.unpack x) of
-    Just intValue ->
-      return intValue
-    Nothing ->
-      raiseParseError m $ "unexpected symbol: " <> x <> "\n expecting: an integer"
-
 weakTermFloat :: IO WeakTermPlus
 weakTermFloat = do
   m <- currentHint
-  x <- symbol
-  case readMaybe (T.unpack x) of
-    Just floatValue -> do
-      h <- newAster m
-      return (m, WeakTermFloat h floatValue)
-    Nothing ->
-      raiseParseError m $ "unexpected symbol: " <> x <> "\n expecting: an integer"
+  floatValue <- float
+  h <- newAster m
+  return (m, WeakTermFloat h floatValue)
 
 toSigma :: Hint -> [WeakIdentPlus] -> IO WeakTermPlus
 toSigma m xts = do
