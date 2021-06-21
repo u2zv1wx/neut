@@ -119,8 +119,6 @@ weakTermPiIntro = do
   token "lambda"
   varList <- many weakIdentPlus
   e <- tryPlanList [weakTermDotBind, weakTermDoEnd]
-  -- char '.' >> skip
-  -- e <- weakTerm
   return (m, WeakTermPiIntro OpacityTransparent LamKindNormal varList e)
 
 weakTermDotBind :: IO WeakTermPlus
@@ -143,8 +141,6 @@ weakTermPiIntroFix = do
   self <- weakIdentPlus
   varList <- many weakIdentPlus
   e <- tryPlanList [weakTermDotBind, weakTermDoEnd]
-  -- char '.' >> skip
-  -- e <- weakTerm
   return (m, WeakTermPiIntro OpacityTransparent (LamKindFix self) varList e)
 
 weakTermAux :: IO WeakTermPlus
