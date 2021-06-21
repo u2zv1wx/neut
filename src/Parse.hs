@@ -63,7 +63,7 @@ stmt = do
   if T.null s
     then leave
     else do
-      headSymbol <- lookAhead symbolMaybe
+      headSymbol <- lookAhead (symbolMaybe isSymbolChar)
       case headSymbol of
         Just "define" -> do
           def <- stmtDefine True
