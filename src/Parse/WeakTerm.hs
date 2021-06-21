@@ -27,8 +27,6 @@ weakTerm :: IO WeakTermPlus
 weakTerm = do
   headSymbol <- lookAhead (symbolMaybe isSymbolChar)
   case headSymbol of
-    Just "pi" ->
-      weakTermPi
     Just "lambda" ->
       weakTermPiIntro
     Just "fix" ->
@@ -71,53 +69,12 @@ weakTermTau = do
   token "tau"
   return (m, WeakTermTau)
 
-weakTermAdmitQuestion :: IO WeakTermPlus
-weakTermAdmitQuestion = do
-  m <- currentHint
-  token "?admit"
-  h <- newAster m
-  return
-    ( m,
-      WeakTermQuestion
-        ( m,
-          WeakTermPiElim
-            (weakVar m "os.exit")
-            [ h,
-              (m, WeakTermInt (m, WeakTermConst "i64") 1)
-            ]
-        )
-        h
-    )
-
-weakTermAdmit :: IO WeakTermPlus
-weakTermAdmit = do
-  m <- currentHint
-  token "admit"
-  h <- newAster m
-  return
-    ( m,
-      WeakTermPiElim
-        (weakVar m "os.exit")
-        [ h,
-          (m, WeakTermInt (m, WeakTermConst "i64") 1)
-        ]
-    )
-
 weakTermAster :: IO WeakTermPlus
 weakTermAster = do
   m <- currentHint
   token "*"
   h <- newAster m
   return h
-
-weakTermPi :: IO WeakTermPlus
-weakTermPi = do
-  m <- currentHint
-  token "pi"
-  varList <- many weakIdentPlus
-  char '.' >> skip
-  e <- weakTerm
-  return (m, WeakTermPi varList e)
 
 weakTermPiIntro :: IO WeakTermPlus
 weakTermPiIntro = do
@@ -343,12 +300,9 @@ modifyWeakPatternBody s xts body =
   case xts of
     [] ->
       body
-    ((m, x, t) : rest) -> do
-      ( m,
-        WeakTermPiElim
-          (lam m [(m, x, wrapWithNoema s t)] (modifyWeakPatternBody s rest body))
-          [castToNoema s t (weakVar' m x)]
-        )
+    ((m, x, t) : rest) ->
+      bind m (m, x, wrapWithNoema s t) (castToNoema s t (weakVar' m x)) $
+        modifyWeakPatternBody s rest body
 
 weakTermPattern :: IO WeakPattern
 weakTermPattern = do
@@ -471,45 +425,42 @@ weakTermIf :: IO WeakTermPlus
 weakTermIf = do
   m <- currentHint
   token "if"
-  e1 <- weakTerm
+  ifCond <- weakTerm
   token "then"
-  e2 <- weakTerm
-  elseIfList <- many weakTermElseIf
+  ifBody <- weakTerm
+  elseIfList <- many $ do
+    token "else-if"
+    elseIfCond <- weakTerm
+    token "then"
+    elseIfBody <- weakTerm
+    return (elseIfCond, elseIfBody)
   token "else"
-  e3 <- weakTerm
+  elseBody <- weakTerm
   token "end"
-  foldIf m e1 e2 elseIfList e3
-
-weakTermElseIf :: IO (WeakTermPlus, WeakTermPlus)
-weakTermElseIf = do
-  token "else-if"
-  e1 <- weakTerm
-  token "then"
-  e2 <- weakTerm
-  return (e1, e2)
+  foldIf m ifCond ifBody elseIfList elseBody
 
 foldIf :: Hint -> WeakTermPlus -> WeakTermPlus -> [(WeakTermPlus, WeakTermPlus)] -> WeakTermPlus -> IO WeakTermPlus
-foldIf m e1 e2 elseIfList e3 =
+foldIf m ifCond ifBody elseIfList elseBody =
   case elseIfList of
     [] -> do
       h <- newAster m
       return
         ( m,
           WeakTermEnumElim
-            (e1, h)
-            [ ((m, EnumCaseLabel "bool.true"), e2),
-              ((m, EnumCaseLabel "bool.false"), e3)
+            (ifCond, h)
+            [ ((m, EnumCaseLabel "bool.true"), ifBody),
+              ((m, EnumCaseLabel "bool.false"), elseBody)
             ]
         )
     ((elseIfCond, elseIfBody) : rest) -> do
-      item <- foldIf m elseIfCond elseIfBody rest e3
+      cont <- foldIf m elseIfCond elseIfBody rest elseBody
       h <- newAster m
       return
         ( m,
           WeakTermEnumElim
-            (e1, h)
-            [ ((m, EnumCaseLabel "bool.true"), e2),
-              ((m, EnumCaseLabel "bool.false"), item)
+            (ifCond, h)
+            [ ((m, EnumCaseLabel "bool.true"), ifBody),
+              ((m, EnumCaseLabel "bool.false"), cont)
             ]
         )
 
@@ -585,11 +536,8 @@ castLet subject xts cont =
     [] ->
       cont
     ((m, x), t) : rest ->
-      ( m,
-        WeakTermPiElim
-          (lam m [(m, x, wrapWithNoema subject t)] (castLet subject rest cont)) -- shadowing
-          [castToNoema subject t (m, WeakTermIgnore (weakVar' m x))]
-      )
+      bind m (m, x, wrapWithNoema subject t) (castToNoema subject t (m, WeakTermIgnore (weakVar' m x))) $
+        castLet subject rest cont
 
 weakTermArrayIntro :: IO WeakTermPlus
 weakTermArrayIntro = do
@@ -628,12 +576,7 @@ annotate :: WeakTermPlus -> WeakTermPlus -> IO WeakTermPlus
 annotate t e = do
   let m = fst e
   h <- newIdentFromText "_"
-  return
-    ( m,
-      WeakTermPiElim
-        (lam m [(m, h, t)] (weakVar m (asText h)))
-        [e]
-    )
+  return $ bind m (m, h, t) e $ weakVar m (asText h)
 
 lowTypeToArrayKindText :: Hint -> LowType -> IO T.Text
 lowTypeToArrayKindText m t =
@@ -652,6 +595,38 @@ intTerm m i =
 bind :: Hint -> WeakIdentPlus -> WeakTermPlus -> WeakTermPlus -> WeakTermPlus
 bind m mxt e cont =
   (m, WeakTermPiElim (lam m [mxt] cont) [e])
+
+weakTermAdmit :: IO WeakTermPlus
+weakTermAdmit = do
+  m <- currentHint
+  token "admit"
+  h <- newAster m
+  return
+    ( m,
+      WeakTermPiElim
+        (weakVar m "os.exit")
+        [ h,
+          (m, WeakTermInt (m, WeakTermConst "i64") 1)
+        ]
+    )
+
+weakTermAdmitQuestion :: IO WeakTermPlus
+weakTermAdmitQuestion = do
+  m <- currentHint
+  token "?admit"
+  h <- newAster m
+  return
+    ( m,
+      WeakTermQuestion
+        ( m,
+          WeakTermPiElim
+            (weakVar m "os.exit")
+            [ h,
+              (m, WeakTermInt (m, WeakTermConst "i64") 1)
+            ]
+        )
+        h
+    )
 
 --
 -- term-related helper functions
