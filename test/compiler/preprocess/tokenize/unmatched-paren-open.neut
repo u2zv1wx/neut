@@ -1,6 +1,0 @@
-(include "../../../foundation.neut")
-
-(define foo (x)
-  (add-i64 x 1))
-
-(

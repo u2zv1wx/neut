@@ -1,9 +1,8 @@
-(include "../../../foundation.neut")
+include "../../../foundation.neut"
 
-(define foo (x)
-  ((lambda (x)
-     (lambda (x)
-       (add-i64 x 10)))
-    (lambda ((y x)) x)))
+define foo (x : tau) : i64 -> i64 =
+  let f = lambda x. lambda x. add-i64 x 10 in
+  let g = lambda (y : x). x in
+  f g
 
-(reduce ((foo tau) 100))
+reduce (foo tau) 100

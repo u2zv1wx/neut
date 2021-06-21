@@ -1,9 +1,10 @@
-(include "../../foundation.neut")
+include "../../foundation.neut"
 
-(define-data item ()
-  (foo)
-  (bar))
+define-data item
+- foo
+- bar
 
-(define g ((x (item)))
-  (case x
-    ((item.foo) bool.true)))
+define g (x : item) : bool =
+  match x with
+  - item.foo -> bool.true
+  end

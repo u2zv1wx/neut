@@ -1,0 +1,130 @@
+include "../../foundation.neut"
+
+reduce tau
+
+define f (x : i64) : * =
+  add-i64 x 1
+
+define g (x : f32) : * =
+  fadd-f32 x 3.288
+
+define h (foo : i64) : * =
+  add-i64 (question foo) foo
+
+reduce
+  (x : i64) -> tau
+
+reduce
+  (x : i64) -> (y : i1) -> (z : f32) -> tau
+
+reduce
+  lambda (x : i64). x
+
+reduce
+  lambda (x : i64) (y : i1) (z : f32). z
+
+reduce
+  fix self (x : i64).
+    let tmp : bottom = self x in
+    tmp
+
+reduce
+  fix self (x : i64) (y : i1) (z : f32) do
+    let tmp : bottom = self x y z in
+    tmp
+  end
+
+reduce
+  (lambda x. x) tau
+
+reduce
+  (lambda (x : tau) (y : tau). x) tau tau
+
+use bool
+
+reduce
+  let f : bool -> f32 =
+    lambda (x : bool) do
+      switch x with
+      - bool.true -> 10.0
+      - false -> 20.0
+      end
+    end
+  in
+  f bool.true
+
+reduce
+  question (lambda (x : i64). x)
+
+define fake-nop : top =
+  let x : i64 = 10 in
+  derangement nop x
+
+define fake-store (dest : unsafe.pointer) : top =
+  let x : i64 = 10 in
+  derangement (store i64) dest x
+
+define fake-load (src : unsafe.pointer) : unsafe.pointer =
+  derangement (load (pointer i8)) src
+
+define fake-create-array : unsafe.pointer =
+  let x : i64 = 10 in
+  let y : i64 = 20 in
+  let z : i64 = 30 in
+  derangement (create-array i8) x y z
+
+define fake-create-struct (some-struct : unsafe.pointer) (x : unsafe.pointer) : unsafe.pointer =
+  let a : i8 = 10 in
+  let b : i64 = 30 in
+  let c : f32 = 2.8 in
+  derangement (create-struct i8 (struct i8) (i64) (pointer i8) f32) a some-struct b x c
+
+define fake-syscall (x : unsafe.pointer) : unsafe.pointer =
+  let a : i8 = 10 in
+  let b : i64 = 30 in
+  let c : f32 = 2.8 in
+  derangement (syscall 100) a x b x c
+
+define fake-external-allocate (size : i64) : unsafe.pointer =
+  derangement (external malloc) size
+
+define fake-external-deallocate (ptr : unsafe.pointer) : top =
+  derangement (external free) ptr
+
+reduce
+  fake-external-deallocate (fake-external-allocate 10)
+
+define-data empty
+
+define empty-elim (x : empty) (a : tau) : tau =
+  match x with
+  end
+
+define empty-elim-noetic (s : subject) (x : noema s empty) (a : tau) : a =
+  match-noetic x with
+  end
+
+define-data list (a : tau)
+- nil
+- cons a (list a)
+
+define length (a : tau) (xs : list a) : i64 =
+  match xs with
+  - list.nil ->
+    0
+  - list.cons y ys ->
+    add-i64 1 (length a ys)
+  end
+
+define length-noetic-internal (s : subject) (a : tau) (xs : noema s (list a)) (acc : i64) : i64 =
+  match-noetic xs with
+  - list.nil ->
+    acc
+  - list.cons _ ys ->
+    length-noetic-internal s a ys (add-i64 acc 1)
+  end
+
+reduce
+  let xs = list.cons i64 1 (list.cons * 2 (list.cons * 3 (list.nil *))) in
+  idealize xs over s in
+  length-noetic-internal s i64 xs 0

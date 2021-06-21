@@ -1,10 +1,15 @@
-(ensure core/0.2.0.0
-  "https://github.com/veka41/neut-core/raw/master/release/0.2.0.0.tar.xz")
+ensure core/0.3.0.0 "https://github.com/veka41/neut-core/raw/master/release/0.3.0.0.tar.xz"
+-- (ensure core/0.2.0.0
+--   "https://github.com/veka41/neut-core/raw/master/release/0.2.0.0.tar.xz")
 
-(include "core/0.2.0.0/foundation.neut")
+include "core/0.3.0.0/foundation.neut"
+-- (include "core/0.2.0.0/foundation.neut")
 
-(include "core/0.2.0.0/identity.neut")
+-- (include "core/0.2.0.0/identity.neut")
 
-(include "core/0.2.0.0/noesis.neut")
+-- (include "core/0.2.0.0/noesis.neut")
 
-(include "core/0.2.0.0/noema.neut")
+include "core/0.3.0.0/bool.neut"
+
+include "core/0.3.0.0/noema.neut"
+-- (include "core/0.2.0.0/noema.neut")
