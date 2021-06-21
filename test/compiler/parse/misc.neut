@@ -53,6 +53,12 @@ reduce
   in
   f bool.true
 
+define use-admit : top -> bool -> i64 =
+  admit
+
+define use-admit-question : top -> bool -> i64 =
+  ?admit
+
 reduce
   question (lambda (x : i64). x)
 
