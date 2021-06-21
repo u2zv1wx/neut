@@ -65,37 +65,37 @@ weakTermTau = do
   token "tau"
   return (m, WeakTermTau)
 
--- weakTermAdmitQuestion :: IO WeakTermPlus
--- weakTermAdmitQuestion = do
---   m <- currentHint
---   token "?admit"
---   h <- newAster m
---   return
---     ( m,
---       WeakTermQuestion
---         ( m,
---           WeakTermPiElim
---             (weakVar m "os.exit")
---             [ h,
---               (m, WeakTermInt (m, WeakTermConst "i64") 1)
---             ]
---         )
---         h
---     )
+weakTermAdmitQuestion :: IO WeakTermPlus
+weakTermAdmitQuestion = do
+  m <- currentHint
+  token "?admit"
+  h <- newAster m
+  return
+    ( m,
+      WeakTermQuestion
+        ( m,
+          WeakTermPiElim
+            (weakVar m "os.exit")
+            [ h,
+              (m, WeakTermInt (m, WeakTermConst "i64") 1)
+            ]
+        )
+        h
+    )
 
--- weakTermAdmit :: IO WeakTermPlus
--- weakTermAdmit = do
---   m <- currentHint
---   token "admit"
---   h <- newAster m
---   return
---     ( m,
---       WeakTermPiElim
---         (weakVar m "os.exit")
---         [ h,
---           (m, WeakTermInt (m, WeakTermConst "i64") 1)
---         ]
---     )
+weakTermAdmit :: IO WeakTermPlus
+weakTermAdmit = do
+  m <- currentHint
+  token "admit"
+  h <- newAster m
+  return
+    ( m,
+      WeakTermPiElim
+        (weakVar m "os.exit")
+        [ h,
+          (m, WeakTermInt (m, WeakTermConst "i64") 1)
+        ]
+    )
 
 weakTermAster :: IO WeakTermPlus
 weakTermAster = do
@@ -188,10 +188,6 @@ weakTermEnumElim = do
 
 weakTermEnumClause :: IO (EnumCasePlus, WeakTermPlus)
 weakTermEnumClause = do
-  -- headSymbol <- lookAhead symbol
-  -- if headSymbol == "end"
-  --   then raiseParseError "end"
-  --   else do
   m <- currentHint
   token "-"
   c <- symbol
@@ -357,11 +353,6 @@ weakTermMatchNoetic = do
 
 weakTermMatchClause :: IO (WeakPattern, WeakTermPlus)
 weakTermMatchClause = do
-  -- headSymbol <- lookAhead symbol
-  -- -- fixme: このendって不要な気がする。どうせsymbolが失敗するでしょう？
-  -- if headSymbol == "end"
-  --   then raiseParseError "end"
-  --   else do
   token "-"
   pat <- weakTermPattern
   body <- weakTerm
@@ -393,7 +384,6 @@ weakTermPattern :: IO WeakPattern
 weakTermPattern = do
   m <- currentHint
   c <- symbol
-  -- c <- simpleSymbol
   argList <- weakTermPatternArgument
   return (m, asIdent c, argList)
 
@@ -436,9 +426,6 @@ weakTermLetNormal = do
           (m, WeakTermPiIntro OpacityTransparent LamKindNormal [x] e2)
         ]
     )
-
---          (m, WeakTermPiIntro OpacityTransparent LamKindNormal [x] e2) [e1])
--- return (m, WeakTermPiElim (m, WeakTermPiIntro OpacityTransparent LamKindNormal [x] e2) [e1])
 
 weakTermSigmaElimVar :: IO WeakIdentPlus
 weakTermSigmaElimVar =
@@ -522,16 +509,6 @@ weakTermIf = do
   e3 <- weakTerm
   token "end"
   foldIf m e1 e2 elseIfList e3
-
--- h <- newAster m
--- return
---   ( m,
---     WeakTermEnumElim
---       (e1, h)
---       [ ((m, EnumCaseLabel "bool.true"), e2),
---         ((m, EnumCaseLabel "bool.false"), e3)
---       ]
---   )
 
 weakTermElseIf :: IO (WeakTermPlus, WeakTermPlus)
 weakTermElseIf = do
@@ -670,7 +647,6 @@ weakTermArrayIntro = do
   let topType = weakVar m "top"
   arrText <- lowTypeToArrayKindText m t
   let arrName = arrText <> "-array" -- e.g. i8-array
-  -- let t' = (m, WeakTermConst arrText)
   t' <- lowTypeToWeakTerm m t
   es' <- mapM (annotate t') es
   return $
@@ -707,20 +683,6 @@ annotate t e = do
         [e]
     )
 
--- undefined
---   ( m,
---     WeakTermPiElim
---       ( m,
---         WeakTermPiIntro
---           OpacityTransparent
---           LamKindNormal
---           []
---           undefined
---       )
---       [(m, WeakTermDerangement (DerangementCreateArray t) es)]
---   )
--- undefined
-
 lowTypeToArrayKindText :: Hint -> LowType -> IO T.Text
 lowTypeToArrayKindText m t =
   case t of
@@ -754,6 +716,8 @@ weakTermSimple = do
       weakTermInteger,
       weakTermFloat,
       weakTermBuiltin,
+      weakTermAdmitQuestion,
+      weakTermAdmit,
       weakTermVar
     ]
 
