@@ -19,7 +19,7 @@ import Text.Read (readMaybe)
 
 weakTerm :: IO WeakTermPlus
 weakTerm = do
-  headSymbol <- lookAhead symbolMaybe
+  headSymbol <- lookAhead (symbolMaybe isSymbolChar)
   case headSymbol of
     Just "pi" ->
       weakTermPi
@@ -119,7 +119,7 @@ weakTermPiIntro = do
   token "lambda"
   varList <- many weakIdentPlus
   e <- tryPlanList [weakTermDotBind, weakTermDoEnd]
-  return (m, WeakTermPiIntro OpacityTransparent LamKindNormal varList e)
+  return $ lam m varList e
 
 weakTermDotBind :: IO WeakTermPlus
 weakTermDotBind = do
@@ -366,13 +366,7 @@ modifyWeakPatternBody s xts body =
     ((m, x, t) : rest) -> do
       ( m,
         WeakTermPiElim
-          ( m,
-            WeakTermPiIntro
-              OpacityTransparent
-              LamKindNormal
-              [(m, x, wrapWithNoema s t)]
-              (modifyWeakPatternBody s rest body)
-          )
+          (lam m [(m, x, wrapWithNoema s t)] (modifyWeakPatternBody s rest body))
           [castToNoema s t (m, WeakTermVar VarKindLocal x)]
         )
 
@@ -419,7 +413,7 @@ weakTermLetNormal = do
         [ t1,
           resultType,
           e1,
-          (m, WeakTermPiIntro OpacityTransparent LamKindNormal [x] e2)
+          (lam m [x] e2)
         ]
     )
 
@@ -443,7 +437,7 @@ weakTermLetSigmaElim = do
       WeakTermPiElim
         e1
         [ resultType,
-          (m, WeakTermPiIntro OpacityTransparent LamKindNormal xts e2)
+          lam m xts e2
         ]
     )
 
@@ -571,16 +565,13 @@ weakTermSigmaIntro = do
       return (m, x, t)
     sigVar <- newIdentFromText "sigvar"
     k <- newIdentFromText "sig-k"
-    return
-      ( m,
-        WeakTermPiIntro
-          OpacityTransparent
-          LamKindNormal
-          [ (m, sigVar, (m, WeakTermTau)),
-            (m, k, (m, WeakTermPi xts (m, WeakTermVar VarKindLocal sigVar)))
-          ]
-          (m, WeakTermPiElim (m, WeakTermVar VarKindLocal k) es)
-      )
+    return $
+      lam
+        m
+        [ (m, sigVar, (m, WeakTermTau)),
+          (m, k, (m, WeakTermPi xts (m, WeakTermVar VarKindLocal sigVar)))
+        ]
+        (m, WeakTermPiElim (m, WeakTermVar VarKindLocal k) es)
 
 weakTermIdealize :: IO WeakTermPlus
 weakTermIdealize = do
@@ -601,13 +592,10 @@ weakTermIdealize = do
       WeakTermPiElim
         (m, WeakTermVar VarKindLocal (asIdent "idea.run"))
         [ resultType,
-          ( m,
-            WeakTermPiIntro
-              OpacityTransparent
-              LamKindNormal
-              [(mSubject, asIdent subject, (m, WeakTermVar VarKindLocal (asIdent "subject")))]
-              (castLet subjectTerm (zip varList' ts) e)
-          )
+          lam
+            m
+            [(mSubject, asIdent subject, (weakVar m "subject"))]
+            (castLet subjectTerm (zip varList' ts) e)
         ]
     )
 
@@ -619,13 +607,7 @@ castLet subject xts cont =
     ((m, x), t) : rest ->
       ( m,
         WeakTermPiElim
-          ( m,
-            WeakTermPiIntro
-              OpacityTransparent
-              LamKindNormal
-              [(m, x, wrapWithNoema subject t)] -- shadowing
-              (castLet subject rest cont)
-          )
+          (lam m [(m, x, wrapWithNoema subject t)] (castLet subject rest cont)) -- shadowing
           [castToNoema subject t (m, WeakTermIgnore (m, WeakTermVar VarKindLocal x))] -- FIXME: ここでxをdo-not-consumeに包むべき
       )
 
@@ -669,13 +651,7 @@ annotate t e = do
   return
     ( m,
       WeakTermPiElim
-        ( m,
-          WeakTermPiIntro
-            OpacityTransparent
-            LamKindNormal
-            [(m, h, t)]
-            (weakVar m (asText h))
-        )
+        (lam m [(m, h, t)] (weakVar m (asText h)))
         [e]
     )
 
@@ -695,7 +671,7 @@ intTerm m i =
 
 bind :: Hint -> WeakIdentPlus -> WeakTermPlus -> WeakTermPlus -> WeakTermPlus
 bind m mxt e cont =
-  (m, WeakTermPiElim (m, WeakTermPiIntro OpacityTransparent LamKindNormal [mxt] cont) [e])
+  (m, WeakTermPiElim (lam m [mxt] cont) [e])
 
 --
 -- term-related helper functions

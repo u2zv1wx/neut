@@ -53,8 +53,6 @@ initializeState fileContent = do
   writeIORef column 1
   writeIORef text fileContent
 
--- modifyIORef' text $ \_ -> content
-
 withNestedState :: IO a -> IO a
 withNestedState comp = do
   state <- saveState
@@ -176,37 +174,35 @@ sepBy2 f sep = do
 symbol :: IO T.Text
 symbol = do
   m <- currentHint
-  s <- readIORef text
-  let x = T.takeWhile isSymbolChar s
-  let rest = T.dropWhile isSymbolChar s
-  updateStreamC (T.length x) rest
-  skip
-  if T.null x
-    then raiseParseError m "unexpected non-symbol character, expecting: symbol-character"
-    else return x
+  mx <- symbolMaybe isSymbolChar
+  returnSymbol m mx
 
-symbolMaybe :: IO (Maybe T.Text)
-symbolMaybe = do
+simpleSymbol :: IO T.Text
+simpleSymbol = do
+  m <- currentHint
+  mx <- symbolMaybe isSimpleSymbolChar
+  returnSymbol m mx
+
+{-# INLINE returnSymbol #-}
+returnSymbol :: Hint -> Maybe T.Text -> IO T.Text
+returnSymbol m mx =
+  case mx of
+    Nothing ->
+      raiseParseError m "unexpected non-symbol character, expecting: symbol-character"
+    Just x ->
+      return x
+
+{-# INLINE symbolMaybe #-}
+symbolMaybe :: (Char -> Bool) -> IO (Maybe T.Text)
+symbolMaybe predicate = do
   s <- readIORef text
-  let x = T.takeWhile isSymbolChar s
-  let rest = T.dropWhile isSymbolChar s
+  let x = T.takeWhile predicate s
+  let rest = T.dropWhile predicate s
   updateStreamC (T.length x) rest
   skip
   if T.null x
     then return Nothing
     else return $ Just x
-
-simpleSymbol :: IO T.Text
-simpleSymbol = do
-  m <- currentHint
-  s <- readIORef text
-  let x = T.takeWhile isSimpleSymbolChar s
-  let rest = T.dropWhile isSimpleSymbolChar s
-  updateStreamC (T.length x) rest
-  skip
-  if T.null x
-    then raiseParseError m "unexpected non-symbol character, expecting: symbol-character"
-    else return x
 
 string :: IO T.Text
 string = do
@@ -360,3 +356,7 @@ keywordSet =
 weakVar :: Hint -> T.Text -> WeakTermPlus
 weakVar m str =
   (m, WeakTermVar VarKindLocal (asIdent str))
+
+lam :: Hint -> [WeakIdentPlus] -> WeakTermPlus -> WeakTermPlus
+lam m varList e =
+  (m, WeakTermPiIntro OpacityTransparent LamKindNormal varList e)
