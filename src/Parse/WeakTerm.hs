@@ -55,7 +55,7 @@ weakTerm = do
       weakTermProduct
     Just "idealize" ->
       weakTermIdealize
-    Just "array-introduction" ->
+    Just "new-array" ->
       weakTermArrayIntro
     _ ->
       tryPlanList
@@ -542,7 +542,7 @@ castLet subject xts cont =
 weakTermArrayIntro :: IO WeakTermPlus
 weakTermArrayIntro = do
   m <- currentHint
-  token "array-introduction"
+  token "new-array"
   t <- lowTypeSimple
   es <- many weakTermSimple
   arr <- newIdentFromText "arr"

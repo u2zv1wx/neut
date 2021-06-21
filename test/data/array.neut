@@ -1,19 +1,19 @@
 include "../header.neut"
 
 define empty-array : i8-array =
-  array-introduction i8
+  new-array i8
 
 define xs : i64-array =
-  array-introduction i64 1 2 -30 20
+  new-array i64 1 2 -30 20
 
 define fs1 : f16-array =
-  array-introduction f16 3.28 2.14 2.0 -9.82
+  new-array f16 3.28 2.14 2.0 -9.82
 
 define fs2 : f32-array =
-  array-introduction f32 3.28 2.14 2.0 -9.82
+  new-array f32 3.28 2.14 2.0 -9.82
 
 define fs3 : f64-array =
-  array-introduction f64 3.28 2.14 2.0 -9.82
+  new-array f64 3.28 2.14 2.0 -9.82
 
 define l (xs : i64-array) : i64 =
   idealize xs over s in
