@@ -357,6 +357,10 @@ weakVar :: Hint -> T.Text -> WeakTermPlus
 weakVar m str =
   (m, WeakTermVar VarKindLocal (asIdent str))
 
+weakVar' :: Hint -> Ident -> WeakTermPlus
+weakVar' m ident =
+  (m, WeakTermVar VarKindLocal ident)
+
 lam :: Hint -> [WeakIdentPlus] -> WeakTermPlus -> WeakTermPlus
 lam m varList e =
   (m, WeakTermPiIntro OpacityTransparent LamKindNormal varList e)

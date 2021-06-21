@@ -367,7 +367,7 @@ modifyWeakPatternBody s xts body =
       ( m,
         WeakTermPiElim
           (lam m [(m, x, wrapWithNoema s t)] (modifyWeakPatternBody s rest body))
-          [castToNoema s t (m, WeakTermVar VarKindLocal x)]
+          [castToNoema s t (weakVar' m x)]
         )
 
 weakTermPattern :: IO WeakPattern
@@ -409,7 +409,7 @@ weakTermLetNormal = do
   return
     ( m,
       WeakTermPiElim
-        (m, WeakTermVar VarKindLocal (asIdent "identity.bind"))
+        (weakVar m "identity.bind")
         [ t1,
           resultType,
           e1,
@@ -463,7 +463,7 @@ weakTermLetCoproduct = do
         Nothing
         (e1, doNotCare m)
         [ ( (m, sumLeft, [(m, err, typeOfLeft)]),
-            (m, WeakTermPiElim (m, WeakTermVar VarKindLocal sumLeft) [typeOfLeft, typeOfRight, (m, WeakTermVar VarKindLocal err)])
+            (m, WeakTermPiElim (weakVar' m sumLeft) [typeOfLeft, typeOfRight, (weakVar' m err)])
           ),
           ( (m, asIdent "sum.right", [x]),
             e2
@@ -569,9 +569,9 @@ weakTermSigmaIntro = do
       lam
         m
         [ (m, sigVar, (m, WeakTermTau)),
-          (m, k, (m, WeakTermPi xts (m, WeakTermVar VarKindLocal sigVar)))
+          (m, k, (m, WeakTermPi xts (weakVar' m sigVar)))
         ]
-        (m, WeakTermPiElim (m, WeakTermVar VarKindLocal k) es)
+        (m, WeakTermPiElim (weakVar' m k) es)
 
 weakTermIdealize :: IO WeakTermPlus
 weakTermIdealize = do
@@ -585,12 +585,12 @@ weakTermIdealize = do
   token "in"
   e <- weakTerm
   resultType <- newAster m
-  let subjectTerm = (mSubject, WeakTermVar VarKindLocal (asIdent subject))
+  let subjectTerm = (weakVar mSubject subject)
   ts <- mapM (\(mx, _) -> newAster mx) varList
   return
     ( m,
       WeakTermPiElim
-        (m, WeakTermVar VarKindLocal (asIdent "idea.run"))
+        (weakVar m "idea.run")
         [ resultType,
           lam
             m
@@ -608,7 +608,7 @@ castLet subject xts cont =
       ( m,
         WeakTermPiElim
           (lam m [(m, x, wrapWithNoema subject t)] (castLet subject rest cont)) -- shadowing
-          [castToNoema subject t (m, WeakTermIgnore (m, WeakTermVar VarKindLocal x))] -- FIXME: ここでxをdo-not-consumeに包むべき
+          [castToNoema subject t (m, WeakTermIgnore (weakVar' m x))]
       )
 
 weakTermArrayIntro :: IO WeakTermPlus
@@ -745,14 +745,14 @@ weakTermBuiltin = do
   case x of
     "target-platform" -> do
       target <- getTarget
-      return (m, WeakTermVar VarKindLocal (asIdent $ "target" <> nsSep <> target))
+      return (weakVar m ("target" <> nsSep <> target))
     _ ->
       raiseParseError m $ "no such builtin constant: " <> x
 
 weakTermVar :: IO WeakTermPlus
 weakTermVar = do
   (m, x) <- var
-  return (m, WeakTermVar VarKindLocal $ asIdent x)
+  return (weakVar m x)
 
 weakTermString :: IO WeakTermPlus
 weakTermString = do
@@ -764,7 +764,7 @@ weakTermString = do
   return
     ( m,
       WeakTermPiElim
-        (m, WeakTermVar VarKindLocal (asIdent "unsafe.create-new-string"))
+        (weakVar m "unsafe.create-new-string")
         [ (m, WeakTermInt (m, WeakTermConst "i64") len),
           ( m,
             WeakTermDerangement
@@ -810,9 +810,9 @@ toSigma m xts = do
     ( m,
       WeakTermPi
         [ (m, sigVar, (m, WeakTermTau)),
-          (m, h, (m, WeakTermPi xts (m, WeakTermVar VarKindLocal sigVar)))
+          (m, h, (m, WeakTermPi xts (weakVar' m sigVar)))
         ]
-        (m, WeakTermVar VarKindLocal sigVar)
+        (weakVar' m sigVar)
     )
 
 castFromNoema :: WeakTermPlus -> WeakTermPlus -> WeakTermPlus -> WeakTermPlus
@@ -820,7 +820,7 @@ castFromNoema subject baseType tree = do
   let m = fst tree
   ( m,
     WeakTermPiElim
-      (m, WeakTermVar VarKindLocal (asIdent "unsafe.cast"))
+      (weakVar m "unsafe.cast")
       [ wrapWithNoema subject baseType,
         baseType,
         tree
@@ -832,7 +832,7 @@ castToNoema subject baseType tree = do
   let m = fst tree
   ( m,
     WeakTermPiElim
-      (m, WeakTermVar VarKindLocal (asIdent "unsafe.cast"))
+      (weakVar m "unsafe.cast")
       [ baseType,
         wrapWithNoema subject baseType,
         tree
@@ -842,7 +842,7 @@ castToNoema subject baseType tree = do
 wrapWithNoema :: WeakTermPlus -> WeakTermPlus -> WeakTermPlus
 wrapWithNoema subject baseType = do
   let m = fst baseType
-  (m, WeakTermPiElim (m, WeakTermVar VarKindLocal (asIdent "noema")) [subject, baseType])
+  (m, WeakTermPiElim (weakVar m "noema") [subject, baseType])
 
 doNotCare :: Hint -> WeakTermPlus
 doNotCare m =
