@@ -188,20 +188,20 @@ weakTermEnumElim = do
 
 weakTermEnumClause :: IO (EnumCasePlus, WeakTermPlus)
 weakTermEnumClause = do
-  headSymbol <- lookAhead symbol
-  if headSymbol == "end"
-    then raiseParseError "end"
-    else do
-      m <- currentHint
-      token "-"
-      c <- symbol
-      token "->"
-      body <- weakTerm
-      case c of
-        "default" ->
-          return ((m, EnumCaseDefault), body)
-        _ ->
-          return ((m, EnumCaseLabel c), body)
+  -- headSymbol <- lookAhead symbol
+  -- if headSymbol == "end"
+  --   then raiseParseError "end"
+  --   else do
+  m <- currentHint
+  token "-"
+  c <- symbol
+  token "->"
+  body <- weakTerm
+  case c of
+    "default" ->
+      return ((m, EnumCaseDefault), body)
+    _ ->
+      return ((m, EnumCaseLabel c), body)
 
 -- question e
 weakTermQuestion :: IO WeakTermPlus
@@ -227,7 +227,7 @@ weakTermDerangementNop = do
 
 weakTermDerangementKind :: IO Derangement
 weakTermDerangementKind = do
-  s <- saveState
+  m <- currentHint
   headSymbol <- symbol
   case headSymbol of
     "nop" ->
@@ -251,12 +251,11 @@ weakTermDerangementKind = do
       f <- symbol
       return $ DerangementExternal f
     _ -> do
-      loadState s
-      raiseParseError "derangement"
+      raiseParseError m "invalid derangement kind"
 
 weakTermDerangementKind' :: IO Derangement
 weakTermDerangementKind' = do
-  s <- saveState
+  m <- currentHint
   headSymbol <- symbol
   case headSymbol of
     "store" -> do
@@ -278,13 +277,12 @@ weakTermDerangementKind' = do
       f <- symbol
       return $ DerangementExternal f
     _ -> do
-      loadState s
-      raiseParseError "derangement"
+      raiseParseError m "invalid derangement kind"
 
 -- t ::= i{n} | f{n} | pointer t | array INT t | struct t ... t
 lowType :: IO LowType
 lowType = do
-  s <- saveState
+  m <- currentHint
   headSymbol <- symbol
   case headSymbol of
     "pointer" -> do
@@ -303,35 +301,35 @@ lowType = do
       | Just size <- asLowFloat headSymbol ->
         return $ LowTypeFloat size
       | otherwise -> do
-        loadState s
-        raiseParseError "lowType"
+        raiseParseError m "lowType"
 
 lowTypeSimple :: IO LowType
 lowTypeSimple = do
   tryPlanList
     [ betweenParen lowType,
       lowTypeInt,
-      lowTypeFloat,
-      raiseParseError "lowTypeSimple"
+      lowTypeFloat
     ]
 
 lowTypeInt :: IO LowType
 lowTypeInt = do
+  m <- currentHint
   headSymbol <- symbol
   case asLowInt headSymbol of
     Just size ->
       return $ LowTypeInt size
     Nothing ->
-      raiseParseError "lowTypeInt"
+      raiseParseError m "lowTypeInt"
 
 lowTypeFloat :: IO LowType
 lowTypeFloat = do
+  m <- currentHint
   headSymbol <- symbol
   case asLowFloat headSymbol of
     Just size ->
       return $ LowTypeFloat size
     Nothing ->
-      raiseParseError "lowTypeFloat"
+      raiseParseError m "lowTypeFloat"
 
 weakTermMatch :: IO WeakTermPlus
 weakTermMatch = do
@@ -359,15 +357,15 @@ weakTermMatchNoetic = do
 
 weakTermMatchClause :: IO (WeakPattern, WeakTermPlus)
 weakTermMatchClause = do
-  headSymbol <- lookAhead symbol
-  -- fixme: このendって不要な気がする。どうせsymbolが失敗するでしょう？
-  if headSymbol == "end"
-    then raiseParseError "end"
-    else do
-      token "-"
-      pat <- weakTermPattern
-      body <- weakTerm
-      return (pat, body)
+  -- headSymbol <- lookAhead symbol
+  -- -- fixme: このendって不要な気がする。どうせsymbolが失敗するでしょう？
+  -- if headSymbol == "end"
+  --   then raiseParseError "end"
+  --   else do
+  token "-"
+  pat <- weakTermPattern
+  body <- weakTerm
+  return (pat, body)
 
 modifyWeakPattern :: WeakTermPlus -> (WeakPattern, WeakTermPlus) -> (WeakPattern, WeakTermPlus)
 modifyWeakPattern s ((m, a, xts), body) =
@@ -690,7 +688,7 @@ lowTypeToWeakTerm m t =
     LowTypeFloat s ->
       return (m, WeakTermConst (showFloatSize s))
     _ ->
-      raiseParseError "invalid argument passed to lowTypeToType"
+      raiseParseError m "invalid argument passed to lowTypeToType"
 
 annotate :: WeakTermPlus -> WeakTermPlus -> IO WeakTermPlus
 annotate t e = do
@@ -724,14 +722,14 @@ annotate t e = do
 -- undefined
 
 lowTypeToArrayKindText :: Hint -> LowType -> IO T.Text
-lowTypeToArrayKindText _ t =
+lowTypeToArrayKindText m t =
   case t of
     LowTypeInt size ->
       return $ showIntSize size
     LowTypeFloat size ->
       return $ showFloatSize size
     _ -> do
-      raiseParseError "unsupported array kind"
+      raiseParseError m "unsupported array kind"
 
 intTerm :: Hint -> Integer -> WeakTermPlus
 intTerm m i =
@@ -789,7 +787,7 @@ weakSimpleIdent = do
   m <- currentHint
   x <- simpleSymbol
   if isKeyword x
-    then raiseParseError $ "found a keyword `" <> x <> "`, expecting a variable"
+    then raiseParseError m $ "found a keyword `" <> x <> "`, expecting a variable"
     else return (m, asIdent x)
 
 var :: IO (Hint, T.Text)
@@ -797,7 +795,7 @@ var = do
   m <- currentHint
   x <- symbol
   if isKeyword x
-    then raiseParseError $ "found a reserved symbol `" <> x <> "`, expecting a variable"
+    then raiseParseError m $ "found a reserved symbol `" <> x <> "`, expecting a variable"
     else return (m, x)
 
 varText :: IO T.Text
@@ -813,7 +811,7 @@ weakTermBuiltin = do
       target <- getTarget
       return (m, WeakTermVar VarKindLocal (asIdent $ "target" <> nsSep <> target))
     _ ->
-      raiseParseError $ "no such builtin constant: " <> x
+      raiseParseError m $ "no such builtin constant: " <> x
 
 weakTermVar :: IO WeakTermPlus
 weakTermVar = do
@@ -849,12 +847,13 @@ weakTermInteger = do
 
 integer :: IO Integer
 integer = do
+  m <- currentHint
   x <- symbol
   case readMaybe (T.unpack x) of
     Just intValue ->
       return intValue
     Nothing ->
-      raiseParseError $ "unexpected symbol: " <> x <> "\n expecting: an integer"
+      raiseParseError m $ "unexpected symbol: " <> x <> "\n expecting: an integer"
 
 weakTermFloat :: IO WeakTermPlus
 weakTermFloat = do
@@ -865,7 +864,7 @@ weakTermFloat = do
       h <- newAster m
       return (m, WeakTermFloat h floatValue)
     Nothing ->
-      raiseParseError $ "unexpected symbol: " <> x <> "\n expecting: an integer"
+      raiseParseError m $ "unexpected symbol: " <> x <> "\n expecting: an integer"
 
 toSigma :: Hint -> [WeakIdentPlus] -> IO WeakTermPlus
 toSigma m xts = do

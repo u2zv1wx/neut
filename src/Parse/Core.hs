@@ -71,17 +71,19 @@ betweenParen f = do
 
 token :: T.Text -> IO ()
 token expected = do
+  m <- currentHint
   actual <- symbol
   if actual == expected
     then return ()
-    else raiseParseError $ "found an unexpected token `" <> actual <> "`, expecting: " <> expected
+    else raiseParseError m $ "found an unexpected token `" <> actual <> "`, expecting: " <> expected
 
 char :: Char -> IO ()
 char c = do
+  m <- currentHint
   s <- readIORef text
   case T.uncons s of
     Nothing ->
-      raiseParseError $
+      raiseParseError m $
         "unexpected end of input\nexpecting: '" <> T.singleton c <> "'"
     Just (c', rest)
       | c == c' ->
@@ -89,7 +91,7 @@ char c = do
           then updateStreamL rest
           else updateStreamC 1 rest
       | otherwise ->
-        raiseParseError $
+        raiseParseError m $
           "unexpected character: '"
             <> T.singleton c'
             <> "'\nexpecting: '"
@@ -142,8 +144,9 @@ many1 f = do
 tryPlanList :: [IO a] -> IO a
 tryPlanList planList =
   case planList of
-    [] ->
-      raiseParseError "empty planList"
+    [] -> do
+      m <- currentHint
+      raiseCritical m "Parse.Core.tryPlanList: this function shouldn't be called for the empty list"
     [f] ->
       f
     f : fs -> do
@@ -172,13 +175,14 @@ sepBy2 f sep = do
 
 symbol :: IO T.Text
 symbol = do
+  m <- currentHint
   s <- readIORef text
   let x = T.takeWhile isSymbolChar s
   let rest = T.dropWhile isSymbolChar s
   updateStreamC (T.length x) rest
   skip
   if T.null x
-    then raiseParseError "empty symbol"
+    then raiseParseError m "unexpected non-symbol character, expecting: symbol-character"
     else return x
 
 symbolMaybe :: IO (Maybe T.Text)
@@ -194,13 +198,14 @@ symbolMaybe = do
 
 simpleSymbol :: IO T.Text
 simpleSymbol = do
+  m <- currentHint
   s <- readIORef text
   let x = T.takeWhile isSimpleSymbolChar s
   let rest = T.dropWhile isSimpleSymbolChar s
   updateStreamC (T.length x) rest
   skip
   if T.null x
-    then raiseParseError "empty symbol"
+    then raiseParseError m "unexpected non-symbol character, expecting: symbol-character"
     else return x
 
 string :: IO T.Text
@@ -216,8 +221,9 @@ string = do
 stringLengthOf :: EscapeFlag -> T.Text -> Int -> IO Int
 stringLengthOf flag s i =
   case T.uncons s of
-    Nothing ->
-      raiseParseError "unexpected end of input while parsing string"
+    Nothing -> do
+      m <- currentHint
+      raiseParseError m "unexpected end of input while parsing string"
     Just (c, rest)
       | c == '"' -> do
         incrementColumn
@@ -294,9 +300,8 @@ incrementColumn :: IO ()
 incrementColumn =
   modifyIORef' column $ \x -> 1 + x
 
-raiseParseError :: T.Text -> IO a
-raiseParseError txt = do
-  m <- currentHint
+raiseParseError :: Hint -> T.Text -> IO a
+raiseParseError m txt =
   throw $ Error [logError (getPosInfo m) txt]
 
 -- asKeyword :: T.Text -> Maybe Keywordみたいにすべきかも。
