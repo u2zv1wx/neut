@@ -129,7 +129,6 @@ stmtDefine isReducible = do
   if isReducible
     then token "define"
     else token "define-opaque"
-  -- token "define" -- fixme: define-opaque
   (mFun, funName) <- var
   funName' <- withSectionPrefix funName
   argList <- many weakIdentPlus
@@ -218,7 +217,6 @@ stmtEnsure = do
   isAlreadyInstalled <- doesDirExist pkgStrDirPath
   when (not isAlreadyInstalled) $ do
     ensureDir pkgStrDirPath
-    -- urlStr' <- readStrOrThrow mUrl urlStr
     let urlStr' = T.unpack urlStr
     p urlStr'
     let curlCmd = proc "curl" ["-s", "-S", "-L", urlStr']
@@ -233,16 +231,6 @@ stmtEnsure = do
     note' $ "extracting " <> pkgStr <> " into " <> T.pack (toFilePath pkgStrDirPath)
     tarExitCode <- waitForProcess tarHandler
     raiseIfFailure mUrl "tar" tarExitCode tarErrorHandler pkgStrDirPath
-
--- readStrOrThrow :: Hint -> T.Text -> IO String
--- readStrOrThrow m quotedStr =
---   case readMaybe (T.unpack $ "\"" <> quotedStr) of
---     Nothing -> do
---       p' quotedStr
---       p' (T.unpack quotedStr)
---       raiseError m "the atom here must be a string"
---     Just str ->
---       return str
 
 raiseIfFailure :: Hint -> String -> ExitCode -> Handle -> Path Abs Dir -> IO ()
 raiseIfFailure m procName exitCode h pkgDirPath =
@@ -552,53 +540,6 @@ stmtDefineResourceType = do
         ]
     )
 
--- defineFunction
---   True
---   m
---   mFun
---   name
---   []
---   (m, WeakTermTau)
---   ( m,
---     WeakTermPiElim
---       (weakVar m "unsafe.cast")
---       [ ( m,
---           WeakTermPi
---             [ (m, flag, weakVar m "bool"),
---               (m, value, weakVar m "unsafe.pointer")
---             ]
---             (weakVar m "unsafe.pointer")
---         ),
---         (m, WeakTermTau),
---         ( m,
---           WeakTermPiIntro
---             OpacityTransparent
---             LamKindResourceHandler
---             [ (m, flag, (weakVar m "bool")),
---               (m, value, (weakVar m "unsafe.pointer"))
---             ]
---             ( m,
---               WeakTermEnumElim
---                 ((weakVar m (asText flag)), (weakVar m "bool"))
---                 [ ( (m, EnumCaseLabel "bool.true"),
---                     (m, WeakTermPiElim copier [weakVar m (asText value)])
---                   ),
---                   ( (m, EnumCaseLabel "bool.false"),
---                     ( m,
---                       WeakTermPiElim
---                         (weakVar m "unsafe.cast")
---                         [ (weakVar m "top"),
---                           (weakVar m "unsafe.pointer"),
---                           (m, WeakTermPiElim discarder [weakVar m (asText value)])
---                         ]
---                     )
---                   )
---                 ]
---             )
---         )
---       ]
---   )
-
 weakTermToWeakIdent :: Hint -> IO WeakTermPlus -> IO WeakIdentPlus
 weakTermToWeakIdent m f = do
   a <- f
@@ -608,9 +549,7 @@ weakTermToWeakIdent m f = do
 
 setAsData :: T.Text -> Int -> [(Hint, T.Text, [WeakIdentPlus])] -> IO ()
 setAsData a i bts = do
-  -- let proj (_, y, _) = y
   let bs = map (\(_, b, _) -> a <> nsSep <> b) bts
-  -- bs <- mapM (withSectionPrefix . proj) bts
   modifyIORef' dataEnv $ \env -> Map.insert a bs env
   forM_ (zip bs [0 ..]) $ \(x, k) ->
     modifyIORef' constructorEnv $ \env -> Map.insert x (i, k) env
