@@ -362,7 +362,7 @@ stmtDefineData = do
 defineData :: Hint -> Hint -> T.Text -> [WeakIdentPlus] -> [(Hint, T.Text, [WeakIdentPlus])] -> IO [WeakStmt]
 defineData m mFun a xts bts = do
   setAsData a (length xts) bts
-  z <- newIdentFromText "cod"
+  z <- newTextualIdentFromText "cod"
   let lamArgs = (m, z, (m, WeakTermTau)) : map (toPiTypeWith z) bts
   let baseType = (m, WeakTermPi lamArgs (m, WeakTermVar VarKindLocal z))
   case xts of
@@ -491,8 +491,8 @@ stmtDefineResourceType = do
   name <- varText >>= withSectionPrefix
   discarder <- weakTermSimple
   copier <- weakTermSimple
-  flag <- newIdentFromText "flag"
-  value <- newIdentFromText "value"
+  flag <- newTextualIdentFromText "flag"
+  value <- newTextualIdentFromText "value"
   defineTerm
     True
     m
@@ -537,13 +537,6 @@ stmtDefineResourceType = do
           )
         ]
     )
-
-weakTermToWeakIdent :: Hint -> IO WeakTermPlus -> IO WeakIdentPlus
-weakTermToWeakIdent m f = do
-  a <- f
-  txt <- newText
-  h <- newIdentFromText txt
-  return (m, h, a)
 
 setAsData :: T.Text -> Int -> [(Hint, T.Text, [WeakIdentPlus])] -> IO ()
 setAsData a i bts = do

@@ -49,17 +49,13 @@ weakTerm = do
       weakTermLetCoproduct
     Just "if" ->
       weakTermIf
-    Just "sigma" ->
-      weakTermSigma
-    Just "product" ->
-      weakTermProduct
     Just "idealize" ->
       weakTermIdealize
     Just "new-array" ->
       weakTermArrayIntro
     _ ->
       tryPlanList
-        [ weakTermArrow,
+        [ weakTermDep,
           weakTermAux
         ]
 
@@ -72,7 +68,7 @@ weakTermTau = do
 weakTermAster :: IO WeakTermPlus
 weakTermAster = do
   m <- currentHint
-  token "*"
+  token "?"
   h <- newAster m
   return h
 
@@ -109,19 +105,39 @@ weakTermPiIntroFix = do
 weakTermAux :: IO WeakTermPlus
 weakTermAux = do
   m <- currentHint
-  e <- weakTermSimple
+  xt@(_, _, e) <- weakTermToWeakIdent m $ weakTermSimple
+  tryPlanList
+    [ weakTermPi m xt,
+      weakTermSigma m xt,
+      weakTermApp m e
+    ]
+
+weakTermPi :: Hint -> WeakIdentPlus -> IO WeakTermPlus
+weakTermPi m xt = do
+  xts <- many1 $ (token "->" >> weakTermArrowItem)
+  let (_, _, cod) = last xts
+  return (m, WeakTermPi (xt : init xts) cod)
+
+weakTermSigma :: Hint -> WeakIdentPlus -> IO WeakTermPlus
+weakTermSigma m xt = do
+  xts <- many1 $ (token "*" >> weakTermArrowItem)
+  toSigma m $ xt : xts
+
+weakTermApp :: Hint -> WeakTermPlus -> IO WeakTermPlus
+weakTermApp m e = do
   es <- many weakTermSimple
   if null es
     then return e
     else return (m, WeakTermPiElim e es)
 
-weakTermArrow :: IO WeakTermPlus
-weakTermArrow = do
+weakTermDep :: IO WeakTermPlus
+weakTermDep = do
   m <- currentHint
-  xt <- weakTermArrowItem
-  xts <- many1 $ (token "->" >> weakTermArrowItem)
-  let (_, _, cod) = last xts
-  return (m, WeakTermPi (xt : init xts) cod)
+  xt <- weakAscription
+  tryPlanList
+    [ weakTermPi m xt,
+      weakTermSigma m xt
+    ]
 
 weakTermArrowItem :: IO WeakIdentPlus
 weakTermArrowItem = do
@@ -129,8 +145,8 @@ weakTermArrowItem = do
     [ weakAscription,
       do
         m <- currentHint
-        a <- tryPlanList [weakTermAux, weakTermTau, weakTermVar]
-        h <- newIdentFromText "_"
+        a <- tryPlanList [weakTermSimple >>= weakTermApp m, weakTermTau, weakTermVar]
+        h <- newTextualIdentFromText "_"
         return (m, h, a)
     ]
 
@@ -386,7 +402,7 @@ weakTermLetCoproduct = do
   e1 <- weakTerm
   token "in"
   e2 <- weakTerm
-  err <- newIdentFromText "err"
+  err <- newTextualIdentFromText "err"
   typeOfLeft <- newAster m
   typeOfRight <- newAster m
   let sumLeft = asIdent "sum.left"
@@ -464,26 +480,6 @@ foldIf m ifCond ifBody elseIfList elseBody =
             ]
         )
 
--- sigma (x1 : A1) ... (xn : An). B
-weakTermSigma :: IO WeakTermPlus
-weakTermSigma = do
-  m <- currentHint
-  token "sigma"
-  varList <- many weakIdentPlus
-  char '.' >> skip
-  cod <- weakTerm
-  h <- newIdentFromText "_"
-  toSigma m $ varList ++ [(m, h, cod)]
-
--- product e1 ... en
-weakTermProduct :: IO WeakTermPlus
-weakTermProduct = do
-  m <- currentHint
-  token "product"
-  ts <- many weakTermSimple
-  xs <- mapM (const $ newIdentFromText "_") ts
-  toSigma m $ zipWith (\x t -> (m, x, t)) xs ts
-
 -- (e1, ..., en) (n >= 2)
 weakTermSigmaIntro :: IO WeakTermPlus
 weakTermSigmaIntro = do
@@ -491,11 +487,11 @@ weakTermSigmaIntro = do
   betweenParen $ do
     es <- sepBy2 weakTerm (char ',' >> skip)
     xts <- forM es $ \_ -> do
-      x <- newIdentFromText "_"
+      x <- newTextualIdentFromText "_"
       t <- newAster m
       return (m, x, t)
-    sigVar <- newIdentFromText "sigvar"
-    k <- newIdentFromText "sig-k"
+    sigVar <- newTextualIdentFromText "sigvar"
+    k <- newTextualIdentFromText "sig-k"
     return $
       lam
         m
@@ -545,10 +541,10 @@ weakTermArrayIntro = do
   token "new-array"
   t <- lowTypeSimple
   es <- many weakTermSimple
-  arr <- newIdentFromText "arr"
-  ptr <- newIdentFromText "ptr"
-  h1 <- newIdentFromText "_"
-  h2 <- newIdentFromText "_"
+  arr <- newTextualIdentFromText "arr"
+  ptr <- newTextualIdentFromText "ptr"
+  h1 <- newTextualIdentFromText "_"
+  h2 <- newTextualIdentFromText "_"
   let ptrType = weakVar m "unsafe.pointer"
   let topType = weakVar m "top"
   arrText <- lowTypeToArrayKindText m t
@@ -575,7 +571,7 @@ lowTypeToWeakTerm m t =
 annotate :: WeakTermPlus -> WeakTermPlus -> IO WeakTermPlus
 annotate t e = do
   let m = fst e
-  h <- newIdentFromText "_"
+  h <- newTextualIdentFromText "_"
   return $ bind m (m, h, t) e $ weakVar m (asText h)
 
 lowTypeToArrayKindText :: Hint -> LowType -> IO T.Text
@@ -733,8 +729,8 @@ weakTermFloat = do
 
 toSigma :: Hint -> [WeakIdentPlus] -> IO WeakTermPlus
 toSigma m xts = do
-  sigVar <- newIdentFromText "sig"
-  h <- newIdentFromText "_"
+  sigVar <- newTextualIdentFromText "sig"
+  h <- newTextualIdentFromText "_"
   return
     ( m,
       WeakTermPi

@@ -2,13 +2,13 @@ include "../../foundation.neut"
 
 reduce tau
 
-define f (x : i64) : * =
+define f (x : i64) : ? =
   add-i64 x 1
 
-define g (x : f32) : * =
+define g (x : f32) : ? =
   fadd-f32 x 3.288
 
-define h (foo : i64) : * =
+define h (foo : i64) : ? =
   add-i64 (question foo) foo
 
 reduce
@@ -56,7 +56,7 @@ reduce
 define use-admit : top -> bool -> i64 =
   admit
 
-define use-admit-question : top -> bool -> i64 =
+define use-admit-question : i64 =
   ?admit
 
 reduce
@@ -131,6 +131,6 @@ define length-noetic-internal (s : subject) (a : tau) (xs : noema s (list a)) (a
   end
 
 reduce
-  let xs = list.cons i64 1 (list.cons * 2 (list.cons * 3 (list.nil *))) in
+  let xs = list.cons i64 1 (list.cons ? 2 (list.cons ? 3 (list.nil ?))) in
   idealize xs over s in
   length-noetic-internal s i64 xs 0

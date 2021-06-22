@@ -1,11 +1,11 @@
 include "../../../foundation.neut"
 
 reduce
-  let x : * = tau in x
+  let x : ? = tau in x
 
 reduce
   lambda (x : i64).
-    let y : * = x in
+    let y : ? = x in
     y
 
 define f (x : tau) : tau =
@@ -38,4 +38,4 @@ reduce
   top
 
 reduce
-  (lambda (x : *). x) top.unit
+  (lambda (x : ?). x) top.unit

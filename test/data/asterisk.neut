@@ -1,9 +1,9 @@
 include "../header.neut"
 
-define x : * =
+define x : ? =
   let a : i64 = 1 in
   a
 
-define y : * =
-  let z : * = x in
+define y : ? =
+  let z : ? = x in
   z

@@ -38,6 +38,6 @@ define xs : my-list i64 =
   my-list.cons i64 0 (my-list.cons i64 1 (my-list.cons i64 2 (my-list.nil i64)))
 
 reduce
-  i64.print (length * xs)
+  i64.print (length ? xs)
 
 end hidden

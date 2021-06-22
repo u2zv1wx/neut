@@ -1,22 +1,28 @@
 include "../header.neut"
 
-define a2 : product i64 i64 =
+define a2 : i64 * i64 =
   (2, 2)
 
 reduce
   let (x, _) = a2 in
   i64.print x
 
-define a3 : sigma (a : tau). a =
+define a3 : (a : tau) * a =
   (i64, 2)
 
 reduce
   let (_, _) = a3 in
   i64.print 3
 
-define a4 : product i8 i64 i64 i3 =
+define a4 : i8 * i64 * i64 * i3 =
   (4, 4, 4, 4)
 
 reduce
   let (_, _, i, _) = a4 in
   i64.print i
+
+define a5 : (a : i32) * i64 * i64 * i3 =
+  (4, 4, 4, 4)
+
+define a6 : (a : tau) * a =
+  (i64, 4)

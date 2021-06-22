@@ -343,6 +343,8 @@ keywordSet =
       ":",
       "<-",
       "=",
+      "*",
+      "?",
       "?admit",
       "admit",
       "define",
@@ -358,6 +360,7 @@ keywordSet =
       "else-if",
       "end",
       "ensure",
+      "hole",
       "idealize",
       "if",
       "in",
@@ -393,3 +396,21 @@ weakVar' m ident =
 lam :: Hint -> [WeakIdentPlus] -> WeakTermPlus -> WeakTermPlus
 lam m varList e =
   (m, WeakTermPiIntro OpacityTransparent LamKindNormal varList e)
+
+newTextualIdentFromText :: T.Text -> IO Ident
+newTextualIdentFromText txt = do
+  i <- newCount
+  newIdentFromText $ ";" <> txt <> T.pack (show i)
+
+-- newIdent :: IO Ident
+-- newIdent = do
+--   newText >>= newIdentFromText
+
+weakTermToWeakIdent :: Hint -> IO WeakTermPlus -> IO WeakIdentPlus
+weakTermToWeakIdent m f = do
+  a <- f
+  h <- newTextualIdentFromText "_"
+  -- h <- newIdent
+  -- txt <- newText
+  -- h <- newIdentFromText txt
+  return (m, h, a)

@@ -17,10 +17,10 @@ define fs3 : f64-array =
 
 define l (xs : i64-array) : i64 =
   idealize xs over s in
-  let a = i64-array-access * xs 0 in
-  let b = i64-array-access * xs 1 in
-  let c = i64-array-access * xs 2 in
-  let d = i64-array-access * xs 3 in
+  let a = i64-array-access ? xs 0 in
+  let b = i64-array-access ? xs 1 in
+  let c = i64-array-access ? xs 2 in
+  let d = i64-array-access ? xs 3 in
   add-i64 a (add-i64 b (add-i64 c d))
 
 -- こう書くと壊れる：

@@ -222,6 +222,12 @@ newText = do
   i <- newCount
   return $ ";" <> T.pack (show i)
 
+{-# INLINE newTextFromText #-}
+newTextFromText :: T.Text -> IO T.Text
+newTextFromText txt = do
+  i <- newCount
+  return $ ";" <> txt <> T.pack (show i)
+
 {-# INLINE newAster #-}
 newAster :: Hint -> IO WeakTermPlus
 newAster m = do
