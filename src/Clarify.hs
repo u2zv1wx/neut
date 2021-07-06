@@ -109,7 +109,8 @@ clarifyTerm tenv term =
         clauseClosure <- returnClosure tenv True LamKindNormal fvs mPat xts body'
         closureArgs <- constructClauseArguments clauseClosure i $ length patList
         let (argVarNameList, argList, argVarList) = unzip3 (resultArg : closureArgs)
-        let consName = wrapWithQuote $ if isJust mSubject then asText constructorName <> ";noetic" else asText constructorName
+        let constructorName' = asText constructorName <> ";cons"
+        let consName = wrapWithQuote $ if isJust mSubject then constructorName' <> ";noetic" else constructorName'
         return $
           ( EnumCaseInt i,
             bindLet
@@ -239,14 +240,15 @@ returnClosure tenv isReducible kind fvs m xts e = do
   case kind of
     LamKindNormal -> do
       i <- newCount
-      let name = "thunk-" <> T.pack (show i)
+      let name = "thunk;" <> T.pack (show i)
       registerIfNecessary m name isReducible False xts'' fvs'' e
       return (m, CompUpIntro (m, ValueSigmaIntro [fvEnvSigma, fvEnv, (m, ValueVarGlobal (wrapWithQuote name))]))
     LamKindCons _ consName -> do
       cenv <- readIORef constructorEnv
       case Map.lookup consName cenv of
         Just (_, constructorNumber) -> do
-          registerIfNecessary m consName isReducible True xts'' fvs'' e
+          let consName' = consName <> ";cons"
+          registerIfNecessary m consName' isReducible True xts'' fvs'' e
           return (m, CompUpIntro (m, ValueSigmaIntro [fvEnvSigma, fvEnv, (m, ValueInt 64 (toInteger constructorNumber))]))
         Nothing ->
           raiseCritical m $ "no such constructor is registered: `" <> consName <> "`"
@@ -261,7 +263,7 @@ returnClosure tenv isReducible kind fvs m xts e = do
         raiseError m "this resource-lambda is not closed"
       e' <- linearize xts'' e >>= reduceCompPlus
       i <- newCount
-      let name = "resource-handler-" <> T.pack (show i)
+      let name = "resource-handler;" <> T.pack (show i)
       insDefEnv (wrapWithQuote name) isReducible (map fst xts'') e'
       return (m, CompUpIntro (m, ValueVarGlobal (wrapWithQuote name)))
 

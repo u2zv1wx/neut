@@ -37,7 +37,7 @@ sigmaS4 ::
 sigmaS4 mName m mxts =
   case mName of
     Nothing -> do
-      h <- toGlobalVarName <$> newIdentFromText "sigma"
+      h <- wrapWithQuote <$> newText
       registerSwitcher m h (sigmaT m mxts) (sigma4 m mxts)
       return (m, ValueVarGlobal h)
     Just name ->
