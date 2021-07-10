@@ -34,7 +34,13 @@ clarifyStmt tenv ss =
   case ss of
     [] -> do
       m <- newHint 1 1 <$> getCurrentFilePath
-      return (m, CompUpIntro (m, ValueInt 64 0))
+      denv <- readIORef defEnv
+      case Map.lookup (wrapWithQuote "main") denv of
+        Nothing ->
+          raiseError m "`main` is missing"
+        _ ->
+          return ()
+      return (m, CompPiElimDownElim (m, ValueVarGlobal (wrapWithQuote "main")) [])
     StmtDef m mx t e : cont -> do
       case mx of
         Just x -> do
@@ -42,13 +48,15 @@ clarifyStmt tenv ss =
           insDefEnv (toGlobalVarName x) True [] e'
           clarifyStmt (insTypeEnv [(m, x, t)] tenv) cont
         Nothing -> do
-          e' <- clarifyTerm tenv e
-          result <- newIdentFromText "result"
-          cont' <- clarifyStmt tenv cont
-          t' <- clarifyTerm tenv t
-          discardResult <- toAffineApp m result t'
-          hole <- newIdentFromText "unit"
-          return (m, CompUpElim result e' (m, CompUpElim hole discardResult cont'))
+          raiseError m "reduce"
+
+-- e' <- clarifyTerm tenv e
+-- result <- newIdentFromText "result"
+-- cont' <- clarifyStmt tenv cont
+-- t' <- clarifyTerm tenv t
+-- discardResult <- toAffineApp m result t'
+-- hole <- newIdentFromText "unit"
+-- return (m, CompUpElim result e' (m, CompUpElim hole discardResult cont'))
 
 clarifyTerm :: TypeEnv -> TermPlus -> IO CompPlus
 clarifyTerm tenv term =

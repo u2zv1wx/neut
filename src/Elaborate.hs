@@ -34,6 +34,11 @@ elaborateStmt' stmt =
       (e', te) <- infer e
       t' <- inferType t
       insConstraintEnv te t'
+      case mx of
+        Just (_, I ("main", _)) ->
+          insConstraintEnv t (m, WeakTermEnum "top")
+        _ ->
+          return ()
       -- cs <- readIORef constraintEnv
       -- p "==========================================================="
       -- forM_ cs $ \(e1, e2) -> do
