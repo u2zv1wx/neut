@@ -53,7 +53,7 @@ type IdentDef =
   (Ident, Def)
 
 data WeakStmt
-  = WeakStmtDef Hint (Maybe (IsReducible, Ident)) WeakTermPlus WeakTermPlus
+  = WeakStmtDef Hint (IsReducible, Ident) WeakTermPlus WeakTermPlus
   deriving (Show)
 
 type Constraint =

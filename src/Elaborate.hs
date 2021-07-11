@@ -30,15 +30,12 @@ elaborateStmt' stmt =
   case stmt of
     [] -> do
       return []
-    WeakStmtDef m mx t e : cont -> do
+    WeakStmtDef m (isReducible, x) t e : cont -> do
       (e', te) <- infer e
       t' <- inferType t
       insConstraintEnv te t'
-      case mx of
-        Just (_, I ("main", _)) ->
-          insConstraintEnv t (m, WeakTermEnum "top")
-        _ ->
-          return ()
+      when (asText x == "main") $
+        insConstraintEnv t (m, WeakTermEnum "top")
       -- cs <- readIORef constraintEnv
       -- p "==========================================================="
       -- forM_ cs $ \(e1, e2) -> do
@@ -48,17 +45,12 @@ elaborateStmt' stmt =
       unify
       e'' <- elaborate' e'
       t'' <- elaborate' t' >>= reduceTermPlus
-      case mx of
-        Just (isReducible, x) -> do
-          insWeakTypeEnv x $ weaken t''
-          modifyIORef' substEnv $ \env -> IntMap.insert (asInt x) (weaken e'') env
-          when (not isReducible) $
-            modifyIORef' opaqueEnv $ \env -> S.insert x env
-          cont' <- elaborateStmt' cont
-          return $ StmtDef m (Just x) t'' e'' : cont'
-        Nothing -> do
-          cont' <- elaborateStmt' cont
-          return $ StmtDef m Nothing t'' e'' : cont'
+      insWeakTypeEnv x $ weaken t''
+      modifyIORef' substEnv $ \env -> IntMap.insert (asInt x) (weaken e'') env
+      when (not isReducible) $
+        modifyIORef' opaqueEnv $ \env -> S.insert x env
+      cont' <- elaborateStmt' cont
+      return $ StmtDef m x t'' e'' : cont'
 
 elaborate' :: WeakTermPlus -> IO TermPlus
 elaborate' term =

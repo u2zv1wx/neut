@@ -11,10 +11,15 @@ define item : pohe i64 =
     20
     top.unit
 
-reduce
-  i64.print (pohe.item-1 i64 item)
+-- reduce
+--   i64.print (pohe.item-1 i64 item)
 
-reduce
-  i64.print (pohe.item-2 i64 item)
+-- reduce
+--   i64.print (pohe.item-2 i64 item)
+
+define main : top =
+  let _ = i64.print (pohe.item-1 i64 item) in
+  let _ = i64.print (pohe.item-2 i64 item) in
+  top.unit
 
 define-codata empty

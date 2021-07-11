@@ -45,7 +45,7 @@ type TypeEnv =
   IntMap.IntMap TermPlus
 
 data Stmt
-  = StmtDef Hint (Maybe Ident) TermPlus TermPlus
+  = StmtDef Hint Ident TermPlus TermPlus
   deriving (Show)
 
 asVar :: TermPlus -> Maybe Ident

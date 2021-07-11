@@ -76,11 +76,8 @@ stmt = do
         Just "define-enum" -> do
           stmtDefineEnum
           stmt
-        Just "reduce" -> do
-          def <- stmtReduce
-          stmtList <- stmt
-          return $ def : stmtList
         Just "include" ->
+          -- raiseParseError m "`include` can only be used at the header section of a file"
           stmtInclude
         Just "define-data" -> do
           stmtList1 <- stmtDefineData
@@ -113,10 +110,12 @@ stmt = do
         Just "unuse" -> do
           stmtUnuse
           stmt
-        _ -> do
-          def <- stmtAux
-          defList <- stmt
-          return $ def : defList
+        Just x -> do
+          m <- currentHint
+          raiseParseError m $ "invalid statement: " <> x
+        Nothing -> do
+          m <- currentHint
+          raiseParseError m $ "found the empty symbol when expecting a statement"
 
 --
 -- parser for statements
@@ -147,13 +146,13 @@ defineFunction isReducible m mFun funName' argList codType e = do
   let piType = (m, WeakTermPi argList codType)
   (_, funName'', piType') <- discernIdentPlus (m, asIdent funName', piType)
   e' <- discern (m, WeakTermPiIntro OpacityTranslucent (LamKindFix (mFun, asIdent funName', piType)) argList e)
-  return $ WeakStmtDef m (Just (isReducible, funName'')) piType' e'
+  return $ WeakStmtDef m (isReducible, funName'') piType' e'
 
 defineTerm :: IsReducible -> Hint -> T.Text -> WeakTermPlus -> WeakTermPlus -> IO WeakStmt
 defineTerm isReducible m funName' codType e = do
   (_, funName'', codType') <- discernIdentPlus (m, asIdent funName', codType)
   e' <- discern e
-  return $ WeakStmtDef m (Just (isReducible, funName'')) codType' e'
+  return $ WeakStmtDef m (isReducible, funName'') codType' e'
 
 stmtDefineEnum :: IO ()
 stmtDefineEnum = do
@@ -196,14 +195,6 @@ stmtDefineEnumClauseWithoutDiscriminant = do
   token "-"
   item <- varText
   return (item, Nothing)
-
-stmtReduce :: IO WeakStmt
-stmtReduce = do
-  m <- currentHint
-  token "reduce"
-  e <- weakTerm >>= discern
-  t <- newAster m
-  return $ WeakStmtDef m Nothing t e
 
 stmtEnsure :: IO ()
 stmtEnsure = do
@@ -266,13 +257,6 @@ stmtUnuse = do
   token "unuse"
   name <- varText
   unuse name
-
-stmtAux :: IO WeakStmt
-stmtAux = do
-  m <- currentHint
-  e <- weakTerm >>= discern
-  t <- newAster m
-  return $ WeakStmtDef m Nothing t e
 
 stmtDefinePrefix :: IO ()
 stmtDefinePrefix = do
@@ -368,7 +352,7 @@ defineData m mFun a xts bts = do
   case xts of
     [] -> do
       (_, a', tau) <- discernIdentPlus (m, asIdent a, (m, WeakTermTau))
-      let formRule = WeakStmtDef m (Just (False, a')) tau (m, WeakTermPi [] (m, WeakTermTau)) -- fake type
+      let formRule = WeakStmtDef m (False, a') tau (m, WeakTermPi [] (m, WeakTermTau)) -- fake type
       introRuleList <- mapM (stmtDefineDataConstructor m lamArgs baseType a xts) bts
       return $ formRule : introRuleList
     _ -> do

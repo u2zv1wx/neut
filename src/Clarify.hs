@@ -41,22 +41,10 @@ clarifyStmt tenv ss =
         _ ->
           return ()
       return (m, CompPiElimDownElim (m, ValueVarGlobal (wrapWithQuote "main")) [])
-    StmtDef m mx t e : cont -> do
-      case mx of
-        Just x -> do
-          e' <- clarifyTerm tenv e >>= reduceCompPlus
-          insDefEnv (toGlobalVarName x) True [] e'
-          clarifyStmt (insTypeEnv [(m, x, t)] tenv) cont
-        Nothing -> do
-          raiseError m "reduce"
-
--- e' <- clarifyTerm tenv e
--- result <- newIdentFromText "result"
--- cont' <- clarifyStmt tenv cont
--- t' <- clarifyTerm tenv t
--- discardResult <- toAffineApp m result t'
--- hole <- newIdentFromText "unit"
--- return (m, CompUpElim result e' (m, CompUpElim hole discardResult cont'))
+    StmtDef m x t e : cont -> do
+      e' <- clarifyTerm tenv e >>= reduceCompPlus
+      insDefEnv (toGlobalVarName x) True [] e'
+      clarifyStmt (insTypeEnv [(m, x, t)] tenv) cont
 
 clarifyTerm :: TypeEnv -> TermPlus -> IO CompPlus
 clarifyTerm tenv term =
