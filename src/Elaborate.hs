@@ -21,9 +21,15 @@ import Elaborate.Unify
 import Reduce.Term
 import Reduce.WeakTerm
 
-elaborate :: [WeakStmt] -> IO [Stmt]
+elaborate :: [WeakStmtPlus] -> IO [Stmt]
 elaborate ss =
-  elaborateStmt' ss
+  case ss of
+    [] ->
+      return []
+    (_, defList) : rest -> do
+      foo <- elaborateStmt' defList
+      bar <- elaborate rest
+      return $ foo ++ bar
 
 elaborateStmt' :: [WeakStmt] -> IO [Stmt]
 elaborateStmt' stmt =

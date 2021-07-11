@@ -28,19 +28,19 @@ import System.Process hiding (env)
 -- core functions
 --
 
-parse :: Path Abs File -> IO [WeakStmt]
+parse :: Path Abs File -> IO [WeakStmtPlus]
 parse path = do
   pushTrace path
   visit path
 
-visit :: Path Abs File -> IO [WeakStmt]
+visit :: Path Abs File -> IO [WeakStmtPlus]
 visit path = do
   pushTrace path
   modifyIORef' fileEnv $ \env -> Map.insert path VisitInfoActive env
   withNestedState $ do
     TIO.readFile (toFilePath path) >>= initializeState
     skip
-    stmt
+    headerOrStmt path
 
 leave :: IO [WeakStmt]
 leave = do
@@ -56,6 +56,25 @@ pushTrace path =
 popTrace :: IO ()
 popTrace =
   modifyIORef' traceEnv $ \env -> tail env
+
+headerOrStmt :: Path Abs File -> IO [WeakStmtPlus]
+headerOrStmt path = do
+  s <- readIORef text
+  if T.null s
+    then return [(path, [])]
+    else do
+      headSymbol <- lookAhead (symbolMaybe isSymbolChar)
+      case headSymbol of
+        Just "include" -> do
+          defList1 <- stmtInclude
+          defList2 <- headerOrStmt path
+          return $ defList1 ++ defList2
+        Just "ensure" -> do
+          stmtEnsure
+          headerOrStmt path
+        _ -> do
+          defList <- stmt
+          return [(path, defList)]
 
 stmt :: IO [WeakStmt]
 stmt = do
@@ -76,9 +95,12 @@ stmt = do
         Just "define-enum" -> do
           stmtDefineEnum
           stmt
-        Just "include" ->
-          -- raiseParseError m "`include` can only be used at the header section of a file"
-          stmtInclude
+        Just "include" -> do
+          m <- currentHint
+          raiseParseError m "`include` can only be used at the header section of a file"
+        Just "ensure" -> do
+          m <- currentHint
+          raiseParseError m "`ensure` can only be used at the header section of a file"
         Just "define-data" -> do
           stmtList1 <- stmtDefineData
           stmtList2 <- stmt
@@ -91,9 +113,6 @@ stmt = do
           def <- stmtDefineResourceType
           stmtList <- stmt
           return $ def : stmtList
-        Just "ensure" -> do
-          stmtEnsure
-          stmt
         Just "section" ->
           stmtSection
         Just "end" ->
@@ -274,7 +293,7 @@ stmtRemovePrefix = do
   to <- varText
   modifyIORef' nsEnv $ \env -> filter (/= (from, to)) env
 
-stmtInclude :: IO [WeakStmt]
+stmtInclude :: IO [WeakStmtPlus]
 stmtInclude = do
   m <- currentHint
   ensureEnvSanity m
@@ -293,11 +312,9 @@ stmtInclude = do
       let cyclicPath = dropWhile (/= newPath) (reverse tenv) ++ [newPath]
       raiseError m $ "found a cyclic inclusion:\n" <> showCyclicPath cyclicPath
     Just VisitInfoFinish ->
-      stmt
-    Nothing -> do
-      defList1 <- visit newPath
-      defList2 <- stmt
-      return $ defList1 ++ defList2
+      return []
+    Nothing ->
+      visit newPath
 
 ensureEnvSanity :: Hint -> IO ()
 ensureEnvSanity m = do

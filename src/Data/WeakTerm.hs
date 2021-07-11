@@ -7,6 +7,7 @@ import Data.Maybe (catMaybes, maybeToList)
 import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
 import qualified Data.Text as T
+import Path
 
 data WeakTerm
   = WeakTermTau
@@ -51,6 +52,9 @@ type Def =
 
 type IdentDef =
   (Ident, Def)
+
+type WeakStmtPlus =
+  (Path Abs File, [WeakStmt])
 
 data WeakStmt
   = WeakStmtDef Hint (IsReducible, Ident) WeakTermPlus WeakTermPlus
