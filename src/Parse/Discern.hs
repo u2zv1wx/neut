@@ -45,7 +45,7 @@ discernStmtList stmtList =
 
 discernTopLevelName :: Bool -> Hint -> Ident -> IO Ident
 discernTopLevelName isReducible m x = do
-  let nameEnv = if isReducible then topNameEnv else opaqueTopNameEnv
+  let nameEnv = if isReducible then transparentTopNameEnv else opaqueTopNameEnv
   nenv <- readIORef nameEnv
   when (Map.member (asText x) nenv) $
     raiseError m $ "the variable `" <> asText x <> "` is already defined at the top level"
@@ -61,7 +61,7 @@ discern' nenv term =
       return (m, WeakTermTau)
     (m, WeakTermVar _ (I (s, _))) -> do
       tryCand (resolveSymbol m (asWeakVar m nenv) s) $ do
-        nenvTrans <- readIORef topNameEnv
+        nenvTrans <- readIORef transparentTopNameEnv
         tryCand (resolveSymbol m (asTransparentGlobalVar m nenvTrans) s) $ do
           nenvOpaque <- readIORef opaqueTopNameEnv
           tryCand (resolveSymbol m (asOpaqueGlobalVar m nenvOpaque) s) $ do
@@ -121,7 +121,7 @@ discern' nenv term =
       mSubject' <- mapM (discern' nenv) mSubject
       e' <- discern' nenv e
       t' <- discern' nenv t
-      nenvTrans <- readIORef topNameEnv
+      nenvTrans <- readIORef transparentTopNameEnv
       clauseList' <- forM clauseList $ \((mCons, constructorName, xts), body) -> do
         -- constructorName' <- resolveSymbol m (asItself m nenv) (asText constructorName)
         constructorName' <- resolveSymbol m (asItself m nenvTrans) (asText constructorName)

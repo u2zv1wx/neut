@@ -44,7 +44,7 @@ setupDef def =
   case def of
     WeakStmtDef _ x t e -> do
       insWeakTypeEnv x t
-      nenv <- readIORef topNameEnv
+      nenv <- readIORef transparentTopNameEnv
       when (Map.member (asText x) nenv) $
         modifyIORef' substEnv $ \env -> IntMap.insert (asInt x) e env
     _ ->

@@ -131,9 +131,9 @@ sectionEnv :: IORef [T.Text]
 sectionEnv =
   unsafePerformIO (newIORef [])
 
-{-# NOINLINE topNameEnv #-}
-topNameEnv :: IORef (Map.HashMap T.Text Ident)
-topNameEnv =
+{-# NOINLINE transparentTopNameEnv #-}
+transparentTopNameEnv :: IORef (Map.HashMap T.Text Ident)
+transparentTopNameEnv =
   unsafePerformIO (newIORef Map.empty)
 
 {-# NOINLINE opaqueTopNameEnv #-}
