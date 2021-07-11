@@ -61,7 +61,7 @@ headerOrStmt :: Path Abs File -> IO [WeakStmtPlus]
 headerOrStmt path = do
   s <- readIORef text
   if T.null s
-    then return [(path, [])]
+    then leave >>= \result -> return [(path, result)]
     else do
       headSymbol <- lookAhead (symbolMaybe isSymbolChar)
       case headSymbol of
@@ -73,8 +73,8 @@ headerOrStmt path = do
           stmtEnsure
           headerOrStmt path
         _ -> do
-          defList <- stmt
-          return [(path, defList)]
+          stmtList <- stmt >>= discernStmtList
+          return [(path, stmtList)]
 
 stmt :: IO [WeakStmt]
 stmt = do
@@ -113,22 +113,30 @@ stmt = do
           def <- stmtDefineResourceType
           stmtList <- stmt
           return $ def : stmtList
-        Just "section" ->
-          stmtSection
-        Just "end" ->
-          stmtEnd
+        Just "section" -> do
+          st <- stmtSection
+          stmtList <- stmt
+          return $ st : stmtList
+        Just "end" -> do
+          st <- stmtEnd
+          stmtList <- stmt
+          return $ st : stmtList
         Just "define-prefix" -> do
-          stmtDefinePrefix
-          stmt
+          st <- stmtDefinePrefix
+          stmtList <- stmt
+          return $ st : stmtList
         Just "remove-prefix" -> do
-          stmtRemovePrefix
-          stmt
+          st <- stmtRemovePrefix
+          stmtList <- stmt
+          return $ st : stmtList
         Just "use" -> do
-          stmtUse
-          stmt
+          st <- stmtUse
+          stmtList <- stmt
+          return $ st : stmtList
         Just "unuse" -> do
-          stmtUnuse
-          stmt
+          st <- stmtUnuse
+          stmtList <- stmt
+          return $ st : stmtList
         Just x -> do
           m <- currentHint
           raiseParseError m $ "invalid statement: " <> x
@@ -163,15 +171,14 @@ stmtDefine isReducible = do
 defineFunction :: IsReducible -> Hint -> Hint -> T.Text -> [WeakIdentPlus] -> WeakTermPlus -> WeakTermPlus -> IO WeakStmt
 defineFunction isReducible m mFun funName' argList codType e = do
   let piType = (m, WeakTermPi argList codType)
-  (_, funName'', piType') <- discernIdentPlus (m, asIdent funName', piType)
-  e' <- discern (m, WeakTermPiIntro OpacityTranslucent (LamKindFix (mFun, asIdent funName', piType)) argList e)
-  return $ WeakStmtDef m (isReducible, funName'') piType' e'
+  funName'' <- discernTopLevelName isReducible m $ asIdent funName'
+  let e' = (m, WeakTermPiIntro OpacityTranslucent (LamKindFix (mFun, asIdent funName', piType)) argList e)
+  return $ WeakStmtDef m funName'' piType e'
 
 defineTerm :: IsReducible -> Hint -> T.Text -> WeakTermPlus -> WeakTermPlus -> IO WeakStmt
 defineTerm isReducible m funName' codType e = do
-  (_, funName'', codType') <- discernIdentPlus (m, asIdent funName', codType)
-  e' <- discern e
-  return $ WeakStmtDef m (isReducible, funName'') codType' e'
+  funName'' <- discernTopLevelName isReducible m $ asIdent funName'
+  return $ WeakStmtDef m funName'' codType e
 
 stmtDefineEnum :: IO ()
 stmtDefineEnum = do
@@ -252,51 +259,52 @@ raiseIfFailure m procName exitCode h pkgDirPath =
       errStr <- hGetContents h
       raiseError m $ T.pack $ "the child process `" ++ procName ++ "` failed with the following message (exitcode = " ++ show i ++ "):\n" ++ errStr
 
-stmtSection :: IO [WeakStmt]
+stmtSection :: IO WeakStmt
 stmtSection = do
   token "section"
-  item <- varText
-  handleSection item stmt
+  name <- varText
+  handleSection name
+  return $ WeakStmtUse name
 
-stmtEnd :: IO [WeakStmt]
+stmtEnd :: IO WeakStmt
 stmtEnd = do
   m <- currentHint
   token "end"
-  item <- varText
-  handleEnd m item stmt
+  name <- varText
+  handleEnd m name
+  return $ WeakStmtUnuse name
 
-stmtUse :: IO ()
+stmtUse :: IO WeakStmt
 stmtUse = do
   token "use"
   name <- varText
-  use name
+  return $ WeakStmtUse name
 
-stmtUnuse :: IO ()
+stmtUnuse :: IO WeakStmt
 stmtUnuse = do
   token "unuse"
   name <- varText
-  unuse name
+  return $ WeakStmtUnuse name
 
-stmtDefinePrefix :: IO ()
+stmtDefinePrefix :: IO WeakStmt
 stmtDefinePrefix = do
   token "define-prefix"
   from <- varText
   token "="
   to <- varText
-  modifyIORef' nsEnv $ \env -> (from, to) : env
+  return $ WeakStmtDefinePrefix from to
 
-stmtRemovePrefix :: IO ()
+stmtRemovePrefix :: IO WeakStmt
 stmtRemovePrefix = do
   token "remove-prefix"
   from <- varText
   token "="
   to <- varText
-  modifyIORef' nsEnv $ \env -> filter (/= (from, to)) env
+  return $ WeakStmtRemovePrefix from to
 
 stmtInclude :: IO [WeakStmtPlus]
 stmtInclude = do
   m <- currentHint
-  ensureEnvSanity m
   token "include"
   path <- T.unpack <$> string
   dirPath <-
@@ -315,13 +323,6 @@ stmtInclude = do
       return []
     Nothing ->
       visit newPath
-
-ensureEnvSanity :: Hint -> IO ()
-ensureEnvSanity m = do
-  penv <- readIORef prefixEnv
-  if null penv
-    then return ()
-    else raiseError m $ "`include` can only be used with no `use`, but the current `use` is: " <> T.intercalate ", " penv
 
 ensureFileExistence :: Hint -> Path Abs File -> IO ()
 ensureFileExistence m path = do
@@ -368,8 +369,8 @@ defineData m mFun a xts bts = do
   let baseType = (m, WeakTermPi lamArgs (m, WeakTermVar VarKindLocal z))
   case xts of
     [] -> do
-      (_, a', tau) <- discernIdentPlus (m, asIdent a, (m, WeakTermTau))
-      let formRule = WeakStmtDef m (False, a') tau (m, WeakTermPi [] (m, WeakTermTau)) -- fake type
+      a' <- discernTopLevelName False m $ asIdent a
+      let formRule = WeakStmtDef m a' (m, WeakTermTau) (m, WeakTermPi [] (m, WeakTermTau)) -- fake type
       introRuleList <- mapM (stmtDefineDataConstructor m lamArgs baseType a xts) bts
       return $ formRule : introRuleList
     _ -> do

@@ -57,7 +57,11 @@ type WeakStmtPlus =
   (Path Abs File, [WeakStmt])
 
 data WeakStmt
-  = WeakStmtDef Hint (IsReducible, Ident) WeakTermPlus WeakTermPlus
+  = WeakStmtDef Hint Ident WeakTermPlus WeakTermPlus
+  | WeakStmtUse T.Text
+  | WeakStmtUnuse T.Text
+  | WeakStmtDefinePrefix T.Text T.Text
+  | WeakStmtRemovePrefix T.Text T.Text
   deriving (Show)
 
 type Constraint =

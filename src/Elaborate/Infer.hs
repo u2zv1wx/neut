@@ -35,17 +35,9 @@ infer' ctx term =
   case term of
     (m, WeakTermTau) ->
       return ((m, WeakTermTau), (m, WeakTermTau))
-    (m, WeakTermVar _ x) -> do
+    (m, WeakTermVar kind x) -> do
       t <- lookupWeakTypeEnv m x
-      senv <- readIORef substEnv
-      oenv <- readIORef opaqueEnv
-      case (IntMap.member (asInt x) senv, S.member x oenv) of
-        (True, False) ->
-          return ((m, WeakTermVar VarKindGlobalTransparent x), (m, snd t))
-        (True, True) ->
-          return ((m, WeakTermVar VarKindGlobalOpaque x), (m, snd t))
-        (False, _) ->
-          return ((m, WeakTermVar VarKindLocal x), (m, snd t))
+      return ((m, WeakTermVar kind x), (m, snd t))
     (m, WeakTermPi xts t) -> do
       (xts', t') <- inferPi ctx xts t
       return ((m, WeakTermPi xts' t'), (m, WeakTermTau))

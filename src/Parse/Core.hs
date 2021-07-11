@@ -58,8 +58,14 @@ withNestedState :: IO a -> IO a
 withNestedState comp = do
   state <- saveState
   value <- comp
+  cleanup
   loadState state
   return value
+
+cleanup :: IO ()
+cleanup = do
+  writeIORef nsEnv []
+  writeIORef prefixEnv []
 
 betweenParen :: IO a -> IO a
 betweenParen f = do

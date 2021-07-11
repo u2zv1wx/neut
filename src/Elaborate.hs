@@ -12,7 +12,6 @@ import qualified Data.IntMap as IntMap
 import Data.List (nub)
 import Data.Log
 import Data.LowType
-import qualified Data.Set as S
 import Data.Term
 import qualified Data.Text as T
 import Data.WeakTerm
@@ -21,27 +20,14 @@ import Elaborate.Unify
 import Reduce.Term
 import Reduce.WeakTerm
 
-elaborate :: [WeakStmtPlus] -> IO [Stmt]
+elaborate :: [WeakStmtPlus] -> IO [StmtPlus]
 elaborate ss =
   case ss of
     [] ->
       return []
-    (_, defList) : rest -> do
-      foo <- elaborateStmt' defList
-      bar <- elaborate rest
-      return $ foo ++ bar
-
-elaborateStmt' :: [WeakStmt] -> IO [Stmt]
-elaborateStmt' stmt =
-  case stmt of
-    [] -> do
-      return []
-    WeakStmtDef m (isReducible, x) t e : cont -> do
-      (e', te) <- infer e
-      t' <- inferType t
-      insConstraintEnv te t'
-      when (asText x == "main") $
-        insConstraintEnv t (m, WeakTermEnum "top")
+    (path, defList) : rest -> do
+      mapM_ setupDef defList
+      defList' <- inferStmtList defList
       -- cs <- readIORef constraintEnv
       -- p "==========================================================="
       -- forM_ cs $ \(e1, e2) -> do
@@ -49,14 +35,50 @@ elaborateStmt' stmt =
       --   p $ T.unpack $ toText e2
       --   p "---------------------"
       unify
-      e'' <- elaborate' e'
-      t'' <- elaborate' t' >>= reduceTermPlus
-      insWeakTypeEnv x $ weaken t''
-      modifyIORef' substEnv $ \env -> IntMap.insert (asInt x) (weaken e'') env
-      when (not isReducible) $
-        modifyIORef' opaqueEnv $ \env -> S.insert x env
-      cont' <- elaborateStmt' cont
-      return $ StmtDef m x t'' e'' : cont'
+      defList'' <- elaborateStmtList defList'
+      rest' <- elaborate rest
+      return $ (path, defList'') : rest'
+
+setupDef :: WeakStmt -> IO ()
+setupDef def =
+  case def of
+    WeakStmtDef _ x t e -> do
+      insWeakTypeEnv x t
+      nenv <- readIORef topNameEnv
+      when (Map.member (asText x) nenv) $
+        modifyIORef' substEnv $ \env -> IntMap.insert (asInt x) e env
+    _ ->
+      return ()
+
+inferStmtList :: [WeakStmt] -> IO [WeakStmt]
+inferStmtList stmtList =
+  case stmtList of
+    [] ->
+      return []
+    WeakStmtDef m x t e : rest -> do
+      (e', te) <- infer e
+      t' <- inferType t
+      insConstraintEnv te t'
+      when (asText x == "main") $ insConstraintEnv t (m, WeakTermEnum "top")
+      rest' <- inferStmtList rest
+      return $ WeakStmtDef m x t' e' : rest'
+    _ : rest ->
+      inferStmtList rest
+
+elaborateStmtList :: [WeakStmt] -> IO [Stmt]
+elaborateStmtList stmtList = do
+  case stmtList of
+    [] ->
+      return []
+    WeakStmtDef m x t e : rest -> do
+      e' <- elaborate' e
+      t' <- elaborate' t >>= reduceTermPlus
+      insWeakTypeEnv x $ weaken t'
+      modifyIORef' substEnv $ \env -> IntMap.insert (asInt x) (weaken e') env
+      rest' <- elaborateStmtList rest
+      return $ StmtDef m x t' e' : rest'
+    _ : rest ->
+      elaborateStmtList rest
 
 elaborate' :: WeakTermPlus -> IO TermPlus
 elaborate' term =
@@ -151,16 +173,16 @@ elaborate' term =
       e' <- elaborate' e
       t' <- elaborate' t >>= reduceTermPlus
       denv <- readIORef dataEnv
-      oenv <- readIORef opaqueEnv
+      oenv <- readIORef opaqueTopNameEnv
       case t' of
         (_, TermPiElim (_, TermVar _ name) _)
           | Just bs <- Map.lookup (asText name) denv,
-            S.member name oenv -> do
+            Map.member (asText name) oenv -> do
             patList' <- elaboratePatternList m bs patList
             return (m, TermCase resultType' mSubject' (e', t') patList')
         (_, TermVar _ name)
           | Just bs <- Map.lookup (asText name) denv,
-            S.member name oenv -> do
+            Map.member (asText name) oenv -> do
             patList' <- elaboratePatternList m bs patList
             return (m, TermCase resultType' mSubject' (e', t') patList')
         _ -> do

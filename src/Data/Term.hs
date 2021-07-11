@@ -7,6 +7,7 @@ import Data.Log
 import Data.LowType
 import qualified Data.Text as T
 import Data.WeakTerm
+import Path
 
 data Term
   = TermTau
@@ -43,6 +44,9 @@ type IdentPlus =
 
 type TypeEnv =
   IntMap.IntMap TermPlus
+
+type StmtPlus =
+  (Path Abs File, [Stmt])
 
 data Stmt
   = StmtDef Hint Ident TermPlus TermPlus

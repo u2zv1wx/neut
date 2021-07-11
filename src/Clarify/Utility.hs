@@ -102,7 +102,9 @@ boolFalse =
 {-# INLINE toGlobalVarName #-}
 toGlobalVarName :: Ident -> T.Text
 toGlobalVarName x =
-  wrapWithQuote $ asText x
+  wrapWithQuote $ "neut:" <> asText x
+
+-- wrapWithQuote $ asText x
 
 {-# INLINE toConstructorLabelName #-}
 toConstructorLabelName :: Ident -> T.Text

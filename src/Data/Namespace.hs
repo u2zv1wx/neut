@@ -74,14 +74,21 @@ getCurrentSection' nameStack =
 --     t ->
 --       raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
 
-handleSection :: T.Text -> IO a -> IO a
-handleSection s cont = do
+handleSection :: T.Text -> IO ()
+handleSection s = do
   modifyIORef' sectionEnv $ \env -> s : env
-  getCurrentSection >>= use
-  cont
 
-handleEnd :: Hint -> T.Text -> IO a -> IO a
-handleEnd m s cont = do
+-- getCurrentSection >>= use
+-- cont
+
+-- handleSection :: T.Text -> IO a -> IO a
+-- handleSection s cont = do
+--   modifyIORef' sectionEnv $ \env -> s : env
+--   getCurrentSection >>= use
+--   cont
+
+handleEnd :: Hint -> T.Text -> IO ()
+handleEnd m s = do
   ns <- readIORef sectionEnv
   case ns of
     [] ->
@@ -90,10 +97,24 @@ handleEnd m s cont = do
       | s == s' -> do
         getCurrentSection >>= unuse
         modifyIORef' sectionEnv $ \_ -> ns'
-        cont
       | otherwise ->
         raiseError m $
           "the innermost section is not `" <> s <> "`, but is `" <> s' <> "`"
+
+-- handleEnd :: Hint -> T.Text -> IO a -> IO a
+-- handleEnd m s cont = do
+--   ns <- readIORef sectionEnv
+--   case ns of
+--     [] ->
+--       raiseError m "there is no section to end"
+--     s' : ns'
+--       | s == s' -> do
+--         getCurrentSection >>= unuse
+--         modifyIORef' sectionEnv $ \_ -> ns'
+--         cont
+--       | otherwise ->
+--         raiseError m $
+--           "the innermost section is not `" <> s <> "`, but is `" <> s' <> "`"
 
 {-# INLINE resolveSymbol #-}
 resolveSymbol :: Hint -> (T.Text -> Maybe b) -> T.Text -> IO (Maybe b)
@@ -162,6 +183,16 @@ asVar m nenv var f =
 asWeakVar :: Hint -> Map.HashMap T.Text Ident -> T.Text -> Maybe WeakTermPlus
 asWeakVar m nenv var =
   asVar m nenv var (WeakTermVar VarKindLocal)
+
+{-# INLINE asTransparentGlobalVar #-}
+asTransparentGlobalVar :: Hint -> Map.HashMap T.Text Ident -> T.Text -> Maybe WeakTermPlus
+asTransparentGlobalVar m nenv var =
+  asVar m nenv var (WeakTermVar VarKindGlobalTransparent)
+
+{-# INLINE asOpaqueGlobalVar #-}
+asOpaqueGlobalVar :: Hint -> Map.HashMap T.Text Ident -> T.Text -> Maybe WeakTermPlus
+asOpaqueGlobalVar m nenv var =
+  asVar m nenv var (WeakTermVar VarKindGlobalOpaque)
 
 {-# INLINE asItself #-}
 asItself :: Hint -> Map.HashMap T.Text Ident -> T.Text -> Maybe (Hint, Ident)

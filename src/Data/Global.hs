@@ -136,6 +136,11 @@ topNameEnv :: IORef (Map.HashMap T.Text Ident)
 topNameEnv =
   unsafePerformIO (newIORef Map.empty)
 
+{-# NOINLINE opaqueTopNameEnv #-}
+opaqueTopNameEnv :: IORef (Map.HashMap T.Text Ident)
+opaqueTopNameEnv =
+  unsafePerformIO (newIORef Map.empty)
+
 {-# NOINLINE weakTypeEnv #-}
 weakTypeEnv :: IORef (IntMap.IntMap WeakTermPlus)
 weakTypeEnv =
@@ -165,11 +170,6 @@ suspendedConstraintEnv =
 substEnv :: IORef (IntMap.IntMap WeakTermPlus)
 substEnv =
   unsafePerformIO (newIORef IntMap.empty)
-
-{-# NOINLINE opaqueEnv #-}
-opaqueEnv :: IORef (S.Set Ident)
-opaqueEnv =
-  unsafePerformIO (newIORef S.empty)
 
 {-# NOINLINE defEnv #-}
 defEnv :: IORef (Map.HashMap T.Text (IsReducible, [Ident], CompPlus))

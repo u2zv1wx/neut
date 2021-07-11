@@ -25,26 +25,35 @@ import Data.Term
 import qualified Data.Text as T
 import Reduce.Comp
 
-clarify :: [Stmt] -> IO CompPlus
+clarify :: [StmtPlus] -> IO CompPlus
 clarify =
   clarifyStmt IntMap.empty >=> reduceCompPlus
 
-clarifyStmt :: TypeEnv -> [Stmt] -> IO CompPlus
+clarifyStmt :: TypeEnv -> [StmtPlus] -> IO CompPlus
 clarifyStmt tenv ss =
   case ss of
     [] -> do
       m <- newHint 1 1 <$> getCurrentFilePath
       denv <- readIORef defEnv
-      case Map.lookup (wrapWithQuote "main") denv of
+      case Map.lookup (toGlobalVarName $ asIdent "main") denv of
         Nothing ->
           raiseError m "`main` is missing"
         _ ->
           return ()
-      return (m, CompPiElimDownElim (m, ValueVarGlobal (wrapWithQuote "main")) [])
-    StmtDef m x t e : cont -> do
-      e' <- clarifyTerm tenv e >>= reduceCompPlus
-      insDefEnv (toGlobalVarName x) True [] e'
-      clarifyStmt (insTypeEnv [(m, x, t)] tenv) cont
+      return (m, CompPiElimDownElim (m, ValueVarGlobal (toGlobalVarName $ asIdent "main")) [])
+    (_, defList) : rest -> do
+      mapM_ clarifyDef defList
+      clarifyStmt tenv rest
+
+clarifyDef :: Stmt -> IO ()
+clarifyDef (StmtDef _ x _ e) = do
+  e' <- clarifyTerm IntMap.empty e >>= reduceCompPlus
+  insDefEnv (toGlobalVarName x) False [] e'
+
+-- StmtDef m x t e : cont -> do
+--   e' <- clarifyTerm tenv e >>= reduceCompPlus
+--   insDefEnv (toGlobalVarName x) True [] e'
+--   clarifyStmt (insTypeEnv [(m, x, t)] tenv) cont
 
 clarifyTerm :: TypeEnv -> TermPlus -> IO CompPlus
 clarifyTerm tenv term =
