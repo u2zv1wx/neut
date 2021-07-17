@@ -14,6 +14,7 @@ import Data.IORef
 import qualified Data.IntMap as IntMap
 import Data.Log
 import Data.LowType
+import qualified Data.Set as S
 import Data.Term
 import qualified Data.Text as T
 import Data.WeakTerm
@@ -338,17 +339,15 @@ lookupConstTypeEnv m x
           "the constant `" <> x <> "` is not found in the type environment."
 
 primOpToType :: Hint -> PrimOp -> IO TermPlus
-primOpToType m (PrimOp _ domList cod) = do
+primOpToType m (PrimOp op domList cod) = do
   domList' <- mapM (lowTypeToType m) domList
   xs <- mapM (const (newIdentFromText "_")) domList'
   let xts = zipWith (\x t -> (m, x, t)) xs domList'
-  cod' <- lowTypeToType m cod
-  return (m, TermPi xts cod') -- ひとまずこっちでundefinedを回避。cmpはi1を返すことになるから、enumの前に工夫がいる。
-
--- if S.member op cmpOpSet
---   then do
---     let cod' = (m, TermEnum undefined "bool") -- FIXME: boolはどこ？
---     return (m, TermPi xts cod')
---   else do
---     cod' <- lowTypeToType m cod
---     return (m, TermPi xts cod')
+  if S.member op cmpOpSet
+    then do
+      path <- getExecPath
+      let cod' = (m, TermEnum path "bool")
+      return (m, TermPi xts cod')
+    else do
+      cod' <- lowTypeToType m cod
+      return (m, TermPi xts cod')

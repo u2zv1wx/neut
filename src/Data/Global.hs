@@ -74,11 +74,6 @@ topMetaNameEnv :: IORef (Map.HashMap T.Text Ident)
 topMetaNameEnv =
   unsafePerformIO (newIORef Map.empty)
 
--- {-# NOINLINE metaTermCtx #-}
--- metaTermCtx :: IORef SubstMetaTerm
--- metaTermCtx =
---   unsafePerformIO (newIORef IntMap.empty)
-
 {-# NOINLINE targetPlatform #-}
 targetPlatform :: IORef (Maybe T.Text)
 targetPlatform =

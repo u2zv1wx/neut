@@ -2,6 +2,7 @@ module Data.Basic where
 
 import qualified Data.Text as T
 import Path
+import System.Environment
 
 newtype Ident
   = I (T.Text, Int)
@@ -147,3 +148,7 @@ getPosInfo m =
 showPosInfo :: Path Abs File -> Loc -> String
 showPosInfo path (l, c) =
   toFilePath path ++ ":" ++ show l ++ ":" ++ show c
+
+getExecPath :: IO (Path Abs File)
+getExecPath =
+  getExecutablePath >>= parseAbsFile

@@ -80,6 +80,13 @@ reduceCompPlus term =
             reduceCompPlus body
           | Just body <- lookup EnumCaseDefault les ->
             reduceCompPlus body
+          | otherwise -> do
+            p "other"
+            p' v
+            p' les
+            let (ls, es) = unzip les
+            es' <- mapM reduceCompPlus es
+            return (m, CompEnumElim v (zip ls es'))
         _ -> do
           -- p "other"
           -- p' v

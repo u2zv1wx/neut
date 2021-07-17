@@ -68,10 +68,8 @@ discern' nenv term =
           nenvOpaque <- readIORef opaqueTopNameEnv
           tryCand (resolveSymbol m (asOpaqueGlobalVar m nenvOpaque) s) $ do
             renv <- readIORef revEnumEnv
-            -- tryCand (resolveSymbol m (findThenModify renv (\x -> (m, WeakTermEnumIntro x))) s) $ do
             tryCand (resolveSymbol m (asEnumIntro m renv) s) $ do
               eenv <- readIORef enumEnv
-              -- tryCand (resolveSymbol m (findThenModify eenv (\x -> (m, WeakTermEnum x))) s) $
               tryCand (resolveSymbol m (asEnum m eenv) s) $
                 tryCand (resolveSymbol m (asWeakConstant m) s) $
                   raiseError m $ "undefined variable: " <> s
@@ -162,7 +160,6 @@ discernEnumCase m weakCase =
     WeakEnumCaseLabel _ l -> do
       renv <- readIORef revEnumEnv
       ml <- resolveSymbol m (asEnumLabel renv) l
-      -- ml <- resolveSymbol m (findThenModify renv (WeakEnumCaseLabel undefined)) l
       case ml of
         Just l' ->
           return l'

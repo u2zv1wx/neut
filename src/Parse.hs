@@ -30,6 +30,7 @@ import System.Process hiding (env)
 
 parse :: Path Abs File -> IO [WeakStmtPlus]
 parse path = do
+  setupEnumEnv
   pushTrace path
   result <- visit path
   -- ensureMain
@@ -41,12 +42,8 @@ parse path = do
 --   _ <- discern (m, WeakTermVar VarKindLocal $ asIdent "main")
 --   return ()
 
--- when (Map.member (asText x) nenv) $
---   raiseError m $ "the variable `" <> asText x <> "` is already defined at the top level"
-
 visit :: Path Abs File -> IO [WeakStmtPlus]
 visit path = do
-  -- fixme: ここでpathがdouble quoteを含んでいないことをチェック
   pushTrace path
   ensureNoDoubleQuotes path
   modifyIORef' fileEnv $ \env -> Map.insert path VisitInfoActive env
@@ -58,7 +55,7 @@ visit path = do
 ensureNoDoubleQuotes :: Path Abs File -> IO ()
 ensureNoDoubleQuotes path = do
   m <- currentHint
-  if ('\'' `elem` toFilePath path)
+  if ('"' `elem` toFilePath path)
     then raiseError m "filepath cannot contain double quotes"
     else return ()
 
@@ -590,6 +587,25 @@ isLinear' found input =
         False
       | otherwise ->
         isLinear' (S.insert x found) xs
+
+setupEnumEnv :: IO ()
+setupEnumEnv =
+  forM_ initEnumEnvInfo $ \(name, xis) -> setupEnumEnvWith name xis
+
+setupEnumEnvWith :: T.Text -> [(T.Text, Int)] -> IO ()
+setupEnumEnvWith name xis = do
+  path <- getExecPath
+  let (xs, is) = unzip xis
+  modifyIORef' enumEnv $ \env -> Map.insert name (path, xis) env
+  let rev = Map.fromList $ zip xs (zip3 (repeat path) (repeat name) is)
+  modifyIORef' revEnumEnv $ \env -> Map.union rev env
+
+initEnumEnvInfo :: [(T.Text, [(T.Text, Int)])]
+initEnumEnvInfo =
+  [ ("bottom", []),
+    ("top", [("top.unit", 0)]),
+    ("bool", [("bool.false", 0), ("bool.true", 1)])
+  ]
 
 insEnumEnv :: Hint -> T.Text -> [(T.Text, Int)] -> IO ()
 insEnumEnv m name xis = do

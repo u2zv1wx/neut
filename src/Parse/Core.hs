@@ -408,10 +408,6 @@ newTextualIdentFromText txt = do
   i <- newCount
   newIdentFromText $ ";" <> txt <> T.pack (show i)
 
--- newIdent :: IO Ident
--- newIdent = do
---   newText >>= newIdentFromText
-
 weakTermToWeakIdent :: Hint -> IO WeakTermPlus -> IO WeakIdentPlus
 weakTermToWeakIdent m f = do
   a <- f
