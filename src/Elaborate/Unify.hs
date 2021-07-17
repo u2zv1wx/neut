@@ -271,7 +271,6 @@ asStuckedTerm term =
           Just $ StuckPiElimVarLocalOpaque x []
         VarKindGlobalOpaque path ->
           Just $ StuckPiElimVarGlobalOpaque path x []
-        -- Just $ StuckPiElimVarLocalOpaque x []
         VarKindGlobalTransparent path ->
           Just $ StuckPiElimVarGlobalTransparent path x []
     (_, WeakTermAster h) ->
@@ -356,8 +355,3 @@ lookupAny is sub =
 lookupDefinition :: Path Abs File -> Ident -> Map.HashMap (Path Abs File, Int) WeakTermPlus -> Maybe WeakTermPlus
 lookupDefinition path x defs =
   Map.lookup (path, asInt x) defs
-
--- {-# INLINE lookupDefinition #-}
--- lookupDefinition :: Ident -> (IntMap.IntMap WeakTermPlus) -> Maybe WeakTermPlus
--- lookupDefinition x sub =
---   IntMap.lookup (asInt x) sub
