@@ -6,10 +6,9 @@ import qualified Data.HashMap.Lazy as Map
 import Data.IORef
 import Data.Log
 import Data.LowType
--- import Data.MetaTerm
 import qualified Data.Text as T
--- import Data.Tree
 import Data.WeakTerm hiding (asVar)
+import Path
 
 nsSepChar :: Char
 nsSepChar =
@@ -170,7 +169,7 @@ takeAll predicate candidateList acc =
           takeAll predicate xs acc
 
 {-# INLINE asVar #-}
-asVar :: Hint -> Map.HashMap T.Text Ident -> T.Text -> (Ident -> a) -> Maybe (Hint, a)
+asVar :: Hint -> Map.HashMap T.Text b -> T.Text -> (b -> a) -> Maybe (Hint, a)
 asVar m nenv var f =
   Map.lookup var nenv >>= \x -> return (m, f x)
 
@@ -185,19 +184,19 @@ asWeakVar m nenv var =
   asVar m nenv var (WeakTermVar VarKindLocal)
 
 {-# INLINE asTransparentGlobalVar #-}
-asTransparentGlobalVar :: Hint -> Map.HashMap T.Text Ident -> T.Text -> Maybe WeakTermPlus
+asTransparentGlobalVar :: Hint -> Map.HashMap T.Text (Path Abs File, Ident) -> T.Text -> Maybe WeakTermPlus
 asTransparentGlobalVar m nenv var =
-  asVar m nenv var (WeakTermVar VarKindGlobalTransparent)
+  asVar m nenv var (\(fp, x) -> WeakTermVar (VarKindGlobalTransparent fp) x)
 
 {-# INLINE asOpaqueGlobalVar #-}
-asOpaqueGlobalVar :: Hint -> Map.HashMap T.Text Ident -> T.Text -> Maybe WeakTermPlus
+asOpaqueGlobalVar :: Hint -> Map.HashMap T.Text (Path Abs File, Ident) -> T.Text -> Maybe WeakTermPlus
 asOpaqueGlobalVar m nenv var =
-  asVar m nenv var (WeakTermVar VarKindGlobalOpaque)
+  asVar m nenv var (\(fp, x) -> WeakTermVar (VarKindGlobalOpaque fp) x)
 
-{-# INLINE asItself #-}
-asItself :: Hint -> Map.HashMap T.Text Ident -> T.Text -> Maybe (Hint, Ident)
-asItself m nenv var =
-  asVar m nenv var id
+{-# INLINE asConstructor #-}
+asConstructor :: Hint -> Map.HashMap T.Text (Path Abs File, Ident) -> T.Text -> Maybe (Hint, Ident)
+asConstructor m nenv var =
+  asVar m nenv var snd
 
 {-# INLINE findThenModify #-}
 findThenModify :: Map.HashMap T.Text t -> (T.Text -> a) -> T.Text -> Maybe a
@@ -205,6 +204,37 @@ findThenModify env f name = do
   if name `Map.member` env
     then Just $ f name
     else Nothing
+
+{-# INLINE asEnumLabel #-}
+asEnumLabel :: Map.HashMap T.Text (Path Abs File, T.Text, Int) -> T.Text -> Maybe WeakEnumCase
+asEnumLabel env name = do
+  case Map.lookup name env of
+    Just (fp, _, _) ->
+      Just $ WeakEnumCaseLabel (Just fp) name
+    _ ->
+      Nothing
+
+{-# INLINE asEnumIntro #-}
+asEnumIntro :: Hint -> Map.HashMap T.Text (Path Abs File, T.Text, Int) -> T.Text -> Maybe WeakTermPlus
+asEnumIntro m env name = do
+  case Map.lookup name env of
+    Just (fp, _, _) ->
+      Just (m, WeakTermEnumIntro fp name)
+    _ ->
+      Nothing
+
+{-# INLINE asEnum #-}
+asEnum :: Hint -> Map.HashMap T.Text (Path Abs File, a) -> T.Text -> Maybe WeakTermPlus
+asEnum m env name = do
+  case Map.lookup name env of
+    Just (fp, _) ->
+      Just (m, WeakTermEnum fp name)
+    _ ->
+      Nothing
+
+-- if name `Map.member` env
+--   then Just $ f name
+--   else Nothing
 
 -- {-# INLINE asMetaConstant #-}
 -- asMetaConstant :: Hint -> T.Text -> Maybe MetaTermPlus

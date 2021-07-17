@@ -14,7 +14,6 @@ import Data.IORef
 import qualified Data.IntMap as IntMap
 import Data.Log
 import Data.LowType
-import qualified Data.Set as S
 import Data.Term
 import qualified Data.Text as T
 import Data.WeakTerm
@@ -83,12 +82,12 @@ infer' ctx term =
     (m, WeakTermFloat t f) -> do
       t' <- inferType' [] t -- t must be closed
       return ((m, WeakTermFloat t' f), t')
-    (m, WeakTermEnum name) ->
-      return ((m, WeakTermEnum name), (m, WeakTermTau))
-    (m, WeakTermEnumIntro l) -> do
+    (m, WeakTermEnum path name) ->
+      return ((m, WeakTermEnum path name), (m, WeakTermTau))
+    (m, WeakTermEnumIntro path l) -> do
       k <- lookupKind m l
-      let t = (m, WeakTermEnum k)
-      return ((m, WeakTermEnumIntro l), t)
+      let t = (m, WeakTermEnum path k)
+      return ((m, WeakTermEnumIntro path l), t)
     (m, WeakTermEnumElim (e, _) ces) -> do
       (e', t') <- infer' ctx e
       let (cs, es) = unzip ces
@@ -141,27 +140,6 @@ inferSubject m ctx subject = do
   (subject', tSub) <- infer' ctx subject
   insConstraintEnv (m, WeakTermTau) tSub
   return subject'
-
--- inferArgs ::
---   Hint ->
---   [(WeakTermPlus, WeakTermPlus)] ->
---   [WeakIdentPlus] ->
---   WeakTermPlus ->
---   IO WeakTermPlus
--- inferArgs m args1 args2 cod =
---   case (args1, args2) of
---     ([], []) ->
---       return cod
---     ((e, t) : ets, (_, x, tx) : xts) -> do
---       insConstraintEnv tx t
---       p $ T.unpack $ "ins: " <> T.pack (show x) <> " ~> " <> toText e
---       modifyIORef' substEnv $ \env -> IntMap.insert (asInt x) e env
---       -- tx' <- substWeakTermPlus sub tx
---       -- t' <- substWeakTermPlus sub t
---       -- insConstraintEnv tx' t'
---       inferArgs m ets xts cod
---     _ ->
---       raiseCritical m "invalid argument passed to inferArgs"
 
 inferArgs ::
   SubstWeakTerm ->
@@ -292,16 +270,20 @@ newTypeAsterListInCtx ctx ids =
       ts <- newTypeAsterListInCtx (ctx ++ [(m, x, t)]) rest
       return $ (m, x, t) : ts
 
-inferEnumCase :: Context -> EnumCasePlus -> IO (EnumCasePlus, WeakTermPlus)
+inferEnumCase :: Context -> WeakEnumCasePlus -> IO (WeakEnumCasePlus, WeakTermPlus)
 inferEnumCase ctx weakCase =
   case weakCase of
-    (m, EnumCaseLabel name) -> do
+    (m, WeakEnumCaseLabel mPath name) -> do
       k <- lookupKind m name
-      return (weakCase, (m, WeakTermEnum k))
-    (m, EnumCaseDefault) -> do
+      case mPath of
+        Nothing ->
+          raiseCritical m "inferEnumCase"
+        Just path ->
+          return (weakCase, (m, WeakTermEnum path k))
+    (m, WeakEnumCaseDefault) -> do
       h <- newTypeAsterInCtx ctx m
-      return ((m, EnumCaseDefault), h)
-    (m, EnumCaseInt _) -> do
+      return ((m, WeakEnumCaseDefault), h)
+    (m, WeakEnumCaseInt _) -> do
       raiseCritical m "enum-case-int shouldn't be used in the target language"
 
 insConstraintEnv :: WeakTermPlus -> WeakTermPlus -> IO ()
@@ -337,7 +319,7 @@ lookupKind m name = do
   case Map.lookup name renv of
     Nothing ->
       raiseError m $ "no such enum-intro is defined: " <> name
-    Just (j, _) ->
+    Just (_, j, _) ->
       return j
 
 lookupConstTypeEnv :: Hint -> T.Text -> IO TermPlus
@@ -356,14 +338,17 @@ lookupConstTypeEnv m x
           "the constant `" <> x <> "` is not found in the type environment."
 
 primOpToType :: Hint -> PrimOp -> IO TermPlus
-primOpToType m (PrimOp op domList cod) = do
+primOpToType m (PrimOp _ domList cod) = do
   domList' <- mapM (lowTypeToType m) domList
   xs <- mapM (const (newIdentFromText "_")) domList'
   let xts = zipWith (\x t -> (m, x, t)) xs domList'
-  if S.member op cmpOpSet
-    then do
-      let cod' = (m, TermEnum "bool")
-      return (m, TermPi xts cod')
-    else do
-      cod' <- lowTypeToType m cod
-      return (m, TermPi xts cod')
+  cod' <- lowTypeToType m cod
+  return (m, TermPi xts cod') -- ひとまずこっちでundefinedを回避。cmpはi1を返すことになるから、enumの前に工夫がいる。
+
+-- if S.member op cmpOpSet
+--   then do
+--     let cod' = (m, TermEnum undefined "bool") -- FIXME: boolはどこ？
+--     return (m, TermPi xts cod')
+--   else do
+--     cod' <- lowTypeToType m cod
+--     return (m, TermPi xts cod')

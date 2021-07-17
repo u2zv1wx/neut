@@ -33,13 +33,22 @@ instance Show Hint where
     "_"
 
 data EnumCase
-  = EnumCaseLabel T.Text
+  = EnumCaseLabel (Path Abs File) T.Text
   | EnumCaseInt Int
   | EnumCaseDefault
   deriving (Show, Eq, Ord)
 
 type EnumCasePlus =
   (Hint, EnumCase)
+
+data WeakEnumCase
+  = WeakEnumCaseLabel (Maybe (Path Abs File)) T.Text
+  | WeakEnumCaseInt Int
+  | WeakEnumCaseDefault
+  deriving (Show, Eq, Ord)
+
+type WeakEnumCasePlus =
+  (Hint, WeakEnumCase)
 
 data Opacity
   = OpacityOpaque
@@ -49,8 +58,8 @@ data Opacity
 
 data VarKind
   = VarKindLocal
-  | VarKindGlobalOpaque
-  | VarKindGlobalTransparent
+  | VarKindGlobalOpaque (Path Abs File)
+  | VarKindGlobalTransparent (Path Abs File)
   deriving (Show, Eq)
 
 data LamKind a

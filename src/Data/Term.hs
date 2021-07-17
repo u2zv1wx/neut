@@ -18,8 +18,8 @@ data Term
   | TermConst T.Text
   | TermInt IntSize Integer
   | TermFloat FloatSize Double
-  | TermEnum T.Text
-  | TermEnumIntro T.Text
+  | TermEnum (Path Abs File) T.Text
+  | TermEnumIntro (Path Abs File) T.Text
   | TermEnumElim (TermPlus, TermPlus) [(EnumCasePlus, TermPlus)]
   | TermDerangement Derangement [TermPlus]
   | TermCase
@@ -84,16 +84,17 @@ weaken term =
       (m, WeakTermInt (m, WeakTermConst (showIntSize size)) x)
     (m, TermFloat size x) ->
       (m, WeakTermFloat (m, WeakTermConst (showFloatSize size)) x)
-    (m, TermEnum x) ->
-      (m, WeakTermEnum x)
-    (m, TermEnumIntro l) ->
-      (m, WeakTermEnumIntro l)
+    (m, TermEnum filePath x) ->
+      (m, WeakTermEnum filePath x)
+    (m, TermEnumIntro filePath l) ->
+      (m, WeakTermEnumIntro filePath l)
     (m, TermEnumElim (e, t) branchList) -> do
       let t' = weaken t
       let e' = weaken e
       let (caseList, es) = unzip branchList
+      let caseList' = map (\(me, ec) -> (me, weakenEnumCase ec)) caseList
       let es' = map weaken es
-      (m, WeakTermEnumElim (e', t') (zip caseList es'))
+      (m, WeakTermEnumElim (e', t') (zip caseList' es'))
     (m, TermDerangement i es) -> do
       let es' = map weaken es
       (m, WeakTermDerangement i es')
@@ -106,6 +107,16 @@ weaken term =
       (m, WeakTermCase resultType' mSubject' (e', t') patList')
     (m, TermIgnore e) ->
       (m, WeakTermIgnore (weaken e))
+
+weakenEnumCase :: EnumCase -> WeakEnumCase
+weakenEnumCase ec =
+  case ec of
+    EnumCaseLabel fp l ->
+      WeakEnumCaseLabel (Just fp) l
+    EnumCaseInt i ->
+      WeakEnumCaseInt i
+    EnumCaseDefault ->
+      WeakEnumCaseDefault
 
 weakenIdentPlus :: (Hint, Ident, TermPlus) -> (Hint, Ident, WeakTermPlus)
 weakenIdentPlus (m, x, t) =

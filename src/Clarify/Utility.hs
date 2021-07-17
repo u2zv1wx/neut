@@ -8,8 +8,9 @@ import qualified Data.HashMap.Lazy as Map
 import Data.IORef
 import Data.Namespace
 import qualified Data.Text as T
+import Path
 
-toApp :: T.Text -> Hint -> Ident -> CompPlus -> IO CompPlus
+toApp :: Integer -> Hint -> Ident -> CompPlus -> IO CompPlus
 toApp switcher m x t = do
   (expVarName, expVar) <- newValueVarLocalWith m "exp"
   return
@@ -20,7 +21,7 @@ toApp switcher m x t = do
         ( m,
           CompPiElimDownElim
             expVar
-            [(m, ValueEnumIntro switcher), (m, ValueVarLocal x)]
+            [(m, ValueInt 64 switcher), (m, ValueVarLocal x)]
         )
     )
 
@@ -29,14 +30,22 @@ toApp switcher m x t = do
 --   exp @ (0, x)
 toAffineApp :: Hint -> Ident -> CompPlus -> IO CompPlus
 toAffineApp =
-  toApp boolFalse
+  toApp 0
+
+-- toAffineApp :: Hint -> Ident -> CompPlus -> IO CompPlus
+-- toAffineApp =
+--   toApp boolFalse
 
 -- toRelevantApp meta x t ~>
 --   bind exp := t in
 --   exp @ (1, x)
 toRelevantApp :: Hint -> Ident -> CompPlus -> IO CompPlus
 toRelevantApp =
-  toApp boolTrue
+  toApp 1
+
+-- toRelevantApp :: Hint -> Ident -> CompPlus -> IO CompPlus
+-- toRelevantApp =
+--   toApp boolTrue
 
 bindLet :: [(Ident, CompPlus)] -> CompPlus -> CompPlus
 bindLet binder cont =
@@ -48,7 +57,9 @@ bindLet binder cont =
 
 switch :: CompPlus -> CompPlus -> [(EnumCase, CompPlus)]
 switch e1 e2 =
-  [(EnumCaseLabel boolFalse, e1), (EnumCaseDefault, e2)]
+  [(EnumCaseInt 0, e1), (EnumCaseDefault, e2)]
+
+-- [(EnumCaseLabel undefined boolFalse, e1), (EnumCaseDefault, e2)]
 
 tryCache :: Hint -> T.Text -> IO () -> IO ValuePlus
 tryCache m key doInsertion = do
@@ -100,9 +111,14 @@ boolFalse =
   "bool" <> nsSep <> "false"
 
 {-# INLINE toGlobalVarName #-}
-toGlobalVarName :: Ident -> T.Text
-toGlobalVarName x =
-  wrapWithQuote $ "neut:" <> asText x
+toGlobalVarName :: Path Abs File -> Ident -> T.Text
+toGlobalVarName path x =
+  wrapWithQuote $ asText x <> ";" <> T.pack (toFilePath path)
+
+-- {-# INLINE toGlobalVarName #-}
+-- toGlobalVarName :: Ident -> T.Text
+-- toGlobalVarName x =
+--   wrapWithQuote $ "neut:" <> asText x
 
 -- wrapWithQuote $ asText x
 

@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module Parse.WeakTerm
   ( weakTerm,
     weakTermSimple,
@@ -161,7 +163,7 @@ weakTermEnumElim = do
   h <- newAster m
   return (m, WeakTermEnumElim (e, h) clauseList)
 
-weakTermEnumClause :: IO (EnumCasePlus, WeakTermPlus)
+weakTermEnumClause :: IO (WeakEnumCasePlus, WeakTermPlus)
 weakTermEnumClause = do
   m <- currentHint
   token "-"
@@ -170,9 +172,9 @@ weakTermEnumClause = do
   body <- weakTerm
   case c of
     "default" ->
-      return ((m, EnumCaseDefault), body)
-    _ ->
-      return ((m, EnumCaseLabel c), body)
+      return ((m, WeakEnumCaseDefault), body)
+    _ -> do
+      return ((m, WeakEnumCaseLabel Nothing c), body)
 
 -- question e
 weakTermQuestion :: IO WeakTermPlus
@@ -189,6 +191,7 @@ weakTermDerangement = do
   token "derangement"
   k <- tryPlanList [weakTermDerangementNop, betweenParen weakTermDerangementKind]
   es <- many weakTermSimple
+  -- fixme: add arity check
   return (m, WeakTermDerangement k es)
 
 weakTermDerangementNop :: IO Derangement
@@ -464,8 +467,8 @@ foldIf m ifCond ifBody elseIfList elseBody =
         ( m,
           WeakTermEnumElim
             (ifCond, h)
-            [ ((m, EnumCaseLabel "bool.true"), ifBody),
-              ((m, EnumCaseLabel "bool.false"), elseBody)
+            [ ((m, WeakEnumCaseLabel Nothing "bool.true"), ifBody),
+              ((m, WeakEnumCaseLabel Nothing "bool.false"), elseBody)
             ]
         )
     ((elseIfCond, elseIfBody) : rest) -> do
@@ -475,8 +478,8 @@ foldIf m ifCond ifBody elseIfList elseBody =
         ( m,
           WeakTermEnumElim
             (ifCond, h)
-            [ ((m, EnumCaseLabel "bool.true"), ifBody),
-              ((m, EnumCaseLabel "bool.false"), cont)
+            [ ((m, WeakEnumCaseLabel Nothing "bool.true"), ifBody),
+              ((m, WeakEnumCaseLabel Nothing "bool.false"), cont)
             ]
         )
 

@@ -282,14 +282,6 @@ runCheck :: Path Abs File -> IO ()
 runCheck =
   parse >=> elaborate >=> \_ -> return ()
 
--- runBuild :: Path Abs File -> IO Builder
--- runBuild =
---   preprocess >=> parse >=> elaborate >=> clarify >=> lower >=> emit
-
--- runCheck :: Path Abs File -> IO ()
--- runCheck =
---   preprocess >=> parse >=> elaborate >=> \_ -> return ()
-
 clangOptWith :: OutputKind -> Path Abs File -> [String]
 clangOptWith kind outputPath =
   case kind of

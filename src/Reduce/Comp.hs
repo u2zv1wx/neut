@@ -70,12 +70,20 @@ reduceCompPlus term =
               return (m, CompUpElim x e1' e2')
     (m, CompEnumElim v les) ->
       case v of
-        (_, ValueEnumIntro l)
-          | Just body <- lookup (EnumCaseLabel l) les ->
+        (_, ValueEnumIntro path l)
+          | Just body <- lookup (EnumCaseLabel path l) les ->
+            reduceCompPlus body
+          | Just body <- lookup EnumCaseDefault les ->
+            reduceCompPlus body
+        (_, ValueInt _ l)
+          | Just body <- lookup (EnumCaseInt (fromInteger l)) les ->
             reduceCompPlus body
           | Just body <- lookup EnumCaseDefault les ->
             reduceCompPlus body
         _ -> do
+          -- p "other"
+          -- p' v
+          -- p' les
           let (ls, es) = unzip les
           es' <- mapM reduceCompPlus es
           return (m, CompEnumElim v (zip ls es'))

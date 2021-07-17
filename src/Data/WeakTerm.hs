@@ -19,9 +19,9 @@ data WeakTerm
   | WeakTermConst T.Text
   | WeakTermInt WeakTermPlus Integer
   | WeakTermFloat WeakTermPlus Double
-  | WeakTermEnum T.Text
-  | WeakTermEnumIntro T.Text
-  | WeakTermEnumElim (WeakTermPlus, WeakTermPlus) [(EnumCasePlus, WeakTermPlus)]
+  | WeakTermEnum (Path Abs File) T.Text
+  | WeakTermEnumIntro (Path Abs File) T.Text
+  | WeakTermEnumElim (WeakTermPlus, WeakTermPlus) [(WeakEnumCasePlus, WeakTermPlus)]
   | WeakTermQuestion WeakTermPlus WeakTermPlus -- e : t (output the type `t` as note)
   | WeakTermDerangement Derangement [WeakTermPlus] -- (derangement kind arg-1 ... arg-n)
   | WeakTermCase
@@ -135,9 +135,9 @@ varWeakTermPlus term =
       varWeakTermPlus t
     (_, WeakTermFloat t _) ->
       varWeakTermPlus t
-    (_, WeakTermEnum _) ->
+    (_, WeakTermEnum _ _) ->
       S.empty
-    (_, WeakTermEnumIntro _) ->
+    (_, WeakTermEnumIntro _ _) ->
       S.empty
     (_, WeakTermEnumElim (e, t) les) -> do
       let xs = varWeakTermPlus t
@@ -191,9 +191,9 @@ asterWeakTermPlus term =
       asterWeakTermPlus t
     (_, WeakTermFloat t _) ->
       asterWeakTermPlus t
-    (_, WeakTermEnum _) ->
+    (_, WeakTermEnum _ _) ->
       S.empty
-    (_, WeakTermEnumIntro _) ->
+    (_, WeakTermEnumIntro _ _) ->
       S.empty
     (_, WeakTermEnumElim (e, t) les) -> do
       let set1 = asterWeakTermPlus e
@@ -286,9 +286,9 @@ toText term =
       T.pack $ show a
     (_, WeakTermFloat _ a) ->
       T.pack $ show a
-    (_, WeakTermEnum l) ->
-      l
-    (_, WeakTermEnumIntro v) ->
+    (_, WeakTermEnum path l) ->
+      l <> "@" <> T.pack (toFilePath path)
+    (_, WeakTermEnumIntro _ v) ->
       v
     (_, WeakTermEnumElim (e, _) mles) -> do
       let (mls, es) = unzip mles
@@ -345,18 +345,18 @@ showPattern (_, f, xts) = do
       let xs = map (\(_, x, _) -> x) xts
       inParen $ asText f <> " " <> T.intercalate " " (map showVariable xs)
 
-showClause :: (EnumCase, WeakTermPlus) -> T.Text
+showClause :: (WeakEnumCase, WeakTermPlus) -> T.Text
 showClause (c, e) =
   inParen $ showCase c <> " " <> toText e
 
-showCase :: EnumCase -> T.Text
+showCase :: WeakEnumCase -> T.Text
 showCase c =
   case c of
-    EnumCaseLabel l ->
+    WeakEnumCaseLabel _ l ->
       l
-    EnumCaseDefault ->
+    WeakEnumCaseDefault ->
       "default"
-    EnumCaseInt i ->
+    WeakEnumCaseInt i ->
       T.pack (show i)
 
 showItems :: [T.Text] -> T.Text

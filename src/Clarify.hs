@@ -23,37 +23,34 @@ import Data.Maybe (catMaybes, isJust, maybeToList)
 import qualified Data.Set as S
 import Data.Term
 import qualified Data.Text as T
+import Path
 import Reduce.Comp
 
 clarify :: [StmtPlus] -> IO CompPlus
 clarify =
-  clarifyStmt IntMap.empty >=> reduceCompPlus
+  clarifyStmt >=> reduceCompPlus
 
-clarifyStmt :: TypeEnv -> [StmtPlus] -> IO CompPlus
-clarifyStmt tenv ss =
+clarifyStmt :: [StmtPlus] -> IO CompPlus
+clarifyStmt ss =
   case ss of
     [] -> do
-      m <- newHint 1 1 <$> getCurrentFilePath
+      mainFilePath <- getCurrentFilePath
+      let m = newHint 1 1 mainFilePath
       denv <- readIORef defEnv
-      case Map.lookup (toGlobalVarName $ asIdent "main") denv of
+      case Map.lookup (toGlobalVarName mainFilePath $ asIdent "main") denv of
         Nothing ->
           raiseError m "`main` is missing"
         _ ->
           return ()
-      return (m, CompPiElimDownElim (m, ValueVarGlobal (toGlobalVarName $ asIdent "main")) [])
-    (_, defList) : rest -> do
-      mapM_ clarifyDef defList
-      clarifyStmt tenv rest
+      return (m, CompPiElimDownElim (m, ValueVarGlobal (toGlobalVarName mainFilePath $ asIdent "main")) [])
+    (path, defList) : rest -> do
+      mapM_ (clarifyDef path) defList
+      clarifyStmt rest
 
-clarifyDef :: Stmt -> IO ()
-clarifyDef (StmtDef _ x _ e) = do
+clarifyDef :: Path Abs File -> Stmt -> IO ()
+clarifyDef path (StmtDef _ x _ e) = do
   e' <- clarifyTerm IntMap.empty e >>= reduceCompPlus
-  insDefEnv (toGlobalVarName x) False [] e'
-
--- StmtDef m x t e : cont -> do
---   e' <- clarifyTerm tenv e >>= reduceCompPlus
---   insDefEnv (toGlobalVarName x) True [] e'
---   clarifyStmt (insTypeEnv [(m, x, t)] tenv) cont
+  insDefEnv (toGlobalVarName path x) True [] e'
 
 clarifyTerm :: TypeEnv -> TermPlus -> IO CompPlus
 clarifyTerm tenv term =
@@ -64,8 +61,10 @@ clarifyTerm tenv term =
       case kind of
         VarKindLocal ->
           return (m, CompUpIntro (m, ValueVarLocal x))
-        _ ->
-          return (m, CompPiElimDownElim (m, ValueVarGlobal (toGlobalVarName x)) [])
+        VarKindGlobalOpaque path ->
+          return (m, CompPiElimDownElim (m, ValueVarGlobal (toGlobalVarName path x)) [])
+        VarKindGlobalTransparent path ->
+          return (m, CompPiElimDownElim (m, ValueVarGlobal (toGlobalVarName path x)) [])
     (m, TermPi {}) ->
       returnClosureS4 m
     (m, TermPiIntro opacity kind mxts e) -> do
@@ -87,10 +86,10 @@ clarifyTerm tenv term =
       return (m, CompUpIntro (m, ValueInt size l))
     (m, TermFloat size l) ->
       return (m, CompUpIntro (m, ValueFloat size l))
-    (m, TermEnum _) ->
+    (m, TermEnum _ _) ->
       returnImmediateS4 m
-    (m, TermEnumIntro l) ->
-      return (m, CompUpIntro (m, ValueEnumIntro l))
+    (m, TermEnumIntro path l) ->
+      return (m, CompUpIntro (m, ValueEnumIntro path l))
     (m, TermEnumElim (e, _) bs) -> do
       let (cs, es) = unzip bs
       let fvs = chainFromTermList tenv es
@@ -335,9 +334,9 @@ chainOf tenv term =
       []
     (_, TermFloat _ _) ->
       []
-    (_, TermEnum _) ->
+    (_, TermEnum _ _) ->
       []
-    (_, TermEnumIntro _) ->
+    (_, TermEnumIntro _ _) ->
       []
     (_, TermEnumElim (e, t) les) -> do
       let xs0 = chainOf tenv t

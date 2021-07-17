@@ -55,12 +55,12 @@ reduceWeakTermPlus term =
       let les'' = zip (map snd ls) es'
       t' <- reduceWeakTermPlus t
       case e' of
-        (_, WeakTermEnumIntro l) ->
-          case lookup (EnumCaseLabel l) les'' of
+        (_, WeakTermEnumIntro mPath l) ->
+          case lookup (WeakEnumCaseLabel (Just mPath) l) les'' of
             Just body ->
               reduceWeakTermPlus body
             Nothing ->
-              case lookup EnumCaseDefault les'' of
+              case lookup WeakEnumCaseDefault les'' of
                 Just body ->
                   reduceWeakTermPlus body
                 Nothing ->
@@ -149,10 +149,10 @@ substWeakTermPlus sub term =
     (m, WeakTermFloat t x) -> do
       t' <- substWeakTermPlus sub t
       return (m, WeakTermFloat t' x)
-    (m, WeakTermEnum x) ->
-      return (m, WeakTermEnum x)
-    (m, WeakTermEnumIntro l) ->
-      return (m, WeakTermEnumIntro l)
+    (_, WeakTermEnum _ _) ->
+      return term
+    (_, WeakTermEnumIntro _ _) ->
+      return term
     (m, WeakTermEnumElim (e, t) branchList) -> do
       t' <- substWeakTermPlus sub t
       e' <- substWeakTermPlus sub e

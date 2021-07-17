@@ -5,6 +5,7 @@ import qualified Data.IntMap as IntMap
 import Data.LowType
 import qualified Data.Set as S
 import qualified Data.Text as T
+import Path
 
 data Value
   = ValueVarLocal Ident
@@ -12,7 +13,7 @@ data Value
   | ValueSigmaIntro [ValuePlus]
   | ValueInt IntSize Integer
   | ValueFloat FloatSize Double
-  | ValueEnumIntro T.Text
+  | ValueEnumIntro (Path Abs File) T.Text
   deriving (Show)
 
 data Comp

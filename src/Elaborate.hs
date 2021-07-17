@@ -17,6 +17,7 @@ import qualified Data.Text as T
 import Data.WeakTerm
 import Elaborate.Infer
 import Elaborate.Unify
+import Path
 import Reduce.Term
 import Reduce.WeakTerm
 
@@ -26,7 +27,7 @@ elaborate ss =
     [] ->
       return []
     (path, defList) : rest -> do
-      mapM_ setupDef defList
+      mapM_ (setupDef path) defList
       defList' <- inferStmtList defList
       -- cs <- readIORef constraintEnv
       -- p "==========================================================="
@@ -35,18 +36,18 @@ elaborate ss =
       --   p $ T.unpack $ toText e2
       --   p "---------------------"
       unify
-      defList'' <- elaborateStmtList defList'
+      defList'' <- elaborateStmtList path defList'
       rest' <- elaborate rest
       return $ (path, defList'') : rest'
 
-setupDef :: WeakStmt -> IO ()
-setupDef def =
+setupDef :: Path Abs File -> WeakStmt -> IO ()
+setupDef path def =
   case def of
     WeakStmtDef _ x t e -> do
       insWeakTypeEnv x t
       nenv <- readIORef transparentTopNameEnv
       when (Map.member (asText x) nenv) $
-        modifyIORef' substEnv $ \env -> IntMap.insert (asInt x) e env
+        modifyIORef' topDefEnv $ \env -> Map.insert (path, asInt x) e env
     _ ->
       return ()
 
@@ -59,14 +60,14 @@ inferStmtList stmtList =
       (e', te) <- infer e
       t' <- inferType t
       insConstraintEnv te t'
-      when (asText x == "main") $ insConstraintEnv t (m, WeakTermEnum "top")
+      when (asText x == "main") $ insConstraintEnv t (m, WeakTermConst "i64")
       rest' <- inferStmtList rest
       return $ WeakStmtDef m x t' e' : rest'
     _ : rest ->
       inferStmtList rest
 
-elaborateStmtList :: [WeakStmt] -> IO [Stmt]
-elaborateStmtList stmtList = do
+elaborateStmtList :: Path Abs File -> [WeakStmt] -> IO [Stmt]
+elaborateStmtList path stmtList = do
   case stmtList of
     [] ->
       return []
@@ -74,11 +75,11 @@ elaborateStmtList stmtList = do
       e' <- elaborate' e
       t' <- elaborate' t >>= reduceTermPlus
       insWeakTypeEnv x $ weaken t'
-      modifyIORef' substEnv $ \env -> IntMap.insert (asInt x) (weaken e') env
-      rest' <- elaborateStmtList rest
+      modifyIORef' topDefEnv $ \env -> Map.insert (path, asInt x) (weaken e') env
+      rest' <- elaborateStmtList path rest
       return $ StmtDef m x t' e' : rest'
     _ : rest ->
-      elaborateStmtList rest
+      elaborateStmtList path rest
 
 elaborate' :: WeakTermPlus -> IO TermPlus
 elaborate' term =
@@ -140,19 +141,20 @@ elaborate' term =
               <> T.pack (show x)
               <> "` is a float, but its type is:\n"
               <> toText (weaken t')
-    (m, WeakTermEnum k) ->
-      return (m, TermEnum k)
-    (m, WeakTermEnumIntro x) ->
-      return (m, TermEnumIntro x)
+    (m, WeakTermEnum path k) ->
+      return (m, TermEnum path k)
+    (m, WeakTermEnumIntro path x) ->
+      return (m, TermEnumIntro path x)
     (m, WeakTermEnumElim (e, t) les) -> do
       e' <- elaborate' e
       let (ls, es) = unzip les
       es' <- mapM elaborate' es
       t' <- elaborate' t >>= reduceTermPlus
       case t' of
-        (_, TermEnum x) -> do
+        (_, TermEnum path x) -> do
           checkSwitchExaustiveness m x (map snd ls)
-          return (m, TermEnumElim (e', t') (zip ls es'))
+          ls' <- mapM (elaborateEnumCase path) ls
+          return (m, TermEnumElim (e', t') (zip ls' es'))
         _ ->
           raiseError m $
             "the type of `"
@@ -233,9 +235,23 @@ elaborateKind kind =
     LamKindResourceHandler ->
       return LamKindResourceHandler
 
-checkSwitchExaustiveness :: Hint -> T.Text -> [EnumCase] -> IO ()
+elaborateEnumCase :: Path Abs File -> WeakEnumCasePlus -> IO EnumCasePlus
+elaborateEnumCase path (m, c) =
+  case c of
+    WeakEnumCaseLabel Nothing _ ->
+      raiseCritical m "elaborateEnumCase"
+    WeakEnumCaseLabel (Just pa) l ->
+      if pa == path
+        then return (m, EnumCaseLabel pa l)
+        else raiseError m "elaborateEnumCase, label"
+    WeakEnumCaseInt i ->
+      return (m, EnumCaseInt i)
+    WeakEnumCaseDefault ->
+      return (m, EnumCaseDefault)
+
+checkSwitchExaustiveness :: Hint -> T.Text -> [WeakEnumCase] -> IO ()
 checkSwitchExaustiveness m x caseList = do
-  let b = EnumCaseDefault `elem` caseList
+  let b = WeakEnumCaseDefault `elem` caseList
   enumSet <- lookupEnumSet m x
   let len = toInteger $ length (nub caseList)
   when (not ((toInteger (length enumSet)) <= len || b)) $
@@ -248,4 +264,4 @@ lookupEnumSet m name = do
     Nothing ->
       raiseError m $ "no such enum defined: " <> name
     Just xis ->
-      return $ map fst xis
+      return $ map fst $ snd xis

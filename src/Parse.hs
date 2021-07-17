@@ -31,16 +31,36 @@ import System.Process hiding (env)
 parse :: Path Abs File -> IO [WeakStmtPlus]
 parse path = do
   pushTrace path
-  visit path
+  result <- visit path
+  -- ensureMain
+  return result
+
+-- ensureMain :: IO ()
+-- ensureMain = do
+--   m <- currentHint
+--   _ <- discern (m, WeakTermVar VarKindLocal $ asIdent "main")
+--   return ()
+
+-- when (Map.member (asText x) nenv) $
+--   raiseError m $ "the variable `" <> asText x <> "` is already defined at the top level"
 
 visit :: Path Abs File -> IO [WeakStmtPlus]
 visit path = do
+  -- fixme: ここでpathがdouble quoteを含んでいないことをチェック
   pushTrace path
+  ensureNoDoubleQuotes path
   modifyIORef' fileEnv $ \env -> Map.insert path VisitInfoActive env
   withNestedState $ do
     TIO.readFile (toFilePath path) >>= initializeState
     skip
     headerOrStmt path
+
+ensureNoDoubleQuotes :: Path Abs File -> IO ()
+ensureNoDoubleQuotes path = do
+  m <- currentHint
+  if ('\'' `elem` toFilePath path)
+    then raiseError m "filepath cannot contain double quotes"
+    else return ()
 
 leave :: IO [WeakStmt]
 leave = do
@@ -521,10 +541,10 @@ stmtDefineResourceType = do
               ( m,
                 WeakTermEnumElim
                   ((weakVar m (asText flag)), (weakVar m "bool"))
-                  [ ( (m, EnumCaseLabel "bool.true"),
+                  [ ( (m, WeakEnumCaseLabel Nothing "bool.true"),
                       (m, WeakTermPiElim copier [weakVar m (asText value)])
                     ),
-                    ( (m, EnumCaseLabel "bool.false"),
+                    ( (m, WeakEnumCaseLabel Nothing "bool.false"),
                       ( m,
                         WeakTermPiElim
                           (weakVar m "unsafe.cast")
@@ -573,15 +593,16 @@ isLinear' found input =
 
 insEnumEnv :: Hint -> T.Text -> [(T.Text, Int)] -> IO ()
 insEnumEnv m name xis = do
+  path <- getCurrentFilePath
   eenv <- readIORef enumEnv
-  let definedEnums = Map.keys eenv ++ map fst (concat (Map.elems eenv))
+  let definedEnums = Map.keys eenv ++ map fst (concat $ map snd (Map.elems eenv))
   case find (`elem` definedEnums) $ name : map fst xis of
     Just x ->
       raiseError m $ "the constant `" <> x <> "` is already defined [ENUM]"
     _ -> do
       let (xs, is) = unzip xis
-      let rev = Map.fromList $ zip xs (zip (repeat name) is)
-      modifyIORef' enumEnv $ \env -> Map.insert name xis env
+      let rev = Map.fromList $ zip xs (zip3 (repeat path) (repeat name) is)
+      modifyIORef' enumEnv $ \env -> Map.insert name (path, xis) env
       modifyIORef' revEnumEnv $ \env -> Map.union rev env
 
 varText :: IO T.Text

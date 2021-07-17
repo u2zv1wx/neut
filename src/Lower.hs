@@ -13,6 +13,7 @@ import Data.Log
 import Data.LowComp
 import Data.LowType
 import qualified Data.Text as T
+import Path
 
 lower :: CompPlus -> IO LowComp
 lower mainTerm@(m, _) = do
@@ -85,7 +86,7 @@ takeBaseName term =
       "float"
     (_, ValueFloat FloatSize64 _) ->
       "double"
-    (_, ValueEnumIntro _) ->
+    (_, ValueEnumIntro {}) ->
       "i64"
 
 takeBaseName' :: LowValue -> T.Text
@@ -338,8 +339,8 @@ lowerValueLet x lowerValue cont =
       llvmUncastLet x (LowValueInt l) (LowTypeInt size) cont
     (_, ValueFloat size f) ->
       llvmUncastLet x (LowValueFloat size f) (LowTypeFloat size) cont
-    (m, ValueEnumIntro l) -> do
-      i <- toInteger <$> getEnumNum m l
+    (m, ValueEnumIntro path l) -> do
+      i <- toInteger <$> getEnumNum m path l
       llvmUncastLet x (LowValueInt i) (LowTypeInt 64) cont
 
 lowerValueLet' :: [(Ident, ValuePlus)] -> LowComp -> IO LowComp
@@ -362,8 +363,8 @@ constructSwitch switch =
       return $ Just (code', [])
     [(_, code)] -> do
       constructSwitch [(EnumCaseDefault, code)]
-    (EnumCaseLabel l, code@(m, _)) : rest -> do
-      i <- enumValueToInteger m l
+    (EnumCaseLabel path l, code@(m, _)) : rest -> do
+      i <- enumValueToInteger m path l
       constructSwitch $ (EnumCaseInt i, code) : rest
     (EnumCaseInt i, code) : rest -> do
       code' <- lowerComp code
@@ -467,18 +468,19 @@ newNameWith mName =
     Just name ->
       newIdentFromText name
 
-enumValueToInteger :: Hint -> T.Text -> IO Int
-enumValueToInteger m l =
-  getEnumNum m l
+enumValueToInteger :: Hint -> Path Abs File -> T.Text -> IO Int
+enumValueToInteger m path l =
+  getEnumNum m path l
 
-getEnumNum :: Hint -> T.Text -> IO Int
-getEnumNum m label = do
+getEnumNum :: Hint -> Path Abs File -> T.Text -> IO Int
+getEnumNum m path label = do
   renv <- readIORef revEnumEnv
   case Map.lookup label renv of
-    Nothing ->
+    Just (fp, _, i)
+      | fp == path ->
+        return i
+    _ ->
       raiseCritical m $ "no such enum is defined: " <> label
-    Just (_, i) ->
-      return i
 
 insLowDefEnv :: T.Text -> [Ident] -> LowComp -> IO ()
 insLowDefEnv funName args e =
