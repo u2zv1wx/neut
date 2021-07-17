@@ -1,5 +1,6 @@
 module Clarify
   ( clarify,
+    clarifyLibrary,
   )
 where
 
@@ -28,18 +29,27 @@ clarify (ss, mainDefList) = do
   clarifyHeader ss
   clarifyBody mainDefList >>= reduceCompPlus
 
+clarifyLibrary :: ([StmtPlus], StmtPlus) -> IO [(T.Text, CompPlus)]
+clarifyLibrary (ss, (mainFilePath, mainDefList)) = do
+  clarifyHeader ss
+  mainDefList' <- mapM (clarifyDef mainFilePath) mainDefList
+  register mainDefList' -- for inlining
+  forM mainDefList' $ \(name, e) -> do
+    e' <- reduceCompPlus e
+    return (name, e')
+
 clarifyHeader :: [StmtPlus] -> IO ()
 clarifyHeader ss =
   case ss of
     [] ->
       return ()
     (path, defList) : rest -> do
-      mapM_ (clarifyDef path) defList
+      mapM (clarifyDef path) defList >>= register
       clarifyHeader rest
 
 clarifyBody :: StmtPlus -> IO CompPlus
 clarifyBody (mainFilePath, mainDefList) = do
-  mapM_ (clarifyDef mainFilePath) mainDefList
+  mapM (clarifyDef mainFilePath) mainDefList >>= register
   let m = newHint 1 1 mainFilePath
   -- denv <- readIORef defEnv
   -- case Map.lookup (toGlobalVarName mainFilePath $ asIdent "main") denv of
@@ -49,10 +59,14 @@ clarifyBody (mainFilePath, mainDefList) = do
   --     return ()
   return (m, CompPiElimDownElim (m, ValueVarGlobal (toGlobalVarName mainFilePath $ asIdent "main")) [])
 
-clarifyDef :: Path Abs File -> Stmt -> IO ()
+register :: [(T.Text, CompPlus)] -> IO ()
+register defList =
+  forM_ defList $ \(x, e) -> insDefEnv x True [] e
+
+clarifyDef :: Path Abs File -> Stmt -> IO (T.Text, CompPlus)
 clarifyDef path (StmtDef _ x _ e) = do
   e' <- clarifyTerm IntMap.empty e >>= reduceCompPlus
-  insDefEnv (toGlobalVarName path x) True [] e'
+  return (toGlobalVarName path x, e')
 
 clarifyTerm :: TypeEnv -> TermPlus -> IO CompPlus
 clarifyTerm tenv term =
