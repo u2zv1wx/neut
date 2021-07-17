@@ -28,7 +28,7 @@ import System.Process hiding (env)
 -- core functions
 --
 
-parse :: Path Abs File -> IO [WeakStmtPlus]
+parse :: Path Abs File -> IO ([WeakStmtPlus], WeakStmtPlus)
 parse path = do
   setupEnumEnv
   pushTrace path
@@ -42,7 +42,7 @@ parse path = do
 --   _ <- discern (m, WeakTermVar VarKindLocal $ asIdent "main")
 --   return ()
 
-visit :: Path Abs File -> IO [WeakStmtPlus]
+visit :: Path Abs File -> IO ([WeakStmtPlus], WeakStmtPlus)
 visit path = do
   pushTrace path
   ensureNoDoubleQuotes path
@@ -50,7 +50,7 @@ visit path = do
   withNestedState $ do
     TIO.readFile (toFilePath path) >>= initializeState
     skip
-    headerOrStmt path
+    header path
 
 ensureNoDoubleQuotes :: Path Abs File -> IO ()
 ensureNoDoubleQuotes path = do
@@ -74,24 +74,24 @@ popTrace :: IO ()
 popTrace =
   modifyIORef' traceEnv $ \env -> tail env
 
-headerOrStmt :: Path Abs File -> IO [WeakStmtPlus]
-headerOrStmt path = do
+header :: Path Abs File -> IO ([WeakStmtPlus], WeakStmtPlus)
+header path = do
   s <- readIORef text
   if T.null s
-    then leave >>= \result -> return [(path, result)]
+    then leave >>= \result -> return ([], (path, result))
     else do
       headSymbol <- lookAhead (symbolMaybe isSymbolChar)
       case headSymbol of
         Just "include" -> do
           defList1 <- stmtInclude
-          defList2 <- headerOrStmt path
-          return $ defList1 ++ defList2
+          (defList2, main) <- header path
+          return (defList1 ++ defList2, main)
         Just "ensure" -> do
           stmtEnsure
-          headerOrStmt path
+          header path
         _ -> do
           stmtList <- stmt >>= discernStmtList
-          return [(path, stmtList)]
+          return ([], (path, stmtList))
 
 stmt :: IO [WeakStmt]
 stmt = do
@@ -342,8 +342,9 @@ stmtInclude = do
       raiseError m $ "found a cyclic inclusion:\n" <> showCyclicPath cyclicPath
     Just VisitInfoFinish ->
       return []
-    Nothing ->
-      visit newPath
+    Nothing -> do
+      (ss, s) <- visit newPath
+      return $ ss ++ [s]
 
 ensureFileExistence :: Hint -> Path Abs File -> IO ()
 ensureFileExistence m path = do

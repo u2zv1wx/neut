@@ -21,24 +21,31 @@ import Path
 import Reduce.Term
 import Reduce.WeakTerm
 
-elaborate :: [WeakStmtPlus] -> IO [StmtPlus]
-elaborate ss =
+-- elaborate :: [WeakStmtPlus] -> IO [StmtPlus]
+elaborate :: ([WeakStmtPlus], WeakStmtPlus) -> IO ([StmtPlus], StmtPlus)
+elaborate (ss, mainDefList) =
   case ss of
-    [] ->
-      return []
-    (path, defList) : rest -> do
-      mapM_ (setupDef path) defList
-      defList' <- inferStmtList defList
-      -- cs <- readIORef constraintEnv
-      -- p "==========================================================="
-      -- forM_ cs $ \(e1, e2) -> do
-      --   p $ T.unpack $ toText e1
-      --   p $ T.unpack $ toText e2
-      --   p "---------------------"
-      unify
-      defList'' <- elaborateStmtList path defList'
-      rest' <- elaborate rest
-      return $ (path, defList'') : rest'
+    [] -> do
+      mainDefList' <- elaborateStmtPlus mainDefList
+      return ([], mainDefList')
+    headStmtPlus : rest -> do
+      headStmtPlus' <- elaborateStmtPlus headStmtPlus
+      (rest', s') <- elaborate (rest, mainDefList)
+      return (headStmtPlus' : rest', s')
+
+elaborateStmtPlus :: WeakStmtPlus -> IO StmtPlus
+elaborateStmtPlus (path, defList) = do
+  mapM_ (setupDef path) defList
+  defList' <- inferStmtList defList
+  -- cs <- readIORef constraintEnv
+  -- p "==========================================================="
+  -- forM_ cs $ \(e1, e2) -> do
+  --   p $ T.unpack $ toText e1
+  --   p $ T.unpack $ toText e2
+  --   p "---------------------"
+  unify
+  defList'' <- elaborateStmtList path defList'
+  return (path, defList'')
 
 setupDef :: Path Abs File -> WeakStmt -> IO ()
 setupDef path def =

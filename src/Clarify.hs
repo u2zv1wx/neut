@@ -1,6 +1,3 @@
---
--- clarification == polarization + closure conversion + linearization
---
 module Clarify
   ( clarify,
   )
@@ -26,26 +23,31 @@ import qualified Data.Text as T
 import Path
 import Reduce.Comp
 
-clarify :: [StmtPlus] -> IO CompPlus
-clarify =
-  clarifyStmt >=> reduceCompPlus
+clarify :: ([StmtPlus], StmtPlus) -> IO CompPlus
+clarify (ss, mainDefList) = do
+  clarifyHeader ss
+  clarifyBody mainDefList >>= reduceCompPlus
 
-clarifyStmt :: [StmtPlus] -> IO CompPlus
-clarifyStmt ss =
+clarifyHeader :: [StmtPlus] -> IO ()
+clarifyHeader ss =
   case ss of
-    [] -> do
-      mainFilePath <- getCurrentFilePath
-      let m = newHint 1 1 mainFilePath
-      denv <- readIORef defEnv
-      case Map.lookup (toGlobalVarName mainFilePath $ asIdent "main") denv of
-        Nothing ->
-          raiseError m "`main` is missing"
-        _ ->
-          return ()
-      return (m, CompPiElimDownElim (m, ValueVarGlobal (toGlobalVarName mainFilePath $ asIdent "main")) [])
+    [] ->
+      return ()
     (path, defList) : rest -> do
       mapM_ (clarifyDef path) defList
-      clarifyStmt rest
+      clarifyHeader rest
+
+clarifyBody :: StmtPlus -> IO CompPlus
+clarifyBody (mainFilePath, mainDefList) = do
+  mapM_ (clarifyDef mainFilePath) mainDefList
+  let m = newHint 1 1 mainFilePath
+  -- denv <- readIORef defEnv
+  -- case Map.lookup (toGlobalVarName mainFilePath $ asIdent "main") denv of
+  --   Nothing ->
+  --     raiseError m "`main` is missing"
+  --   _ ->
+  --     return ()
+  return (m, CompPiElimDownElim (m, ValueVarGlobal (toGlobalVarName mainFilePath $ asIdent "main")) [])
 
 clarifyDef :: Path Abs File -> Stmt -> IO ()
 clarifyDef path (StmtDef _ x _ e) = do
