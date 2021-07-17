@@ -206,11 +206,11 @@ findThenModify env f name = do
     else Nothing
 
 {-# INLINE asEnumLabel #-}
-asEnumLabel :: Map.HashMap T.Text (Path Abs File, T.Text, Int) -> T.Text -> Maybe WeakEnumCase
+asEnumLabel :: Map.HashMap T.Text (Path Abs File, T.Text, Int) -> T.Text -> Maybe EnumCase
 asEnumLabel env name = do
   case Map.lookup name env of
     Just (fp, _, _) ->
-      Just $ WeakEnumCaseLabel (Just fp) name
+      Just $ EnumCaseLabel fp name
     _ ->
       Nothing
 

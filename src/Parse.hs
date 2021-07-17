@@ -295,12 +295,14 @@ stmtUse :: IO WeakStmt
 stmtUse = do
   token "use"
   name <- varText
+  use name
   return $ WeakStmtUse name
 
 stmtUnuse :: IO WeakStmt
 stmtUnuse = do
   token "unuse"
   name <- varText
+  unuse name
   return $ WeakStmtUnuse name
 
 stmtDefinePrefix :: IO WeakStmt
@@ -309,6 +311,7 @@ stmtDefinePrefix = do
   from <- varText
   token "="
   to <- varText
+  modifyIORef' nsEnv $ \env -> (from, to) : env
   return $ WeakStmtDefinePrefix from to
 
 stmtRemovePrefix :: IO WeakStmt
@@ -317,6 +320,7 @@ stmtRemovePrefix = do
   from <- varText
   token "="
   to <- varText
+  modifyIORef' nsEnv $ \env -> filter (/= (from, to)) env
   return $ WeakStmtRemovePrefix from to
 
 stmtInclude :: IO [WeakStmtPlus]
@@ -512,6 +516,7 @@ stmtDefineResourceType = do
   copier <- weakTermSimple
   flag <- newTextualIdentFromText "flag"
   value <- newTextualIdentFromText "value"
+  path <- getExecPath
   defineTerm
     True
     m
@@ -538,10 +543,10 @@ stmtDefineResourceType = do
               ( m,
                 WeakTermEnumElim
                   ((weakVar m (asText flag)), (weakVar m "bool"))
-                  [ ( (m, WeakEnumCaseLabel Nothing "bool.true"),
+                  [ ( (m, EnumCaseLabel path "bool.true"),
                       (m, WeakTermPiElim copier [weakVar m (asText value)])
                     ),
-                    ( (m, WeakEnumCaseLabel Nothing "bool.false"),
+                    ( (m, EnumCaseLabel path "bool.false"),
                       ( m,
                         WeakTermPiElim
                           (weakVar m "unsafe.cast")

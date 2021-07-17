@@ -125,7 +125,6 @@ discern' nenv term =
       t' <- discern' nenv t
       nenvTrans <- readIORef transparentTopNameEnv
       clauseList' <- forM clauseList $ \((mCons, constructorName, xts), body) -> do
-        -- constructorName' <- resolveSymbol m (asItself m nenv) (asText constructorName)
         constructorName' <- resolveSymbol m (asConstructor m nenvTrans) (asText constructorName)
         case constructorName' of
           Just (_, newName) -> do
@@ -154,10 +153,10 @@ discernBinder nenv binder e =
       (xts', e') <- discernBinder (Map.insert (asText x) x' nenv) xts e
       return ((mx, x', t') : xts', e')
 
-discernEnumCase :: Hint -> WeakEnumCase -> IO WeakEnumCase
+discernEnumCase :: Hint -> EnumCase -> IO EnumCase
 discernEnumCase m weakCase =
   case weakCase of
-    WeakEnumCaseLabel _ l -> do
+    EnumCaseLabel _ l -> do
       renv <- readIORef revEnumEnv
       ml <- resolveSymbol m (asEnumLabel renv) l
       case ml of

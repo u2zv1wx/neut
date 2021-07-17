@@ -271,20 +271,16 @@ newTypeAsterListInCtx ctx ids =
       ts <- newTypeAsterListInCtx (ctx ++ [(m, x, t)]) rest
       return $ (m, x, t) : ts
 
-inferEnumCase :: Context -> WeakEnumCasePlus -> IO (WeakEnumCasePlus, WeakTermPlus)
+inferEnumCase :: Context -> EnumCasePlus -> IO (EnumCasePlus, WeakTermPlus)
 inferEnumCase ctx weakCase =
   case weakCase of
-    (m, WeakEnumCaseLabel mPath name) -> do
+    (m, EnumCaseLabel path name) -> do
       k <- lookupKind m name
-      case mPath of
-        Nothing ->
-          raiseCritical m "inferEnumCase"
-        Just path ->
-          return (weakCase, (m, WeakTermEnum path k))
-    (m, WeakEnumCaseDefault) -> do
+      return (weakCase, (m, WeakTermEnum path k))
+    (m, EnumCaseDefault) -> do
       h <- newTypeAsterInCtx ctx m
-      return ((m, WeakEnumCaseDefault), h)
-    (m, WeakEnumCaseInt _) -> do
+      return ((m, EnumCaseDefault), h)
+    (m, EnumCaseInt _) -> do
       raiseCritical m "enum-case-int shouldn't be used in the target language"
 
 insConstraintEnv :: WeakTermPlus -> WeakTermPlus -> IO ()

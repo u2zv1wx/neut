@@ -92,9 +92,9 @@ weaken term =
       let t' = weaken t
       let e' = weaken e
       let (caseList, es) = unzip branchList
-      let caseList' = map (\(me, ec) -> (me, weakenEnumCase ec)) caseList
+      -- let caseList' = map (\(me, ec) -> (me, weakenEnumCase ec)) caseList
       let es' = map weaken es
-      (m, WeakTermEnumElim (e', t') (zip caseList' es'))
+      (m, WeakTermEnumElim (e', t') (zip caseList es'))
     (m, TermDerangement i es) -> do
       let es' = map weaken es
       (m, WeakTermDerangement i es')
@@ -108,15 +108,15 @@ weaken term =
     (m, TermIgnore e) ->
       (m, WeakTermIgnore (weaken e))
 
-weakenEnumCase :: EnumCase -> WeakEnumCase
-weakenEnumCase ec =
-  case ec of
-    EnumCaseLabel fp l ->
-      WeakEnumCaseLabel (Just fp) l
-    EnumCaseInt i ->
-      WeakEnumCaseInt i
-    EnumCaseDefault ->
-      WeakEnumCaseDefault
+-- weakenEnumCase :: EnumCase -> EnumCase
+-- weakenEnumCase ec =
+--   case ec of
+--     EnumCaseLabel fp l ->
+--       WeakEnumCaseLabel (Just fp) l
+--     EnumCaseInt i ->
+--       WeakEnumCaseInt i
+--     EnumCaseDefault ->
+--       WeakEnumCaseDefault
 
 weakenIdentPlus :: (Hint, Ident, TermPlus) -> (Hint, Ident, WeakTermPlus)
 weakenIdentPlus (m, x, t) =

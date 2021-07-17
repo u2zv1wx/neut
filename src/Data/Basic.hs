@@ -42,15 +42,6 @@ data EnumCase
 type EnumCasePlus =
   (Hint, EnumCase)
 
-data WeakEnumCase
-  = WeakEnumCaseLabel (Maybe (Path Abs File)) T.Text
-  | WeakEnumCaseInt Int
-  | WeakEnumCaseDefault
-  deriving (Show, Eq, Ord)
-
-type WeakEnumCasePlus =
-  (Hint, WeakEnumCase)
-
 data Opacity
   = OpacityOpaque
   | OpacityTranslucent

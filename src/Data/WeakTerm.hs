@@ -21,7 +21,7 @@ data WeakTerm
   | WeakTermFloat WeakTermPlus Double
   | WeakTermEnum (Path Abs File) T.Text
   | WeakTermEnumIntro (Path Abs File) T.Text
-  | WeakTermEnumElim (WeakTermPlus, WeakTermPlus) [(WeakEnumCasePlus, WeakTermPlus)]
+  | WeakTermEnumElim (WeakTermPlus, WeakTermPlus) [(EnumCasePlus, WeakTermPlus)]
   | WeakTermQuestion WeakTermPlus WeakTermPlus -- e : t (output the type `t` as note)
   | WeakTermDerangement Derangement [WeakTermPlus] -- (derangement kind arg-1 ... arg-n)
   | WeakTermCase
@@ -345,18 +345,18 @@ showPattern (_, f, xts) = do
       let xs = map (\(_, x, _) -> x) xts
       inParen $ asText f <> " " <> T.intercalate " " (map showVariable xs)
 
-showClause :: (WeakEnumCase, WeakTermPlus) -> T.Text
+showClause :: (EnumCase, WeakTermPlus) -> T.Text
 showClause (c, e) =
   inParen $ showCase c <> " " <> toText e
 
-showCase :: WeakEnumCase -> T.Text
+showCase :: EnumCase -> T.Text
 showCase c =
   case c of
-    WeakEnumCaseLabel _ l ->
+    EnumCaseLabel _ l ->
       l
-    WeakEnumCaseDefault ->
+    EnumCaseDefault ->
       "default"
-    WeakEnumCaseInt i ->
+    EnumCaseInt i ->
       T.pack (show i)
 
 showItems :: [T.Text] -> T.Text

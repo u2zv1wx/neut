@@ -19,6 +19,7 @@ import Data.Namespace
 import qualified Data.Text as T
 import Data.WeakTerm
 import Parse.Core
+import Path
 import qualified System.Info as System
 
 --
@@ -163,7 +164,7 @@ weakTermEnumElim = do
   h <- newAster m
   return (m, WeakTermEnumElim (e, h) clauseList)
 
-weakTermEnumClause :: IO (WeakEnumCasePlus, WeakTermPlus)
+weakTermEnumClause :: IO (EnumCasePlus, WeakTermPlus)
 weakTermEnumClause = do
   m <- currentHint
   token "-"
@@ -172,9 +173,9 @@ weakTermEnumClause = do
   body <- weakTerm
   case c of
     "default" ->
-      return ((m, WeakEnumCaseDefault), body)
-    _ -> do
-      return ((m, WeakEnumCaseLabel Nothing c), body)
+      return ((m, EnumCaseDefault), body)
+    _ ->
+      return ((m, EnumCaseLabel placeholderPath c), body)
 
 -- question e
 weakTermQuestion :: IO WeakTermPlus
@@ -459,7 +460,8 @@ weakTermIf = do
   foldIf m ifCond ifBody elseIfList elseBody
 
 foldIf :: Hint -> WeakTermPlus -> WeakTermPlus -> [(WeakTermPlus, WeakTermPlus)] -> WeakTermPlus -> IO WeakTermPlus
-foldIf m ifCond ifBody elseIfList elseBody =
+foldIf m ifCond ifBody elseIfList elseBody = do
+  path <- getExecPath
   case elseIfList of
     [] -> do
       h <- newAster m
@@ -467,8 +469,8 @@ foldIf m ifCond ifBody elseIfList elseBody =
         ( m,
           WeakTermEnumElim
             (ifCond, h)
-            [ ((m, WeakEnumCaseLabel Nothing "bool.true"), ifBody),
-              ((m, WeakEnumCaseLabel Nothing "bool.false"), elseBody)
+            [ ((m, EnumCaseLabel path "bool.true"), ifBody),
+              ((m, EnumCaseLabel path "bool.false"), elseBody)
             ]
         )
     ((elseIfCond, elseIfBody) : rest) -> do
@@ -478,8 +480,8 @@ foldIf m ifCond ifBody elseIfList elseBody =
         ( m,
           WeakTermEnumElim
             (ifCond, h)
-            [ ((m, WeakEnumCaseLabel Nothing "bool.true"), ifBody),
-              ((m, WeakEnumCaseLabel Nothing "bool.false"), cont)
+            [ ((m, EnumCaseLabel path "bool.true"), ifBody),
+              ((m, EnumCaseLabel path "bool.false"), cont)
             ]
         )
 
@@ -795,3 +797,7 @@ defaultTargetArch =
       "amd64"
     other ->
       T.pack other
+
+placeholderPath :: Path Abs File
+placeholderPath =
+  $(mkAbsFile "/_")

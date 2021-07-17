@@ -153,8 +153,8 @@ elaborate' term =
       case t' of
         (_, TermEnum path x) -> do
           checkSwitchExaustiveness m x (map snd ls)
-          ls' <- mapM (elaborateEnumCase path) ls
-          return (m, TermEnumElim (e', t') (zip ls' es'))
+          checkEnumElim m path $ map snd ls
+          return (m, TermEnumElim (e', t') (zip ls es'))
         _ ->
           raiseError m $
             "the type of `"
@@ -235,23 +235,22 @@ elaborateKind kind =
     LamKindResourceHandler ->
       return LamKindResourceHandler
 
-elaborateEnumCase :: Path Abs File -> WeakEnumCasePlus -> IO EnumCasePlus
-elaborateEnumCase path (m, c) =
-  case c of
-    WeakEnumCaseLabel Nothing _ ->
-      raiseCritical m "elaborateEnumCase"
-    WeakEnumCaseLabel (Just pa) l ->
-      if pa == path
-        then return (m, EnumCaseLabel pa l)
-        else raiseError m "elaborateEnumCase, label"
-    WeakEnumCaseInt i ->
-      return (m, EnumCaseInt i)
-    WeakEnumCaseDefault ->
-      return (m, EnumCaseDefault)
+checkEnumElim :: Hint -> Path Abs File -> [EnumCase] -> IO ()
+checkEnumElim m path ls =
+  case ls of
+    [] ->
+      return ()
+    l : rest -> do
+      case l of
+        EnumCaseLabel fp _
+          | fp /= path ->
+            raiseError m "enum-elim"
+        _ ->
+          checkEnumElim m path rest
 
-checkSwitchExaustiveness :: Hint -> T.Text -> [WeakEnumCase] -> IO ()
+checkSwitchExaustiveness :: Hint -> T.Text -> [EnumCase] -> IO ()
 checkSwitchExaustiveness m x caseList = do
-  let b = WeakEnumCaseDefault `elem` caseList
+  let b = EnumCaseDefault `elem` caseList
   enumSet <- lookupEnumSet m x
   let len = toInteger $ length (nub caseList)
   when (not ((toInteger (length enumSet)) <= len || b)) $
