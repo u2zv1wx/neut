@@ -64,6 +64,11 @@ shouldCancelAlloc :: IORef Bool
 shouldCancelAlloc =
   unsafePerformIO (newIORef True)
 
+{-# NOINLINE isMain #-}
+isMain :: IORef Bool
+isMain =
+  unsafePerformIO (newIORef False)
+
 {-# NOINLINE endOfEntry #-}
 endOfEntry :: IORef String
 endOfEntry =
@@ -172,7 +177,7 @@ topDefEnv =
   unsafePerformIO (newIORef Map.empty)
 
 {-# NOINLINE defEnv #-}
-defEnv :: IORef (Map.HashMap T.Text (IsReducible, [Ident], CompPlus))
+defEnv :: IORef (Map.HashMap T.Text (IsReducible, [Ident], Maybe CompPlus))
 defEnv =
   unsafePerformIO (newIORef Map.empty)
 
@@ -180,6 +185,11 @@ defEnv =
 lowDefEnv :: IORef (Map.HashMap T.Text ([Ident], LowComp))
 lowDefEnv =
   unsafePerformIO (newIORef Map.empty)
+
+{-# NOINLINE topNameSet #-}
+topNameSet :: IORef (S.Set T.Text)
+topNameSet =
+  unsafePerformIO (newIORef S.empty)
 
 {-# NOINLINE declEnv #-}
 declEnv :: IORef (Map.HashMap T.Text ([LowType], LowType))

@@ -343,6 +343,7 @@ stmtInclude = do
     Just VisitInfoFinish ->
       return []
     Nothing -> do
+      -- これが嘘。StmtIncludeからはvisitはしない。includeを無視するようなやつがいる。
       (ss, s) <- visit newPath
       return $ ss ++ [s]
 

@@ -92,7 +92,11 @@ registerSwitcher m name aff rel = do
 
 insDefEnv :: T.Text -> Bool -> [Ident] -> CompPlus -> IO ()
 insDefEnv name isReducible args e =
-  modifyIORef' defEnv $ \env -> Map.insert name (isReducible, args, e) env
+  modifyIORef' defEnv $ \env -> Map.insert name (isReducible, args, Just e) env
+
+insDefEnv' :: T.Text -> Bool -> [Ident] -> IO ()
+insDefEnv' name isReducible args =
+  modifyIORef' defEnv $ \env -> Map.insert name (isReducible, args, Nothing) env
 
 {-# INLINE boolTrue #-}
 boolTrue :: T.Text

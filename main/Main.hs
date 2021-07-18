@@ -17,12 +17,17 @@ import Options.Applicative
 import Parse
 import Path
 import Path.IO
--- import Preprocess
 import System.Exit
 import System.Process hiding (env)
 import Text.Read (readMaybe)
 
 type InputPath =
+  String
+
+type MainInputPath =
+  String
+
+type AuxInputPath =
   String
 
 type OutputPath =
@@ -43,12 +48,16 @@ type ShouldDisplayLogLocation =
 type ShouldDisplayLogLevel =
   Bool
 
+type IsMain =
+  Bool
+
 type ClangOption =
   String
 
 data OutputKind
   = OutputKindObject
   | OutputKindLLVM
+  | OutputKindLibrary
   | OutputKindAsm
   deriving (Show)
 
@@ -63,7 +72,9 @@ instance Read OutputKind where
     []
 
 data Command
-  = Build InputPath (Maybe OutputPath) OutputKind ShouldColorize ShouldCancelAlloc ShouldDisplayLogLocation ShouldDisplayLogLevel (Maybe ClangOption)
+  = Build InputPath (Maybe OutputPath) OutputKind ShouldColorize ShouldCancelAlloc ShouldDisplayLogLocation ShouldDisplayLogLevel IsMain (Maybe ClangOption)
+  | Compile InputPath (Maybe OutputPath) OutputKind ShouldColorize ShouldCancelAlloc ShouldDisplayLogLocation ShouldDisplayLogLevel IsMain (Maybe ClangOption)
+  | Link MainInputPath [AuxInputPath] (Maybe OutputPath) (Maybe ClangOption)
   | Check InputPath ShouldColorize CheckOptEndOfEntry
   | Archive InputPath (Maybe OutputPath)
 
@@ -77,6 +88,12 @@ parseOpt =
     ( command
         "build"
         (info (helper <*> parseBuildOpt) (progDesc "build given file"))
+        <> command
+          "compile"
+          (info (helper <*> parseCompileOpt) (progDesc "compile given file"))
+        <> command
+          "link"
+          (info (helper <*> parseLinkOpt) (progDesc "link given files"))
         <> command
           "check"
           (info (helper <*> parseCheckOpt) (progDesc "check specified file"))
@@ -140,6 +157,113 @@ parseBuildOpt =
             [ long "no-log-level",
               help "Set this to suppress level information when displaying log"
             ]
+        )
+      <*> flag
+        False
+        True
+        ( mconcat
+            [ long "main"
+            ]
+        )
+      <*> optional
+        ( strOption
+            ( mconcat
+                [ long "clang-option",
+                  metavar "OPT",
+                  help "option string to be passed to clang"
+                ]
+            )
+        )
+
+parseCompileOpt :: Parser Command
+parseCompileOpt =
+  Compile
+    <$> argument
+      str
+      ( mconcat
+          [ metavar "INPUT",
+            help "The path of input file"
+          ]
+      )
+      <*> optional
+        ( strOption $
+            mconcat
+              [ long "output",
+                short 'o',
+                metavar "OUTPUT",
+                help "The path of output file"
+              ]
+        )
+      <*> option
+        kindReader
+        ( mconcat
+            [ long "emit",
+              metavar "KIND",
+              value OutputKindLibrary,
+              help "The type of output file"
+            ]
+        )
+      <*> colorizeOpt
+      <*> flag
+        True
+        False
+        ( mconcat
+            [ long "no-alloc-cancellation",
+              help "Set this to disable optimization for redundant alloc"
+            ]
+        )
+      <*> flag
+        True
+        False
+        ( mconcat
+            [ long "no-log-location",
+              help "Set this to suppress location information when displaying log"
+            ]
+        )
+      <*> flag
+        True
+        False
+        ( mconcat
+            [ long "no-log-level",
+              help "Set this to suppress level information when displaying log"
+            ]
+        )
+      <*> flag
+        False
+        True
+        ( mconcat
+            [ long "main"
+            ]
+        )
+      <*> optional
+        ( strOption
+            ( mconcat
+                [ long "clang-option",
+                  metavar "OPT",
+                  help "option string to be passed to clang"
+                ]
+            )
+        )
+
+parseLinkOpt :: Parser Command
+parseLinkOpt = do
+  Link
+    <$> argument
+      str
+      ( mconcat
+          [ metavar "INPUT",
+            help "The main input file"
+          ]
+      )
+      <*> many (argument str (metavar "AUX_INPUT"))
+      <*> optional
+        ( strOption $
+            mconcat
+              [ long "output",
+                short 'o',
+                metavar "OUTPUT",
+                help "The path of output file"
+              ]
         )
       <*> optional
         ( strOption
@@ -211,12 +335,15 @@ parseArchiveOpt =
 run :: Command -> IO ()
 run cmd =
   case cmd of
-    Build inputPathStr mOutputPathStr outputKind colorizeFlag cancelAllocFlag logLocationFlag logLevelFlag mClangOptStr -> do
+    Build inputPathStr mOutputPathStr outputKind colorizeFlag cancelAllocFlag logLocationFlag logLevelFlag isMainFlag mClangOptStr -> do
       writeIORef shouldColorize colorizeFlag
       writeIORef shouldCancelAlloc cancelAllocFlag
       writeIORef shouldDisplayLogLocation logLocationFlag
       writeIORef shouldDisplayLogLevel logLevelFlag
+      writeIORef isMain isMainFlag
+      putStrLn $ show isMainFlag
       inputPath <- resolveFile' inputPathStr
+      -- llvmIRBuilder <- runCompiler (runBuild inputPath)
       llvmIRBuilder <- runCompiler (runBuild inputPath)
       (basename, _) <- splitExtension $ filename inputPath
       mOutputPath <- mapM resolveFile' mOutputPathStr
@@ -233,6 +360,39 @@ run cmd =
             hClose stdin
             exitCode <- waitForProcess clangProcessHandler
             exitWith exitCode
+    Compile inputPathStr mOutputPathStr outputKind colorizeFlag cancelAllocFlag logLocationFlag logLevelFlag isMainFlag mClangOptStr -> do
+      writeIORef shouldColorize colorizeFlag
+      writeIORef shouldCancelAlloc cancelAllocFlag
+      writeIORef shouldDisplayLogLocation logLocationFlag
+      writeIORef shouldDisplayLogLevel logLevelFlag
+      writeIORef isMain isMainFlag
+      inputPath <- resolveFile' inputPathStr
+      llvmIRBuilder <- runCompiler (runCompile inputPath)
+      (basename, _) <- splitExtension $ filename inputPath
+      mOutputPath <- mapM resolveFile' mOutputPathStr
+      outputPath <- constructOutputPath basename mOutputPath outputKind
+      let llvmIR = toLazyByteString llvmIRBuilder
+      case outputKind of
+        OutputKindLLVM ->
+          L.writeFile (toFilePath outputPath) llvmIR
+        _ -> do
+          let additionalClangOptions = words $ fromMaybe "" mClangOptStr
+          let clangCmd = proc "clang" $ clangOptWith outputKind outputPath ++ additionalClangOptions ++ ["-c"]
+          withCreateProcess clangCmd {std_in = CreatePipe} $ \(Just stdin) _ _ clangProcessHandler -> do
+            L.hPut stdin llvmIR
+            hClose stdin
+            exitCode <- waitForProcess clangProcessHandler
+            exitWith exitCode
+    Link mainFilePath auxFilePathList mOutputPathStr mClangOptStr -> do
+      inputPath <- resolveFile' mainFilePath
+      (basename, _) <- splitExtension $ filename inputPath
+      mOutputPath <- mapM resolveFile' mOutputPathStr
+      outputPath <- constructOutputPath basename mOutputPath OutputKindObject
+      let additionalClangOptions = words $ fromMaybe "" mClangOptStr
+      let clangCmd = proc "clang" $ clangLibOpt outputPath ++ additionalClangOptions ++ (mainFilePath : auxFilePathList)
+      withCreateProcess clangCmd $ \_ _ _ clangProcessHandler -> do
+        exitCode <- waitForProcess clangProcessHandler
+        exitWith exitCode
     Check inputPathStr colorizeFlag eoe -> do
       writeIORef shouldColorize colorizeFlag
       writeIORef endOfEntry eoe
@@ -262,6 +422,9 @@ constructOutputPath basename mPath kind =
         OutputKindAsm -> do
           dir <- getCurrentDir
           addExtension ".s" (dir </> basename)
+        OutputKindLibrary -> do
+          dir <- getCurrentDir
+          addExtension ".o" (dir </> basename)
         OutputKindObject -> do
           dir <- getCurrentDir
           return $ dir </> basename
@@ -277,6 +440,10 @@ constructOutputArchivePath inputPath mPath =
 runBuild :: Path Abs File -> IO Builder
 runBuild =
   parse >=> elaborate >=> clarify >=> lower >=> emit
+
+runCompile :: Path Abs File -> IO Builder
+runCompile =
+  parse >=> elaborate >=> clarifyLibrary >=> lowerLibrary >=> emitLibrary
 
 runCheck :: Path Abs File -> IO ()
 runCheck =
@@ -296,6 +463,14 @@ clangBaseOpt outputPath =
     "-Wno-override-module",
     "-O2",
     "-",
+    "-o",
+    toFilePath outputPath
+  ]
+
+clangLibOpt :: Path Abs File -> [String]
+clangLibOpt outputPath =
+  [ "-Wno-override-module",
+    "-O2",
     "-o",
     toFilePath outputPath
   ]

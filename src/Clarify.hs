@@ -29,14 +29,31 @@ clarify (ss, mainDefList) = do
   clarifyHeader ss
   clarifyBody mainDefList >>= reduceCompPlus
 
-clarifyLibrary :: ([StmtPlus], StmtPlus) -> IO [(T.Text, CompPlus)]
+clarifyLibrary :: ([StmtPlus], StmtPlus) -> IO ([(T.Text, CompPlus)], Maybe CompPlus)
 clarifyLibrary (ss, (mainFilePath, mainDefList)) = do
   clarifyHeader ss
   mainDefList' <- mapM (clarifyDef mainFilePath) mainDefList
   register mainDefList' -- for inlining
-  forM mainDefList' $ \(name, e) -> do
+  mainDefList'' <- forM mainDefList' $ \(name, e) -> do
     e' <- reduceCompPlus e
     return (name, e')
+  flag <- readIORef isMain
+  if not flag
+    then return (mainDefList'', Nothing)
+    else do
+      let m = newHint 1 1 mainFilePath
+      -- register cartesian-immediate and cartesian-closure
+      _ <- immediateS4 m
+      _ <- returnClosureS4 m
+      denv <- readIORef defEnv
+      case Map.lookup (toGlobalVarName mainFilePath $ asIdent "main") denv of
+        Nothing -> do
+          p' $ Map.keys denv
+          raiseError m "`main` is missing"
+        _ ->
+          return ()
+      let mainTerm = (m, CompPiElimDownElim (m, ValueVarGlobal (toGlobalVarName mainFilePath $ asIdent "main")) [])
+      return (mainDefList'', Just mainTerm)
 
 clarifyHeader :: [StmtPlus] -> IO ()
 clarifyHeader ss =
@@ -44,29 +61,30 @@ clarifyHeader ss =
     [] ->
       return ()
     (path, defList) : rest -> do
-      mapM (clarifyDef path) defList >>= register
+      -- mapM (clarifyDef path) defList >>= register
+      mapM (clarifyDef path) defList >>= register'
       clarifyHeader rest
 
 clarifyBody :: StmtPlus -> IO CompPlus
 clarifyBody (mainFilePath, mainDefList) = do
   mapM (clarifyDef mainFilePath) mainDefList >>= register
   let m = newHint 1 1 mainFilePath
-  -- denv <- readIORef defEnv
-  -- case Map.lookup (toGlobalVarName mainFilePath $ asIdent "main") denv of
-  --   Nothing ->
-  --     raiseError m "`main` is missing"
-  --   _ ->
-  --     return ()
   return (m, CompPiElimDownElim (m, ValueVarGlobal (toGlobalVarName mainFilePath $ asIdent "main")) [])
 
 register :: [(T.Text, CompPlus)] -> IO ()
 register defList =
   forM_ defList $ \(x, e) -> insDefEnv x True [] e
 
+register' :: [(T.Text, CompPlus)] -> IO ()
+register' defList =
+  forM_ defList $ \(x, _) -> insDefEnv' x True []
+
 clarifyDef :: Path Abs File -> Stmt -> IO (T.Text, CompPlus)
 clarifyDef path (StmtDef _ x _ e) = do
   e' <- clarifyTerm IntMap.empty e >>= reduceCompPlus
-  return (toGlobalVarName path x, e')
+  let x' = toGlobalVarName path x
+  modifyIORef' topNameSet $ \set -> S.insert x' set
+  return (x', e')
 
 clarifyTerm :: TypeEnv -> TermPlus -> IO CompPlus
 clarifyTerm tenv term =

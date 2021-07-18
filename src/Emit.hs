@@ -1,5 +1,6 @@
 module Emit
   ( emit,
+    emitLibrary,
   )
 where
 
@@ -33,6 +34,23 @@ emit mainTerm = do
       body' <- reduceLowComp IntMap.empty Map.empty body
       emitDefinition "i8*" (TE.encodeUtf8Builder name) args' body'
   return $ unlinesL $ g : zs <> concat xs
+
+emitLibrary :: Maybe LowComp -> IO Builder
+emitLibrary mMainTerm = do
+  case mMainTerm of
+    Just mainTerm ->
+      emit mainTerm
+    Nothing -> do
+      declarations <- emitDeclarations
+      -- mainTerm' <- reduceLowComp IntMap.empty Map.empty mainTerm
+      -- zs <- emitDefinition "i64" "main" [] mainTerm'
+      lenv <- readIORef lowDefEnv
+      xs <-
+        forM (HashMap.toList lenv) $ \(name, (args, body)) -> do
+          let args' = map (showLowValue . LowValueVarLocal) args
+          body' <- reduceLowComp IntMap.empty Map.empty body
+          emitDefinition "i8*" (TE.encodeUtf8Builder name) args' body'
+      return $ unlinesL $ [declarations] <> concat xs
 
 emitDeclarations :: IO Builder
 emitDeclarations = do

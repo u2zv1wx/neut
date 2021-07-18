@@ -22,7 +22,7 @@ reduceCompPlus term =
       denv <- readIORef defEnv
       case v of
         (_, ValueVarGlobal x)
-          | Just (isReducible, xs, body) <- Map.lookup x denv,
+          | Just (isReducible, xs, Just body) <- Map.lookup x denv,
             isReducible,
             length xs == length ds -> do
             let sub = IntMap.fromList (zip (map asInt xs) ds)
